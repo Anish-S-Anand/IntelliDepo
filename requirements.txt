@@ -1,0 +1,22 @@
+# Core Document Processing
+openpyxl>=3.1.0             # Excel file reading and writing
+python-docx>=1.1.0          # Word document reading and writing
+PyMuPDF>=1.24.0             # PDF text extraction and rendering
+pdfplumber>=0.11.0          # PDF text extraction and table parsing
+
+# Data Analysis and Processing
+pandas>=2.2.0               # Data manipulation and analysis
+numpy>=1.26.0               # Numerical computing
+
+# Utilities
+python-dotenv>=1.0.0        # Environment variable management
+
+# Optional: For advanced PDF processing
+pypdf>=4.0.0                # Alternative PDF library for more complex operations
+
+# Development dependencies (optional, comment out if not needed)
+# pytest>=8.0.0              # Testing framework
+# pytest-cov>=5.0.0          # Code coverage
+# black>=24.0.0              # Code formatter
+# flake8>=7.0.0              # Linter
+# mypy>=1.10.0               # Static type checker

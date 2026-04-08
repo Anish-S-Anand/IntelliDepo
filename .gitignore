@@ -1,0 +1,124 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+.vim/
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.AppleDouble
+.LSOverride
+
+# Local configuration
+.env
+.env.local
+local_config.py
+secrets.py
+
+# Generated files and caches
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Analysis and temporary files
+*.tmp
+temp/
+*.log
+*.backup
+*.bak
+
+# Document working files
+~$*.xlsx
+.~*
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Distribution
+*.tar.gz
+*.zip
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# Node / Frontend
+node_modules/
+.next/
+out/
+.turbo/
+
+# SQLite databases
+*.db
+*.sqlite3
+*.db-journal
+
+# Ruff
+.ruff_cache/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Environment files
+.env.development
+.env.production
+.env.test
+
+# Project specific
+analysis_output/
+reports/
+temp_data/
+probe.txt
+doc_page_*.png
+pytest-cache-files-*/

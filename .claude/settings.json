@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"console.log\\(require\\('./node_modules/tailwindcss/package.json'\\).version\\)\")",
+      "Bash(node -e \"require\\('three'\\); console.log\\('three ok'\\)\")",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(netstat -ano)",
+      "Read(//c/Intelli/Intelli/**)",
+      "Bash(taskkill /F /PID 16784)",
+      "Bash(cmd /c \"taskkill /F /PID 16784\")",
+      "Bash(cmd /c \"taskkill /F /PID 16784 2>&1\")",
+      "Bash(cmd /c \"netstat -ano | findstr :3000\")",
+      "Read(//tmp/**)",
+      "Bash(cmd /c \"for /f \\\\\"tokens=5\\\\\" %a in \\('netstat -ano ^| findstr :3000'\\) do taskkill /F /PID %a\")",
+      "Bash(cmd /c \"netstat -ano 2>nul | findstr LISTENING | findstr :3000\")",
+      "Bash(cmd /c \"netstat -ano\")",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object LocalPort,OwningProcess,State\")",
+      "Bash(powershell -Command \"Stop-Process -Id 16784 -Force; Start-Sleep 2; Get-Process -Id 16784 -ErrorAction SilentlyContinue\")",
+      "Bash(npm install:*)",
+      "Bash(curl -s http://localhost:3000/stream/macropulse/simulation)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object OwningProcess\")",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)",
+      "Bash(docker --version)",
+      "Bash(npm --version)",
+      "Bash(python -c \"import secrets; print\\(secrets.token_urlsafe\\(64\\)\\)\")",
+      "Bash(docker compose:*)",
+      "Bash(docker rm:*)",
+      "Bash(docker exec:*)",
+      "Bash(pip install:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Intelli\\Intelli\\frontend\\src\\app\\depot"
+    ]
+  }
+}
