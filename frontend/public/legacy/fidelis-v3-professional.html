@@ -789,6 +789,9 @@ svg.chart { width: 100%; overflow: visible; }
   <button class="nav-item" onclick="nav('counting')" title="Counting"><span class="ni-icon">#️⃣</span><span class="ni-label">CNT</span></button>
   <button class="nav-item" onclick="nav('heatmap')" title="Heatmap"><span class="ni-icon">🗺</span><span class="ni-label">MAP</span></button>
   <button class="nav-item" onclick="nav('zones')" title="Zones"><span class="ni-icon">🎛</span><span class="ni-label">ZNE</span></button>
+  <button class="nav-item" onclick="nav('sequencing')" title="FIFO/LIFO"><span class="ni-icon">🔄</span><span class="ni-label">SEQ</span></button>
+  <button class="nav-item" onclick="nav('batches')" title="Batch Tracking"><span class="ni-icon">📋</span><span class="ni-label">BATCH</span></button>
+  <button class="nav-item" onclick="nav('lpr')" title="Gate & LPR"><span class="ni-icon">🚗</span><span class="ni-label">LPR</span></button>
   <button class="nav-item" onclick="nav('sla')" title="SLA & Fleet"><span class="ni-icon">🚛</span><span class="ni-label">FLEET</span></button>
   <button class="nav-item" onclick="nav('analytics')" title="Analytics"><span class="ni-icon">📊</span><span class="ni-label">DATA</span></button>
   <div class="nav-sep"></div>
@@ -1506,6 +1509,182 @@ svg.chart { width: 100%; overflow: visible; }
   </div>
 </div>
 
+<!-- ════════════════════════════════
+     SEQUENCING — Day 3 (F-017, F-018, F-020)
+════════════════════════════════ -->
+<div class="page" id="pg-sequencing">
+  <div class="ph">
+    <div>
+      <div class="layer-badge">Day 3 — FIFO/FILO/LIFO/FEFO</div>
+      <div class="page-title">Inventory Sequencing &mdash; Rule Config</div>
+      <div class="page-sub">Product-type rule assignment • Visual pick-sequence queue • Non-compliance alerts</div>
+    </div>
+    <div class="ph-right">
+      <button class="btn-ref" onclick="renderSequencing()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <div class="kpi-grid mb-20">
+    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">FIFO Compliance<span class="kpi-icon">🔄</span></div><div class="kpi-val" style="color:var(--pos)">96.4<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)">↑ +8.2% MoM</div></div>
+    <div class="kpi" style="--kpi-color:var(--info)"><div class="kpi-label">Active Rules<span class="kpi-icon">📋</span></div><div class="kpi-val" style="color:var(--info)">12</div><div class="kpi-delta" style="color:var(--sub)">Across 4 product types</div></div>
+    <div class="kpi" style="--kpi-color:var(--sev-high)"><div class="kpi-label">Non-Compliant Picks<span class="kpi-icon">⚠</span></div><div class="kpi-val" style="color:var(--sev-high)" id="seqNonComp">3</div><div class="kpi-delta" style="color:var(--sev-high)">Blocked — require override</div></div>
+    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Picks Today<span class="kpi-icon">✅</span></div><div class="kpi-val" style="color:var(--pos)">87</div><div class="kpi-delta" style="color:var(--pos)">All compliant</div></div>
+  </div>
+
+  <div class="col-2-1 mb-20">
+    <div class="card">
+      <div class="card-title">Sequencing Rules by Product Type <span class="badge" style="background:var(--acc-soft);color:var(--acc);border:1px solid rgba(229,82,26,0.2)">Active</span></div>
+      <div id="seqRulesTable" style="overflow-x:auto"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Pick Sequence Queue <span class="badge" style="background:rgba(59,130,246,0.1);color:var(--info);border:1px solid rgba(59,130,246,0.2)">Next Up</span></div>
+      <div id="seqPickQueue"></div>
+    </div>
+  </div>
+
+  <div class="card mb-20">
+    <div class="card-title">Non-Compliance Alerts <span class="badge" style="background:rgba(220,38,38,0.1);color:var(--sev-critical);border:1px solid rgba(220,38,38,0.2)" id="seqAlertBadge">3 Blocked</span></div>
+    <div id="seqAlerts"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     BATCH TRACKING — Day 3 (F-019)
+════════════════════════════════ -->
+<div class="page" id="pg-batches">
+  <div class="ph">
+    <div>
+      <div class="layer-badge">Day 3 — Batch Tracking</div>
+      <div class="page-title">Batch Tracking &amp; Expiry Monitor</div>
+      <div class="page-sub">SKU tracking • Batch lifecycle • Expiry countdown • Pick traceability</div>
+    </div>
+    <div class="ph-right">
+      <button class="btn-ref" onclick="renderBatches()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <div class="kpi-grid mb-20">
+    <div class="kpi" style="--kpi-color:var(--info)"><div class="kpi-label">Total Batches<span class="kpi-icon">📦</span></div><div class="kpi-val" style="color:var(--info)" id="batchTotal">8</div><div class="kpi-delta" style="color:var(--sub)">Active in depot</div></div>
+    <div class="kpi" style="--kpi-color:var(--sev-critical)"><div class="kpi-label">Expiring Soon<span class="kpi-icon">⏰</span></div><div class="kpi-val" style="color:var(--sev-critical)" id="batchExpiring">2</div><div class="kpi-delta" style="color:var(--sev-high)">Within 30 days</div></div>
+    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">FEFO Compliant<span class="kpi-icon">✅</span></div><div class="kpi-val" style="color:var(--pos)">96<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)">First-Expiry-First-Out</div></div>
+    <div class="kpi" style="--kpi-color:var(--warn)"><div class="kpi-label">Expired Blocked<span class="kpi-icon">🚫</span></div><div class="kpi-val" style="color:var(--warn)" id="batchExpired">1</div><div class="kpi-delta" style="color:var(--sev-high)">Blocked at API layer</div></div>
+  </div>
+
+  <div class="filter-row mb-16">
+    <input type="text" class="search-box" placeholder="Search batch, SKU, product..." id="batchSearch" oninput="renderBatches()" style="width:240px">
+    <select class="fbtn" id="batchFilter" onchange="renderBatches()" style="padding:6px 10px;background:var(--card);border:1px solid var(--bord);color:var(--text);border-radius:8px;font-size:11px">
+      <option value="all">All Status</option>
+      <option value="active">Active</option>
+      <option value="expiring">Expiring Soon</option>
+      <option value="expired">Expired</option>
+    </select>
+  </div>
+
+  <div class="card mb-20">
+    <div class="card-title">Batch Inventory <span class="badge" style="background:var(--acc-soft);color:var(--acc);border:1px solid rgba(229,82,26,0.2)">Live</span></div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:11px" id="batchTable">
+        <thead>
+          <tr style="text-align:left;color:var(--sub);font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid var(--bord)">
+            <th style="padding:8px 8px 8px 0">Batch Code</th>
+            <th style="padding:8px">Product / SKU</th>
+            <th style="padding:8px">Location</th>
+            <th style="padding:8px">Mfg Date</th>
+            <th style="padding:8px">Expiry Date</th>
+            <th style="padding:8px">Countdown</th>
+            <th style="padding:8px;text-align:right">Qty</th>
+            <th style="padding:8px">Status</th>
+          </tr>
+        </thead>
+        <tbody id="batchTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     LPR GATE CONTROL — Day 3 (F-021 to F-025)
+════════════════════════════════ -->
+<div class="page" id="pg-lpr">
+  <div class="ph">
+    <div>
+      <div class="layer-badge">Day 3 — LPR &amp; Gate Control</div>
+      <div class="page-title">Gate Control Console &mdash; License Plate Recognition</div>
+      <div class="page-sub">Plate recognition • Vehicle registry • Blacklist management • Visitor registration</div>
+    </div>
+    <div class="ph-right">
+      <button class="btn-ref" onclick="renderLPR()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <div class="kpi-grid mb-20">
+    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Vehicles Today<span class="kpi-icon">🚗</span></div><div class="kpi-val" style="color:var(--pos)" id="lprTotal">142</div><div class="kpi-delta" style="color:var(--pos)">↑ 12% vs yesterday</div></div>
+    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Approved<span class="kpi-icon">✅</span></div><div class="kpi-val" style="color:var(--pos)" id="lprApproved">138</div><div class="kpi-delta" style="color:var(--pos)">97.2% approval rate</div></div>
+    <div class="kpi" style="--kpi-color:var(--sev-critical)"><div class="kpi-label">Denied<span class="kpi-icon">🚫</span></div><div class="kpi-val" style="color:var(--sev-critical)" id="lprDenied">3</div><div class="kpi-delta" style="color:var(--sev-high)">Blacklist matches</div></div>
+    <div class="kpi" style="--kpi-color:var(--info)"><div class="kpi-label">OCR Accuracy<span class="kpi-icon">🤖</span></div><div class="kpi-val" style="color:var(--info)">99.1<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)">Tesseract + OpenCV</div></div>
+  </div>
+
+  <div class="grid-2 mb-20">
+    <div class="card">
+      <div class="card-title">Live Gate Feed <span class="badge" style="background:rgba(52,211,153,0.1);color:var(--pos);border:1px solid rgba(52,211,153,0.2)">● Gate North</span></div>
+      <div id="lprGateFeed" style="background:var(--bg);border-radius:10px;border:1px solid var(--bord);height:220px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+        <div style="text-align:center">
+          <div style="font-size:48px;margin-bottom:8px">📹</div>
+          <div style="font-size:11px;color:var(--sub)">Gate Camera Feed — Simulated</div>
+        </div>
+        <div id="lprPlateOverlay" style="position:absolute;bottom:12px;left:12px;right:12px;display:none"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Latest Recognition <span class="badge" style="background:var(--acc-soft);color:var(--acc);border:1px solid rgba(229,82,26,0.2)">Live</span></div>
+      <div id="lprLatest"></div>
+    </div>
+  </div>
+
+  <div class="grid-2 mb-20">
+    <div class="card">
+      <div class="card-title">Vehicle Log <span class="badge" style="background:rgba(59,130,246,0.1);color:var(--info);border:1px solid rgba(59,130,246,0.2)">Today</span></div>
+      <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr style="text-align:left;color:var(--sub);font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid var(--bord);position:sticky;top:0;background:var(--card)">
+              <th style="padding:8px 8px 8px 0">Plate</th>
+              <th style="padding:8px">Type</th>
+              <th style="padding:8px">Gate</th>
+              <th style="padding:8px">Time</th>
+              <th style="padding:8px">Status</th>
+            </tr>
+          </thead>
+          <tbody id="lprLogBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <div class="card mb-16">
+        <div class="card-title">Blacklist Management <span class="badge" style="background:rgba(220,38,38,0.1);color:var(--sev-critical);border:1px solid rgba(220,38,38,0.2)" id="lprBlacklistBadge">3 Entries</span></div>
+        <div id="lprBlacklist"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Visitor Registration <span class="badge" style="background:rgba(52,211,153,0.1);color:var(--pos);border:1px solid rgba(52,211,153,0.2)">Quick Add</span></div>
+        <div id="lprVisitorForm">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+            <input type="text" placeholder="Vehicle Number" style="padding:8px 10px;background:var(--bg);border:1px solid var(--bord);border-radius:8px;color:var(--text);font-size:11px">
+            <input type="text" placeholder="Driver Name" style="padding:8px 10px;background:var(--bg);border:1px solid var(--bord);border-radius:8px;color:var(--text);font-size:11px">
+            <input type="text" placeholder="Company / Purpose" style="padding:8px 10px;background:var(--bg);border:1px solid var(--bord);border-radius:8px;color:var(--text);font-size:11px">
+            <input type="text" placeholder="Contact Number" style="padding:8px 10px;background:var(--bg);border:1px solid var(--bord);border-radius:8px;color:var(--text);font-size:11px">
+          </div>
+          <div style="display:flex;gap:8px">
+            <select style="flex:1;padding:8px 10px;background:var(--bg);border:1px solid var(--bord);border-radius:8px;color:var(--text);font-size:11px">
+              <option>Gate North</option><option>Gate South</option><option>Gate East</option>
+            </select>
+            <button style="padding:8px 16px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer" onclick="alert('Visitor registered (demo)')">Register</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 </div><!-- /content -->
 </div><!-- /app-shell -->
 
@@ -1593,6 +1772,9 @@ function nav(page) {
   if (page === "counting") renderCounting();
   if (page === "heatmap") renderHeatmap();
   if (page === "zones") renderZones();
+  if (page === "sequencing") renderSequencing();
+  if (page === "batches") renderBatches();
+  if (page === "lpr") renderLPR();
 }
 
 function switchDepot(id) {
@@ -2526,6 +2708,218 @@ function updateThresholdPreview() {
   bar.innerHTML = `<div style="width:${w}%;background:var(--pos);opacity:0.4"></div>
     <div style="width:${c-w}%;background:var(--warn);opacity:0.4"></div>
     <div style="width:${100-c}%;background:var(--sev-critical);opacity:0.4"></div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// DAY 3 — SEQUENCING DATA & RENDER (F-017, F-018, F-020)
+// ════════════════════════════════════════════════════════
+const SEQ_RULES = [
+  { product:"OPC Cement 53", sku:"CEM-OPC-53", rule:"FIFO", priority:1, enforced:true, compliance:98.2, overrides:1 },
+  { product:"PPC Cement 33", sku:"CEM-PPC-33", rule:"FIFO", priority:1, enforced:true, compliance:97.5, overrides:0 },
+  { product:"Fertilizer Grade A", sku:"FER-GRA-A", rule:"FEFO", priority:2, enforced:true, compliance:94.1, overrides:2 },
+  { product:"Chemicals HAZ-3", sku:"CHM-HAZ-3", rule:"FEFO", priority:1, enforced:true, compliance:99.0, overrides:0 },
+  { product:"Steel Coils Grade 2", sku:"STL-COL-2", rule:"LIFO", priority:3, enforced:true, compliance:91.8, overrides:3 },
+  { product:"OPC Cement 43", sku:"CEM-OPC-43", rule:"FIFO", priority:2, enforced:false, compliance:88.5, overrides:5 },
+];
+
+const SEQ_PICK_QUEUE = [
+  { id:"PK-001", batch:"B2025-1022", product:"OPC Cement 53", rule:"FIFO", location:"Zone A · Bay 1", qty:50, priority:"HIGH", expiry:"2026-08-15" },
+  { id:"PK-002", batch:"B2025-1018", product:"Chemicals HAZ-3", rule:"FEFO", location:"Zone C · Bay 2", qty:25, priority:"URGENT", expiry:"2026-05-01" },
+  { id:"PK-003", batch:"B2025-1019", product:"PPC Cement 33", rule:"FIFO", location:"Zone A · Bay 3", qty:100, priority:"NORMAL", expiry:"2026-11-20" },
+  { id:"PK-004", batch:"B2025-1021", product:"Fertilizer Grade A", rule:"FEFO", location:"Zone B · Bay 1", qty:75, priority:"HIGH", expiry:"2026-06-10" },
+  { id:"PK-005", batch:"B2025-1023", product:"Steel Coils Grade 2", rule:"LIFO", location:"Zone D · Bay 2", qty:30, priority:"NORMAL", expiry:"N/A" },
+];
+
+const SEQ_VIOLATIONS = [
+  { id:"VIO-001", product:"Steel Coils Grade 2", batch:"B2025-1020", rule:"LIFO", attempted:"Bay 4 (older)", correct:"Bay 2 (newer)", worker:"Operator #12", time:"09:42 AM", severity:"HIGH" },
+  { id:"VIO-002", product:"OPC Cement 43", batch:"B2025-1015", rule:"FIFO", attempted:"Bay 6 (newer)", correct:"Bay 3 (older)", worker:"Operator #8", time:"08:15 AM", severity:"MEDIUM" },
+  { id:"VIO-003", product:"Fertilizer Grade A", batch:"B2025-1017", rule:"FEFO", attempted:"Exp 2026-09", correct:"Exp 2026-06", worker:"Operator #5", time:"07:30 AM", severity:"CRITICAL" },
+];
+
+function seqPrioCol(p) { return p==="URGENT"?"var(--sev-critical)":p==="HIGH"?"var(--sev-high)":"var(--info)"; }
+function seqRuleCol(r) { return r==="FIFO"?"var(--info)":r==="FEFO"?"var(--warn)":r==="LIFO"?"var(--acc)":"var(--sub)"; }
+
+function renderSequencing() {
+  // Rules table
+  document.getElementById("seqRulesTable").innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:11px">
+    <thead><tr style="text-align:left;color:var(--sub);font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid var(--bord)">
+      <th style="padding:8px 8px 8px 0">Product</th><th style="padding:8px">SKU</th><th style="padding:8px">Rule</th><th style="padding:8px;text-align:center">Enforced</th><th style="padding:8px;text-align:right">Compliance</th><th style="padding:8px;text-align:right">Overrides</th>
+    </tr></thead>
+    <tbody>${SEQ_RULES.map(r => {
+      const rc = seqRuleCol(r.rule);
+      const cc = r.compliance>=95?"var(--pos)":r.compliance>=90?"var(--warn)":"var(--sev-high)";
+      return `<tr style="border-bottom:1px solid var(--bord)">
+        <td style="padding:8px 8px 8px 0;font-weight:700;color:var(--text)">${r.product}</td>
+        <td style="padding:8px;color:var(--sub);font-family:'JetBrains Mono',monospace;font-size:10px">${r.sku}</td>
+        <td style="padding:8px"><span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:99px;background:${rc}18;color:${rc};border:1px solid ${rc}33">${r.rule}</span></td>
+        <td style="padding:8px;text-align:center">${r.enforced?'<span style="color:var(--pos)">●</span>':'<span style="color:var(--sub)">○</span>'}</td>
+        <td style="padding:8px;text-align:right;font-weight:700;color:${cc}">${r.compliance}%</td>
+        <td style="padding:8px;text-align:right;color:${r.overrides>0?'var(--sev-high)':'var(--sub)'}">${r.overrides}</td>
+      </tr>`;
+    }).join("")}</tbody></table>`;
+
+  // Pick queue
+  document.getElementById("seqPickQueue").innerHTML = SEQ_PICK_QUEUE.map((p,i) => {
+    const pc = seqPrioCol(p.priority);
+    const rc = seqRuleCol(p.rule);
+    return `<div style="padding:10px 12px;border-radius:8px;background:var(--bg);margin-bottom:6px;border-left:3px solid ${pc};display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+          <span style="font-size:9px;font-weight:700;color:var(--sub);background:var(--card);padding:1px 6px;border-radius:4px;border:1px solid var(--bord)">#${i+1}</span>
+          <span style="font-size:11px;font-weight:700;color:var(--text)">${p.product}</span>
+          <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px;background:${rc}18;color:${rc};border:1px solid ${rc}33">${p.rule}</span>
+        </div>
+        <div style="font-size:10px;color:var(--sub)">${p.batch} · ${p.location} · ${p.qty} units</div>
+      </div>
+      <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:99px;background:${pc}18;color:${pc};border:1px solid ${pc}33">${p.priority}</span>
+    </div>`;
+  }).join("");
+
+  // Violations
+  document.getElementById("seqAlerts").innerHTML = SEQ_VIOLATIONS.map(v => {
+    const sc = v.severity==="CRITICAL"?"var(--sev-critical)":v.severity==="HIGH"?"var(--sev-high)":"var(--warn)";
+    return `<div style="padding:12px 14px;border-radius:10px;background:var(--bg);margin-bottom:8px;border-left:4px solid ${sc}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div>
+          <span style="font-size:12px;font-weight:700;color:var(--text)">${v.product}</span>
+          <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px;background:${sc}18;color:${sc};border:1px solid ${sc}33;margin-left:6px">${v.severity}</span>
+        </div>
+        <span style="font-size:9px;color:var(--sub)">${v.time}</span>
+      </div>
+      <div style="font-size:10px;color:var(--sub);margin-bottom:4px">${v.rule} violation — ${v.batch}</div>
+      <div style="display:flex;gap:16px;font-size:10px">
+        <span style="color:var(--sev-high)">✗ Attempted: ${v.attempted}</span>
+        <span style="color:var(--pos)">✓ Correct: ${v.correct}</span>
+      </div>
+      <div style="font-size:9px;color:var(--sub);margin-top:4px">Worker: ${v.worker} · <span style="color:var(--sev-high);font-weight:600;cursor:pointer">Override Required →</span></div>
+    </div>`;
+  }).join("");
+}
+
+// ════════════════════════════════════════════════════════
+// DAY 3 — BATCH TRACKING DATA & RENDER (F-019)
+// ════════════════════════════════════════════════════════
+const BATCH_DATA = [
+  { code:"B2025-1022", product:"OPC Cement 53", sku:"CEM-OPC-53", location:"Zone A · Bay 1", mfg:"2025-10-22", expiry:"2026-10-22", qty:490, status:"active", picks:12 },
+  { code:"B2025-1023", product:"Steel Coils Grade 2", sku:"STL-COL-2", location:"Zone D · Bay 2", mfg:"2025-10-23", expiry:"N/A", qty:200, status:"active", picks:5 },
+  { code:"B2025-1019", product:"PPC Cement 33", sku:"CEM-PPC-33", location:"Zone A · Bay 3", mfg:"2025-10-19", expiry:"2026-10-19", qty:293, status:"active", picks:8 },
+  { code:"B2025-1021", product:"Fertilizer Grade A", sku:"FER-GRA-A", location:"Zone B · Bay 1", mfg:"2025-10-21", expiry:"2026-06-10", qty:450, status:"expiring", picks:15 },
+  { code:"B2025-1018", product:"Chemicals HAZ-3", sku:"CHM-HAZ-3", location:"Zone C · Bay 2", mfg:"2025-10-18", expiry:"2026-05-01", qty:148, status:"expiring", picks:20 },
+  { code:"B2025-1015", product:"OPC Cement 43", sku:"CEM-OPC-43", location:"Zone C · Bay 4", mfg:"2025-10-15", expiry:"2026-04-08", qty:0, status:"expired", picks:45 },
+  { code:"B2025-1024", product:"OPC Cement 53", sku:"CEM-OPC-53", location:"Zone A · Bay 5", mfg:"2025-11-01", expiry:"2026-11-01", qty:500, status:"active", picks:2 },
+  { code:"B2025-1025", product:"Fertilizer Grade B", sku:"FER-GRB-B", location:"Zone B · Bay 3", mfg:"2025-11-05", expiry:"2026-07-15", qty:320, status:"active", picks:7 },
+];
+
+function batchStatusCol(s) { return s==="expired"?"var(--sev-critical)":s==="expiring"?"var(--warn)":"var(--pos)"; }
+function batchStatusLabel(s) { return s==="expired"?"EXPIRED":s==="expiring"?"EXPIRING":"ACTIVE"; }
+
+function batchCountdown(expiry) {
+  if(expiry==="N/A") return '<span style="color:var(--sub)">No expiry</span>';
+  const diff = Math.ceil((new Date(expiry) - new Date())/(1000*60*60*24));
+  if(diff <= 0) return '<span style="color:var(--sev-critical);font-weight:700">EXPIRED</span>';
+  if(diff <= 30) return `<span style="color:var(--sev-critical);font-weight:700">${diff}d</span>`;
+  if(diff <= 90) return `<span style="color:var(--warn);font-weight:700">${diff}d</span>`;
+  return `<span style="color:var(--pos)">${diff}d</span>`;
+}
+
+function renderBatches() {
+  const search = (document.getElementById("batchSearch")?.value || "").toLowerCase();
+  const filter = document.getElementById("batchFilter")?.value || "all";
+
+  const filtered = BATCH_DATA.filter(b => {
+    const matchSearch = !search || b.code.toLowerCase().includes(search) || b.product.toLowerCase().includes(search) || b.sku.toLowerCase().includes(search);
+    const matchFilter = filter==="all" || b.status===filter;
+    return matchSearch && matchFilter;
+  });
+
+  document.getElementById("batchTableBody").innerHTML = filtered.map(b => {
+    const col = batchStatusCol(b.status);
+    const label = batchStatusLabel(b.status);
+    return `<tr style="border-bottom:1px solid var(--bord)">
+      <td style="padding:8px 8px 8px 0;font-weight:700;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:10px">${b.code}</td>
+      <td style="padding:8px"><div style="font-weight:600;color:var(--text)">${b.product}</div><div style="font-size:9px;color:var(--sub)">${b.sku}</div></td>
+      <td style="padding:8px;color:var(--sub)">${b.location}</td>
+      <td style="padding:8px;color:var(--sub)">${b.mfg}</td>
+      <td style="padding:8px;color:var(--sub)">${b.expiry}</td>
+      <td style="padding:8px">${batchCountdown(b.expiry)}</td>
+      <td style="padding:8px;text-align:right;font-weight:700;color:var(--text)">${b.qty.toLocaleString()}</td>
+      <td style="padding:8px"><span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px;border:1px solid ${col}33;background:${col}18;color:${col}">${label}</span></td>
+    </tr>`;
+  }).join("");
+}
+
+// ════════════════════════════════════════════════════════
+// DAY 3 — LPR GATE CONTROL DATA & RENDER (F-021 to F-025)
+// ════════════════════════════════════════════════════════
+const LPR_LOG = [
+  { plate:"TN-04-AB-1234", type:"Truck", gate:"North", time:"10:32 AM", status:"approved", driver:"Ravi Kumar", company:"ACC Cement" },
+  { plate:"MH-12-CD-5678", type:"Truck", gate:"North", time:"10:18 AM", status:"approved", driver:"Suresh P.", company:"Ultratech" },
+  { plate:"GJ-05-EF-9012", type:"Tanker", gate:"South", time:"09:55 AM", status:"approved", driver:"Amit Shah", company:"GACL" },
+  { plate:"DL-03-XX-6666", type:"Van", gate:"North", time:"09:42 AM", status:"denied", driver:"Unknown", company:"—" },
+  { plate:"KA-01-KL-2345", type:"Truck", gate:"South", time:"09:30 AM", status:"approved", driver:"Vinod R.", company:"JSW Steel" },
+  { plate:"RJ-14-IJ-7890", type:"Truck", gate:"North", time:"09:15 AM", status:"approved", driver:"Prakash M.", company:"IFFCO" },
+  { plate:"UP-32-BL-0001", type:"Car", gate:"North", time:"08:50 AM", status:"denied", driver:"Unknown", company:"—" },
+  { plate:"DL-03-GH-3456", type:"Truck", gate:"South", time:"08:35 AM", status:"approved", driver:"Manoj K.", company:"Tata Steel" },
+  { plate:"TN-11-ZZ-9999", type:"Bike", gate:"North", time:"08:10 AM", status:"denied", driver:"Unknown", company:"—" },
+  { plate:"MH-04-AB-7777", type:"Truck", gate:"North", time:"07:45 AM", status:"approved", driver:"Kiran S.", company:"Ambuja" },
+];
+
+const LPR_BLACKLIST = [
+  { plate:"DL-03-XX-6666", reason:"Stolen vehicle report — FIR #4421", added:"2026-03-15", addedBy:"Security Head" },
+  { plate:"UP-32-BL-0001", reason:"Unauthorized access attempt (3 prior incidents)", added:"2026-02-28", addedBy:"Gate Manager" },
+  { plate:"TN-11-ZZ-9999", reason:"Fake plates detected — ANPR mismatch", added:"2026-04-02", addedBy:"AI System" },
+];
+
+function lprStatusCol(s) { return s==="approved"?"var(--pos)":"var(--sev-critical)"; }
+
+function renderLPR() {
+  // Latest recognition
+  const latest = LPR_LOG[0];
+  const lCol = lprStatusCol(latest.status);
+  document.getElementById("lprLatest").innerHTML = `
+    <div style="text-align:center;padding:16px 0">
+      <div style="font-size:36px;font-weight:800;letter-spacing:4px;color:var(--text);font-family:'JetBrains Mono',monospace;background:var(--bg);padding:12px 24px;border-radius:10px;border:2px solid ${lCol};display:inline-block;margin-bottom:12px">${latest.plate}</div>
+      <div style="margin-bottom:8px"><span style="font-size:12px;font-weight:700;padding:4px 14px;border-radius:99px;background:${lCol}22;color:${lCol};border:1px solid ${lCol}44">${latest.status.toUpperCase()}</span></div>
+      <div style="font-size:11px;color:var(--sub);margin-bottom:4px">${latest.type} · ${latest.gate} Gate · ${latest.time}</div>
+      <div style="font-size:11px;color:var(--text);font-weight:600">${latest.driver} — ${latest.company}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px">
+      <div style="background:var(--bg);border-radius:6px;padding:8px;border:1px solid var(--bord);text-align:center"><div style="font-size:8px;color:var(--sub);font-weight:700;text-transform:uppercase">Confidence</div><div style="font-size:16px;font-weight:700;color:var(--pos);margin-top:2px">98.7%</div></div>
+      <div style="background:var(--bg);border-radius:6px;padding:8px;border:1px solid var(--bord);text-align:center"><div style="font-size:8px;color:var(--sub);font-weight:700;text-transform:uppercase">Processing</div><div style="font-size:16px;font-weight:700;color:var(--info);margin-top:2px">0.3s</div></div>
+    </div>`;
+
+  // Plate overlay on gate feed
+  const overlay = document.getElementById("lprPlateOverlay");
+  overlay.style.display = "block";
+  overlay.innerHTML = `<div style="background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);border-radius:8px;padding:8px 14px;display:flex;justify-content:space-between;align-items:center">
+    <span style="font-size:14px;font-weight:800;color:#fff;font-family:'JetBrains Mono',monospace;letter-spacing:2px">${latest.plate}</span>
+    <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:${lCol}33;color:${lCol}">${latest.status.toUpperCase()}</span>
+  </div>`;
+
+  // Vehicle log
+  document.getElementById("lprLogBody").innerHTML = LPR_LOG.map(v => {
+    const col = lprStatusCol(v.status);
+    return `<tr style="border-bottom:1px solid var(--bord)">
+      <td style="padding:6px 6px 6px 0;font-weight:700;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:10px">${v.plate}</td>
+      <td style="padding:6px;color:var(--sub);font-size:10px">${v.type}</td>
+      <td style="padding:6px;color:var(--sub);font-size:10px">${v.gate}</td>
+      <td style="padding:6px;color:var(--sub);font-size:10px">${v.time}</td>
+      <td style="padding:6px"><span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px;background:${col}18;color:${col};border:1px solid ${col}33">${v.status.toUpperCase()}</span></td>
+    </tr>`;
+  }).join("");
+
+  // Blacklist
+  document.getElementById("lprBlacklistBadge").textContent = LPR_BLACKLIST.length+" Entries";
+  document.getElementById("lprBlacklist").innerHTML = LPR_BLACKLIST.map(b => {
+    return `<div style="padding:8px 10px;border-radius:8px;background:var(--bg);margin-bottom:6px;border-left:3px solid var(--sev-critical)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-size:12px;font-weight:800;color:var(--sev-critical);font-family:'JetBrains Mono',monospace;letter-spacing:1px">${b.plate}</span>
+        <span style="font-size:8px;color:var(--sub)">${b.added}</span>
+      </div>
+      <div style="font-size:10px;color:var(--text);margin-bottom:2px">${b.reason}</div>
+      <div style="font-size:9px;color:var(--sub)">Added by: ${b.addedBy}</div>
+    </div>`;
+  }).join("");
 }
 
 </script>
