@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const LEGACY_HTML_PATH = "/legacy/fidelis-v3-professional.html";
+const LEGACY_HTML_PATH = "/legacy/fidelis-chart-updated.html";
 const LEGACY_ATTR = "data-legacy-depot";
 
 export function LegacyDepotHtmlMount() {
