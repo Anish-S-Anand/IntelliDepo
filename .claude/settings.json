@@ -36,7 +36,17 @@
       "Bash(findstr LISTENING)",
       "Bash(taskkill //PID 16636 //F)",
       "Bash(xargs ls:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(tasklist /FI \"PID eq 24320\" /FO TABLE)",
+      "Bash(cmd //c \"tasklist /FI \\\\\"PID eq 24320\\\\\" /FO TABLE\")",
+      "Bash(wmic process:*)",
+      "Bash(powershell -Command \"Get-Process -Id 24320 | Select-Object ProcessName,Path\")",
+      "Bash(powershell -Command \"Stop-Process -Id 24320 -Force\")",
+      "Bash(powershell -Command \"Get-Process -Id \\(Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue\\).OwningProcess -ErrorAction SilentlyContinue | Stop-Process -Force\")",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(rm -rf .next)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/depot)",
+      "Bash(find \"/c/Users/DELL/IntelliDepo/frontend/src\" -name \"*.tsx\" -type f -exec grep -l \"useState\\\\|useQuery\\\\|useEffect\" {} \\\\;)"
     ],
     "additionalDirectories": [
       "c:\\Intelli\\Intelli\\frontend\\src\\app\\depot",
