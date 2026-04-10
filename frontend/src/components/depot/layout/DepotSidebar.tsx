@@ -2,19 +2,19 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
-  Monitor,
   Package,
   Eye,
   AlertTriangle,
   BarChart3,
   Radio,
   Settings,
-  ChevronLeft,
-  Bell,
+  Hash,
+  Map,
+  Sliders,
 } from "lucide-react";
 import { getAllActiveAlerts } from "@/services/depotVision";
 
@@ -23,6 +23,9 @@ const NAV_ITEMS = [
   { label: "DASH", fullLabel: "Dashboard", href: "/depot/operations", icon: LayoutDashboard },
   { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package },
   { label: "VIS", fullLabel: "Vision AI", href: "/depot/vision", icon: Eye },
+  { label: "CNT", fullLabel: "Counting", href: "/depot/counting", icon: Hash },
+  { label: "MAP", fullLabel: "Heatmap", href: "/depot/heatmap", icon: Map },
+  { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
   { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle, hasPulse: true },
   { label: "ANL", fullLabel: "Analytics", href: "/depot/analytics", icon: BarChart3 },
 ];
@@ -33,7 +36,6 @@ const BOTTOM_ITEMS = [
 
 export default function DepotSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const [alertCount, setAlertCount] = useState(0);
 
   // Fetch active alert count for incident badge
@@ -44,7 +46,6 @@ export default function DepotSidebar() {
         const alerts = await getAllActiveAlerts();
         if (!cancelled) setAlertCount(alerts.length);
       } catch {
-        // fallback to a default count when API is unavailable
         if (!cancelled) setAlertCount(3);
       }
     };

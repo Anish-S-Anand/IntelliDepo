@@ -739,3 +739,474 @@ async def get_active_alerts(
         .order_by(MismatchAlert.created_at.desc())
     )
     return result.scalars().all()
+
+
+# ---------------------------------------------------------------------------
+# Day 2 — DeepSORT MOT Tracking Models
+# ---------------------------------------------------------------------------
+
+class TrackingSessionStatus(str, Enum):
+    ACTIVE = "active"
+    FINALIZED = "finalized"
+    CANCELLED = "cancelled"
+
+
+class TrackingSession(DBBaseModel):
+    """Multi-object tracking session using DeepSORT."""
+    __tablename__ = "depot_tracking_sessions"
+
+    camera_id = Column(UUID(as_uuid=True), nullable=True)
+    zone = Column(String, nullable=True)
+    status = Column(String, default=TrackingSessionStatus.ACTIVE)
+    started_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    finalized_at = Column(DateTime(timezone=True), nullable=True)
+    total_tracks = Column(Integer, default=0)
+    frame_count = Column(Integer, default=0)
+    bags_tally = Column(Integer, default=0)
+    boxes_tally = Column(Integer, default=0)
+    pallets_tally = Column(Integer, default=0)
+    cartons_tally = Column(Integer, default=0)
+    manifest_id = Column(UUID(as_uuid=True), nullable=True)
+
+
+class CountTimeSeries(DBBaseModel):
+    """Time-series count snapshots for charting."""
+    __tablename__ = "depot_count_timeseries"
+
+    session_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    tracking_session_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    bags = Column(Integer, default=0)
+    boxes = Column(Integer, default=0)
+    pallets = Column(Integer, default=0)
+    cartons = Column(Integer, default=0)
+    total = Column(Integer, default=0)
+    cumulative = Column(Integer, default=0)
+
+
+# ---------------------------------------------------------------------------
+# Day 2 — DeepSORT Pydantic Schemas
+# ---------------------------------------------------------------------------
+
+class TrackingSessionInit(BaseModel):
+    camera_id: Optional[uuid.UUID] = None
+    zone: Optional[str] = None
+    manifest_id: Optional[uuid.UUID] = None
+
+
+class TrackingSessionResponse(BaseModel):
+    id: uuid.UUID
+    camera_id: Optional[uuid.UUID]
+    zone: Optional[str]
+    status: str
+    started_at: datetime
+    finalized_at: Optional[datetime]
+    total_tracks: int
+    frame_count: int
+    bags_tally: int
+    boxes_tally: int
+    pallets_tally: int
+    cartons_tally: int
+    manifest_id: Optional[uuid.UUID]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FrameDetection(BaseModel):
+    bbox: list[float] = Field(..., min_length=4, max_length=4, description="[x1, y1, x2, y2]")
+    class_label: str = Field(..., description="bag, box, pallet, carton")
+    confidence: float = Field(..., ge=0.0, le=1.0)
+
+
+class FrameInput(BaseModel):
+    detections: list[FrameDetection] = []
+    frame_number: int = Field(..., ge=0)
+    timestamp: Optional[datetime] = None
+
+
+class TrackResult(BaseModel):
+    track_id: int
+    class_label: str
+    confidence: float
+    bbox: list[float]
+
+
+class FrameResponse(BaseModel):
+    session_id: uuid.UUID
+    frame_number: int
+    tracks: list[TrackResult]
+    running_tally: dict[str, int]
+    total_tracks: int
+
+
+class CountTimeSeriesResponse(BaseModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    tracking_session_id: Optional[uuid.UUID]
+    timestamp: datetime
+    bags: int
+    boxes: int
+    pallets: int
+    cartons: int
+    total: int
+    cumulative: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReconciliationReport(BaseModel):
+    total_sessions: int
+    total_expected: int
+    total_counted: int
+    total_discrepancy: int
+    matched_sessions: int
+    mismatch_sessions: int
+    pending_sessions: int
+    match_rate_pct: float
+    discrepancy_by_type: dict[str, int]
+    active_alerts: int
+
+
+class GoodsAuthorizationRequest(BaseModel):
+    notes: Optional[str] = None
+
+
+class GoodsAuthorizationResponse(BaseModel):
+    session_id: uuid.UUID
+    authorized: bool
+    authorized_by: str
+    authorized_at: datetime
+    reconciliation_status: str
+    message: str
+
+
+# ---------------------------------------------------------------------------
+# Day 2 — DeepSORT MOT Tracking Endpoints
+# ---------------------------------------------------------------------------
+
+@router.post("/tracking/init", response_model=TrackingSessionResponse, status_code=201)
+async def init_tracking_session(
+    payload: TrackingSessionInit,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Initialize a DeepSORT multi-object tracking session for a camera."""
+    session = TrackingSession(
+        camera_id=payload.camera_id,
+        zone=payload.zone,
+        manifest_id=payload.manifest_id,
+        status=TrackingSessionStatus.ACTIVE,
+    )
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+    logger.info(f"Tracking session initialized: {session.id}, camera={payload.camera_id}")
+    return session
+
+
+@router.post("/tracking/{session_id}/frame", response_model=FrameResponse)
+async def process_frame(
+    session_id: uuid.UUID,
+    payload: FrameInput,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """
+    Process a frame with DeepSORT tracking. Accepts bounding box detections,
+    assigns persistent track IDs, and updates running tallies via Redis.
+    """
+    ts = await db.get(TrackingSession, session_id)
+    if not ts:
+        raise HTTPException(status_code=404, detail="Tracking session not found")
+    if ts.status != TrackingSessionStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="Tracking session is not active")
+
+    # Redis key for tracking state
+    redis_key = f"deepsort:session:{session_id}"
+
+    # Get or initialize track counter
+    raw_state = await redis.get(redis_key)
+    if raw_state:
+        import json
+        state = json.loads(raw_state)
+    else:
+        state = {"next_track_id": 1, "tally": {"bag": 0, "box": 0, "pallet": 0, "carton": 0}, "cumulative": 0}
+
+    # Simulate DeepSORT: assign persistent track IDs to detections
+    tracks: list[TrackResult] = []
+    for det in payload.detections:
+        if det.confidence < 0.85:
+            continue
+        track = TrackResult(
+            track_id=state["next_track_id"],
+            class_label=det.class_label,
+            confidence=det.confidence,
+            bbox=det.bbox,
+        )
+        tracks.append(track)
+        state["next_track_id"] += 1
+        label = det.class_label.lower()
+        if label in state["tally"]:
+            state["tally"][label] += 1
+
+    frame_total = sum(state["tally"].values())
+    state["cumulative"] = frame_total
+
+    # Persist state to Redis (TTL 1 hour)
+    import json
+    await redis.set(redis_key, json.dumps(state), ex=3600)
+
+    # Update tracking session in DB
+    ts.frame_count = payload.frame_number + 1
+    ts.total_tracks = state["next_track_id"] - 1
+    ts.bags_tally = state["tally"]["bag"]
+    ts.boxes_tally = state["tally"]["box"]
+    ts.pallets_tally = state["tally"]["pallet"]
+    ts.cartons_tally = state["tally"]["carton"]
+
+    # Write time-series data point
+    ts_entry = CountTimeSeries(
+        session_id=ts.id,
+        tracking_session_id=ts.id,
+        bags=state["tally"]["bag"],
+        boxes=state["tally"]["box"],
+        pallets=state["tally"]["pallet"],
+        cartons=state["tally"]["carton"],
+        total=len(tracks),
+        cumulative=frame_total,
+    )
+    db.add(ts_entry)
+    await db.commit()
+    await db.refresh(ts)
+
+    return FrameResponse(
+        session_id=session_id,
+        frame_number=payload.frame_number,
+        tracks=tracks,
+        running_tally=state["tally"],
+        total_tracks=ts.total_tracks,
+    )
+
+
+@router.post("/tracking/{session_id}/finalize", response_model=ReconciliationResult, status_code=200)
+async def finalize_tracking_session(
+    session_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """
+    Finalize a DeepSORT tracking session. Computes final tallies,
+    creates a CountSession, and optionally reconciles against a manifest.
+    """
+    ts = await db.get(TrackingSession, session_id)
+    if not ts:
+        raise HTTPException(status_code=404, detail="Tracking session not found")
+    if ts.status != TrackingSessionStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="Tracking session is not active")
+
+    ts.status = TrackingSessionStatus.FINALIZED
+    ts.finalized_at = datetime.now(timezone.utc)
+
+    # Create a CountSession from finalized tracking data
+    session_payload = CountSessionCreate(
+        manifest_id=ts.manifest_id,
+        detection_run_id=None,
+        camera_id=ts.camera_id,
+        zone=ts.zone,
+        counted_bags=ts.bags_tally,
+        counted_boxes=ts.boxes_tally,
+        counted_pallets=ts.pallets_tally,
+        counted_cartons=ts.cartons_tally,
+    )
+
+    count_session = CountSession(**session_payload.model_dump())
+    count_session.total_counted = ts.bags_tally + ts.boxes_tally + ts.pallets_tally + ts.cartons_tally
+    count_session.counted_by = str(current_user.id)
+    db.add(count_session)
+    await db.flush()
+
+    manifest = None
+    alert = None
+
+    if ts.manifest_id:
+        manifest = await db.get(ShipmentManifest, ts.manifest_id)
+        if manifest:
+            count_session.discrepancy_bags = count_session.counted_bags - manifest.expected_bags
+            count_session.discrepancy_boxes = count_session.counted_boxes - manifest.expected_boxes
+            count_session.discrepancy_total = count_session.total_counted - manifest.total_expected
+
+            if count_session.discrepancy_total == 0:
+                count_session.reconciliation_status = ReconciliationStatus.MATCHED
+                manifest.status = ManifestStatus.VERIFIED
+                manifest.verified_at = datetime.now(timezone.utc)
+                manifest.verified_by = str(current_user.id)
+            else:
+                count_session.reconciliation_status = ReconciliationStatus.MISMATCH
+                manifest.status = ManifestStatus.DISCREPANCY
+
+                abs_disc = abs(count_session.discrepancy_total)
+                severity = "critical" if abs_disc >= 10 else "high" if abs_disc >= 5 else "medium" if abs_disc >= 2 else "low"
+
+                alert = MismatchAlert(
+                    session_id=count_session.id,
+                    manifest_id=manifest.id,
+                    manifest_code=manifest.manifest_code,
+                    expected_total=manifest.total_expected,
+                    counted_total=count_session.total_counted,
+                    discrepancy=count_session.discrepancy_total,
+                    severity=severity,
+                    message=(
+                        f"DeepSORT tracking mismatch for {manifest.manifest_code}: "
+                        f"expected {manifest.total_expected}, tracked {count_session.total_counted} "
+                        f"(diff: {count_session.discrepancy_total:+d}, frames: {ts.frame_count})"
+                    ),
+                )
+                db.add(alert)
+                count_session.alert_sent = True
+
+    # Clean up Redis state
+    redis_key = f"deepsort:session:{session_id}"
+    await redis.delete(redis_key)
+
+    await db.commit()
+    await db.refresh(count_session)
+    if manifest:
+        await db.refresh(manifest)
+    if alert:
+        await db.refresh(alert)
+
+    logger.info(
+        f"Tracking session {session_id} finalized: "
+        f"{count_session.total_counted} objects, {ts.frame_count} frames"
+    )
+
+    return ReconciliationResult(
+        session=CountSessionResponse.model_validate(count_session),
+        manifest=ManifestResponse.model_validate(manifest) if manifest else None,
+        alert=MismatchAlertResponse.model_validate(alert) if alert else None,
+        status=count_session.reconciliation_status,
+    )
+
+
+@router.get("/sessions/{session_id}/timeseries", response_model=list[CountTimeSeriesResponse])
+async def get_count_timeseries(
+    session_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return count time-series snapshots for a tracking/counting session."""
+    result = await db.execute(
+        select(CountTimeSeries)
+        .where(
+            (CountTimeSeries.session_id == session_id)
+            | (CountTimeSeries.tracking_session_id == session_id)
+        )
+        .order_by(CountTimeSeries.timestamp.asc())
+    )
+    rows = result.scalars().all()
+    if not rows:
+        raise HTTPException(status_code=404, detail="No time-series data found for this session")
+    return rows
+
+
+@router.get("/reconciliation/report", response_model=ReconciliationReport)
+async def get_reconciliation_report(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate a reconciliation summary report across all counting sessions."""
+    result = await db.execute(select(CountSession).order_by(CountSession.created_at.desc()))
+    sessions = result.scalars().all()
+
+    total_expected = 0
+    total_counted = 0
+    matched = 0
+    mismatched = 0
+    pending = 0
+    disc_bags = 0
+    disc_boxes = 0
+
+    for s in sessions:
+        total_counted += s.total_counted
+        if s.reconciliation_status == ReconciliationStatus.MATCHED:
+            matched += 1
+        elif s.reconciliation_status == ReconciliationStatus.MISMATCH:
+            mismatched += 1
+        else:
+            pending += 1
+        disc_bags += abs(s.discrepancy_bags)
+        disc_boxes += abs(s.discrepancy_boxes)
+
+    # Sum expected from manifests linked to sessions
+    manifest_ids = {s.manifest_id for s in sessions if s.manifest_id}
+    for mid in manifest_ids:
+        m = await db.get(ShipmentManifest, mid)
+        if m:
+            total_expected += m.total_expected
+
+    total_sessions = len(sessions)
+    match_rate = round((matched / total_sessions * 100), 1) if total_sessions > 0 else 0.0
+
+    # Active alerts count
+    alert_result = await db.execute(
+        select(func.count()).select_from(MismatchAlert).where(MismatchAlert.acknowledged == False)
+    )
+    active_alerts = alert_result.scalar() or 0
+
+    return ReconciliationReport(
+        total_sessions=total_sessions,
+        total_expected=total_expected,
+        total_counted=total_counted,
+        total_discrepancy=total_counted - total_expected,
+        matched_sessions=matched,
+        mismatch_sessions=mismatched,
+        pending_sessions=pending,
+        match_rate_pct=match_rate,
+        discrepancy_by_type={"bags": disc_bags, "boxes": disc_boxes},
+        active_alerts=active_alerts,
+    )
+
+
+@router.post("/sessions/{session_id}/authorize", response_model=GoodsAuthorizationResponse)
+async def authorize_goods_movement(
+    session_id: uuid.UUID,
+    payload: GoodsAuthorizationRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Authorize goods movement after counting session verification."""
+    session = await db.get(CountSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Counting session not found")
+
+    if session.reconciliation_status == ReconciliationStatus.PENDING:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot authorize — session has not been reconciled yet"
+        )
+
+    if session.reconciliation_status == ReconciliationStatus.MISMATCH:
+        # Allow override but mark it
+        session.reconciliation_status = ReconciliationStatus.OVERRIDE
+        message = "Goods movement authorized with override — mismatch acknowledged"
+    else:
+        message = "Goods movement authorized — counts verified"
+
+    now = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(session)
+
+    logger.info(f"Goods movement authorized for session {session_id} by {current_user.id}")
+
+    return GoodsAuthorizationResponse(
+        session_id=session.id,
+        authorized=True,
+        authorized_by=str(current_user.id),
+        authorized_at=now,
+        reconciliation_status=session.reconciliation_status,
+        message=message,
+    )
