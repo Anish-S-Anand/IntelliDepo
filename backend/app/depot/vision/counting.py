@@ -577,6 +577,156 @@ async def acknowledge_alert(
     return alert
 
 
+# ---------------------------------------------------------------------------
+# Tracking-Based Counting — uses DeepSORT persistent IDs
+# ---------------------------------------------------------------------------
+
+class TrackingCountRequest(BaseModel):
+    tracking_session_id: uuid.UUID
+    manifest_id: Optional[uuid.UUID] = None
+    discrepancy_threshold_pct: float = Field(
+        2.0, ge=0.0, le=100.0,
+        description="Percentage discrepancy threshold to trigger reconciliation alert",
+    )
+
+
+@router.post("/track-count", response_model=ReconciliationResult, status_code=201)
+async def count_from_tracking(
+    payload: TrackingCountRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """
+    Counting Agent v2: aggregates counts from a DeepSORT tracking session.
+    Uses persistent object IDs to avoid double-counting — each unique track
+    that crossed the counting line is counted exactly once.
+    Triggers reconciliation workflow if discrepancy exceeds threshold.
+    """
+    from app.depot.vision.tracking import TrackingSession, TrackedObject, TrackingStatus
+
+    ts = await db.get(TrackingSession, payload.tracking_session_id)
+    if not ts:
+        raise HTTPException(status_code=404, detail="Tracking session not found")
+    if ts.status != TrackingStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Tracking session is not completed")
+
+    # Get counted objects (those that crossed the counting line)
+    result = await db.execute(
+        select(TrackedObject).where(
+            TrackedObject.session_id == payload.tracking_session_id,
+            TrackedObject.is_counted == True,
+        )
+    )
+    counted_objects = result.scalars().all()
+
+    # Tally by class
+    counts: dict[str, int] = {}
+    total_conf = 0.0
+    for obj in counted_objects:
+        counts[obj.class_label] = counts.get(obj.class_label, 0) + 1
+        total_conf += obj.avg_confidence
+
+    avg_conf = round(total_conf / len(counted_objects), 4) if counted_objects else 0.0
+
+    session = CountSession(
+        manifest_id=payload.manifest_id,
+        detection_run_id=ts.detection_run_id,
+        camera_id=ts.camera_id,
+        counted_bags=counts.get("bag", 0),
+        counted_boxes=counts.get("box", 0),
+        counted_pallets=counts.get("pallet", 0),
+        counted_cartons=counts.get("carton", 0),
+        total_counted=sum(counts.values()),
+        confidence_avg=avg_conf,
+        counted_by=str(current_user.id),
+    )
+    db.add(session)
+    await db.flush()
+
+    manifest = None
+    alert = None
+
+    if payload.manifest_id:
+        manifest = await db.get(ShipmentManifest, payload.manifest_id)
+        if not manifest:
+            raise HTTPException(status_code=404, detail="Manifest not found")
+
+        session.discrepancy_bags = session.counted_bags - manifest.expected_bags
+        session.discrepancy_boxes = session.counted_boxes - manifest.expected_boxes
+        session.discrepancy_total = session.total_counted - manifest.total_expected
+
+        # Check against percentage threshold
+        disc_pct = (abs(session.discrepancy_total) / manifest.total_expected * 100) if manifest.total_expected > 0 else 0.0
+
+        if disc_pct <= payload.discrepancy_threshold_pct and session.discrepancy_total == 0:
+            session.reconciliation_status = ReconciliationStatus.MATCHED
+            manifest.status = ManifestStatus.VERIFIED
+            manifest.verified_at = datetime.now(timezone.utc)
+            manifest.verified_by = str(current_user.id)
+        else:
+            session.reconciliation_status = ReconciliationStatus.MISMATCH
+            manifest.status = ManifestStatus.DISCREPANCY
+
+            abs_disc = abs(session.discrepancy_total)
+            severity = "critical" if abs_disc >= 10 else "high" if abs_disc >= 5 else "medium" if abs_disc >= 2 else "low"
+
+            alert = MismatchAlert(
+                session_id=session.id,
+                manifest_id=manifest.id,
+                manifest_code=manifest.manifest_code,
+                expected_total=manifest.total_expected,
+                counted_total=session.total_counted,
+                discrepancy=session.discrepancy_total,
+                severity=severity,
+                message=(
+                    f"Tracking-based count mismatch for {manifest.manifest_code}: "
+                    f"expected {manifest.total_expected}, tracked {session.total_counted} "
+                    f"(diff: {session.discrepancy_total:+d}, {disc_pct:.1f}% variance, "
+                    f"threshold: {payload.discrepancy_threshold_pct}%)"
+                ),
+            )
+            db.add(alert)
+            session.alert_sent = True
+
+            try:
+                priority_map = {"critical": "CRITICAL", "high": "HIGH", "medium": "NORMAL", "low": "LOW"}
+                await NotificationService.send_alert(
+                    db=db, redis=redis, user_id=current_user.id,
+                    event_type="depot.counting.tracking_mismatch",
+                    title=f"Tracking Count Mismatch — {manifest.manifest_code}",
+                    message=alert.message,
+                    priority=priority_map.get(severity, "NORMAL"),
+                    payload={
+                        "manifest_code": manifest.manifest_code,
+                        "discrepancy": session.discrepancy_total,
+                        "variance_pct": disc_pct,
+                    },
+                    channel="in_app",
+                )
+            except Exception as e:
+                logger.warning(f"Failed to dispatch tracking count notification: {e}")
+
+    await db.commit()
+    await db.refresh(session)
+    if manifest:
+        await db.refresh(manifest)
+    if alert:
+        await db.refresh(alert)
+
+    logger.info(
+        f"Tracking-based count from session {payload.tracking_session_id}: "
+        f"{session.total_counted} unique objects ({counts})"
+    )
+
+    return ReconciliationResult(
+        session=CountSessionResponse.model_validate(session),
+        manifest=ManifestResponse.model_validate(manifest) if manifest else None,
+        alert=MismatchAlertResponse.model_validate(alert) if alert else None,
+        status=session.reconciliation_status,
+    )
+
+
 @router.get("/alerts/active", response_model=list[MismatchAlertResponse])
 async def get_active_alerts(
     db: AsyncSession = Depends(get_db),

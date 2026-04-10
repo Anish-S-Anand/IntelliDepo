@@ -388,3 +388,181 @@ async def list_access_logs(
         query = query.where(GateAccessLog.plate_number == plate_number)
     result = await db.execute(query.order_by(GateAccessLog.processed_at.desc()).limit(limit))
     return result.scalars().all()
+
+
+# ---------------------------------------------------------------------------
+# Visitor Registration & Management (F-025)
+# ---------------------------------------------------------------------------
+
+class VisitorStatus(str, Enum):
+    CHECKED_IN = "checked_in"
+    CHECKED_OUT = "checked_out"
+    EXPIRED = "expired"
+
+
+class Visitor(DBBaseModel):
+    """Visitor registration record."""
+    __tablename__ = "depot_visitors"
+
+    name = Column(String, nullable=False)
+    company = Column(String, nullable=True)
+    purpose = Column(String, nullable=True)
+    contact_number = Column(String, nullable=True)
+    id_proof_type = Column(String, nullable=True)
+    id_proof_number = Column(String, nullable=True)
+    vehicle_plate = Column(String, nullable=True, index=True)
+    host_name = Column(String, nullable=True)
+    gate_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    checked_in_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    checked_out_at = Column(DateTime(timezone=True), nullable=True)
+    pass_valid_until = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String, default=VisitorStatus.CHECKED_IN)
+    registered_by = Column(String, nullable=True)
+
+
+class VisitorCreate(BaseModel):
+    name: str = Field(..., json_schema_extra={"example": "Rajesh Kumar"})
+    company: Optional[str] = Field(None, json_schema_extra={"example": "ABC Logistics"})
+    purpose: Optional[str] = Field(None, json_schema_extra={"example": "Delivery pickup"})
+    contact_number: Optional[str] = None
+    id_proof_type: Optional[str] = Field(None, json_schema_extra={"example": "Aadhar"})
+    id_proof_number: Optional[str] = None
+    vehicle_plate: Optional[str] = Field(None, json_schema_extra={"example": "KA-01-CD-5678"})
+    host_name: Optional[str] = None
+    gate_id: Optional[uuid.UUID] = None
+    pass_valid_hours: int = Field(8, ge=1, le=72, description="Pass validity in hours")
+
+
+class VisitorResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    company: Optional[str]
+    purpose: Optional[str]
+    contact_number: Optional[str]
+    id_proof_type: Optional[str]
+    id_proof_number: Optional[str]
+    vehicle_plate: Optional[str]
+    host_name: Optional[str]
+    gate_id: Optional[uuid.UUID]
+    checked_in_at: datetime
+    checked_out_at: Optional[datetime]
+    pass_valid_until: Optional[datetime]
+    status: str
+    registered_by: Optional[str]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+@router.post("/visitors", response_model=VisitorResponse, status_code=201)
+async def register_visitor(
+    payload: VisitorCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Register a visitor and issue a temporary pass.
+    If a vehicle plate is provided, auto-registers it as a temporary vehicle.
+    """
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+    visitor = Visitor(
+        name=payload.name,
+        company=payload.company,
+        purpose=payload.purpose,
+        contact_number=payload.contact_number,
+        id_proof_type=payload.id_proof_type,
+        id_proof_number=payload.id_proof_number,
+        vehicle_plate=payload.vehicle_plate,
+        host_name=payload.host_name,
+        gate_id=payload.gate_id,
+        checked_in_at=now,
+        pass_valid_until=now + timedelta(hours=payload.pass_valid_hours),
+        status=VisitorStatus.CHECKED_IN,
+        registered_by=str(current_user.id),
+    )
+    db.add(visitor)
+
+    # Auto-register vehicle as temporary if plate provided
+    if payload.vehicle_plate:
+        existing = await db.execute(
+            select(VehicleRegistry).where(VehicleRegistry.plate_number == payload.vehicle_plate)
+        )
+        if not existing.scalar_one_or_none():
+            temp_vehicle = VehicleRegistry(
+                plate_number=payload.vehicle_plate,
+                vehicle_type="visitor",
+                owner_name=payload.name,
+                company=payload.company,
+                status=VehicleStatus.TEMPORARY,
+                valid_until=now + timedelta(hours=payload.pass_valid_hours),
+            )
+            db.add(temp_vehicle)
+
+    await db.commit()
+    await db.refresh(visitor)
+    logger.info(f"Visitor registered: {visitor.name} ({visitor.company})")
+    return visitor
+
+
+@router.get("/visitors", response_model=list[VisitorResponse])
+async def list_visitors(
+    status: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List visitors with optional status filter."""
+    query = select(Visitor)
+    if status:
+        query = query.where(Visitor.status == status)
+    result = await db.execute(query.order_by(Visitor.checked_in_at.desc()))
+    return result.scalars().all()
+
+
+@router.get("/visitors/active", response_model=list[VisitorResponse])
+async def get_active_visitors(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all currently checked-in visitors."""
+    result = await db.execute(
+        select(Visitor)
+        .where(Visitor.status == VisitorStatus.CHECKED_IN)
+        .order_by(Visitor.checked_in_at.desc())
+    )
+    return result.scalars().all()
+
+
+@router.patch("/visitors/{visitor_id}/checkout", response_model=VisitorResponse)
+async def checkout_visitor(
+    visitor_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Check out a visitor and expire their temporary vehicle pass."""
+    visitor = await db.get(Visitor, visitor_id)
+    if not visitor:
+        raise HTTPException(status_code=404, detail="Visitor not found")
+    if visitor.status == VisitorStatus.CHECKED_OUT:
+        raise HTTPException(status_code=409, detail="Visitor already checked out")
+
+    visitor.status = VisitorStatus.CHECKED_OUT
+    visitor.checked_out_at = datetime.now(timezone.utc)
+
+    # Expire temporary vehicle
+    if visitor.vehicle_plate:
+        veh_result = await db.execute(
+            select(VehicleRegistry).where(
+                VehicleRegistry.plate_number == visitor.vehicle_plate,
+                VehicleRegistry.status == VehicleStatus.TEMPORARY,
+            )
+        )
+        temp_vehicle = veh_result.scalar_one_or_none()
+        if temp_vehicle:
+            temp_vehicle.status = VehicleStatus.EXPIRED
+
+    await db.commit()
+    await db.refresh(visitor)
+    logger.info(f"Visitor checked out: {visitor.name}")
+    return visitor

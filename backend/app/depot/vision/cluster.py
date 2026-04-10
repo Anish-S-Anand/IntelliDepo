@@ -363,3 +363,82 @@ async def resolve_capacity_alert(
     await db.commit()
     await db.refresh(alert)
     return alert
+
+
+# ---------------------------------------------------------------------------
+# Zone Density History (Time-Series)
+# ---------------------------------------------------------------------------
+
+class ZoneDensityHistory(DBBaseModel):
+    """Time-series record of zone occupancy for historical trend analysis."""
+    __tablename__ = "depot_zone_density_history"
+
+    zone_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    zone_code = Column(String, nullable=True)
+    occupancy = Column(Integer, nullable=False)
+    capacity = Column(Integer, nullable=False)
+    utilization_pct = Column(Float, nullable=False)
+    status = Column(String, nullable=True)
+    recorded_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class DensityHistoryResponse(BaseModel):
+    id: uuid.UUID
+    zone_id: uuid.UUID
+    zone_code: Optional[str]
+    occupancy: int
+    capacity: int
+    utilization_pct: float
+    status: Optional[str]
+    recorded_at: datetime
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+@router.post("/density/snapshot", response_model=list[DensityHistoryResponse], status_code=201)
+async def record_density_snapshot(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Record a point-in-time snapshot of all zone densities.
+    Call periodically (e.g., every 15 minutes) to build historical trends.
+    """
+    result = await db.execute(
+        select(DepotZone).where(DepotZone.is_active == True)
+    )
+    zones = result.scalars().all()
+
+    records = []
+    for zone in zones:
+        record = ZoneDensityHistory(
+            zone_id=zone.id,
+            zone_code=zone.zone_code,
+            occupancy=zone.current_occupancy,
+            capacity=zone.max_capacity_units,
+            utilization_pct=zone.utilization_pct,
+            status=zone.status,
+        )
+        db.add(record)
+        records.append(record)
+
+    await db.commit()
+    for r in records:
+        await db.refresh(r)
+    return records
+
+
+@router.get("/density/history", response_model=list[DensityHistoryResponse])
+async def get_density_history(
+    zone_id: Optional[uuid.UUID] = None,
+    limit: int = 500,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get zone density history for trend analysis."""
+    query = select(ZoneDensityHistory)
+    if zone_id:
+        query = query.where(ZoneDensityHistory.zone_id == zone_id)
+    result = await db.execute(query.order_by(ZoneDensityHistory.recorded_at.desc()).limit(limit))
+    return result.scalars().all()

@@ -551,3 +551,258 @@ async def run_security_breach_agent(
         alerts_dispatched=alerts_dispatched,
         breaches=[BreachResponse.model_validate(b) for b in breaches_created],
     )
+
+
+# ---------------------------------------------------------------------------
+# Perimeter Incident & Auto-Escalation (Day 4)
+# ---------------------------------------------------------------------------
+
+class IncidentStatus(str, Enum):
+    OPEN = "open"
+    ACKNOWLEDGED = "acknowledged"
+    ESCALATED = "escalated"
+    RESOLVED = "resolved"
+
+
+class PerimeterIncident(DBBaseModel):
+    """Incident created from a perimeter breach with auto-escalation tracking."""
+    __tablename__ = "depot_perimeter_incidents"
+
+    breach_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    zone_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    severity = Column(String, nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    escalation_level = Column(Integer, default=0)
+    escalation_deadline = Column(DateTime(timezone=True), nullable=True)
+    escalated_to = Column(String, nullable=True)
+    status = Column(String, default=IncidentStatus.OPEN)
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+    acknowledged_by = Column(String, nullable=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    resolved_by = Column(String, nullable=True)
+    resolution_notes = Column(Text, nullable=True)
+    video_archive_ref = Column(String, nullable=True)
+
+
+class IncidentResponse(BaseModel):
+    id: uuid.UUID
+    breach_id: uuid.UUID
+    zone_id: uuid.UUID
+    severity: str
+    title: str
+    description: Optional[str]
+    escalation_level: int
+    escalation_deadline: Optional[datetime]
+    escalated_to: Optional[str]
+    status: str
+    acknowledged_at: Optional[datetime]
+    acknowledged_by: Optional[str]
+    resolved_at: Optional[datetime]
+    resolved_by: Optional[str]
+    resolution_notes: Optional[str]
+    video_archive_ref: Optional[str]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class IncidentAcknowledge(BaseModel):
+    reason: str = Field(..., min_length=5, json_schema_extra={"example": "Security team dispatched to Zone A"})
+
+
+class IncidentResolve(BaseModel):
+    resolution_notes: str = Field(..., min_length=5, json_schema_extra={"example": "False alarm — authorized maintenance crew"})
+
+
+ESCALATION_MINUTES = 5
+ESCALATION_CHAIN = ["Security Supervisor", "Facility Head", "Site Director"]
+
+
+@router.post("/incidents/from-breach/{breach_id}", response_model=IncidentResponse, status_code=201)
+async def create_incident_from_breach(
+    breach_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Create a security incident from a perimeter breach.
+    Sets a 5-minute auto-escalation deadline. If not acknowledged within
+    the deadline, the incident escalates up the chain.
+    """
+    from datetime import timedelta
+
+    breach = await db.get(PerimeterBreach, breach_id)
+    if not breach:
+        raise HTTPException(status_code=404, detail="Breach not found")
+
+    zone = await db.get(PerimeterZone, breach.zone_id)
+    zone_name = zone.name if zone else "Unknown Zone"
+
+    incident = PerimeterIncident(
+        breach_id=breach.id,
+        zone_id=breach.zone_id,
+        severity=breach.severity,
+        title=f"Security Incident — {zone_name}",
+        description=(
+            f"{breach.breach_type.replace('_', ' ').title()} detected in {zone_name}. "
+            f"Confidence: {breach.confidence:.0%}. "
+            f"Night vision: {'enabled' if zone and zone.night_vision_enabled else 'off'}."
+        ),
+        escalation_level=0,
+        escalation_deadline=datetime.now(timezone.utc) + timedelta(minutes=ESCALATION_MINUTES),
+        escalated_to=ESCALATION_CHAIN[0],
+        status=IncidentStatus.OPEN,
+        video_archive_ref=breach.snapshot_ref,
+    )
+    db.add(incident)
+    await db.commit()
+    await db.refresh(incident)
+    logger.info(f"Incident created from breach {breach_id}: {incident.title}")
+    return incident
+
+
+@router.get("/incidents", response_model=list[IncidentResponse])
+async def list_incidents(
+    status: Optional[str] = None,
+    severity: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List perimeter incidents with optional filters."""
+    query = select(PerimeterIncident)
+    if status:
+        query = query.where(PerimeterIncident.status == status)
+    if severity:
+        query = query.where(PerimeterIncident.severity == severity)
+    result = await db.execute(query.order_by(PerimeterIncident.created_at.desc()))
+    return result.scalars().all()
+
+
+@router.get("/incidents/active", response_model=list[IncidentResponse])
+async def get_active_incidents(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all unresolved incidents."""
+    result = await db.execute(
+        select(PerimeterIncident)
+        .where(PerimeterIncident.status.in_([IncidentStatus.OPEN, IncidentStatus.ACKNOWLEDGED, IncidentStatus.ESCALATED]))
+        .order_by(PerimeterIncident.created_at.desc())
+    )
+    return result.scalars().all()
+
+
+@router.patch("/incidents/{incident_id}/acknowledge", response_model=IncidentResponse)
+async def acknowledge_incident(
+    incident_id: uuid.UUID,
+    payload: IncidentAcknowledge,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Acknowledge an incident (stops auto-escalation countdown)."""
+    incident = await db.get(PerimeterIncident, incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    if incident.status == IncidentStatus.RESOLVED:
+        raise HTTPException(status_code=409, detail="Incident already resolved")
+
+    incident.status = IncidentStatus.ACKNOWLEDGED
+    incident.acknowledged_at = datetime.now(timezone.utc)
+    incident.acknowledged_by = str(current_user.id)
+    incident.description = (incident.description or "") + f"\n\nAcknowledged: {payload.reason}"
+    await db.commit()
+    await db.refresh(incident)
+    logger.info(f"Incident {incident_id} acknowledged by {current_user.id}")
+    return incident
+
+
+@router.patch("/incidents/{incident_id}/resolve", response_model=IncidentResponse)
+async def resolve_incident(
+    incident_id: uuid.UUID,
+    payload: IncidentResolve,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Resolve an incident with mandatory resolution notes."""
+    incident = await db.get(PerimeterIncident, incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    if incident.status == IncidentStatus.RESOLVED:
+        raise HTTPException(status_code=409, detail="Incident already resolved")
+
+    incident.status = IncidentStatus.RESOLVED
+    incident.resolved_at = datetime.now(timezone.utc)
+    incident.resolved_by = str(current_user.id)
+    incident.resolution_notes = payload.resolution_notes
+
+    # Also resolve the underlying breach
+    breach = await db.get(PerimeterBreach, incident.breach_id)
+    if breach and not breach.resolved_at:
+        breach.resolved_at = datetime.now(timezone.utc)
+        breach.resolved_by = str(current_user.id)
+        breach.resolution_notes = payload.resolution_notes
+
+    await db.commit()
+    await db.refresh(incident)
+    logger.info(f"Incident {incident_id} resolved by {current_user.id}")
+    return incident
+
+
+@router.post("/incidents/escalate-overdue", response_model=list[IncidentResponse])
+async def escalate_overdue_incidents(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """
+    Auto-escalation check: escalates any open incidents past their deadline.
+    Should be called periodically (e.g., every minute via Celery beat or cron).
+    Escalation chain: Security Supervisor -> Facility Head -> Site Director.
+    """
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(PerimeterIncident).where(
+            PerimeterIncident.status == IncidentStatus.OPEN,
+            PerimeterIncident.escalation_deadline <= now,
+        )
+    )
+    overdue = list(result.scalars().all())
+    escalated = []
+
+    for incident in overdue:
+        next_level = min(incident.escalation_level + 1, len(ESCALATION_CHAIN) - 1)
+        incident.escalation_level = next_level
+        incident.escalated_to = ESCALATION_CHAIN[next_level]
+        incident.escalation_deadline = now + timedelta(minutes=ESCALATION_MINUTES)
+        incident.status = IncidentStatus.ESCALATED
+
+        try:
+            await NotificationService.send_alert(
+                db=db, redis=redis, user_id=current_user.id,
+                event_type="depot.perimeter.escalation",
+                title=f"ESCALATED: {incident.title}",
+                message=f"Incident escalated to {incident.escalated_to} (Level {next_level})",
+                priority="CRITICAL",
+                payload={
+                    "incident_id": str(incident.id),
+                    "escalation_level": next_level,
+                    "escalated_to": incident.escalated_to,
+                },
+                channel="in_app",
+            )
+        except Exception as e:
+            logger.warning(f"Failed to send escalation alert: {e}")
+
+        escalated.append(incident)
+
+    await db.commit()
+    for inc in escalated:
+        await db.refresh(inc)
+
+    if escalated:
+        logger.warning(f"Auto-escalated {len(escalated)} overdue incidents")
+
+    return escalated

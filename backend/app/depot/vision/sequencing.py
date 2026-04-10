@@ -394,13 +394,222 @@ async def confirm_pick(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Confirm a pick order as completed."""
+    """Confirm a pick order as completed and log it."""
     order = await db.get(PickOrder, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Pick order not found")
     order.picked = True
     order.picked_at = datetime.now(timezone.utc)
     order.picked_by = str(current_user.id)
+
+    # Create pick log with full traceability
+    log = PickLog(
+        pick_order_id=order.id,
+        batch_id=order.batch_id,
+        batch_code=order.batch_code,
+        sku_code=order.sku_code,
+        quantity_picked=order.pick_quantity,
+        sequencing_rule_applied=order.sequencing_rule,
+        compliance_status=order.compliance_status,
+        zone=order.zone,
+        picked_by=str(current_user.id),
+        picked_at=order.picked_at,
+    )
+    db.add(log)
+
+    # Deduct from batch
+    batch = await db.get(InventoryBatch, order.batch_id)
+    if batch:
+        batch.quantity = max(0, batch.quantity - order.pick_quantity)
+        if batch.quantity == 0:
+            batch.status = BatchStatus.DEPLETED
+
+    await db.commit()
+    await db.refresh(order)
+    return order
+
+
+# ---------------------------------------------------------------------------
+# Pick Override Flow (Compliance Officer)
+# ---------------------------------------------------------------------------
+
+class PickOverrideRequest(BaseModel):
+    reason_code: str = Field(
+        ..., min_length=3,
+        json_schema_extra={"example": "URGENT_CUSTOMER_REQUEST"},
+        description="Reason code for overriding the sequencing rule",
+    )
+    reason_detail: str = Field(
+        ..., min_length=10,
+        json_schema_extra={"example": "Customer requires specific batch due to quality issue"},
+    )
+
+
+@router.patch("/pick-orders/{order_id}/override", response_model=PickOrderResponse)
+async def override_pick_order(
+    order_id: uuid.UUID,
+    payload: PickOverrideRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Override a pick order's sequencing compliance.
+    Requires a reason code and detailed justification.
+    Logged for audit trail and compliance reporting.
+    """
+    order = await db.get(PickOrder, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Pick order not found")
+    if order.picked:
+        raise HTTPException(status_code=409, detail="Pick order already completed")
+
+    order.compliance_status = ComplianceResult.OVERRIDE
+    order.override_reason = f"[{payload.reason_code}] {payload.reason_detail}"
+    await db.commit()
+    await db.refresh(order)
+    logger.warning(
+        f"Pick order {order_id} overridden by {current_user.id}: "
+        f"code={payload.reason_code}"
+    )
+    return order
+
+
+# ---------------------------------------------------------------------------
+# Pick Log with Traceability
+# ---------------------------------------------------------------------------
+
+class PickLog(DBBaseModel):
+    """Immutable pick log for compliance audit trail."""
+    __tablename__ = "depot_pick_logs"
+
+    pick_order_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    batch_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    batch_code = Column(String, nullable=True)
+    sku_code = Column(String, nullable=False)
+    quantity_picked = Column(Integer, nullable=False)
+    sequencing_rule_applied = Column(String, nullable=True)
+    compliance_status = Column(String, default=ComplianceResult.COMPLIANT)
+    override_reason = Column(Text, nullable=True)
+    overridden_by = Column(String, nullable=True)
+    scan_method = Column(String, nullable=True)  # barcode, rfid, manual
+    scan_value = Column(String, nullable=True)
+    zone = Column(String, nullable=True)
+    rack = Column(String, nullable=True)
+    bin_location = Column(String, nullable=True)
+    picked_by = Column(String, nullable=True)
+    picked_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class PickLogResponse(BaseModel):
+    id: uuid.UUID
+    pick_order_id: uuid.UUID
+    batch_id: uuid.UUID
+    batch_code: Optional[str]
+    sku_code: str
+    quantity_picked: int
+    sequencing_rule_applied: Optional[str]
+    compliance_status: str
+    override_reason: Optional[str]
+    scan_method: Optional[str]
+    zone: Optional[str]
+    picked_by: Optional[str]
+    picked_at: datetime
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+@router.get("/pick-logs", response_model=list[PickLogResponse])
+async def list_pick_logs(
+    sku_code: Optional[str] = None,
+    compliance_status: Optional[str] = None,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List pick logs with optional filters for compliance audit."""
+    query = select(PickLog)
+    if sku_code:
+        query = query.where(PickLog.sku_code == sku_code)
+    if compliance_status:
+        query = query.where(PickLog.compliance_status == compliance_status)
+    result = await db.execute(query.order_by(PickLog.picked_at.desc()).limit(limit))
+    return result.scalars().all()
+
+
+@router.get("/pick-logs/overrides", response_model=list[PickLogResponse])
+async def list_override_logs(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all pick logs where sequencing rules were overridden."""
+    result = await db.execute(
+        select(PickLog)
+        .where(PickLog.compliance_status == ComplianceResult.OVERRIDE)
+        .order_by(PickLog.picked_at.desc())
+    )
+    return result.scalars().all()
+
+
+# ---------------------------------------------------------------------------
+# Scan-Based Pick (Barcode/RFID)
+# ---------------------------------------------------------------------------
+
+class ScanPickRequest(BaseModel):
+    pick_order_id: uuid.UUID
+    scan_method: str = Field("barcode", json_schema_extra={"example": "barcode"})
+    scan_value: str = Field(..., json_schema_extra={"example": "BATCH-2026-0412-A"})
+
+
+@router.post("/pick-orders/scan-confirm", response_model=PickOrderResponse)
+async def scan_confirm_pick(
+    payload: ScanPickRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Confirm a pick order via barcode/RFID scan.
+    Validates the scanned value matches the expected batch code.
+    """
+    order = await db.get(PickOrder, payload.pick_order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Pick order not found")
+    if order.picked:
+        raise HTTPException(status_code=409, detail="Already picked")
+
+    # Validate scan matches expected batch
+    if order.batch_code and payload.scan_value != order.batch_code:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Scan mismatch: expected batch '{order.batch_code}', scanned '{payload.scan_value}'"
+        )
+
+    order.picked = True
+    order.picked_at = datetime.now(timezone.utc)
+    order.picked_by = str(current_user.id)
+
+    log = PickLog(
+        pick_order_id=order.id,
+        batch_id=order.batch_id,
+        batch_code=order.batch_code,
+        sku_code=order.sku_code,
+        quantity_picked=order.pick_quantity,
+        sequencing_rule_applied=order.sequencing_rule,
+        compliance_status=order.compliance_status,
+        scan_method=payload.scan_method,
+        scan_value=payload.scan_value,
+        zone=order.zone,
+        picked_by=str(current_user.id),
+        picked_at=order.picked_at,
+    )
+    db.add(log)
+
+    batch = await db.get(InventoryBatch, order.batch_id)
+    if batch:
+        batch.quantity = max(0, batch.quantity - order.pick_quantity)
+        if batch.quantity == 0:
+            batch.status = BatchStatus.DEPLETED
+
     await db.commit()
     await db.refresh(order)
     return order

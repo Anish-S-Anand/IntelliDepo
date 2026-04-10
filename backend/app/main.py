@@ -126,6 +126,7 @@ if settings.ENABLE_DEPOT_MODULES:
     from app.depot.vision.cluster import router as cluster_router
     from app.depot.vision.sequencing import router as sequencing_router
     from app.depot.vision.colour_analysis import router as colour_router
+    from app.depot.vision.tracking import router as tracking_router
     from app.depot.inventory.core import router as inventory_router
     from app.depot.gate.lpr import router as gate_lpr_router
 
@@ -136,6 +137,7 @@ if settings.ENABLE_DEPOT_MODULES:
     app.include_router(cluster_router)
     app.include_router(sequencing_router)
     app.include_router(colour_router)
+    app.include_router(tracking_router)
     app.include_router(inventory_router)
     app.include_router(gate_lpr_router)
 
