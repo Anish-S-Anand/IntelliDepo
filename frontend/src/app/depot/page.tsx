@@ -1,5 +1,10 @@
-import { redirect } from "next/navigation";
+import { IntelliDepotProfessional } from "@/components/depot/professional/IntelliDepotProfessional";
+
+export const metadata = {
+  title: "IntelliDepot Professional",
+  description: "Native IntelliDepot professional workspace.",
+};
 
 export default function DepotPage() {
-  redirect("/depot/operations");
+  return <IntelliDepotProfessional />;
 }

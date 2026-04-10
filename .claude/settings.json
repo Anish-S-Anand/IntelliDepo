@@ -30,10 +30,17 @@
       "Bash(docker exec:*)",
       "Bash(pip install:*)",
       "Bash(git pull:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(npx next:*)",
+      "Bash(findstr :3000)",
+      "Bash(findstr LISTENING)",
+      "Bash(taskkill //PID 16636 //F)",
+      "Bash(xargs ls:*)",
+      "Bash(git checkout:*)"
     ],
     "additionalDirectories": [
-      "c:\\Intelli\\Intelli\\frontend\\src\\app\\depot"
+      "c:\\Intelli\\Intelli\\frontend\\src\\app\\depot",
+      "c:\\Users\\DELL\\IntelliDepo\\frontend\\src"
     ]
   }
 }

@@ -69,11 +69,16 @@ class DetectionModel(DBBaseModel):
     model_name = Column(String, nullable=False)
     model_version = Column(String, default="v8n")
     weights_path = Column(String, nullable=True)           # path or URI to .pt file
-    confidence_threshold = Column(Float, default=0.45)
+    confidence_threshold = Column(Float, default=0.85)     # 85% default per F-001
     iou_threshold = Column(Float, default=0.50)
-    target_classes = Column(String, default="bag,box")     # comma-separated
+    target_classes = Column(String, default="bag,box,pallet")  # comma-separated
     is_active = Column(Boolean, default=True)
     description = Column(Text, nullable=True)
+    # Dimension calibration (pixel-to-real-world)
+    frame_width_px = Column(Integer, default=1920)
+    frame_height_px = Column(Integer, default=1080)
+    px_to_cm_x = Column(Float, default=0.5)               # horizontal px -> cm
+    px_to_cm_y = Column(Float, default=0.5)                # vertical px -> cm
 
 
 class DetectionRun(DBBaseModel):
@@ -111,13 +116,22 @@ class DetectedObject(DBBaseModel):
 # Pydantic Schemas
 # ---------------------------------------------------------------------------
 
+class DimensionCalibration(BaseModel):
+    """Pixel-to-real-world dimension calibration parameters."""
+    frame_width_px: int = Field(1920, description="Frame width in pixels")
+    frame_height_px: int = Field(1080, description="Frame height in pixels")
+    px_to_cm_x: float = Field(0.5, description="Horizontal pixels-to-cm ratio")
+    px_to_cm_y: float = Field(0.5, description="Vertical pixels-to-cm ratio")
+    calibration_note: Optional[str] = Field(None, description="Note about calibration method")
+
+
 class DetectionModelCreate(BaseModel):
     model_name: str = Field(..., json_schema_extra={"example": "depot-yolov8n"})
     model_version: str = Field("v8n", json_schema_extra={"example": "v8n"})
     weights_path: Optional[str] = Field(None, json_schema_extra={"example": "/models/depot_yolov8n.pt"})
-    confidence_threshold: float = Field(0.45, ge=0.0, le=1.0)
+    confidence_threshold: float = Field(0.85, ge=0.0, le=1.0, description="Min confidence threshold (default 85%)")
     iou_threshold: float = Field(0.50, ge=0.0, le=1.0)
-    target_classes: str = Field("bag,box", json_schema_extra={"example": "bag,box,pallet"})
+    target_classes: str = Field("bag,box,pallet", json_schema_extra={"example": "bag,box,pallet"})
     description: Optional[str] = None
 
 
@@ -189,11 +203,17 @@ def _simulate_detections(
     frame_count: int,
     confidence_threshold: float,
     target_classes: list[str],
+    frame_width_px: int = 1920,
+    frame_height_px: int = 1080,
+    px_to_cm_x: float = 0.5,
+    px_to_cm_y: float = 0.5,
 ) -> list[DetectedObject]:
     """
     Generate synthetic detection results that mimic real YOLO output.
     Replace this function body with actual `ultralytics` YOLO inference
     once model weights are available.
+
+    Uses calibrated pixel-to-cm ratios for accurate real-world size estimation.
     """
     objects: list[DetectedObject] = []
     available = [c for c in target_classes if c in [e.value for e in ObjectClass]]
@@ -209,8 +229,10 @@ def _simulate_detections(
             by = round(random.uniform(0.0, 0.7), 4)
             bw = round(random.uniform(0.05, 0.3), 4)
             bh = round(random.uniform(0.05, 0.3), 4)
-            # rough physical size estimate: assume 1920x1080 frame, 1px ~ 0.5cm
-            size_cm2 = round(bw * 1920 * 0.5 * bh * 1080 * 0.5, 2)
+            # Calibrated physical size: use pixel-to-cm ratios from model config
+            width_cm = bw * frame_width_px * px_to_cm_x
+            height_cm = bh * frame_height_px * px_to_cm_y
+            size_cm2 = round(width_cm * height_cm, 2)
             objects.append(DetectedObject(
                 run_id=run_id,
                 frame_number=frame_no,
@@ -305,6 +327,10 @@ async def start_detection_run(
         payload.frame_count,
         det_model.confidence_threshold,
         target_classes,
+        frame_width_px=det_model.frame_width_px or 1920,
+        frame_height_px=det_model.frame_height_px or 1080,
+        px_to_cm_x=det_model.px_to_cm_x or 0.5,
+        px_to_cm_y=det_model.px_to_cm_y or 0.5,
     )
     for obj in detections:
         db.add(obj)
