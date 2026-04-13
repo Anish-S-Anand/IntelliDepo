@@ -141,6 +141,10 @@ if settings.ENABLE_DEPOT_MODULES:
     app.include_router(inventory_router)
     app.include_router(gate_lpr_router)
 
+    # IntelliOps modules
+    from app.depot.ops.live_monitoring import router as ops_monitoring_router
+    app.include_router(ops_monitoring_router)
+
 from app.core.data_infra.storage_router import router as storage_router
 
 app.include_router(vector_router)

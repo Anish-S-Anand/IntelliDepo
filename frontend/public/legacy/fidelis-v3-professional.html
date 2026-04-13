@@ -794,6 +794,7 @@ svg.chart { width: 100%; overflow: visible; }
   <button class="nav-item" onclick="nav('lpr')" title="Gate & LPR"><span class="ni-icon">🚗</span><span class="ni-label">LPR</span></button>
   <button class="nav-item" onclick="nav('perimeter')" title="Perimeter"><span class="ni-icon">🔒</span><span class="ni-label">SEC</span></button>
   <button class="nav-item" onclick="nav('exec')" title="Executive"><span class="ni-icon">📊</span><span class="ni-label">EXEC</span></button>
+  <button class="nav-item" onclick="nav('opslive')" title="IntelliOps Live"><span class="ni-icon">⚡</span><span class="ni-label">OPS+</span></button>
   <button class="nav-item" onclick="nav('sla')" title="SLA & Fleet"><span class="ni-icon">🚛</span><span class="ni-label">FLEET</span></button>
   <button class="nav-item" onclick="nav('analytics')" title="Analytics"><span class="ni-icon">📊</span><span class="ni-label">DATA</span></button>
   <div class="nav-sep"></div>
@@ -1797,6 +1798,64 @@ svg.chart { width: 100%; overflow: visible; }
   </div>
 </div>
 
+<!-- ════════════════════════════════
+     INTELLIOPS LIVE MONITORING — Day 1 (F-054, F-055, F-056)
+════════════════════════════════ -->
+<div class="page" id="pg-opslive">
+  <div class="ph">
+    <div>
+      <div class="layer-badge">IntelliOps™ — Phase 3</div>
+      <div class="page-title">Live Operations Monitor</div>
+      <div class="page-sub">Multi-feed dashboard • Threshold alerts • Priority-ranked alert feed • Real-time KPIs</div>
+    </div>
+    <div class="ph-right">
+      <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--pos);font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:var(--pos);animation:pulse 2s infinite"></span>WebSocket Connected</span>
+      <button class="btn-ref" onclick="renderOpsLive()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <!-- KPI Grid (F-054) -->
+  <div class="kpi-grid mb-20" id="opsKpis"></div>
+
+  <!-- Multi-feed + Alert Priority Feed -->
+  <div class="col-2-1 mb-20">
+    <!-- Live Event Feed (F-054) -->
+    <div class="card">
+      <div class="card-title">Live Event Feed <span class="badge" style="background:var(--acc-soft);color:var(--acc);border:1px solid rgba(229,82,26,0.2)">● Streaming</span></div>
+      <div id="opsEventFeed" style="max-height:400px;overflow-y:auto"></div>
+    </div>
+    <!-- Alert Priority Feed (F-056) -->
+    <div class="card">
+      <div class="card-title">Alert Priority Feed <span class="badge" style="background:rgba(220,38,38,0.1);color:var(--sev-critical);border:1px solid rgba(220,38,38,0.2)" id="opsAlertBadge">0</span></div>
+      <div id="opsAlertFeed" style="max-height:400px;overflow-y:auto"></div>
+    </div>
+  </div>
+
+  <!-- Threshold Config (F-055) + Feed Status -->
+  <div class="grid-2 mb-20">
+    <div class="card">
+      <div class="card-title">Alert Thresholds (F-055) <span class="badge" style="background:rgba(251,191,36,0.1);color:var(--warn);border:1px solid rgba(251,191,36,0.2)">Configurable</span></div>
+      <div id="opsThresholds"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Feed Sources Status</div>
+      <div id="opsFeedStatus"></div>
+    </div>
+  </div>
+
+  <!-- Event Volume Chart + Severity Breakdown -->
+  <div class="grid-2 mb-20">
+    <div class="card">
+      <div class="card-title">Event Volume — Last 12 Hours</div>
+      <div id="opsVolumeChart" style="display:flex;align-items:flex-end;gap:6px;height:160px;padding:0 8px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Active Alerts by Severity</div>
+      <div id="opsSeverityBreakdown"></div>
+    </div>
+  </div>
+</div>
+
 </div><!-- /content -->
 </div><!-- /app-shell -->
 
@@ -1889,6 +1948,7 @@ function nav(page) {
   if (page === "lpr") renderLPR();
   if (page === "perimeter") renderPerimeter();
   if (page === "exec") renderExecDashboard();
+  if (page === "opslive") renderOpsLive();
 }
 
 function switchDepot(id) {
@@ -3323,6 +3383,186 @@ function renderExecDashboard() {
       </div>
       <div style="width:100%;height:6px;background:var(--bord);border-radius:3px;overflow:hidden">
         <div style="height:100%;width:${pct}%;background:${s.color};border-radius:3px;transition:width 0.5s"></div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ════════════════════════════════════════════════════════
+// INTELLIOPS DAY 1 — LIVE MONITORING (F-054, F-055, F-056)
+// ════════════════════════════════════════════════════════
+const OPS_EVENTS = [
+  { id:"EV-001", type:"sensor", source:"TEMP-A01", name:"Zone A Temp Sensor", zone:"Zone A", severity:"critical", value:52.3, unit:"°C", message:"Temperature exceeded critical threshold (50°C)", time:"10:42 AM" },
+  { id:"EV-002", type:"camera", source:"CAM-02", name:"Zone A Overhead", zone:"Zone A", severity:"high", value:null, unit:null, message:"Motion detected in restricted area after hours", time:"10:38 AM" },
+  { id:"EV-003", type:"gate", source:"GATE-N", name:"North Gate", zone:"Gate", severity:"info", value:null, unit:null, message:"Vehicle TN-04-AB-1234 entered — Approved", time:"10:35 AM" },
+  { id:"EV-004", type:"sensor", source:"HUM-C01", name:"Zone C Humidity", zone:"Zone C", severity:"high", value:96.2, unit:"%", message:"Humidity above warning threshold (95%)", time:"10:30 AM" },
+  { id:"EV-005", type:"security", source:"PIR-W03", name:"West Fence PIR", zone:"Perimeter", severity:"medium", value:1, unit:null, message:"PIR motion detected — investigating", time:"10:25 AM" },
+  { id:"EV-006", type:"equipment", source:"CONV-B1", name:"Conveyor B1", zone:"Zone B", severity:"low", value:45, unit:"rpm", message:"Conveyor speed below optimal range", time:"10:20 AM" },
+  { id:"EV-007", type:"sla", source:"SLA-012", name:"ACC Cement Dispatch", zone:null, severity:"high", value:82, unit:"%", message:"SLA breach probability at 82% — 45 min remaining", time:"10:15 AM" },
+  { id:"EV-008", type:"sensor", source:"WEIGHT-D1", name:"Zone D Floor Scale", zone:"Zone D", severity:"info", value:1092, unit:"units", message:"Zone D load updated — 1092 units", time:"10:10 AM" },
+  { id:"EV-009", type:"camera", source:"CAM-05", name:"Gate Exit South", zone:"Gate", severity:"info", value:null, unit:null, message:"Vehicle MH-12-CD-5678 exited — logged", time:"10:05 AM" },
+  { id:"EV-010", type:"environment", source:"WIND-01", name:"Anemometer", zone:"External", severity:"medium", value:45, unit:"km/h", message:"High wind speed — outdoor ops advisory", time:"10:00 AM" },
+];
+
+const OPS_ALERTS = [
+  { id:"AL-001", type:"sensor_temperature", severity:"critical", priority:100, source:"TEMP-A01", name:"Zone A Temp Sensor", zone:"Zone A", title:"TEMPERATURE CRITICAL — Zone A", message:"52.3°C exceeded critical threshold (50°C). Immediate action required.", status:"active", time:"10:42 AM" },
+  { id:"AL-002", type:"camera_motion", severity:"high", priority:75, source:"CAM-02", name:"Zone A Overhead", zone:"Zone A", title:"MOTION ALERT — Restricted Area", message:"Unauthorized motion in Zone A restricted area. Camera CAM-02 tracking.", status:"active", time:"10:38 AM" },
+  { id:"AL-003", type:"sensor_humidity", severity:"high", priority:75, source:"HUM-C01", name:"Zone C Humidity", zone:"Zone C", title:"HUMIDITY WARNING — Zone C", message:"96.2% humidity in Hazmat zone. Chemical storage safety risk.", status:"acknowledged", time:"10:30 AM" },
+  { id:"AL-004", type:"sla_breach", severity:"high", priority:70, source:"SLA-012", name:"ACC Cement SLA", zone:null, title:"SLA BREACH RISK — ACC Cement", message:"82% breach probability. Dispatch deadline in 45 minutes.", status:"active", time:"10:15 AM" },
+  { id:"AL-005", type:"security_motion", severity:"medium", priority:50, source:"PIR-W03", name:"West Fence PIR", zone:"Perimeter", title:"PERIMETER MOTION — West Fence", message:"PIR motion sensor triggered. Guard dispatched for verification.", status:"acknowledged", time:"10:25 AM" },
+  { id:"AL-006", type:"environment_wind", severity:"medium", priority:45, source:"WIND-01", name:"Anemometer", zone:"External", title:"HIGH WIND ADVISORY", message:"45 km/h wind speed. Outdoor crane operations suspended.", status:"active", time:"10:00 AM" },
+];
+
+const OPS_THRESHOLDS = [
+  { type:"sensor", metric:"temperature", warning:45, critical:50, comparison:"gte", unit:"°C" },
+  { type:"sensor", metric:"humidity", warning:90, critical:95, comparison:"gte", unit:"%" },
+  { type:"sensor", metric:"vibration", warning:6, critical:8, comparison:"gte", unit:"g" },
+  { type:"environment", metric:"wind_speed", warning:35, critical:50, comparison:"gte", unit:"km/h" },
+  { type:"equipment", metric:"conveyor_speed", warning:30, critical:20, comparison:"lte", unit:"rpm" },
+  { type:"sla", metric:"breach_probability", warning:70, critical:85, comparison:"gte", unit:"%" },
+];
+
+const OPS_FEED_SOURCES = [
+  { name:"CCTV Cameras", count:12, online:11, icon:"📹", status:"online" },
+  { name:"IoT Sensors", count:48, online:46, icon:"📡", status:"online" },
+  { name:"Gate Systems", count:4, online:4, icon:"🚗", status:"online" },
+  { name:"Weather Station", count:1, online:1, icon:"🌤", status:"online" },
+  { name:"Conveyor Systems", count:6, online:5, icon:"⚙", status:"degraded" },
+  { name:"WebSocket Feed", count:1, online:1, icon:"⚡", status:"online" },
+];
+
+const OPS_VOLUME = [
+  { hour:"00", count:12 },{ hour:"01", count:8 },{ hour:"02", count:5 },
+  { hour:"03", count:3 },{ hour:"04", count:7 },{ hour:"05", count:15 },
+  { hour:"06", count:42 },{ hour:"07", count:78 },{ hour:"08", count:120 },
+  { hour:"09", count:145 },{ hour:"10", count:168 },{ hour:"11", count:132 },
+];
+
+function opsSevCol(s) { return s==="critical"?"var(--sev-critical)":s==="high"?"var(--sev-high)":s==="medium"?"var(--warn)":s==="low"?"var(--pos)":"var(--info)"; }
+function opsTypeIcon(t) { return {sensor:"📡",camera:"📹",gate:"🚗",security:"🔒",sla:"📋",equipment:"⚙",environment:"🌤"}[t]||"📌"; }
+
+function renderOpsLive() {
+  const activeAlerts = OPS_ALERTS.filter(a=>a.status!=="resolved");
+  const critCount = activeAlerts.filter(a=>a.severity==="critical").length;
+  const highCount = activeAlerts.filter(a=>a.severity==="high").length;
+
+  // KPIs
+  document.getElementById("opsKpis").innerHTML = [
+    { l:"Events Today", v:"738", c:"var(--info)", d:"↑ +12% vs yesterday", i:"📊" },
+    { l:"Active Alerts", v:activeAlerts.length, c:"var(--sev-high)", d:`${critCount} CRITICAL, ${highCount} HIGH`, i:"🚨" },
+    { l:"Feed Sources", v:"69/72", c:"var(--pos)", d:"96% online", i:"📡" },
+    { l:"Avg Response", v:"2.4m", c:"var(--pos)", d:"↓ 45% faster", i:"⏱" },
+    { l:"Events/Hour", v:"168", c:"var(--info)", d:"Peak hour active", i:"⚡" },
+    { l:"Thresholds", v:OPS_THRESHOLDS.length, c:"var(--warn)", d:"Active rules", i:"🎯" },
+  ].map(k=>`<div class="kpi" style="--kpi-color:${k.c}"><div class="kpi-label">${k.l}<span class="kpi-icon">${k.i}</span></div><div class="kpi-val" style="color:${k.c}">${k.v}</div><div class="kpi-delta" style="color:${k.d.includes('↑')||k.d.includes('↓')?'var(--pos)':k.d.includes('CRITICAL')?'var(--sev-critical)':'var(--sub)'}">${k.d}</div></div>`).join("");
+
+  // Event Feed
+  document.getElementById("opsEventFeed").innerHTML = OPS_EVENTS.map(e => {
+    const col = opsSevCol(e.severity);
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;background:var(--bg);margin-bottom:5px;border-left:3px solid ${col}">
+      <span style="font-size:16px;margin-top:2px">${opsTypeIcon(e.type)}</span>
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+          <span style="font-size:11px;font-weight:700;color:var(--text)">${e.name}</span>
+          <span style="font-size:9px;color:var(--sub)">${e.time}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text);margin-bottom:3px">${e.message}</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:99px;background:${col}18;color:${col};border:1px solid ${col}33">${e.severity.toUpperCase()}</span>
+          ${e.zone?`<span style="font-size:8px;color:var(--sub)">${e.zone}</span>`:''}
+          ${e.value!==null?`<span style="font-size:8px;color:var(--sub)">${e.value}${e.unit||''}</span>`:''}
+          <span style="font-size:8px;padding:1px 5px;border-radius:4px;background:var(--bg2);color:var(--sub)">${e.source}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+
+  // Alert Priority Feed
+  document.getElementById("opsAlertBadge").textContent = activeAlerts.length + " Active";
+  document.getElementById("opsAlertFeed").innerHTML = OPS_ALERTS.map(a => {
+    const col = opsSevCol(a.severity);
+    const stCol = a.status==="active"?"var(--sev-high)":a.status==="acknowledged"?"var(--info)":"var(--pos)";
+    return `<div style="padding:10px 12px;border-radius:8px;background:var(--bg);margin-bottom:6px;border-left:4px solid ${col}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+        <div>
+          <span style="font-size:11px;font-weight:700;color:${col}">${a.title}</span>
+        </div>
+        <div style="display:flex;gap:4px;align-items:center">
+          <span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:99px;background:${col}18;color:${col};border:1px solid ${col}33">P${a.priority}</span>
+          <span style="font-size:9px;color:var(--sub)">${a.time}</span>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--sub);margin-bottom:6px">${a.message}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:99px;background:${stCol}18;color:${stCol};border:1px solid ${stCol}33">${a.status.toUpperCase()}</span>
+        <div style="display:flex;gap:4px">
+          ${a.status==="active"?`<button style="font-size:8px;padding:2px 8px;border-radius:4px;background:var(--info);color:#fff;border:none;cursor:pointer;font-weight:600" onclick="alert('Acknowledged (demo)')">ACK</button>`:''}
+          <button style="font-size:8px;padding:2px 8px;border-radius:4px;background:var(--bg2);color:var(--sub);border:1px solid var(--bord);cursor:pointer" onclick="alert('Escalated (demo)')">ESCALATE</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+
+  // Thresholds
+  document.getElementById("opsThresholds").innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:11px">
+    <thead><tr style="text-align:left;color:var(--sub);font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid var(--bord)">
+      <th style="padding:6px 6px 6px 0">Type</th><th style="padding:6px">Metric</th><th style="padding:6px;text-align:right">Warning</th><th style="padding:6px;text-align:right">Critical</th><th style="padding:6px;text-align:center">Rule</th>
+    </tr></thead>
+    <tbody>${OPS_THRESHOLDS.map(t => {
+      return `<tr style="border-bottom:1px solid var(--bord)">
+        <td style="padding:6px 6px 6px 0;color:var(--sub)">${t.type}</td>
+        <td style="padding:6px;font-weight:600;color:var(--text)">${t.metric}</td>
+        <td style="padding:6px;text-align:right;color:var(--warn);font-weight:700">${t.warning}${t.unit}</td>
+        <td style="padding:6px;text-align:right;color:var(--sev-critical);font-weight:700">${t.critical}${t.unit}</td>
+        <td style="padding:6px;text-align:center;font-size:9px;color:var(--sub)">${t.comparison==='gte'?'≥':'≤'}</td>
+      </tr>`;
+    }).join("")}</tbody></table>`;
+
+  // Feed Sources
+  document.getElementById("opsFeedStatus").innerHTML = OPS_FEED_SOURCES.map(f => {
+    const col = f.status==="online"?"var(--pos)":f.status==="degraded"?"var(--warn)":"var(--sev-critical)";
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;border-left:3px solid ${col}">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:16px">${f.icon}</span>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text)">${f.name}</div>
+          <div style="font-size:9px;color:var(--sub)">${f.online}/${f.count} active</div>
+        </div>
+      </div>
+      <span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:99px;background:${col}18;color:${col};border:1px solid ${col}33">${f.status.toUpperCase()}</span>
+    </div>`;
+  }).join("");
+
+  // Volume Chart
+  const maxVol = Math.max(...OPS_VOLUME.map(v=>v.count));
+  document.getElementById("opsVolumeChart").innerHTML = OPS_VOLUME.map((v,i) => {
+    const h = maxVol>0?(v.count/maxVol*140):0;
+    const isLast = i===OPS_VOLUME.length-1;
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+      <span style="font-size:8px;color:var(--sub)">${v.count}</span>
+      <div style="width:100%;height:${h}px;border-radius:3px 3px 0 0;background:var(--info);opacity:${isLast?1:0.5};${isLast?'box-shadow:0 0 8px var(--info)':''}"></div>
+      <span style="font-size:8px;color:var(--sub)">${v.hour}h</span>
+    </div>`;
+  }).join("");
+
+  // Severity Breakdown
+  const sevCounts = {critical:0,high:0,medium:0,low:0};
+  OPS_ALERTS.forEach(a=>{ if(sevCounts[a.severity]!==undefined) sevCounts[a.severity]++; });
+  const totalA = Object.values(sevCounts).reduce((a,v)=>a+v,0);
+  document.getElementById("opsSeverityBreakdown").innerHTML = [
+    {l:"CRITICAL",c:sevCounts.critical,col:"var(--sev-critical)"},
+    {l:"HIGH",c:sevCounts.high,col:"var(--sev-high)"},
+    {l:"MEDIUM",c:sevCounts.medium,col:"var(--warn)"},
+    {l:"LOW",c:sevCounts.low,col:"var(--pos)"},
+  ].map(s=>{
+    const pct = totalA>0?(s.c/totalA*100):0;
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:11px;font-weight:700;color:${s.col}">${s.l}</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text)">${s.c}</span>
+      </div>
+      <div style="width:100%;height:6px;background:var(--bord);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${s.col};border-radius:3px"></div>
       </div>
     </div>`;
   }).join("");

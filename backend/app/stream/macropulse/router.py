@@ -29,6 +29,8 @@ from app.stream.macropulse.cost_routing import get_cost_router, classify_complex
 from app.stream.macropulse.event_publisher import get_event_publisher, get_event_schemas
 from app.stream.macropulse.hitl import router as hitl_router, enqueue_for_hitl, should_route_to_hitl
 from app.stream.macropulse.tracing import get_metrics_summary
+from app.stream.macropulse.sla.router import router as sla_router
+from app.stream.macropulse.metrics import router as prometheus_router
 
 router = APIRouter(prefix="/api/v1/macropulse", tags=["macropulse"])
 router.include_router(auth_router)
@@ -38,6 +40,8 @@ router.include_router(alerts_router)
 router.include_router(ingestion_hitl_router)
 router.include_router(guardrails_router)
 router.include_router(hitl_router)
+router.include_router(sla_router)
+router.include_router(prometheus_router)
 
 
 @router.get("/realtime", response_model=MacroPulseRealtimeResponse)
