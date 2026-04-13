@@ -11,7 +11,9 @@ import {
   GitMerge,
   HeartPulse,
   LayoutGrid,
+  Map,
   Settings,
+  ShieldAlert,
 } from "lucide-react";
 
 const TOP_NAV = [
@@ -20,8 +22,10 @@ const TOP_NAV = [
 
 const FEATURE_NAV = [
   { label: "Real-Time Monitoring", href: "/stream/macropulse/realtime", icon: Activity },
-  { label: "Simulation Impact", href: "/stream/macropulse/simulation", icon: GitMerge },
-  { label: "MacroPulse Agent", href: "/stream/macropulse/agent", icon: Bot },
+  { label: "Live Monitoring",      href: "/stream/macropulse/live-monitoring", icon: Map },
+  { label: "SLA Tracking",         href: "/stream/macropulse/sla", icon: ShieldAlert },
+  { label: "Simulation Impact",    href: "/stream/macropulse/simulation", icon: GitMerge },
+  { label: "MacroPulse Agent",     href: "/stream/macropulse/agent", icon: Bot },
 ];
 
 const SUPPORT_NAV = [

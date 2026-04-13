@@ -7,10 +7,12 @@ import {
   ChevronUp,
   Clipboard,
   ClipboardCheck,
+  Paperclip,
   RefreshCw,
   Send,
   Sparkles,
   TrendingUp,
+  X,
   Zap,
 } from "lucide-react";
 
@@ -530,9 +532,33 @@ export default function MacroPulseAgentPage() {
   const [newestIdx, setNewestIdx] = useState<number | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  const [attachedFile, setAttachedFile] = useState<{ name: string; content: string; preview?: string } | null>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const prevSessionIdRef = useRef<string | null>(null);
+
+  const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    const isImage = file.type.startsWith("image/");
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      setAttachedFile({
+        name: file.name,
+        content: isImage ? `[Image attached: ${file.name}]` : result,
+        preview: isImage ? result : undefined,
+      });
+    };
+    if (isImage) {
+      reader.readAsDataURL(file);
+    } else {
+      reader.readAsText(file);
+    }
+    e.target.value = "";
+  };
 
   const {
     sessions,
@@ -582,8 +608,11 @@ export default function MacroPulseAgentPage() {
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || isQuerying || !ready) return;
-      const userMsg = text.trim();
+      const userMsg = attachedFile
+        ? `[Document: ${attachedFile.name}]\n\n${attachedFile.content}\n\n---\n${text.trim()}`
+        : text.trim();
       setInput("");
+      setAttachedFile(null);
 
       let sessionId = activeSessionId;
       if (!sessionId) {
@@ -644,6 +673,7 @@ export default function MacroPulseAgentPage() {
     },
     [
       activeSessionId,
+      attachedFile,
       createSession,
       isQuerying,
       messages,
@@ -836,7 +866,41 @@ export default function MacroPulseAgentPage() {
 
         {/* ── Input area ── */}
         <div className="shrink-0 border-t border-gray-100 p-4">
+          {/* Attached file chip */}
+          {attachedFile && (
+            <div className="mb-2 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs text-blue-700 w-fit max-w-full">
+              {attachedFile.preview ? (
+                <img src={attachedFile.preview} alt="preview" className="h-6 w-6 rounded object-cover shrink-0" />
+              ) : (
+                <Paperclip className="h-3.5 w-3.5 shrink-0" />
+              )}
+              <span className="truncate max-w-[240px]">{attachedFile.name}</span>
+              <button
+                onClick={() => setAttachedFile(null)}
+                className="ml-1 shrink-0 rounded-full p-0.5 hover:bg-blue-200 transition"
+                aria-label="Remove attachment"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.md,.csv,.json,.pdf,.docx,image/*"
+            className="hidden"
+            onChange={handleFileAttach}
+          />
           <div className="flex items-end gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 focus-within:border-blue-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isQuerying}
+              title="Attach document"
+              className="mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-200 hover:text-gray-700 disabled:opacity-40"
+            >
+              <Paperclip className="h-4 w-4" />
+            </button>
             <textarea
               ref={textareaRef}
               value={input}
