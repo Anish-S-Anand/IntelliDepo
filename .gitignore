@@ -127,3 +127,12 @@ temp_data/
 probe.txt
 doc_page_*.png
 pytest-cache-files-*/
+
+# Model weights
+*.pt
+*.pth
+*.onnx
+
+# Test images
+dark_test.jpg
+light_test.jpg
