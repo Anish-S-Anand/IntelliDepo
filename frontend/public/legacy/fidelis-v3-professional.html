@@ -792,6 +792,8 @@ svg.chart { width: 100%; overflow: visible; }
   <button class="nav-item" onclick="nav('sequencing')" title="FIFO/LIFO"><span class="ni-icon">🔄</span><span class="ni-label">SEQ</span></button>
   <button class="nav-item" onclick="nav('batches')" title="Batch Tracking"><span class="ni-icon">📋</span><span class="ni-label">BATCH</span></button>
   <button class="nav-item" onclick="nav('lpr')" title="Gate & LPR"><span class="ni-icon">🚗</span><span class="ni-label">LPR</span></button>
+  <button class="nav-item" onclick="nav('perimeter')" title="Perimeter"><span class="ni-icon">🔒</span><span class="ni-label">SEC</span></button>
+  <button class="nav-item" onclick="nav('exec')" title="Executive"><span class="ni-icon">📊</span><span class="ni-label">EXEC</span></button>
   <button class="nav-item" onclick="nav('sla')" title="SLA & Fleet"><span class="ni-icon">🚛</span><span class="ni-label">FLEET</span></button>
   <button class="nav-item" onclick="nav('analytics')" title="Analytics"><span class="ni-icon">📊</span><span class="ni-label">DATA</span></button>
   <div class="nav-sep"></div>
@@ -1685,6 +1687,116 @@ svg.chart { width: 100%; overflow: visible; }
   </div>
 </div>
 
+<!-- ════════════════════════════════
+     PERIMETER SECURITY — Day 4 (F-026 to F-030)
+════════════════════════════════ -->
+<div class="page" id="pg-perimeter">
+  <div class="ph">
+    <div>
+      <div class="layer-badge">Day 4 — Perimeter Monitoring</div>
+      <div class="page-title">Perimeter Security Dashboard</div>
+      <div class="page-sub">Motion detection • Breach classification • Night vision • Auto-escalation</div>
+    </div>
+    <div class="ph-right">
+      <button class="fbtn" id="secNvBtn" onclick="toggleNightVision()" style="display:flex;align-items:center;gap:4px">🌙 Night Vision: <span id="secNvLabel">OFF</span></button>
+      <button class="btn-ref" onclick="renderPerimeter()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <div class="kpi-grid mb-20">
+    <div class="kpi" style="--kpi-color:var(--sev-critical)"><div class="kpi-label">Active Breaches<span class="kpi-icon">🚨</span></div><div class="kpi-val" style="color:var(--sev-critical)" id="secBreaches">2</div><div class="kpi-delta" style="color:var(--sev-high)">Require immediate response</div></div>
+    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Perimeter Zones<span class="kpi-icon">🔒</span></div><div class="kpi-val" style="color:var(--pos)" id="secZones">6</div><div class="kpi-delta" style="color:var(--pos)">All monitored</div></div>
+    <div class="kpi" style="--kpi-color:var(--warn)"><div class="kpi-label">Motion Events Today<span class="kpi-icon">👁</span></div><div class="kpi-val" style="color:var(--warn)" id="secMotion">18</div><div class="kpi-delta" style="color:var(--sub)">↓ vs 24 yesterday</div></div>
+    <div class="kpi" style="--kpi-color:var(--info)"><div class="kpi-label">Camera Coverage<span class="kpi-icon">📹</span></div><div class="kpi-val" style="color:var(--info)">92<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)">Above 80% minimum</div></div>
+    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Avg Response Time<span class="kpi-icon">⏱</span></div><div class="kpi-val" style="color:var(--pos)">2.4<span class="kpi-unit">min</span></div><div class="kpi-delta" style="color:var(--pos)">↓ 45% faster</div></div>
+    <div class="kpi" style="--kpi-color:var(--sev-high)"><div class="kpi-label">Pending Escalation<span class="kpi-icon">⏰</span></div><div class="kpi-val" style="color:var(--sev-high)" id="secEscalations">1</div><div class="kpi-delta" style="color:var(--sev-high)">5-min auto-escalation</div></div>
+  </div>
+
+  <div class="col-2-1 mb-20">
+    <div class="card">
+      <div class="card-title">Perimeter Map — Camera Coverage <span class="badge" style="background:var(--acc-soft);color:var(--acc);border:1px solid rgba(229,82,26,0.2)">Live</span></div>
+      <div style="background:var(--bg);border-radius:10px;border:1px solid var(--bord);overflow:hidden" id="secMapContainer">
+        <svg viewBox="0 0 1000 500" id="secPerimeterMap" style="width:100%;height:auto"></svg>
+      </div>
+    </div>
+    <div>
+      <div class="card mb-16">
+        <div class="card-title">Active Incidents <span class="badge" style="background:rgba(220,38,38,0.1);color:var(--sev-critical);border:1px solid rgba(220,38,38,0.2)" id="secIncBadge">0</span></div>
+        <div id="secIncidents"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Security Heatmap <span class="badge" style="background:rgba(59,130,246,0.1);color:var(--info);border:1px solid rgba(59,130,246,0.2)">24h Pattern</span></div>
+        <div id="secHeatmap"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-20">
+    <div class="card-title">Incident Clip Archive <span class="badge" style="background:var(--acc-soft);color:var(--acc);border:1px solid rgba(229,82,26,0.2)">Evidence Grade</span></div>
+    <div id="secClipArchive"></div>
+  </div>
+
+  <div class="card mb-20">
+    <div class="card-title">Breach Event Log <span class="badge" style="background:rgba(59,130,246,0.1);color:var(--info);border:1px solid rgba(59,130,246,0.2)">Today</span></div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead>
+          <tr style="text-align:left;color:var(--sub);font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid var(--bord)">
+            <th style="padding:8px 8px 8px 0">Time</th>
+            <th style="padding:8px">Zone</th>
+            <th style="padding:8px">Type</th>
+            <th style="padding:8px">Severity</th>
+            <th style="padding:8px">Camera</th>
+            <th style="padding:8px">Status</th>
+            <th style="padding:8px">Escalation</th>
+          </tr>
+        </thead>
+        <tbody id="secBreachLog"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     EXECUTIVE DASHBOARD — Day 4
+════════════════════════════════ -->
+<div class="page" id="pg-exec">
+  <div class="ph">
+    <div>
+      <div class="layer-badge">Day 4 — Executive View</div>
+      <div class="page-title">Executive Dashboard &mdash; IntelliDepot™</div>
+      <div class="page-sub">Cross-module KPIs • Real-time status • Notification center</div>
+    </div>
+    <div class="ph-right">
+      <button class="btn-ref" onclick="renderExecDashboard()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <div class="kpi-grid mb-20" id="execKpis"></div>
+
+  <div class="grid-2 mb-20">
+    <div class="card">
+      <div class="card-title">Module Status — All Systems <span class="badge" style="background:rgba(52,211,153,0.1);color:var(--pos);border:1px solid rgba(52,211,153,0.2)">● Online</span></div>
+      <div id="execModules"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Notification Center <span class="badge" style="background:rgba(220,38,38,0.1);color:var(--sev-critical);border:1px solid rgba(220,38,38,0.2)" id="execNotifBadge">0</span></div>
+      <div id="execNotifications" style="max-height:320px;overflow-y:auto"></div>
+    </div>
+  </div>
+
+  <div class="grid-2 mb-20">
+    <div class="card">
+      <div class="card-title">Cross-Module Activity — Today</div>
+      <div id="execActivity" style="display:flex;align-items:flex-end;gap:6px;height:180px;padding:0 8px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Active Alerts by Severity</div>
+      <div id="execAlertBreakdown"></div>
+    </div>
+  </div>
+</div>
+
 </div><!-- /content -->
 </div><!-- /app-shell -->
 
@@ -1775,6 +1887,8 @@ function nav(page) {
   if (page === "sequencing") renderSequencing();
   if (page === "batches") renderBatches();
   if (page === "lpr") renderLPR();
+  if (page === "perimeter") renderPerimeter();
+  if (page === "exec") renderExecDashboard();
 }
 
 function switchDepot(id) {
@@ -2918,6 +3032,298 @@ function renderLPR() {
       </div>
       <div style="font-size:10px;color:var(--text);margin-bottom:2px">${b.reason}</div>
       <div style="font-size:9px;color:var(--sub)">Added by: ${b.addedBy}</div>
+    </div>`;
+  }).join("");
+}
+
+// ════════════════════════════════════════════════════════
+// DAY 4 — PERIMETER SECURITY DATA & RENDER (F-026 to F-030)
+// ════════════════════════════════════════════════════════
+const SEC_ZONES = [
+  { id:"PZ-N", name:"North Fence Line", type:"fence", cameras:["CAM-P01","CAM-P02"], coverage:95, status:"active", nightVision:true, coords:[[50,30],[950,30]] },
+  { id:"PZ-E", name:"East Wall", type:"wall", cameras:["CAM-P03"], coverage:88, status:"active", nightVision:true, coords:[[950,30],[950,470]] },
+  { id:"PZ-S", name:"South Gate Perimeter", type:"gate", cameras:["CAM-P04","CAM-P05"], coverage:98, status:"active", nightVision:false, coords:[[950,470],[50,470]] },
+  { id:"PZ-W", name:"West Boundary", type:"fence", cameras:["CAM-P06"], coverage:82, status:"active", nightVision:true, coords:[[50,470],[50,30]] },
+  { id:"PZ-G1", name:"Gate 1 — North Entry", type:"gate", cameras:["CAM-P07"], coverage:100, status:"active", nightVision:true, coords:[[400,30],[600,30]] },
+  { id:"PZ-G4", name:"Gate 4 — Emergency", type:"gate", cameras:["CAM-P08"], coverage:90, status:"alert", nightVision:false, coords:[[700,470],[900,470]] },
+];
+
+const SEC_BREACHES = [
+  { id:"BR-001", zone:"Gate 4 — Emergency", type:"unauthorized_entry", severity:"critical", camera:"CAM-P08", time:"8m ago", status:"acknowledged", description:"Person observed bypassing security checkpoint. Guard Unit 2 dispatched.", escalation:"Facility Head notified", resolved:false },
+  { id:"BR-002", zone:"West Boundary", type:"loitering", severity:"high", camera:"CAM-P06", time:"22m ago", status:"open", description:"Individual loitering near west fence for >10 minutes. Motion tracking active.", escalation:"Auto-escalation in 3m", resolved:false },
+  { id:"BR-003", zone:"North Fence Line", type:"after_hours", severity:"medium", camera:"CAM-P01", time:"1h ago", status:"resolved", description:"After-hours movement detected near north fence. Identified as security patrol.", escalation:"None", resolved:true },
+  { id:"BR-004", zone:"East Wall", type:"object_left", severity:"low", camera:"CAM-P03", time:"2h ago", status:"resolved", description:"Unattended object detected near east wall. Identified as maintenance equipment.", escalation:"None", resolved:true },
+  { id:"BR-005", zone:"South Gate Perimeter", type:"forced_entry", severity:"critical", camera:"CAM-P04", time:"5h ago", status:"resolved", description:"Attempted forced entry at south gate perimeter fence. Police notified, suspect apprehended.", escalation:"Police + Management", resolved:true },
+];
+
+const SEC_CLIPS = [
+  { id:"CL-001", breach:"BR-001", zone:"Gate 4", time:"10:32 AM", duration:"0:42", severity:"critical", thumbnail:"🎬", status:"unreviewed" },
+  { id:"CL-002", breach:"BR-002", zone:"West Boundary", time:"10:18 AM", duration:"2:15", severity:"high", thumbnail:"🎬", status:"unreviewed" },
+  { id:"CL-003", breach:"BR-003", zone:"North Fence", time:"09:40 AM", duration:"0:28", severity:"medium", thumbnail:"🎬", status:"reviewed" },
+  { id:"CL-004", breach:"BR-005", zone:"South Gate", time:"05:22 AM", duration:"1:55", severity:"critical", thumbnail:"🎬", status:"exported" },
+];
+
+const SEC_HEATMAP_DATA = [
+  { hour:"00-04", north:2, east:0, south:1, west:3 },
+  { hour:"04-08", north:5, east:1, south:3, west:2 },
+  { hour:"08-12", north:1, east:2, south:4, west:1 },
+  { hour:"12-16", north:0, east:1, south:2, west:0 },
+  { hour:"16-20", north:3, east:0, south:1, west:2 },
+  { hour:"20-24", north:4, east:3, south:2, west:5 },
+];
+
+let secNightVision = false;
+
+function secSevCol(s) { return s==="critical"?"var(--sev-critical)":s==="high"?"var(--sev-high)":s==="medium"?"var(--warn)":"var(--pos)"; }
+function secStatusCol(s) { return s==="open"?"var(--sev-high)":s==="acknowledged"?"var(--info)":s==="escalated"?"var(--sev-critical)":"var(--pos)"; }
+function secBreachLabel(t) { return {unauthorized_entry:"Unauthorized Entry",loitering:"Loitering",forced_entry:"Forced Entry",after_hours:"After Hours",object_left:"Object Left",unknown:"Unknown"}[t]||t; }
+
+function toggleNightVision() {
+  secNightVision = !secNightVision;
+  document.getElementById("secNvLabel").textContent = secNightVision ? "ON" : "OFF";
+  document.getElementById("secNvBtn").style.background = secNightVision ? "rgba(139,92,246,0.15)" : "";
+  document.getElementById("secNvBtn").style.color = secNightVision ? "#a78bfa" : "";
+  document.getElementById("secNvBtn").style.borderColor = secNightVision ? "rgba(139,92,246,0.3)" : "";
+  document.getElementById("secMapContainer").style.background = secNightVision ? "#0a1a0a" : "var(--bg)";
+  document.getElementById("secMapContainer").style.filter = secNightVision ? "hue-rotate(90deg) saturate(0.3) brightness(0.8)" : "";
+  renderPerimeter();
+}
+
+function renderPerimeter() {
+  const activeBreaches = SEC_BREACHES.filter(b=>!b.resolved);
+  document.getElementById("secBreaches").textContent = activeBreaches.length;
+  document.getElementById("secIncBadge").textContent = activeBreaches.length + " Active";
+
+  // Perimeter map SVG
+  const svg = document.getElementById("secPerimeterMap");
+  const bgCol = secNightVision ? "#0f1f0f" : "var(--bg)";
+  const lineCol = secNightVision ? "#22ff22" : "var(--bord2)";
+  const textCol = secNightVision ? "#44ff44" : "var(--sub)";
+  let svgH = `<rect width="1000" height="500" fill="${bgCol}" rx="0"/>`;
+  // Grid
+  for(let i=0;i<21;i++) svgH+=`<line x1="${i*50}" y1="0" x2="${i*50}" y2="500" stroke="${lineCol}" stroke-width="0.3" opacity="0.3"/>`;
+  for(let i=0;i<11;i++) svgH+=`<line x1="0" y1="${i*50}" x2="1000" y2="${i*50}" stroke="${lineCol}" stroke-width="0.3" opacity="0.3"/>`;
+  // Perimeter outline
+  svgH+=`<rect x="40" y="20" width="920" height="460" rx="6" fill="none" stroke="${secNightVision?'#22ff22':'var(--acc)'}" stroke-width="2.5" stroke-dasharray="12 4" opacity="0.6"/>`;
+  // Zone segments
+  SEC_ZONES.forEach(z => {
+    const isAlert = z.status==="alert";
+    const col = isAlert ? "var(--sev-critical)" : secNightVision ? "#22ff22" : "var(--pos)";
+    const [[x1,y1],[x2,y2]] = z.coords;
+    svgH+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${isAlert?4:2.5}" opacity="${isAlert?1:0.7}"/>`;
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    // Camera icons
+    z.cameras.forEach((c,i) => {
+      const cx = mx + (i-z.cameras.length/2+0.5)*50;
+      const cy = my < 100 ? my+20 : my > 400 ? my-20 : my;
+      svgH+=`<circle cx="${cx}" cy="${cy}" r="8" fill="${col}" fill-opacity="0.2" stroke="${col}" stroke-width="1.5"/>`;
+      svgH+=`<text x="${cx}" y="${cy+3}" text-anchor="middle" fill="${col}" font-size="8" font-weight="700">📹</text>`;
+    });
+    // Zone label
+    const ly = my < 100 ? my+40 : my > 400 ? my-35 : my;
+    svgH+=`<text x="${mx}" y="${ly}" text-anchor="middle" fill="${textCol}" font-size="9" font-weight="600">${z.name}</text>`;
+    if(isAlert) svgH+=`<circle cx="${mx}" cy="${ly-15}" r="12" fill="var(--sev-critical)" fill-opacity="0.3"><animate attributeName="r" values="12;18;12" dur="2s" repeatCount="indefinite"/></circle>`;
+  });
+  // Building footprints
+  svgH+=`<rect x="150" y="120" width="300" height="260" rx="8" fill="var(--card)" fill-opacity="0.3" stroke="${lineCol}" stroke-width="1"/>`;
+  svgH+=`<text x="300" y="250" text-anchor="middle" fill="${textCol}" font-size="12" font-weight="700">WAREHOUSE</text>`;
+  svgH+=`<rect x="550" y="120" width="250" height="150" rx="8" fill="var(--card)" fill-opacity="0.3" stroke="${lineCol}" stroke-width="1"/>`;
+  svgH+=`<text x="675" y="200" text-anchor="middle" fill="${textCol}" font-size="10" font-weight="600">ADMIN</text>`;
+  svgH+=`<rect x="550" y="300" width="250" height="100" rx="8" fill="var(--card)" fill-opacity="0.3" stroke="${lineCol}" stroke-width="1"/>`;
+  svgH+=`<text x="675" y="355" text-anchor="middle" fill="${textCol}" font-size="10" font-weight="600">LOADING</text>`;
+  // Breach markers
+  activeBreaches.forEach(b => {
+    const z = SEC_ZONES.find(sz=>b.zone.includes(sz.name.split("—")[0].trim()));
+    if(!z) return;
+    const [[x1,y1],[x2,y2]] = z.coords;
+    const bx=(x1+x2)/2, by=(y1+y2)/2;
+    const col = secSevCol(b.severity);
+    svgH+=`<circle cx="${bx}" cy="${by}" r="16" fill="${col}" fill-opacity="0.15"><animate attributeName="r" values="16;24;16" dur="1.5s" repeatCount="indefinite"/></circle>`;
+    svgH+=`<circle cx="${bx}" cy="${by}" r="6" fill="${col}"/>`;
+    svgH+=`<text x="${bx}" y="${by+28}" text-anchor="middle" fill="${col}" font-size="8" font-weight="700">${b.severity.toUpperCase()}</text>`;
+  });
+  svg.innerHTML = svgH;
+
+  // Incidents panel
+  document.getElementById("secIncidents").innerHTML = activeBreaches.length===0
+    ? '<div style="text-align:center;color:var(--pos);padding:20px;font-size:12px">✓ No active incidents</div>'
+    : activeBreaches.map(b => {
+      const sc = secSevCol(b.severity);
+      const stc = secStatusCol(b.status);
+      return `<div style="padding:10px 12px;border-radius:8px;background:var(--bg);margin-bottom:8px;border-left:4px solid ${sc}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+          <div>
+            <span style="font-size:12px;font-weight:700;color:var(--text)">${secBreachLabel(b.type)}</span>
+            <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px;background:${sc}18;color:${sc};border:1px solid ${sc}33;margin-left:6px">${b.severity.toUpperCase()}</span>
+          </div>
+          <span style="font-size:9px;color:var(--sub)">${b.time}</span>
+        </div>
+        <div style="font-size:10px;color:var(--sub);margin-bottom:4px">${b.zone} · ${b.camera}</div>
+        <div style="font-size:10px;color:var(--text);margin-bottom:6px">${b.description}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px;background:${stc}18;color:${stc};border:1px solid ${stc}33">${b.status.toUpperCase()}</span>
+          <span style="font-size:9px;color:var(--sev-high)">${b.escalation}</span>
+        </div>
+      </div>`;
+    }).join("");
+
+  // Security heatmap
+  const zones = ["north","east","south","west"];
+  const maxHM = Math.max(...SEC_HEATMAP_DATA.flatMap(h=>zones.map(z=>h[z])));
+  document.getElementById("secHeatmap").innerHTML = `<div style="display:grid;grid-template-columns:auto repeat(${SEC_HEATMAP_DATA.length},1fr);gap:2px;font-size:9px">
+    <div></div>${SEC_HEATMAP_DATA.map(h=>`<div style="text-align:center;color:var(--sub);font-weight:600;padding:2px">${h.hour}</div>`).join("")}
+    ${zones.map(z=>`<div style="color:var(--sub);font-weight:600;padding:4px 6px;text-transform:capitalize">${z}</div>
+      ${SEC_HEATMAP_DATA.map(h=>{
+        const v=h[z]; const intensity=maxHM>0?v/maxHM:0;
+        const bg = intensity>=0.7?"var(--sev-critical)":intensity>=0.4?"var(--warn)":intensity>0?"var(--pos)":"var(--bord)";
+        return `<div style="background:${bg};opacity:${0.2+intensity*0.6};border-radius:3px;text-align:center;padding:4px;color:#fff;font-weight:700">${v}</div>`;
+      }).join("")}`).join("")}
+  </div>`;
+
+  // Clip archive
+  document.getElementById("secClipArchive").innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
+    ${SEC_CLIPS.map(c => {
+      const sc = secSevCol(c.severity);
+      const clipStCol = c.status==="unreviewed"?"var(--sev-high)":c.status==="exported"?"var(--info)":"var(--pos)";
+      return `<div style="background:var(--bg);border-radius:10px;border:1px solid var(--bord);overflow:hidden;transition:0.2s" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--bord)'">
+        <div style="height:80px;background:linear-gradient(135deg,${sc}22,var(--bg2));display:flex;align-items:center;justify-content:center;font-size:28px;position:relative">
+          ${c.thumbnail}
+          <div style="position:absolute;bottom:4px;right:6px;font-size:9px;color:#fff;background:rgba(0,0,0,0.6);padding:1px 5px;border-radius:4px">${c.duration}</div>
+          <div style="position:absolute;top:4px;left:6px;font-size:8px;font-weight:700;padding:1px 5px;border-radius:4px;background:${sc}33;color:${sc}">${c.severity.toUpperCase()}</div>
+        </div>
+        <div style="padding:8px 10px">
+          <div style="font-size:10px;font-weight:700;color:var(--text);margin-bottom:2px">${c.zone} — ${c.breach}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:9px;color:var(--sub)">${c.time}</span>
+            <span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:99px;background:${clipStCol}18;color:${clipStCol};border:1px solid ${clipStCol}33">${c.status.toUpperCase()}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join("")}
+  </div>`;
+
+  // Breach event log
+  document.getElementById("secBreachLog").innerHTML = SEC_BREACHES.map(b => {
+    const sc = secSevCol(b.severity);
+    const stc = secStatusCol(b.status);
+    return `<tr style="border-bottom:1px solid var(--bord)">
+      <td style="padding:6px 6px 6px 0;color:var(--sub);font-size:10px">${b.time}</td>
+      <td style="padding:6px;font-weight:600;color:var(--text);font-size:10px">${b.zone}</td>
+      <td style="padding:6px"><span style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg2);color:var(--text)">${secBreachLabel(b.type)}</span></td>
+      <td style="padding:6px"><span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px;background:${sc}18;color:${sc};border:1px solid ${sc}33">${b.severity.toUpperCase()}</span></td>
+      <td style="padding:6px;color:var(--sub);font-size:10px">${b.camera}</td>
+      <td style="padding:6px"><span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px;background:${stc}18;color:${stc};border:1px solid ${stc}33">${b.status.toUpperCase()}</span></td>
+      <td style="padding:6px;font-size:9px;color:${b.escalation==='None'?'var(--sub)':'var(--sev-high)'}">${b.escalation}</td>
+    </tr>`;
+  }).join("");
+}
+
+// ════════════════════════════════════════════════════════
+// DAY 4 — EXECUTIVE DASHBOARD RENDER
+// ════════════════════════════════════════════════════════
+const EXEC_MODULES = [
+  { name:"IntelliVision", icon:"👁", status:"online", metric:"98.7% accuracy", kpi:"12 cameras active", color:"var(--pos)" },
+  { name:"Counting Agent", icon:"#️⃣", status:"online", metric:"7,479 counted today", kpi:"99.5% accuracy", color:"var(--pos)" },
+  { name:"Cluster Mapping", icon:"🗺", status:"online", metric:"68.3% utilization", kpi:"1 critical zone", color:"var(--warn)" },
+  { name:"FIFO/FEFO Engine", icon:"🔄", status:"online", metric:"96.4% compliance", kpi:"3 violations today", color:"var(--pos)" },
+  { name:"LPR & Gate", icon:"🚗", status:"online", metric:"142 vehicles today", kpi:"99.1% OCR accuracy", color:"var(--pos)" },
+  { name:"Perimeter Security", icon:"🔒", status:"alert", metric:"2 active breaches", kpi:"92% coverage", color:"var(--sev-high)" },
+];
+
+const EXEC_NOTIFICATIONS = [
+  { type:"critical", module:"Perimeter", message:"Unauthorized entry at Gate 4 — Guard Unit 2 dispatched", time:"8m ago" },
+  { type:"high", module:"Counting", message:"Count mismatch on MF-2026-0414: expected 300, counted 293 (-7)", time:"22m ago" },
+  { type:"high", module:"Perimeter", message:"Loitering detected at West Boundary — auto-escalation in 3m", time:"22m ago" },
+  { type:"medium", module:"Sequencing", message:"FEFO violation — Operator #5 attempted wrong expiry batch", time:"45m ago" },
+  { type:"high", module:"LPR", message:"Blacklisted vehicle DL-03-XX-6666 denied at North Gate", time:"1h ago" },
+  { type:"low", module:"Cluster", message:"Zone D utilization at 91% — approaching critical threshold", time:"1.5h ago" },
+  { type:"info", module:"System", message:"All 6 modules operational — daily backup completed", time:"2h ago" },
+];
+
+const EXEC_ACTIVITY = [
+  { hour:"06", detections:45, counts:120, gates:8, alerts:1 },
+  { hour:"07", detections:78, counts:285, gates:15, alerts:2 },
+  { hour:"08", detections:120, counts:410, gates:22, alerts:4 },
+  { hour:"09", detections:95, counts:580, gates:28, alerts:3 },
+  { hour:"10", detections:110, counts:720, gates:18, alerts:5 },
+  { hour:"11", detections:85, counts:810, gates:14, alerts:2 },
+];
+
+function renderExecDashboard() {
+  // KPIs
+  document.getElementById("execKpis").innerHTML = [
+    { l:"Detection Count", v:"7,479", c:"var(--pos)", d:"↑ +15% vs yesterday", i:"📦" },
+    { l:"Active Alerts", v:"5", c:"var(--sev-high)", d:"2 CRITICAL, 3 HIGH", i:"🚨" },
+    { l:"Gate Events", v:"142", c:"var(--info)", d:"97.2% approved", i:"🚗" },
+    { l:"Active Incidents", v:"2", c:"var(--sev-critical)", d:"Require response", i:"⚠" },
+    { l:"FIFO Compliance", v:"96.4%", c:"var(--pos)", d:"↑ +8.2% MoM", i:"🔄" },
+    { l:"System Health", v:"94%", c:"var(--pos)", d:"All modules online", i:"💚" },
+  ].map(k=>`<div class="kpi" style="--kpi-color:${k.c}"><div class="kpi-label">${k.l}<span class="kpi-icon">${k.i}</span></div><div class="kpi-val" style="color:${k.c}">${k.v}</div><div class="kpi-delta" style="color:${k.d.includes('↑')?'var(--pos)':k.d.includes('CRITICAL')?'var(--sev-critical)':'var(--sub)'}">${k.d}</div></div>`).join("");
+
+  // Module status
+  document.getElementById("execModules").innerHTML = EXEC_MODULES.map(m => {
+    const stCol = m.status==="online"?"var(--pos)":"var(--sev-high)";
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg);border-radius:8px;margin-bottom:6px;border-left:3px solid ${m.color}">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:18px">${m.icon}</span>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--text)">${m.name}</div>
+          <div style="font-size:10px;color:var(--sub)">${m.metric}</div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:99px;background:${stCol}18;color:${stCol};border:1px solid ${stCol}33">${m.status.toUpperCase()}</span>
+        <div style="font-size:9px;color:var(--sub);margin-top:3px">${m.kpi}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  // Notifications
+  document.getElementById("execNotifBadge").textContent = EXEC_NOTIFICATIONS.filter(n=>n.type==="critical"||n.type==="high").length + " Urgent";
+  document.getElementById("execNotifications").innerHTML = EXEC_NOTIFICATIONS.map(n => {
+    const nc = n.type==="critical"?"var(--sev-critical)":n.type==="high"?"var(--sev-high)":n.type==="medium"?"var(--warn)":n.type==="low"?"var(--pos)":"var(--info)";
+    return `<div style="padding:8px 10px;border-radius:8px;background:var(--bg);margin-bottom:5px;border-left:3px solid ${nc}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+        <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:${nc}18;color:${nc}">${n.module}</span>
+        <span style="font-size:9px;color:var(--sub)">${n.time}</span>
+      </div>
+      <div style="font-size:10px;color:var(--text)">${n.message}</div>
+    </div>`;
+  }).join("");
+
+  // Activity chart
+  const maxAct = Math.max(...EXEC_ACTIVITY.map(a=>a.counts));
+  document.getElementById("execActivity").innerHTML = EXEC_ACTIVITY.map(a => {
+    const h = maxAct>0?(a.counts/maxAct*150):0;
+    const dh = maxAct>0?(a.detections/maxAct*150):0;
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+      <div style="width:100%;display:flex;flex-direction:column-reverse;gap:1px">
+        <div style="width:100%;height:${h}px;background:var(--info);opacity:0.6;border-radius:3px 3px 0 0"></div>
+        <div style="width:100%;height:${dh}px;background:var(--acc);opacity:0.6;border-radius:3px 3px 0 0"></div>
+      </div>
+      <span style="font-size:8px;color:var(--sub)">${a.hour}:00</span>
+    </div>`;
+  }).join("");
+
+  // Alert breakdown
+  const sevCounts = {critical:0,high:0,medium:0,low:0};
+  EXEC_NOTIFICATIONS.forEach(n=>{ if(sevCounts[n.type]!==undefined) sevCounts[n.type]++; });
+  const totalAlerts = Object.values(sevCounts).reduce((a,v)=>a+v,0);
+  document.getElementById("execAlertBreakdown").innerHTML = [
+    { label:"CRITICAL", count:sevCounts.critical, color:"var(--sev-critical)" },
+    { label:"HIGH", count:sevCounts.high, color:"var(--sev-high)" },
+    { label:"MEDIUM", count:sevCounts.medium, color:"var(--warn)" },
+    { label:"LOW", count:sevCounts.low, color:"var(--pos)" },
+  ].map(s => {
+    const pct = totalAlerts>0?(s.count/totalAlerts*100):0;
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:11px;font-weight:700;color:${s.color}">${s.label}</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text)">${s.count}</span>
+      </div>
+      <div style="width:100%;height:6px;background:var(--bord);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${s.color};border-radius:3px;transition:width 0.5s"></div>
+      </div>
     </div>`;
   }).join("");
 }
