@@ -521,10 +521,9 @@ async def get_latest_frame(camera_id: uuid.UUID, db: AsyncSession = Depends(get_
 
 
 @router.get("/{camera_id}/snapshot")
-async def get_camera_snapshot(camera_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_camera_snapshot(camera_id: uuid.UUID, theme: str = "light", db: AsyncSession = Depends(get_db)):
     """
     Capture a single frame and return it as a JPEG image.
-    This is the real frame endpoint — returns actual image bytes.
     """
     camera = await db.get(Camera, camera_id)
     if not camera:
@@ -532,7 +531,7 @@ async def get_camera_snapshot(camera_id: uuid.UUID, db: AsyncSession = Depends(g
     if camera.status != CameraStatus.ACTIVE:
         raise HTTPException(status_code=409, detail=f"Camera is not active (status={camera.status})")
 
-    frame = await stream_read_frame(str(camera_id))
+    frame = await stream_read_frame(str(camera_id), theme=theme)
     if frame is None:
         raise HTTPException(status_code=503, detail="Stream not connected")
 
@@ -551,7 +550,7 @@ async def get_camera_snapshot(camera_id: uuid.UUID, db: AsyncSession = Depends(g
 
 
 @router.get("/{camera_id}/mjpeg")
-async def mjpeg_stream(camera_id: uuid.UUID, theme: str = "dark", db: AsyncSession = Depends(get_db)):
+async def mjpeg_stream(camera_id: uuid.UUID, theme: str = "light", db: AsyncSession = Depends(get_db)):
     """
     MJPEG live stream endpoint. Returns a multipart/x-mixed-replace stream
     of JPEG frames for direct embedding in <img> tags or video players.

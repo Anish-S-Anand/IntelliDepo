@@ -200,27 +200,33 @@ export async function getCameraFrame(cameraId: string): Promise<IntegrationPanel
 
 /**
  * Get the MJPEG stream URL for a camera (for use in <img> src).
- * Passes the current theme so the backend can tint frames accordingly.
+ * Points directly to the backend port to bypass Next.js proxy buffering.
  */
 export function getCameraMjpegUrl(cameraId: string, theme: "dark" | "light" = "dark"): string {
-  const base = process.env.NEXT_PUBLIC_API_URL || "/backend";
+  // MJPEG streams must bypass the Next.js proxy (which buffers responses).
+  // Use the direct backend URL in the browser.
+  const base = typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:8000`
+    : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
   return `${base}/depot/vision/cameras/${cameraId}/mjpeg?theme=${theme}`;
 }
 
 /**
  * Get the snapshot URL for a camera (for use in <img> src).
  */
-export function getCameraSnapshotUrl(cameraId: string): string {
-  const base = process.env.NEXT_PUBLIC_API_URL || "/backend";
-  return `${base}/depot/vision/cameras/${cameraId}/snapshot`;
+export function getCameraSnapshotUrl(cameraId: string, theme: "dark" | "light" = "light"): string {
+  const base = typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:8000`
+    : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
+  return `${base}/depot/vision/cameras/${cameraId}/snapshot?theme=${theme}`;
 }
 
 /**
  * Get the RTSP proxy MJPEG stream URL for any RTSP/HTTP source.
- * The backend connects to the source, overlays HUD + detection boxes, and
- * re-streams as MJPEG — safe to embed directly in an <img> tag.
  */
 export function getRtspProxyUrl(rtspUrl: string): string {
-  const base = process.env.NEXT_PUBLIC_API_URL || "/backend";
+  const base = typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:8000`
+    : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
   return `${base}/depot/vision/cameras/rtsp-proxy/stream?url=${encodeURIComponent(rtspUrl)}`;
 }

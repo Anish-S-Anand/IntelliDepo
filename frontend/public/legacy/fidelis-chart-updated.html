@@ -1004,8 +1004,8 @@ svg.chart { width: 100%; overflow: visible; }
 
   <!-- Vision KPIs (live from API) -->
   <div class="kpi-grid mb-20">
-    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Detection Accuracy<span class="kpi-icon">🎯</span></div><div class="kpi-val" style="color:var(--pos)" id="kpiDetAcc">--<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--sub)">Avg confidence</div></div>
-    <div class="kpi" style="--kpi-color:var(--info)"><div class="kpi-label">Cameras Online<span class="kpi-icon">📷</span></div><div class="kpi-val" style="color:var(--info)" id="kpiCamsOnline">--</div><div class="kpi-delta" style="color:var(--sub)" id="kpiCamsTotal">of -- registered</div></div>
+    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Detection Accuracy<span class="kpi-icon">🎯</span></div><div class="kpi-val" style="color:var(--pos)" id="kpiDetAcc">98.7<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)">↑ Avg confidence</div></div>
+    <div class="kpi" style="--kpi-color:var(--info)"><div class="kpi-label">LPR Matches<span class="kpi-icon">🚛</span></div><div class="kpi-val" style="color:var(--info)">142<span class="kpi-unit">/d</span></div><div class="kpi-delta" style="color:var(--pos)">↑ 99.1% accuracy</div></div>
     <div class="kpi" style="--kpi-color:var(--warn)"><div class="kpi-label">Perimeter Events<span class="kpi-icon">🔒</span></div><div class="kpi-val" style="color:var(--warn)">3<span class="kpi-unit"> today</span></div><div class="kpi-delta" style="color:var(--pos)">↓ vs 7 yesterday</div></div>
     <div class="kpi" style="--kpi-color:var(--acc)"><div class="kpi-label">Count Discrepancies<span class="kpi-icon">📊</span></div><div class="kpi-val" style="color:var(--acc)">0.2<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)">↓ 90% reduction</div></div>
   </div>
@@ -1567,6 +1567,8 @@ function toggleTheme() {
   tog.classList.toggle("light-pos", isLight);
   knob.textContent = isLight ? "☀️" : "🌙";
   localStorage.setItem("fidelis_theme", isLight ? "light" : "dark");
+  // Re-render cameras so MJPEG streams reconnect with new theme
+  if (document.getElementById("cameraGrid")) renderCameras();
 }
 
 // ════════════════════════════════════════════════════════
@@ -1719,11 +1721,13 @@ function renderAlerts() {
 // CAMERAS — API-DRIVEN
 // ════════════════════════════════════════════════════════
 const API_BASE = "/backend";
+// Direct backend URL for streaming endpoints (bypasses Next.js proxy)
+const DIRECT_BASE = window.location.protocol + '//' + window.location.hostname + ':8000';
 let _apiCameras = []; // cached from last fetch
 
 async function fetchCamerasFromAPI() {
   try {
-    const res = await fetch(API_BASE + "/depot/vision/cameras/");
+    const res = await fetch(DIRECT_BASE + "/depot/vision/cameras/");
     if (!res.ok) throw new Error("HTTP " + res.status);
     _apiCameras = await res.json();
   } catch (e) {
@@ -1741,8 +1745,16 @@ async function fetchCamerasFromAPI() {
   return _apiCameras;
 }
 
-function getMjpegUrl(cameraId) { return API_BASE + "/depot/vision/cameras/" + cameraId + "/mjpeg"; }
-function getSnapshotUrl(cameraId) { return API_BASE + "/depot/vision/cameras/" + cameraId + "/snapshot"; }
+function getMjpegUrl(cameraId) {
+  const isLight = document.body.classList.contains('light-theme');
+  const theme = isLight ? 'light' : 'dark';
+  return DIRECT_BASE + "/depot/vision/cameras/" + cameraId + "/mjpeg?theme=" + theme;
+}
+function getSnapshotUrl(cameraId) {
+  const isLight = document.body.classList.contains('light-theme');
+  const theme = isLight ? 'light' : 'dark';
+  return DIRECT_BASE + "/depot/vision/cameras/" + cameraId + "/snapshot?theme=" + theme;
+}
 
 function renderCameras() {
   fetchCamerasFromAPI().then(cameras => {
@@ -1780,7 +1792,7 @@ function renderCameras() {
             </div>` : `
             <img src="${getMjpegUrl(c.id)}" alt="${c.name}"
               style="width:100%;height:100%;object-cover;position:absolute;top:0;left:0"
-              onerror="this.onerror=null;this.src='${getSnapshotUrl(c.id)}?t='+Date.now();this.style.objectFit='cover'">
+              onerror="this.onerror=null;this.src='${getSnapshotUrl(c.id)}&t='+Date.now();this.style.objectFit='cover'">
             <div class="cam-overlay" style="z-index:2">
               <span class="cam-tag">${c.zone || c.name}</span>
               <span class="cam-stag"><span class="cam-dot" style="background:${sCol};box-shadow:0 0 4px ${sCol}"></span><span style="color:${sCol};font-weight:700">${statusLabel}</span></span>

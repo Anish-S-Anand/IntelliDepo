@@ -1,3 +1,4 @@
+"use client";
 import dynamic from "next/dynamic";
 
 const LegacyDepotHtmlMount = dynamic(
@@ -16,5 +17,6 @@ const LegacyDepotHtmlMount = dynamic(
 );
 
 export default function DepotPage() {
-  return <LegacyDepotHtmlMount />;
+  // key={Date.now()} would remount every render — use a stable build-time key instead
+  return <LegacyDepotHtmlMount key="legacy-depot" />;
 }

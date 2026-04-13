@@ -26,7 +26,8 @@ export function LegacyDepotHtmlMount() {
 
     const loadLegacyHtml = async () => {
       try {
-        const response = await fetch(LEGACY_HTML_PATH, { cache: "no-store" });
+        const bust = `?v=${Date.now()}`;
+        const response = await fetch(LEGACY_HTML_PATH + bust, { cache: "no-store" });
         if (!response.ok) {
           throw new Error(`Failed to load legacy depot HTML (${response.status})`);
         }

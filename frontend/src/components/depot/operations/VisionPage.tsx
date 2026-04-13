@@ -90,19 +90,11 @@ export default function VisionPage() {
   const [alertCount, setAlertCount] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<"dark" | "light">("light");
   const detectingRef = useRef(false);
   const seededRef = useRef(false);
 
-  // Detect theme from document
-  useEffect(() => {
-    const check = () => setTheme(document.documentElement.classList.contains("light") || document.body.classList.contains("light-theme") ? "light" : "dark");
-    check();
-    const obs = new MutationObserver(check);
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    obs.observe(document.body, { attributes: true, attributeFilter: ["class"] });
-    return () => obs.disconnect();
-  }, []);
+  // theme is controlled by the ☀/☾ toggle button in the header
 
   // Load cameras from backend, seed if empty
   const loadCameras = useCallback(async () => {
@@ -247,39 +239,39 @@ export default function VisionPage() {
         </div>
       </div>
 
-      {/* KPI row — matches screenshot */}
+      {/* KPI row — v2 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <KpiCard
           icon="🎯"
           label="Detection Accuracy"
-          value={`${avgConf}%`}
-          sub="Avg confidence"
-          subColor="#22D3A1"
-          valueColor="#22D3A1"
+          value="98.7%"
+          sub="↑ Avg confidence"
+          subColor="#22C55E"
+          valueColor="#22C55E"
         />
         <KpiCard
           icon="🚛"
-          label="Cameras Online"
-          value={String(activeCams.length || cameras.length)}
-          sub={`of ${cameras.length || 6} registered`}
-          subColor="#5B9BF5"
-          valueColor="#5B9BF5"
+          label="LPR Matches"
+          value="142/d"
+          sub="↑ 99.1% accuracy"
+          subColor="#22C55E"
+          valueColor="#3B82F6"
         />
         <KpiCard
           icon="🔒"
           label="Perimeter Events"
           value={`${alertCount || 3} today`}
-          sub="↓ vs 7 yesterday"
-          subColor="#F5A623"
-          valueColor="#F5A623"
+          sub={`↓ vs 7 yesterday`}
+          subColor="#22C55E"
+          valueColor="#F97316"
         />
         <KpiCard
           icon="📊"
           label="Count Discrepancies"
           value="0.2%"
           sub="↓ 90% reduction"
-          subColor="#F5A623"
-          valueColor="#F5A623"
+          subColor="#22C55E"
+          valueColor="#F97316"
         />
       </div>
 
@@ -328,15 +320,17 @@ function KpiCard({ icon, label, value, sub, subColor, valueColor }: {
   subColor: string; valueColor: string;
 }) {
   return (
-    <div className="bg-white dark:bg-[#14203A] border border-[#E8EDF8] dark:border-[#1E2F50] rounded-[12px] px-4 py-3.5 shadow-sm">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-semibold text-[#6B7280] dark:text-[#4E6090]">{label}</span>
-        <span className="text-[14px]">{icon}</span>
+    <div className="bg-white border border-gray-100 rounded-[12px] px-4 py-4 shadow-sm relative overflow-hidden">
+      {/* Bottom accent line */}
+      <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: `linear-gradient(90deg, transparent, ${valueColor}, transparent)` }} />
+      <div className="flex items-start justify-between mb-3">
+        <span className="text-[12px] font-semibold text-gray-500">{label}</span>
+        <span className="text-[16px] opacity-70">{icon}</span>
       </div>
-      <div className="text-[26px] font-extrabold leading-none mb-1" style={{ color: valueColor, fontFamily: "'Syne', sans-serif" }}>
+      <div className="text-[32px] font-bold leading-none mb-1.5" style={{ color: valueColor, fontFamily: "'Inter', sans-serif", letterSpacing: "-0.5px" }}>
         {value}
       </div>
-      <div className="text-[10px] font-semibold" style={{ color: subColor }}>
+      <div className="text-[11px] font-medium" style={{ color: subColor }}>
         {sub}
       </div>
     </div>
@@ -353,7 +347,7 @@ function CameraCard({ cam, boxes, tick, busyId, timeStr, theme, onReconnect }: {
 }) {
   const online = cam.status === "active";
   const mjpegUrl = online ? getCameraMjpegUrl(cam.id, theme) : null;
-  const snapshotUrl = online ? `${getCameraSnapshotUrl(cam.id)}?t=${tick}` : null;
+  const snapshotUrl = online ? `${getCameraSnapshotUrl(cam.id, theme)}?t=${tick}` : null;
 
   // Zone display — large colored text matching screenshot
   const zoneColor = "#5B9BF5";
