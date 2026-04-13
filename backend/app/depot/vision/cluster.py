@@ -261,6 +261,36 @@ async def update_occupancy(
         )
         db.add(alert)
 
+        # Publish to RabbitMQ
+        try:
+            from app.core.rabbitmq import publish_alert
+            await publish_alert("capacity", severity, {
+                "zone_code": zone.zone_code,
+                "zone_name": zone.name,
+                "utilization_pct": zone.utilization_pct,
+                "current_occupancy": zone.current_occupancy,
+                "max_capacity": zone.max_capacity_units,
+            })
+        except Exception as e:
+            logger.warning(f"Failed to publish capacity alert to RabbitMQ: {e}")
+
+        # Broadcast via WebSocket
+        try:
+            from app.core.gateway.realtime import realtime_hub
+            await realtime_hub.publish(
+                topic="depot.alerts",
+                event_type="capacity_alert",
+                payload={
+                    "zone_code": zone.zone_code,
+                    "severity": severity,
+                    "utilization_pct": zone.utilization_pct,
+                    "message": f"Zone {zone.zone_code} at {zone.utilization_pct}% capacity",
+                },
+                sender="depot-cluster",
+            )
+        except Exception as e:
+            logger.warning(f"Failed to broadcast capacity alert via WebSocket: {e}")
+
     await db.commit()
     await db.refresh(zone)
     return zone
@@ -802,6 +832,49 @@ async def mqtt_batch_ingest(
                 zone.status = ZoneStatus.WARNING
             else:
                 zone.status = ZoneStatus.NORMAL
+
+            # Dispatch capacity alert if warning/critical
+            if zone.utilization_pct >= 80:
+                severity = "critical" if zone.utilization_pct >= 95 else "warning"
+                alert = CapacityAlert(
+                    zone_id=zone.id,
+                    zone_code=zone.zone_code,
+                    threshold_pct=80.0 if severity == "warning" else 95.0,
+                    current_pct=zone.utilization_pct,
+                    severity=severity,
+                    message=f"Zone {zone.zone_code} at {zone.utilization_pct}% capacity",
+                )
+                db.add(alert)
+
+                # Publish to RabbitMQ
+                try:
+                    from app.core.rabbitmq import publish_alert
+                    await publish_alert("capacity", severity, {
+                        "zone_code": zone.zone_code,
+                        "zone_name": zone.name,
+                        "utilization_pct": zone.utilization_pct,
+                        "current_occupancy": zone.current_occupancy,
+                        "max_capacity": zone.max_capacity_units,
+                    })
+                except Exception as e:
+                    logger.warning(f"Failed to publish capacity alert to RabbitMQ: {e}")
+
+                # Broadcast via WebSocket
+                try:
+                    from app.core.gateway.realtime import realtime_hub
+                    await realtime_hub.publish(
+                        topic="depot.alerts",
+                        event_type="capacity_alert",
+                        payload={
+                            "zone_code": zone.zone_code,
+                            "severity": severity,
+                            "utilization_pct": zone.utilization_pct,
+                            "message": f"Zone {zone.zone_code} at {zone.utilization_pct}% capacity",
+                        },
+                        sender="depot-cluster",
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to broadcast capacity alert via WebSocket: {e}")
 
             # Record history snapshot
             snapshot = ZoneHistory(

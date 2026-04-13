@@ -76,6 +76,41 @@ async def lifespan(app: FastAPI):
     # Seed MacroPulse market docs index (Day 1 — Pranisree)
     from app.stream.macropulse.vector_setup import validate_and_seed_index
     await validate_and_seed_index()
+    # Seed Depot demo data (cameras, gates, vehicles, zones, etc.) if tables are empty
+    if settings.ENABLE_DEPOT_MODULES:
+        try:
+            from app.depot.seed import seed_database
+            from app.config import settings as _s
+            await seed_database(_s.DATABASE_URL)
+        except Exception as e:
+            logging.getLogger("intelli.depot.seed").warning(f"Depot seed skipped: {e}")
+        # Auto-reconnect cameras in parallel with 5s timeout each
+        try:
+            from app.depot.vision.camera import Camera, stream_connect
+            from sqlalchemy import select
+            import asyncio as _asyncio
+            _cam_log = logging.getLogger("intelli.depot.vision")
+            async with async_session() as db:
+                result = await db.execute(select(Camera).where(Camera.is_active == True))
+                cams = result.scalars().all()
+            _cam_log.info(f"Auto-reconnecting {len(cams)} camera(s) on startup…")
+
+            async def _reconnect_one(cam):
+                try:
+                    ok = await stream_connect(str(cam.id), cam.stream_url)
+                    _cam_log.info(f"  {'✓' if ok else '✗'} {cam.name}")
+                except Exception as ce:
+                    _cam_log.warning(f"  ✗ {cam.name}: {ce}")
+
+            await _asyncio.gather(*[_reconnect_one(c) for c in cams])
+        except Exception as e:
+            logging.getLogger("intelli.depot.vision").warning(f"Camera auto-reconnect skipped: {e}")
+        # Download stock videos in background (non-blocking)
+        try:
+            from app.depot.vision.video_library import ensure_videos_downloaded
+            _asyncio.create_task(ensure_videos_downloaded())
+        except Exception as e:
+            logging.getLogger("intelli.depot.video_library").warning(f"Video download skipped: {e}")
     yield
     await engine.dispose()
 
@@ -143,7 +178,9 @@ if settings.ENABLE_DEPOT_MODULES:
 
     # IntelliOps modules
     from app.depot.ops.live_monitoring import router as ops_monitoring_router
+    from app.depot.ops.operations import router as ops_operations_router
     app.include_router(ops_monitoring_router)
+    app.include_router(ops_operations_router)
 
 from app.core.data_infra.storage_router import router as storage_router
 

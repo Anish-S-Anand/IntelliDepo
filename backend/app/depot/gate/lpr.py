@@ -5,13 +5,14 @@ Feature: DEPOT-V6
 OCR plate recognition, gate open/close trigger API, vehicle registry sync,
 and blacklist matching service.
 """
+import os
 import uuid
 import logging
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
@@ -22,7 +23,34 @@ from app.database import BaseModel as DBBaseModel, get_db
 from app.core.auth.dependencies import get_current_user
 from app.shared.models.user import User
 
+import numpy as np
+
+try:
+    import cv2
+    _HAS_CV2 = True
+except ImportError:
+    _HAS_CV2 = False
+
+try:
+    import pytesseract
+    _HAS_TESSERACT = True
+    # Set Tesseract path for Windows if not on PATH
+    import shutil
+    if not shutil.which("tesseract"):
+        _win_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        if os.path.exists(_win_path):
+            pytesseract.pytesseract.tesseract_cmd = _win_path
+except ImportError:
+    _HAS_TESSERACT = False
+
+_HAS_OCR = _HAS_CV2 and _HAS_TESSERACT
+
 logger = logging.getLogger("intelli.depot.gate")
+
+if _HAS_OCR:
+    logger.info("OpenCV + Tesseract loaded — real LPR OCR available")
+else:
+    logger.warning("OpenCV/Tesseract not available — LPR uses manual plate input")
 
 router = APIRouter(prefix="/depot/gate", tags=["Depot - Gate & LPR"])
 
@@ -154,7 +182,7 @@ class VehicleResponse(BaseModel):
 
 
 class LPRScanRequest(BaseModel):
-    """Simulates an OCR scan of a license plate at a gate."""
+    """Manual plate input for LPR scan (use /lpr/scan-image for OCR from camera frame)."""
     gate_id: uuid.UUID
     plate_number: str = Field(..., json_schema_extra={"example": "KA-12-AB-3456"})
     confidence: float = Field(0.95, ge=0.0, le=1.0)
@@ -180,6 +208,51 @@ class AccessLogResponse(BaseModel):
 
 class GateActionRequest(BaseModel):
     action: str = Field(..., description="open or close")
+
+
+def _extract_plate_from_frame(frame: np.ndarray) -> tuple[str, float]:
+    """
+    Extract license plate text from a camera frame using OpenCV + Tesseract.
+    Returns (plate_text, confidence).
+    """
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    # Apply bilateral filter to reduce noise while keeping edges
+    filtered = cv2.bilateralFilter(gray, 11, 17, 17)
+    # Edge detection
+    edges = cv2.Canny(filtered, 30, 200)
+    # Find contours
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10]
+
+    plate_roi = None
+    for contour in contours:
+        peri = cv2.arcLength(contour, True)
+        approx = cv2.approxPolyDP(contour, 0.018 * peri, True)
+        if len(approx) == 4:  # Rectangle found
+            x, y, w, h = cv2.boundingRect(approx)
+            aspect = w / h if h > 0 else 0
+            if 2.0 <= aspect <= 6.0 and w > 60:  # Plate-like aspect ratio
+                plate_roi = gray[y:y+h, x:x+w]
+                break
+
+    if plate_roi is None:
+        # Fallback: use the bottom third of the frame
+        h, w = gray.shape
+        plate_roi = gray[int(h*0.6):h, int(w*0.2):int(w*0.8)]
+
+    # Preprocess for OCR
+    _, thresh = cv2.threshold(plate_roi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # Run Tesseract
+    custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-'
+    raw_text = pytesseract.image_to_string(thresh, config=custom_config).strip()
+    # Get confidence
+    data = pytesseract.image_to_data(thresh, config=custom_config, output_type=pytesseract.Output.DICT)
+    confidences = [int(c) for c in data['conf'] if int(c) > 0]
+    avg_conf = sum(confidences) / len(confidences) / 100.0 if confidences else 0.5
+
+    # Clean up plate text
+    cleaned = ''.join(c for c in raw_text if c.isalnum() or c == '-').upper()
+    return cleaned, round(avg_conf, 4)
 
 
 # ---------------------------------------------------------------------------
@@ -367,6 +440,157 @@ async def process_lpr_scan(
     await db.commit()
     await db.refresh(log)
     logger.info(f"LPR scan at {gate.gate_code}: {payload.plate_number} -> {decision}")
+
+    # Publish gate signal to RabbitMQ
+    try:
+        from app.core.rabbitmq import publish_gate_signal
+        await publish_gate_signal(str(gate.id), decision, {
+            "plate_number": payload.plate_number,
+            "confidence": payload.confidence,
+            "gate_code": gate.gate_code,
+            "direction": payload.direction,
+        })
+    except Exception as e:
+        logger.warning(f"Failed to publish gate signal to RabbitMQ: {e}")
+
+    # Broadcast via WebSocket
+    try:
+        from app.core.gateway.realtime import realtime_hub
+        await realtime_hub.publish(
+            topic="depot.gate",
+            event_type="lpr_scan",
+            payload={
+                "gate_code": gate.gate_code,
+                "plate_number": payload.plate_number,
+                "decision": decision,
+                "confidence": payload.confidence,
+                "direction": payload.direction,
+            },
+            sender="depot-gate",
+        )
+    except Exception as e:
+        logger.warning(f"Failed to broadcast gate event via WebSocket: {e}")
+
+    return log
+
+
+@router.post("/lpr/scan-image", response_model=AccessLogResponse, status_code=201)
+async def process_lpr_image_scan(
+    gate_id: uuid.UUID = Form(...),
+    direction: str = Form("entry"),
+    file: UploadFile = File(..., description="Gate camera frame (JPEG/PNG)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Process an LPR scan from an uploaded gate camera image.
+    Uses OpenCV + Tesseract to extract the plate number from the image.
+    """
+    if not _HAS_OCR:
+        raise HTTPException(status_code=501, detail="OCR not available — install opencv-python-headless and pytesseract")
+
+    image_bytes = await file.read()
+    frame = np.frombuffer(image_bytes, dtype=np.uint8)
+    frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
+    if frame is None:
+        raise HTTPException(status_code=400, detail="Could not decode image")
+
+    plate_text, confidence = _extract_plate_from_frame(frame)
+    if not plate_text:
+        raise HTTPException(status_code=422, detail="Could not extract plate number from image")
+
+    # Now process the same as text-based scan
+    gate = await db.get(Gate, gate_id)
+    if not gate or not gate.is_active:
+        raise HTTPException(status_code=404, detail="Gate not found")
+
+    # Lookup vehicle in registry
+    veh_result = await db.execute(
+        select(VehicleRegistry).where(VehicleRegistry.plate_number == plate_text)
+    )
+    vehicle = veh_result.scalar_one_or_none()
+
+    decision = AccessDecision.GRANTED
+    denied_reason = None
+    vehicle_id = None
+
+    if vehicle:
+        vehicle_id = vehicle.id
+        if vehicle.status == VehicleStatus.BLACKLISTED:
+            decision = AccessDecision.BLACKLISTED
+            denied_reason = f"Blacklisted: {vehicle.blacklist_reason}"
+        elif vehicle.status == VehicleStatus.EXPIRED:
+            decision = AccessDecision.DENIED
+            denied_reason = "Vehicle registration expired"
+    else:
+        decision = AccessDecision.DENIED
+        denied_reason = "Vehicle not registered"
+
+    if confidence < 0.85:
+        decision = AccessDecision.PENDING
+        denied_reason = f"Low OCR confidence: {confidence}"
+
+    # Archive snapshot to MinIO
+    snapshot_key = None
+    try:
+        from app.depot.vision.frame_storage import save_lpr_snapshot
+        _, buf = cv2.imencode(".jpg", frame)
+        snapshot_key = save_lpr_snapshot(buf.tobytes(), gate.gate_code, plate_text)
+    except Exception as e:
+        logger.warning(f"Failed to archive LPR snapshot: {e}")
+
+    log = GateAccessLog(
+        gate_id=gate.id,
+        gate_code=gate.gate_code,
+        plate_number=plate_text,
+        plate_confidence=confidence,
+        vehicle_id=vehicle_id,
+        decision=decision,
+        direction=direction,
+        snapshot_ref=snapshot_key,
+        ocr_raw=plate_text,
+        denied_reason=denied_reason,
+    )
+    db.add(log)
+
+    if decision == AccessDecision.GRANTED:
+        gate.status = GateStatus.OPEN
+        gate.last_opened = datetime.now(timezone.utc)
+        gate.total_entries_today += 1
+
+    await db.commit()
+    await db.refresh(log)
+
+    # Publish gate signal to RabbitMQ
+    try:
+        from app.core.rabbitmq import publish_gate_signal
+        await publish_gate_signal(str(gate.id), decision, {
+            "plate_number": plate_text,
+            "confidence": confidence,
+            "gate_code": gate.gate_code,
+            "direction": direction,
+        })
+    except Exception as e:
+        logger.warning(f"Failed to publish gate signal to RabbitMQ: {e}")
+
+    # Broadcast via WebSocket
+    try:
+        from app.core.gateway.realtime import realtime_hub
+        await realtime_hub.publish(
+            topic="depot.gate",
+            event_type="lpr_scan",
+            payload={
+                "gate_code": gate.gate_code,
+                "plate_number": plate_text,
+                "decision": decision,
+                "confidence": confidence,
+                "direction": direction,
+            },
+            sender="depot-gate",
+        )
+    except Exception as e:
+        logger.warning(f"Failed to broadcast gate event via WebSocket: {e}")
+
     return log
 
 

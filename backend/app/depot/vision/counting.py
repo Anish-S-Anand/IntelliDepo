@@ -359,6 +359,32 @@ async def create_count_session(
             except Exception as e:
                 logger.warning(f"Failed to dispatch mismatch notification: {e}")
 
+            # Publish to RabbitMQ
+            alert_payload = {
+                "manifest_code": manifest.manifest_code,
+                "expected": manifest.total_expected,
+                "counted": session.total_counted,
+                "discrepancy": session.discrepancy_total,
+                "severity": severity,
+            }
+            try:
+                from app.core.rabbitmq import publish_alert
+                await publish_alert("count_mismatch", severity, alert_payload)
+            except Exception as e:
+                logger.warning(f"Failed to publish count mismatch to RabbitMQ: {e}")
+
+            # Broadcast via WebSocket
+            try:
+                from app.core.gateway.realtime import realtime_hub
+                await realtime_hub.publish(
+                    topic="depot.alerts",
+                    event_type="count_mismatch",
+                    payload={"severity": severity, "message": alert.message, **alert_payload},
+                    sender="depot-counting",
+                )
+            except Exception as e:
+                logger.warning(f"Failed to broadcast count mismatch via WebSocket: {e}")
+
     await db.commit()
     await db.refresh(session)
     if manifest:
@@ -751,9 +777,9 @@ class TrackingSessionStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class TrackingSession(DBBaseModel):
-    """Multi-object tracking session using DeepSORT."""
-    __tablename__ = "depot_tracking_sessions"
+class CountingTrackingSession(DBBaseModel):
+    """Counting-specific tracking session (extends base tracking with tally fields)."""
+    __tablename__ = "depot_counting_tracking_sessions"
 
     camera_id = Column(UUID(as_uuid=True), nullable=True)
     zone = Column(String, nullable=True)

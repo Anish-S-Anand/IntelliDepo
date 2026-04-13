@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Camera,
   Eye,
@@ -16,9 +16,18 @@ import {
 import {
   getDepotCommandSnapshot,
   reconnectCamera,
+  getCameraMjpegUrl,
+  getCameraSnapshotUrl,
   type CameraRecord,
   type DepotCommandSnapshot,
 } from "@/services/depotCommand";
+import {
+  getDetectionModels,
+  startDetectionRun,
+  getRunObjects,
+  type DetectedObject,
+  type DetectionModel,
+} from "@/services/depotVision";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,39 +44,29 @@ interface BoundingBox {
   colour?: string;
 }
 
-// Simulated bounding boxes per camera (in production wired to detection API)
-function generateSimulatedBoxes(cameraId: string, status: string): BoundingBox[] {
-  if (status !== "active") return [];
+const CLASS_COLOURS: Record<string, string> = {
+  bag: "#3b82f6",
+  box: "#f59e0b",
+  pallet: "#22d3a1",
+  carton: "#a78bfa",
+  unknown: "#94a3b8",
+};
 
-  const seed = cameraId.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  const rng = (i: number) => ((seed * 9301 + 49297 + i * 233) % 233280) / 233280;
+// ---------------------------------------------------------------------------
+// Convert backend DetectedObject to BoundingBox
+// ---------------------------------------------------------------------------
 
-  const classes = ["bag", "box", "pallet", "carton"];
-  const colours: Record<string, string> = {
-    bag: "#3b82f6",
-    box: "#f59e0b",
-    pallet: "#22d3a1",
-    carton: "#a78bfa",
-  };
-
-  const count = Math.floor(rng(0) * 5) + 1;
-  const boxes: BoundingBox[] = [];
-
-  for (let i = 0; i < count; i++) {
-    const cls = classes[Math.floor(rng(i + 1) * classes.length)];
-    boxes.push({
-      id: `${cameraId}-det-${i}`,
-      class_label: cls,
-      confidence: 0.85 + rng(i + 10) * 0.14,
-      bbox_x: rng(i + 20) * 0.6 + 0.05,
-      bbox_y: rng(i + 30) * 0.5 + 0.1,
-      bbox_w: rng(i + 40) * 0.15 + 0.08,
-      bbox_h: rng(i + 50) * 0.15 + 0.08,
-      colour: colours[cls],
-    });
-  }
-
-  return boxes;
+function detectedObjectsToBoxes(objects: DetectedObject[], cameraId: string): BoundingBox[] {
+  return objects.map((obj, i) => ({
+    id: obj.id || `${cameraId}-det-${i}`,
+    class_label: obj.class_label,
+    confidence: obj.confidence,
+    bbox_x: obj.bbox_x,
+    bbox_y: obj.bbox_y,
+    bbox_w: obj.bbox_w,
+    bbox_h: obj.bbox_h,
+    colour: CLASS_COLOURS[obj.class_label] || CLASS_COLOURS.unknown,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -83,14 +82,6 @@ function BoundingBoxOverlay({
   width: number;
   height: number;
 }) {
-  const CLASS_COLOURS: Record<string, string> = {
-    bag: "#3b82f6",
-    box: "#f59e0b",
-    pallet: "#22d3a1",
-    carton: "#a78bfa",
-    unknown: "#94a3b8",
-  };
-
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
@@ -167,6 +158,7 @@ function CameraCard({
   onSelect,
   onReconnect,
   isReconnecting,
+  snapshotTick,
 }: {
   camera: CameraRecord;
   boxes: BoundingBox[];
@@ -174,9 +166,14 @@ function CameraCard({
   onSelect: () => void;
   onReconnect: () => void;
   isReconnecting: boolean;
+  snapshotTick: number;
 }) {
   const online = camera.status === "active";
   const detectionCount = boxes.length;
+  const mjpegUrl = online ? getCameraMjpegUrl(camera.id) : null;
+  const snapshotUrl = online
+    ? `${getCameraSnapshotUrl(camera.id)}?t=${snapshotTick}`
+    : null;
 
   return (
     <button
@@ -189,17 +186,26 @@ function CameraCard({
       }`}
     >
       {/* Feed area with bounding boxes */}
-      <div
-        className="relative aspect-video overflow-hidden"
-        style={{
-          background: online
-            ? "linear-gradient(135deg, #0A1628, #0D1E38)"
-            : "#0F1A30",
-        }}
-      >
+      <div className="relative aspect-video overflow-hidden bg-[#0A1628]">
         {online ? (
           <>
-            {/* Simulated camera feed background pattern */}
+            {/* Real camera snapshot (refreshed on tick) */}
+            {mjpegUrl && (
+              <img
+                src={mjpegUrl}
+                alt={`${camera.name} feed`}
+                className="absolute inset-0 w-full h-full object-cover"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  if (snapshotUrl && target.src !== snapshotUrl) {
+                    target.src = snapshotUrl;
+                    return;
+                  }
+                  target.style.display = "none";
+                }}
+              />
+            )}
+            {/* Fallback pattern behind snapshot */}
             <div className="absolute inset-0 opacity-20">
               <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800" />
               <div
@@ -301,13 +307,7 @@ function CameraCard({
                 {} as Record<string, number>,
               ),
             ).map(([cls, count]) => {
-              const colours: Record<string, string> = {
-                bag: "#3b82f6",
-                box: "#f59e0b",
-                pallet: "#22d3a1",
-                carton: "#a78bfa",
-              };
-              const c = colours[cls] || "#94a3b8";
+              const c = CLASS_COLOURS[cls] || "#94a3b8";
               return (
                 <span
                   key={cls}
@@ -337,11 +337,16 @@ function ExpandedCameraView({
   camera,
   boxes,
   onClose,
+  snapshotTick,
 }: {
   camera: CameraRecord;
   boxes: BoundingBox[];
   onClose: () => void;
+  snapshotTick: number;
 }) {
+  const snapshotUrl = `${getCameraSnapshotUrl(camera.id)}?t=${snapshotTick}`;
+  const mjpegUrl = getCameraMjpegUrl(camera.id);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
       <div className="relative w-full max-w-5xl mx-4">
@@ -369,12 +374,21 @@ function ExpandedCameraView({
               </span>
             </div>
           </div>
-          <div
-            className="relative aspect-video"
-            style={{
-              background: "linear-gradient(135deg, #0A1628, #0D1E38)",
-            }}
-          >
+          <div className="relative aspect-video bg-[#0A1628]">
+            {/* Real camera snapshot */}
+            <img
+              src={mjpegUrl}
+              alt={`${camera.name} expanded feed`}
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                if (target.src !== snapshotUrl) {
+                  target.src = snapshotUrl;
+                  return;
+                }
+                target.style.display = "none";
+              }}
+            />
             <div className="absolute inset-0 opacity-15">
               <div
                 className="absolute inset-0"
@@ -394,13 +408,7 @@ function ExpandedCameraView({
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
               {boxes.map((box) => {
-                const colours: Record<string, string> = {
-                  bag: "#3b82f6",
-                  box: "#f59e0b",
-                  pallet: "#22d3a1",
-                  carton: "#a78bfa",
-                };
-                const c = colours[box.class_label] || "#94a3b8";
+                const c = CLASS_COLOURS[box.class_label] || "#94a3b8";
                 return (
                   <div
                     key={box.id}
@@ -456,6 +464,21 @@ export default function LiveFeedViewer() {
   const [expandedCameraId, setExpandedCameraId] = useState<string | null>(null);
   const [busyCameraId, setBusyCameraId] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [cameraBoxes, setCameraBoxes] = useState<Record<string, BoundingBox[]>>({});
+  const [detectionModel, setDetectionModel] = useState<DetectionModel | null>(null);
+  const detectingRef = useRef(false);
+
+  // Load available YOLO detection models on mount
+  useEffect(() => {
+    getDetectionModels()
+      .then((models) => {
+        const active = models.find((m) => m.is_active);
+        if (active) setDetectionModel(active);
+      })
+      .catch(() => {
+        // Model list unavailable — detection will use backend defaults
+      });
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -475,7 +498,7 @@ export default function LiveFeedViewer() {
     void loadData();
   }, [loadData]);
 
-  // Live update tick
+  // Live update tick — refreshes snapshots and triggers detection
   useEffect(() => {
     if (!live) return;
     const interval = setInterval(() => {
@@ -484,7 +507,39 @@ export default function LiveFeedViewer() {
     return () => clearInterval(interval);
   }, [live]);
 
-  // Refresh data periodically
+  // Run detection on active cameras via backend API
+  const cameras = snapshot?.cameras.data ?? [];
+
+  useEffect(() => {
+    if (!live || !detectionModel || detectingRef.current) return;
+    const activeCams = cameras.filter((c) => c.status === "active");
+    if (activeCams.length === 0) return;
+
+    detectingRef.current = true;
+
+    Promise.allSettled(
+      activeCams.map(async (cam) => {
+        try {
+          const run = await startDetectionRun(detectionModel.id, 1, cam.id);
+          const objects = await getRunObjects(run.id);
+          return { cameraId: cam.id, boxes: detectedObjectsToBoxes(objects, cam.id) };
+        } catch {
+          return { cameraId: cam.id, boxes: [] as BoundingBox[] };
+        }
+      })
+    ).then((results) => {
+      const newBoxes: Record<string, BoundingBox[]> = {};
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          newBoxes[result.value.cameraId] = result.value.boxes;
+        }
+      }
+      setCameraBoxes((prev) => ({ ...prev, ...newBoxes }));
+      detectingRef.current = false;
+    });
+  }, [tick, live, detectionModel, cameras]);
+
+  // Refresh camera list periodically
   useEffect(() => {
     if (!live) return;
     const interval = setInterval(() => {
@@ -492,23 +547,6 @@ export default function LiveFeedViewer() {
     }, 30000);
     return () => clearInterval(interval);
   }, [live, loadData]);
-
-  const cameras = snapshot?.cameras.data ?? [];
-
-  // Generate bounding boxes for each camera (varies with tick for live feel)
-  const cameraBoxes = useMemo(() => {
-    const result: Record<string, BoundingBox[]> = {};
-    for (const cam of cameras) {
-      const baseBoxes = generateSimulatedBoxes(cam.id, cam.status);
-      // Slight variation on tick to simulate live movement
-      result[cam.id] = baseBoxes.map((box) => ({
-        ...box,
-        bbox_x: Math.max(0, Math.min(0.85, box.bbox_x + (Math.sin(tick * 0.3 + box.bbox_x * 10) * 0.01))),
-        bbox_y: Math.max(0, Math.min(0.85, box.bbox_y + (Math.cos(tick * 0.3 + box.bbox_y * 10) * 0.008))),
-      }));
-    }
-    return result;
-  }, [cameras, tick]);
 
   const totalDetections = Object.values(cameraBoxes).reduce(
     (sum, boxes) => sum + boxes.length,
@@ -558,6 +596,11 @@ export default function LiveFeedViewer() {
           <p className="text-[11px] text-[#8A9BBF]">
             Real-time YOLO object detection with bounding box overlays | 85%
             confidence threshold
+            {detectionModel && (
+              <span className="ml-2 text-emerald-400">
+                Model: {detectionModel.model_name} {detectionModel.model_version}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
@@ -577,27 +620,19 @@ export default function LiveFeedViewer() {
 
           {/* Global detection counts */}
           <div className="flex gap-2 text-[11px]">
-            {Object.entries(globalCounts).map(([cls, count]) => {
-              const colours: Record<string, string> = {
-                bag: "#3b82f6",
-                box: "#f59e0b",
-                pallet: "#22d3a1",
-                carton: "#a78bfa",
-              };
-              return (
-                <span
-                  key={cls}
-                  className="px-2 py-0.5 rounded-full border"
-                  style={{
-                    color: colours[cls] || "#94a3b8",
-                    borderColor: `${colours[cls] || "#94a3b8"}30`,
-                    background: `${colours[cls] || "#94a3b8"}10`,
-                  }}
-                >
-                  <span className="font-bold">{count}</span> {cls}s
-                </span>
-              );
-            })}
+            {Object.entries(globalCounts).map(([cls, count]) => (
+              <span
+                key={cls}
+                className="px-2 py-0.5 rounded-full border"
+                style={{
+                  color: CLASS_COLOURS[cls] || "#94a3b8",
+                  borderColor: `${CLASS_COLOURS[cls] || "#94a3b8"}30`,
+                  background: `${CLASS_COLOURS[cls] || "#94a3b8"}10`,
+                }}
+              >
+                <span className="font-bold">{count}</span> {cls}s
+              </span>
+            ))}
           </div>
 
           {/* Live toggle */}
@@ -644,6 +679,7 @@ export default function LiveFeedViewer() {
                 onSelect={() => setSelectedCameraId(camera.id)}
                 onReconnect={() => void handleReconnect(camera.id)}
                 isReconnecting={busyCameraId === camera.id}
+                snapshotTick={tick}
               />
               {/* Expand button */}
               {camera.status === "active" && (
@@ -666,6 +702,7 @@ export default function LiveFeedViewer() {
           camera={expandedCamera}
           boxes={cameraBoxes[expandedCamera.id] || []}
           onClose={() => setExpandedCameraId(null)}
+          snapshotTick={tick}
         />
       )}
     </div>

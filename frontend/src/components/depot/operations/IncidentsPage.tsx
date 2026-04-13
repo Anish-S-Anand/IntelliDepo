@@ -1,14 +1,70 @@
 "use client";
 
-import { useState } from "react";
-import { INCIDENTS, SEV_COL, STA_COL } from "@/lib/depot-data";
+import { useState, useEffect, useCallback } from "react";
+import { INCIDENTS as MOCK_INCIDENTS, SEV_COL, STA_COL } from "@/lib/depot-data";
 import type { Incident } from "@/lib/depot-data";
+import {
+  getIncidents,
+  acknowledgeIncident,
+  resolveIncident,
+  type IncidentResponse,
+} from "@/services/depotPerimeter";
 
 type FilterType = "all" | "open" | "acknowledged" | "resolved" | "CRITICAL" | "HIGH";
 
+/** Map backend incidents to the UI Incident shape */
+function mapBackendIncident(inc: IncidentResponse): Incident {
+  const sevMap: Record<string, Incident["sev"]> = {
+    critical: "CRITICAL",
+    high: "HIGH",
+    medium: "MEDIUM",
+    low: "LOW",
+  };
+  const statusMap: Record<string, Incident["status"]> = {
+    open: "open",
+    acknowledged: "acknowledged",
+    escalated: "acknowledged",
+    resolved: "resolved",
+  };
+  return {
+    id: inc.id,
+    type: inc.title,
+    sev: sevMap[inc.severity] || "MEDIUM",
+    loc: inc.escalated_to ? `Escalated to ${inc.escalated_to}` : "Perimeter Zone",
+    t: new Date(inc.created_at).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" }),
+    status: statusMap[inc.status] || "open",
+    cam: inc.video_archive_ref ? "Evidence" : "—",
+    desc: inc.description || inc.title,
+    assignee: inc.acknowledged_by || inc.escalated_to || "—",
+  };
+}
+
 export default function IncidentsPage() {
-  const [incidents, setIncidents] = useState<Incident[]>(INCIDENTS);
+  const [incidents, setIncidents] = useState<Incident[]>(MOCK_INCIDENTS);
   const [filter, setFilter] = useState<FilterType>("all");
+  const [resolveModalId, setResolveModalId] = useState<string | null>(null);
+  const [resolveNotes, setResolveNotes] = useState("");
+
+  // Fetch real incidents from backend and merge with mock data
+  const fetchIncidents = useCallback(async () => {
+    try {
+      const backendIncidents = await getIncidents();
+      const mapped = backendIncidents.map(mapBackendIncident);
+      // Merge: backend incidents first, then mock data for non-overlapping IDs
+      const backendIds = new Set(mapped.map((i) => i.id));
+      const merged = [...mapped, ...MOCK_INCIDENTS.filter((m) => !backendIds.has(m.id))];
+      setIncidents(merged);
+    } catch {
+      // Fallback to mock data
+      setIncidents(MOCK_INCIDENTS);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchIncidents();
+    const interval = setInterval(() => void fetchIncidents(), 20000);
+    return () => clearInterval(interval);
+  }, [fetchIncidents]);
 
   const filtered = incidents.filter((i) => {
     if (filter === "all") return true;
@@ -22,12 +78,40 @@ export default function IncidentsPage() {
   const cntRes = incidents.filter((i) => i.status === "resolved").length;
   const cntCrit = incidents.filter((i) => i.sev === "CRITICAL").length;
 
-  const acknowledge = (id: string) => {
+  const acknowledge = async (id: string) => {
+    // Try backend first for UUID-like IDs
+    if (id.includes("-") && id.length > 10) {
+      try {
+        await acknowledgeIncident(id, "Acknowledged from incident console");
+        void fetchIncidents();
+        return;
+      } catch { /* fall through to local state */ }
+    }
     setIncidents((prev) =>
       prev.map((i) =>
         i.id === id ? { ...i, status: "acknowledged" as const, assignee: "Command Center" } : i
       )
     );
+  };
+
+  const handleResolve = async () => {
+    if (!resolveModalId || resolveNotes.length < 5) return;
+    if (resolveModalId.includes("-") && resolveModalId.length > 10) {
+      try {
+        await resolveIncident(resolveModalId, resolveNotes);
+        void fetchIncidents();
+        setResolveModalId(null);
+        setResolveNotes("");
+        return;
+      } catch { /* fall through */ }
+    }
+    setIncidents((prev) =>
+      prev.map((i) =>
+        i.id === resolveModalId ? { ...i, status: "resolved" as const } : i
+      )
+    );
+    setResolveModalId(null);
+    setResolveNotes("");
   };
 
   const filters: { label: string; value: FilterType; style?: string }[] = [
@@ -119,7 +203,7 @@ export default function IncidentsPage() {
               </div>
               <div className="text-right">
                 <div className="text-[10px] text-[#4E6090]">{i.t}</div>
-                <div className="text-[10px] text-[#8A9BBF] mt-0.5">📷 {i.cam}</div>
+                <div className="text-[10px] text-[#8A9BBF] mt-0.5">{i.cam !== "—" ? `📷 ${i.cam}` : ""}</div>
               </div>
             </div>
             <div className="text-[12px] text-[#8A9BBF] mb-2 leading-relaxed">{i.desc}</div>
@@ -136,10 +220,50 @@ export default function IncidentsPage() {
                   Take Action
                 </button>
               )}
+              {i.status !== "resolved" && (
+                <button
+                  onClick={() => { setResolveModalId(i.id); setResolveNotes(""); }}
+                  className="px-3 py-1.5 rounded-lg border border-[#22D3A1]/30 text-[#22D3A1] text-[11px] font-bold hover:bg-[#22D3A1]/10 transition"
+                >
+                  Resolve
+                </button>
+              )}
             </div>
           </div>
         ))}
       </div>
+
+      {/* Resolve Modal */}
+      {resolveModalId && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setResolveModalId(null)}>
+          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-5 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[16px] font-bold text-[#E8EDF8] mb-4" style={{ fontFamily: "'Syne', sans-serif" }}>
+              Resolve Incident
+            </h3>
+            <textarea
+              value={resolveNotes}
+              onChange={(e) => setResolveNotes(e.target.value)}
+              placeholder="Resolution notes (min 5 characters)..."
+              className="w-full h-24 bg-[#0F1A30] border border-[#1E2F50] rounded-lg p-3 text-[12px] text-[#E8EDF8] placeholder-[#4E6090] resize-none focus:border-[#22D3A1] focus:outline-none"
+            />
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                onClick={() => setResolveModalId(null)}
+                className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResolve}
+                disabled={resolveNotes.length < 5}
+                className="px-4 py-1.5 rounded-lg bg-[#22D3A1] text-[#0D1526] text-[11px] font-bold disabled:opacity-40"
+              >
+                Resolve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

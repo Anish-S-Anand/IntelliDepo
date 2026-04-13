@@ -8,20 +8,21 @@ Provides bounding boxes, class labels, confidence scores, and size estimates.
 Dependency note: AUTH-6.2 (RBAC) is active.
 Permission checks now use the shared RBAC dependency layer.
 
-YOLO note: Real inference requires `ultralytics` + GPU. This module ships a
-SimulatedDetector that generates realistic synthetic results so the full API,
-persistence, and downstream pipeline can be developed and tested without a
-GPU environment. Swap _run_inference() for a real YOLO call when the model
-weights are available.
+Uses ultralytics YOLOv8 for real inference. Falls back to a lightweight
+simulation only when the ultralytics package is not installed (e.g. CI).
 """
 import uuid
 import random
 import logging
+import os
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
+from pathlib import Path
+import io
 
-from fastapi import APIRouter, Depends, HTTPException
+import numpy as np
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
@@ -33,6 +34,41 @@ from app.core.auth.dependencies import get_current_user, require_permission
 from app.shared.models.user import User
 
 logger = logging.getLogger("intelli.depot.detection")
+ALLOW_SIMULATED_VISION = os.getenv("ALLOW_SIMULATED_VISION", "false").lower() in {"1", "true", "yes"}
+
+# ---------------------------------------------------------------------------
+# YOLO model loader — real ultralytics with graceful fallback
+# ---------------------------------------------------------------------------
+
+_yolo_models: dict[str, object] = {}  # weights_path -> YOLO model instance
+
+try:
+    from ultralytics import YOLO as _YOLO
+    _HAS_ULTRALYTICS = True
+    logger.info("ultralytics loaded — real YOLO inference available")
+except ImportError:
+    _HAS_ULTRALYTICS = False
+    logger.warning("ultralytics not installed — detection will use fallback simulation")
+
+
+def _load_yolo_model(weights_path: str | None) -> object | None:
+    """Load (or return cached) YOLO model from weights path."""
+    if not _HAS_ULTRALYTICS:
+        return None
+    key = weights_path or "yolov8n.pt"
+    if key not in _yolo_models:
+        resolved = key
+        if weights_path and Path(weights_path).exists():
+            resolved = weights_path
+        else:
+            resolved = "yolov8n.pt"  # auto-downloads from ultralytics hub
+        try:
+            _yolo_models[key] = _YOLO(resolved)
+            logger.info(f"YOLO model loaded: {resolved}")
+        except Exception as e:
+            logger.error(f"Failed to load YOLO model {resolved}: {e}")
+            return None
+    return _yolo_models.get(key)
 
 router = APIRouter(prefix="/depot/vision/detection", tags=["Depot - Detection"])
 
@@ -195,56 +231,138 @@ class RunSummary(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Simulated YOLO Inference
+# YOLO Inference — real ultralytics with fallback
 # ---------------------------------------------------------------------------
 
-def _simulate_detections(
-    run_id: uuid.UUID,
+# Map YOLO class names to our ObjectClass enum values
+_YOLO_CLASS_MAP: dict[str, str] = {
+    "backpack": "bag", "handbag": "bag", "suitcase": "bag",
+    "bag": "bag", "box": "box", "carton": "carton",
+    "pallet": "pallet",
+}
+
+
+def _run_yolo_inference(
+    model: object,
+    frame: np.ndarray,
+    confidence_threshold: float,
+    target_classes: list[str],
+) -> list[dict]:
+    """Run real YOLO inference on a numpy frame, return normalised detections."""
+    results = model(frame, conf=confidence_threshold, verbose=False)  # type: ignore[operator]
+    detections: list[dict] = []
+    h, w = frame.shape[:2]
+
+    for r in results:
+        for box in r.boxes:
+            cls_id = int(box.cls[0])
+            cls_name = r.names.get(cls_id, "unknown")
+            mapped = _YOLO_CLASS_MAP.get(cls_name, cls_name)
+            if mapped not in target_classes:
+                continue
+            conf = float(box.conf[0])
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            detections.append({
+                "class_label": mapped,
+                "confidence": round(conf, 4),
+                "bbox_x": round(x1 / w, 4),
+                "bbox_y": round(y1 / h, 4),
+                "bbox_w": round((x2 - x1) / w, 4),
+                "bbox_h": round((y2 - y1) / h, 4),
+            })
+    return detections
+
+
+def _fallback_simulate(
     frame_count: int,
     confidence_threshold: float,
     target_classes: list[str],
+) -> list[list[dict]]:
+    """Fallback simulation when YOLO weights are unavailable."""
+    available = [c for c in target_classes if c in [e.value for e in ObjectClass]] or ["box"]
+    all_frames: list[list[dict]] = []
+    for _ in range(frame_count):
+        dets: list[dict] = []
+        for _ in range(random.randint(0, 6)):
+            dets.append({
+                "class_label": random.choice(available),
+                "confidence": round(random.uniform(confidence_threshold, 0.99), 4),
+                "bbox_x": round(random.uniform(0.0, 0.7), 4),
+                "bbox_y": round(random.uniform(0.0, 0.7), 4),
+                "bbox_w": round(random.uniform(0.05, 0.3), 4),
+                "bbox_h": round(random.uniform(0.05, 0.3), 4),
+            })
+        all_frames.append(dets)
+    return all_frames
+
+
+def _detect_on_frames(
+    run_id: uuid.UUID,
+    frames: list[np.ndarray] | None,
+    frame_count: int,
+    confidence_threshold: float,
+    target_classes: list[str],
+    weights_path: str | None,
     frame_width_px: int = 1920,
     frame_height_px: int = 1080,
     px_to_cm_x: float = 0.5,
     px_to_cm_y: float = 0.5,
 ) -> list[DetectedObject]:
     """
-    Generate synthetic detection results that mimic real YOLO output.
-    Replace this function body with actual `ultralytics` YOLO inference
-    once model weights are available.
-
-    Uses calibrated pixel-to-cm ratios for accurate real-world size estimation.
+    Run YOLO detection on real frames when available, otherwise fallback.
+    Returns persisted DetectedObject list.
     """
+    model = _load_yolo_model(weights_path)
     objects: list[DetectedObject] = []
-    available = [c for c in target_classes if c in [e.value for e in ObjectClass]]
-    if not available:
-        available = [ObjectClass.BOX]
 
-    for frame_no in range(1, frame_count + 1):
-        n_objects = random.randint(0, 6)
-        for _ in range(n_objects):
-            conf = round(random.uniform(confidence_threshold, 0.99), 4)
-            cls = random.choice(available)
-            bx = round(random.uniform(0.0, 0.7), 4)
-            by = round(random.uniform(0.0, 0.7), 4)
-            bw = round(random.uniform(0.05, 0.3), 4)
-            bh = round(random.uniform(0.05, 0.3), 4)
-            # Calibrated physical size: use pixel-to-cm ratios from model config
-            width_cm = bw * frame_width_px * px_to_cm_x
-            height_cm = bh * frame_height_px * px_to_cm_y
-            size_cm2 = round(width_cm * height_cm, 2)
-            objects.append(DetectedObject(
-                run_id=run_id,
-                frame_number=frame_no,
-                class_label=cls,
-                confidence=conf,
-                bbox_x=bx,
-                bbox_y=by,
-                bbox_w=bw,
-                bbox_h=bh,
-                size_estimate_cm2=size_cm2,
-                count_in_frame=1,
-            ))
+    if model is not None and frames:
+        # ---- Real YOLO inference ----
+        for frame_no, frame in enumerate(frames, 1):
+            dets = _run_yolo_inference(model, frame, confidence_threshold, target_classes)
+            for det in dets:
+                width_cm = det["bbox_w"] * frame_width_px * px_to_cm_x
+                height_cm = det["bbox_h"] * frame_height_px * px_to_cm_y
+                objects.append(DetectedObject(
+                    run_id=run_id,
+                    frame_number=frame_no,
+                    class_label=det["class_label"],
+                    confidence=det["confidence"],
+                    bbox_x=det["bbox_x"],
+                    bbox_y=det["bbox_y"],
+                    bbox_w=det["bbox_w"],
+                    bbox_h=det["bbox_h"],
+                    size_estimate_cm2=round(width_cm * height_cm, 2),
+                    count_in_frame=1,
+                ))
+    elif ALLOW_SIMULATED_VISION:
+        # ---- Fallback simulation ----
+        logger.info("Using fallback simulation (no YOLO model or no frames provided)")
+        sim_frames = _fallback_simulate(frame_count, confidence_threshold, target_classes)
+        for frame_no, dets in enumerate(sim_frames, 1):
+            for det in dets:
+                width_cm = det["bbox_w"] * frame_width_px * px_to_cm_x
+                height_cm = det["bbox_h"] * frame_height_px * px_to_cm_y
+                objects.append(DetectedObject(
+                    run_id=run_id,
+                    frame_number=frame_no,
+                    class_label=det["class_label"],
+                    confidence=det["confidence"],
+                    bbox_x=det["bbox_x"],
+                    bbox_y=det["bbox_y"],
+                    bbox_w=det["bbox_w"],
+                    bbox_h=det["bbox_h"],
+                    size_estimate_cm2=round(width_cm * height_cm, 2),
+                    count_in_frame=1,
+                ))
+    else:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Real detection unavailable: ensure ultralytics is installed, "
+                "YOLO model loads, and camera frames are accessible. "
+                "Set ALLOW_SIMULATED_VISION=true to enable simulation fallback."
+            ),
+        )
     return objects
 
 
@@ -290,6 +408,44 @@ async def get_model(
     return model
 
 
+class DetectionModelTune(BaseModel):
+    """Tune confidence / IOU thresholds for a detection model."""
+    confidence_threshold: Optional[float] = Field(None, ge=0.0, le=1.0, description="Minimum confidence (0.0-1.0)")
+    iou_threshold: Optional[float] = Field(None, ge=0.0, le=1.0, description="IoU overlap threshold (0.0-1.0)")
+    target_classes: Optional[str] = Field(None, description="Comma-separated target classes")
+
+
+@router.patch("/models/{model_id}/tune", response_model=DetectionModelResponse)
+async def tune_model(
+    model_id: uuid.UUID,
+    payload: DetectionModelTune,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Tune AI model parameters — confidence threshold, IOU threshold, target classes.
+    Used for Day 5 confidence calibration per F-001 (85% default, adjustable).
+    """
+    model = await db.get(DetectionModel, model_id)
+    if not model or not model.is_active:
+        raise HTTPException(status_code=404, detail="Detection model not found")
+
+    if payload.confidence_threshold is not None:
+        model.confidence_threshold = payload.confidence_threshold
+    if payload.iou_threshold is not None:
+        model.iou_threshold = payload.iou_threshold
+    if payload.target_classes is not None:
+        model.target_classes = payload.target_classes
+
+    await db.commit()
+    await db.refresh(model)
+    logger.info(
+        f"Model {model.model_name} tuned: conf={model.confidence_threshold}, "
+        f"iou={model.iou_threshold}, classes={model.target_classes}"
+    )
+    return model
+
+
 # ---------------------------------------------------------------------------
 # Detection Run Endpoints
 # ---------------------------------------------------------------------------
@@ -301,11 +457,10 @@ async def start_detection_run(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Start a detection run.
-    Simulates YOLO inference over the specified number of frames and persists
-    all detected objects. Returns the completed run record.
+    Start a detection run by capturing frames from a connected camera.
+    Uses real YOLO v8 inference when ultralytics is installed and the camera
+    stream is active. Falls back to simulation otherwise.
     """
-
     det_model = await db.get(DetectionModel, payload.model_id)
     if not det_model or not det_model.is_active:
         raise HTTPException(status_code=404, detail="Detection model not found")
@@ -319,19 +474,45 @@ async def start_detection_run(
         initiated_by=str(current_user.id),
     )
     db.add(run)
-    await db.flush()  # get run.id before inserting objects
+    await db.flush()
 
     target_classes = [c.strip() for c in det_model.target_classes.split(",")]
-    detections = _simulate_detections(
-        run.id,
-        payload.frame_count,
-        det_model.confidence_threshold,
-        target_classes,
+
+    # Try to capture real frames from camera stream
+    frames: list[np.ndarray] | None = None
+    if payload.camera_id:
+        try:
+            from app.depot.vision.camera import capture_frames
+            frames = await capture_frames(str(payload.camera_id), payload.frame_count)
+        except Exception as e:
+            logger.warning(f"Could not capture frames from camera {payload.camera_id}: {e}")
+
+    detections = _detect_on_frames(
+        run_id=run.id,
+        frames=frames,
+        frame_count=payload.frame_count,
+        confidence_threshold=det_model.confidence_threshold,
+        target_classes=target_classes,
+        weights_path=det_model.weights_path,
         frame_width_px=det_model.frame_width_px or 1920,
         frame_height_px=det_model.frame_height_px or 1080,
         px_to_cm_x=det_model.px_to_cm_x or 0.5,
         px_to_cm_y=det_model.px_to_cm_y or 0.5,
     )
+
+    # Archive frames to MinIO
+    if frames:
+        try:
+            from app.depot.vision.frame_storage import save_detection_frame
+            from app.depot.vision.camera import _HAS_CV2
+            if _HAS_CV2:
+                import cv2
+                for i, frame in enumerate(frames):
+                    _, buf = cv2.imencode(".jpg", frame)
+                    save_detection_frame(buf.tobytes(), str(run.id), i + 1)
+        except Exception as e:
+            logger.warning(f"Failed to archive detection frames: {e}")
+
     for obj in detections:
         db.add(obj)
 
@@ -341,8 +522,69 @@ async def start_detection_run(
 
     await db.commit()
     await db.refresh(run)
-    logger.info(f"Detection run {run.id}: {run.total_detections} objects in {run.frame_count} frames")
+    logger.info(f"Detection run {run.id}: {run.total_detections} objects in {run.frame_count} frames (yolo={'real' if _HAS_ULTRALYTICS and frames else 'fallback'})")
     return run
+
+
+@router.post("/detect-frame", response_model=list[DetectedObjectResponse], status_code=200)
+async def detect_on_uploaded_frame(
+    file: UploadFile = File(..., description="JPEG/PNG image frame"),
+    model_id: uuid.UUID = Form(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Run YOLO detection on a single uploaded image frame.
+    Returns detected objects without creating a persistent run record.
+    Useful for one-shot detection from uploaded snapshots.
+    """
+    det_model = await db.get(DetectionModel, model_id)
+    if not det_model or not det_model.is_active:
+        raise HTTPException(status_code=404, detail="Detection model not found")
+
+    image_bytes = await file.read()
+    frame = np.frombuffer(image_bytes, dtype=np.uint8)
+
+    try:
+        import cv2
+        frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
+        if frame is None:
+            raise HTTPException(status_code=400, detail="Could not decode image")
+    except ImportError:
+        raise HTTPException(status_code=501, detail="opencv-python-headless is required for frame upload")
+
+    target_classes = [c.strip() for c in det_model.target_classes.split(",")]
+    model = _load_yolo_model(det_model.weights_path)
+
+    if model is None:
+        raise HTTPException(status_code=501, detail="YOLO model not available — install ultralytics")
+
+    raw_dets = _run_yolo_inference(model, frame, det_model.confidence_threshold, target_classes)
+
+    # Build response objects (not persisted)
+    h, w = frame.shape[:2]
+    px_to_cm_x = det_model.px_to_cm_x or 0.5
+    px_to_cm_y = det_model.px_to_cm_y or 0.5
+    result = []
+    for i, det in enumerate(raw_dets):
+        width_cm = det["bbox_w"] * w * px_to_cm_x
+        height_cm = det["bbox_h"] * h * px_to_cm_y
+        obj = DetectedObject(
+            run_id=uuid.uuid4(),
+            frame_number=1,
+            class_label=det["class_label"],
+            confidence=det["confidence"],
+            bbox_x=det["bbox_x"],
+            bbox_y=det["bbox_y"],
+            bbox_w=det["bbox_w"],
+            bbox_h=det["bbox_h"],
+            size_estimate_cm2=round(width_cm * height_cm, 2),
+            count_in_frame=1,
+        )
+        obj.id = uuid.uuid4()
+        obj.created_at = datetime.now(timezone.utc)
+        result.append(DetectedObjectResponse.model_validate(obj))
+    return result
 
 
 @router.get("/runs", response_model=list[DetectionRunResponse])

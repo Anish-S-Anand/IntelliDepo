@@ -170,6 +170,24 @@ export async function getDepotCommandSnapshot(): Promise<DepotCommandSnapshot> {
   };
 }
 
+export interface CameraRegisterPayload {
+  name: string;
+  stream_url: string;
+  protocol?: "rtsp" | "http" | "https";
+  zone?: string;
+  frame_rate?: number;
+  resolution?: string;
+}
+
+export async function registerCamera(payload: CameraRegisterPayload): Promise<CameraRecord> {
+  const res = await api.post<CameraRecord>("/depot/vision/cameras/register", payload);
+  return res.data;
+}
+
+export async function deleteCamera(cameraId: string): Promise<void> {
+  await api.delete(`/depot/vision/cameras/${cameraId}`);
+}
+
 export async function reconnectCamera(cameraId: string) {
   const response = await api.post<{ camera_id: string; status: string }>(`/depot/vision/cameras/${cameraId}/connect`);
   return response.data;
@@ -178,4 +196,31 @@ export async function reconnectCamera(cameraId: string) {
 export async function getCameraFrame(cameraId: string): Promise<IntegrationPanel<CameraFrame | null>> {
   const outcome = await safeGet<CameraFrame>(`/depot/vision/cameras/${cameraId}/frame`);
   return toPanel(outcome, null);
+}
+
+/**
+ * Get the MJPEG stream URL for a camera (for use in <img> src).
+ * Passes the current theme so the backend can tint frames accordingly.
+ */
+export function getCameraMjpegUrl(cameraId: string, theme: "dark" | "light" = "dark"): string {
+  const base = process.env.NEXT_PUBLIC_API_URL || "/backend";
+  return `${base}/depot/vision/cameras/${cameraId}/mjpeg?theme=${theme}`;
+}
+
+/**
+ * Get the snapshot URL for a camera (for use in <img> src).
+ */
+export function getCameraSnapshotUrl(cameraId: string): string {
+  const base = process.env.NEXT_PUBLIC_API_URL || "/backend";
+  return `${base}/depot/vision/cameras/${cameraId}/snapshot`;
+}
+
+/**
+ * Get the RTSP proxy MJPEG stream URL for any RTSP/HTTP source.
+ * The backend connects to the source, overlays HUD + detection boxes, and
+ * re-streams as MJPEG — safe to embed directly in an <img> tag.
+ */
+export function getRtspProxyUrl(rtspUrl: string): string {
+  const base = process.env.NEXT_PUBLIC_API_URL || "/backend";
+  return `${base}/depot/vision/cameras/rtsp-proxy/stream?url=${encodeURIComponent(rtspUrl)}`;
 }

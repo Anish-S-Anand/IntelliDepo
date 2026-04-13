@@ -1,23 +1,40 @@
 "use client";
 
+import VisionPage from "@/components/depot/operations/VisionPage";
+export default function DepotCamerasPage() {
+  return <VisionPage />;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy camera console kept below for reference
+// ---------------------------------------------------------------------------
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Camera,
+  Check,
   Gauge,
+  Plus,
   Radar,
   RefreshCw,
   ShieldAlert,
   Truck,
+  Video,
   Wifi,
   WifiOff,
+  X,
 } from "lucide-react";
 import {
   getCameraFrame,
+  getCameraMjpegUrl,
+  getCameraSnapshotUrl,
   getDepotCommandSnapshot,
   reconnectCamera,
+  registerCamera,
+  type CameraRegisterPayload,
   type DepotCommandSnapshot,
   type IntegrationState,
 } from "@/services/depotCommand";
@@ -51,16 +68,190 @@ function labelForState(state: IntegrationState, message?: string) {
   return message ?? "Offline";
 }
 
-export default function DepotCamerasPage() {
+// ---------------------------------------------------------------------------
+// Camera Registration Modal
+// ---------------------------------------------------------------------------
+
+function RegisterCameraModal({
+  onClose,
+  onRegistered,
+}: {
+  onClose: () => void;
+  onRegistered: () => void;
+}) {
+  const [form, setForm] = useState<CameraRegisterPayload>({
+    name: "",
+    stream_url: "",
+    protocol: "rtsp",
+    zone: "",
+    frame_rate: 25,
+    resolution: "1920x1080",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim() || !form.stream_url.trim()) {
+      setError("Name and Stream URL are required.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await registerCamera({
+        ...form,
+        zone: form.zone || undefined,
+      });
+      onRegistered();
+      onClose();
+    } catch (err: unknown) {
+      const msg =
+        typeof err === "object" && err !== null && "response" in err
+          ? ((err as { response?: { data?: { detail?: string } } }).response?.data?.detail ?? "Registration failed")
+          : "Registration failed";
+      setError(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <form
+        onSubmit={handleSubmit}
+        className="relative w-full max-w-lg rounded-[28px] border border-slate-200 bg-white p-6 shadow-2xl"
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="flex items-center gap-2 mb-5">
+          <Camera className="h-5 w-5 text-cyan-600" />
+          <h3 className="text-lg font-black tracking-tight text-[#0f172a]">Register Camera</h3>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Name *</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Gate Entry North"
+              className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-[#0f172a] placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-100"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Stream URL *</label>
+            <input
+              type="text"
+              value={form.stream_url}
+              onChange={(e) => setForm({ ...form, stream_url: e.target.value })}
+              placeholder="rtsp://192.168.1.101:554/stream1"
+              className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-mono text-[#0f172a] placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-100"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Protocol</label>
+              <select
+                value={form.protocol}
+                onChange={(e) => setForm({ ...form, protocol: e.target.value as "rtsp" | "http" | "https" })}
+                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-[#0f172a] focus:border-cyan-400 focus:outline-none"
+              >
+                <option value="rtsp">RTSP</option>
+                <option value="http">HTTP</option>
+                <option value="https">HTTPS</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Zone</label>
+              <input
+                type="text"
+                value={form.zone}
+                onChange={(e) => setForm({ ...form, zone: e.target.value })}
+                placeholder="e.g. Entry Gate"
+                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-[#0f172a] placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Frame Rate</label>
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={form.frame_rate}
+                onChange={(e) => setForm({ ...form, frame_rate: parseInt(e.target.value) || 25 })}
+                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-[#0f172a] focus:border-cyan-400 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Resolution</label>
+              <select
+                value={form.resolution}
+                onChange={(e) => setForm({ ...form, resolution: e.target.value })}
+                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-[#0f172a] focus:border-cyan-400 focus:outline-none"
+              >
+                <option value="1280x720">1280x720 (720p)</option>
+                <option value="1920x1080">1920x1080 (1080p)</option>
+                <option value="2560x1440">2560x1440 (2K)</option>
+                <option value="3840x2160">3840x2160 (4K)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {error ? (
+          <p className="mt-3 text-sm text-rose-600">{error}</p>
+        ) : null}
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="inline-flex items-center gap-2 rounded-full bg-cyan-600 px-5 py-2 text-sm font-semibold text-white hover:bg-cyan-700 disabled:opacity-50"
+          >
+            {submitting ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+            Register
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Page
+// ---------------------------------------------------------------------------
+
+function DepotCamerasPageLegacy() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const cameraFromUrl = searchParams.get("camera");
+  const [cameraFromUrl, setCameraFromUrl] = useState<string | null>(null);
 
   const [snapshot, setSnapshot] = useState<DepotCommandSnapshot | null>(null);
-  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(cameraFromUrl);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busyCameraId, setBusyCameraId] = useState<string | null>(null);
+  const [showRegister, setShowRegister] = useState(false);
+  const [viewMode, setViewMode] = useState<"metadata" | "stream">("stream");
   const [frameState, setFrameState] = useState<{
     state: IntegrationState;
     frame: Awaited<ReturnType<typeof getCameraFrame>>["data"];
@@ -93,6 +284,11 @@ export default function DepotCamerasPage() {
       setRefreshing(false);
     }
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setCameraFromUrl(params.get("camera"));
+  }, []);
 
   useEffect(() => {
     void loadConsole();
@@ -145,6 +341,8 @@ export default function DepotCamerasPage() {
     [relatedGates, snapshot?.accessLogs.data],
   );
 
+  const isOnline = selectedCamera?.status === "active";
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#081120_0%,#0f172a_28%,#eaf1f5_28.1%,#edf4f7_100%)] px-6 py-6 md:px-8">
       <div className="mx-auto max-w-[1560px]">
@@ -172,7 +370,7 @@ export default function DepotCamerasPage() {
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-4">
               <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Registered</p>
                 <p className="mt-2 text-3xl font-black">{snapshot?.cameras.data.length ?? 0}</p>
@@ -190,6 +388,17 @@ export default function DepotCamerasPage() {
                 >
                   <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
                   Update
+                </button>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Add Camera</p>
+                <button
+                  type="button"
+                  onClick={() => setShowRegister(true)}
+                  className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-emerald-300 hover:text-emerald-200"
+                >
+                  <Plus className="h-4 w-4" />
+                  Register
                 </button>
               </div>
             </div>
@@ -265,6 +474,16 @@ export default function DepotCamerasPage() {
                 );
               })}
 
+              {/* Add camera button in sidebar */}
+              <button
+                type="button"
+                onClick={() => setShowRegister(true)}
+                className="w-full rounded-[24px] border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center text-sm font-semibold text-slate-500 transition hover:border-cyan-400 hover:bg-cyan-50 hover:text-cyan-700"
+              >
+                <Plus className="mx-auto mb-1 h-5 w-5" />
+                Register new camera
+              </button>
+
               {!loading && (snapshot?.cameras.data.length ?? 0) === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-500">
                   No cameras are registered yet, so there is nothing to open in the console.
@@ -281,60 +500,149 @@ export default function DepotCamerasPage() {
                   {selectedCamera?.name ?? "Camera feed"}
                 </h2>
               </div>
-              <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${stateStyles[frameState.state]}`}>
-                {labelForState(frameState.state, frameState.message)}
-              </span>
+              <div className="flex items-center gap-2">
+                {/* View mode toggle */}
+                {selectedCamera ? (
+                  <div className="flex rounded-full border border-slate-200 bg-slate-100 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("stream")}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                        viewMode === "stream" ? "bg-white text-[#0f172a] shadow-sm" : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      <Video className="h-3 w-3" />
+                      Live
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("metadata")}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                        viewMode === "metadata" ? "bg-white text-[#0f172a] shadow-sm" : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      <Gauge className="h-3 w-3" />
+                      Metadata
+                    </button>
+                  </div>
+                ) : null}
+                <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${stateStyles[frameState.state]}`}>
+                  {labelForState(frameState.state, frameState.message)}
+                </span>
+              </div>
             </div>
 
-            <div className="mt-5 overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top,#183b56_0%,#10273b_42%,#0f172a_100%)] p-5 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xl font-bold">{selectedCamera?.zone ?? "No zone selected"}</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-300">
-                    {selectedCamera?.protocol ?? "No protocol"} feed
-                  </p>
+            {/* MJPEG Live Stream View */}
+            {viewMode === "stream" && selectedCamera ? (
+              <div className="mt-5 overflow-hidden rounded-[28px] border border-slate-200 bg-[#0f172a]">
+                <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
+                  <div className="flex items-center gap-3 text-white">
+                    <Video className="h-4 w-4 text-cyan-400" />
+                    <span className="text-sm font-bold">{selectedCamera.zone ?? "No zone"}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-slate-400">{selectedCamera.protocol} feed</span>
+                  </div>
+                  {isOnline ? (
+                    <span className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      LIVE
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold text-slate-500">OFFLINE</span>
+                  )}
                 </div>
-                <Gauge className="h-5 w-5 text-cyan-200" />
+
+                <div className="relative aspect-video bg-black">
+                  {isOnline ? (
+                    <>
+                      <img
+                        key={selectedCameraId}
+                        src={getCameraMjpegUrl(selectedCamera.id)}
+                        alt={`${selectedCamera.name} live feed`}
+                        className="absolute inset-0 w-full h-full object-contain"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          const fallback = `${getCameraSnapshotUrl(selectedCamera.id)}?t=${Date.now()}`;
+                          if (!target.src.includes("/snapshot")) {
+                            target.src = fallback;
+                          }
+                        }}
+                      />
+                      {/* Scanline overlay */}
+                      <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.03)_2px,rgba(0,0,0,0.03)_4px)]" />
+                    </>
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-500">
+                      <WifiOff className="h-8 w-8" />
+                      <p className="text-sm">Camera is offline. Reconnect to see the live feed.</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between px-5 py-3 border-t border-white/10 text-white">
+                  <div className="flex gap-4 text-[11px] text-slate-400">
+                    <span>{selectedCamera.resolution}</span>
+                    <span>{selectedCamera.frame_rate} fps</span>
+                    <span>Frame #{frameState.frame?.frame_number ?? "--"}</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    {formatShortTime(frameState.frame?.timestamp ?? selectedCamera.last_seen)}
+                  </span>
+                </div>
               </div>
+            ) : null}
 
-              <div className="mt-5 rounded-[24px] border border-white/10 bg-white/[0.04] p-5">
-                <div className="aspect-[16/9] rounded-[20px] border border-dashed border-white/10 bg-black/15 p-5">
-                  <div className="flex h-full flex-col justify-between">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-2xl bg-white/[0.06] p-3">
-                        <p className="text-lg font-black">{frameState.frame?.frame_number ?? "--"}</p>
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Latest frame</p>
-                      </div>
-                      <div className="rounded-2xl bg-white/[0.06] p-3">
-                        <p className="text-lg font-black">
-                          {frameState.frame ? `${frameState.frame.width}x${frameState.frame.height}` : selectedCamera?.resolution ?? "--"}
-                        </p>
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Capture window</p>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <div className="rounded-2xl bg-white/[0.06] p-4">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Last seen</p>
-                        <p className="mt-2 text-sm font-semibold">{formatShortTime(frameState.frame?.timestamp ?? selectedCamera?.last_seen)}</p>
-                      </div>
-                      <div className="rounded-2xl bg-white/[0.06] p-4">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Stream URL</p>
-                        <p className="mt-2 line-clamp-2 text-sm font-semibold">{selectedCamera?.stream_url ?? "Not configured"}</p>
-                      </div>
-                      <div className="rounded-2xl bg-white/[0.06] p-4">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Frame rate</p>
-                        <p className="mt-2 text-sm font-semibold">{selectedCamera?.frame_rate ?? "--"} fps</p>
-                      </div>
-                    </div>
-
-                    <p className="text-xs leading-5 text-slate-300">
-                      {frameState.message ?? "Frame metadata is coming directly from the camera feed endpoint."}
+            {/* Metadata View (original) */}
+            {viewMode === "metadata" || !selectedCamera ? (
+              <div className="mt-5 overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top,#183b56_0%,#10273b_42%,#0f172a_100%)] p-5 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xl font-bold">{selectedCamera?.zone ?? "No zone selected"}</p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-300">
+                      {selectedCamera?.protocol ?? "No protocol"} feed
                     </p>
+                  </div>
+                  <Gauge className="h-5 w-5 text-cyan-200" />
+                </div>
+
+                <div className="mt-5 rounded-[24px] border border-white/10 bg-white/[0.04] p-5">
+                  <div className="aspect-[16/9] rounded-[20px] border border-dashed border-white/10 bg-black/15 p-5">
+                    <div className="flex h-full flex-col justify-between">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-2xl bg-white/[0.06] p-3">
+                          <p className="text-lg font-black">{frameState.frame?.frame_number ?? "--"}</p>
+                          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Latest frame</p>
+                        </div>
+                        <div className="rounded-2xl bg-white/[0.06] p-3">
+                          <p className="text-lg font-black">
+                            {frameState.frame ? `${frameState.frame.width}x${frameState.frame.height}` : selectedCamera?.resolution ?? "--"}
+                          </p>
+                          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Capture window</p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <div className="rounded-2xl bg-white/[0.06] p-4">
+                          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Last seen</p>
+                          <p className="mt-2 text-sm font-semibold">{formatShortTime(frameState.frame?.timestamp ?? selectedCamera?.last_seen)}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white/[0.06] p-4">
+                          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Stream URL</p>
+                          <p className="mt-2 line-clamp-2 text-sm font-semibold">{selectedCamera?.stream_url ?? "Not configured"}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white/[0.06] p-4">
+                          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Frame rate</p>
+                          <p className="mt-2 text-sm font-semibold">{selectedCamera?.frame_rate ?? "--"} fps</p>
+                        </div>
+                      </div>
+
+                      <p className="text-xs leading-5 text-slate-300">
+                        {frameState.message ?? "Frame metadata is coming directly from the camera feed endpoint."}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : null}
           </main>
 
           <aside className="space-y-6">
@@ -406,6 +714,14 @@ export default function DepotCamerasPage() {
           </Link>
         </div>
       </div>
+
+      {/* Registration modal */}
+      {showRegister ? (
+        <RegisterCameraModal
+          onClose={() => setShowRegister(false)}
+          onRegistered={() => void loadConsole(true)}
+        />
+      ) : null}
     </div>
   );
 }

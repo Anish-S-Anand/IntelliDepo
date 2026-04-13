@@ -1,7 +1,7 @@
 import dynamic from "next/dynamic";
 
-const OperationsDashboard = dynamic(
-  () => import("@/components/depot/operations/OperationsDashboard"),
+const ExecutiveDashboard = dynamic(
+  () => import("@/components/depot/operations/ExecutiveDashboard"),
   { ssr: false, loading: () => <LoadingShell /> },
 );
 
@@ -14,5 +14,5 @@ function LoadingShell() {
 }
 
 export default function OperationsPage() {
-  return <OperationsDashboard />;
+  return <ExecutiveDashboard />;
 }

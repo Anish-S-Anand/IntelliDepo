@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
-  COUNTING_SESSIONS,
-  BATCH_TALLIES,
-  COUNT_TIMESERIES,
-  reconciliationColor,
-  type CountingSession,
-} from "@/lib/depot-data";
+  getCountSessions,
+  getManifests,
+  getReconciliationReport,
+  type CountSessionResponse,
+  type ManifestResponse,
+  type ReconciliationReport,
+} from "@/services/depotCounting";
+import { exportCountingReport } from "@/lib/exportUtils";
 import {
   Package,
   CheckCircle2,
@@ -17,20 +19,210 @@ import {
   Search,
   Filter,
   ChevronDown,
+  FileText,
   Eye,
   BarChart3,
   Clock,
   Target,
 } from "lucide-react";
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function reconciliationColor(status: string): string {
+  if (status === "mismatch") return "#F04A4A";
+  if (status === "pending") return "#F5A623";
+  return "#22D3A1";
+}
+
 const STATUS_LABEL: Record<string, string> = { matched: "MATCHED", mismatch: "MISMATCH", pending: "PENDING" };
+
+// ---------------------------------------------------------------------------
+// Derived view-model types
+// ---------------------------------------------------------------------------
+
+interface SessionRow {
+  id: string;
+  manifestCode: string;
+  vehicleNumber: string;
+  expectedBags: number;
+  expectedBoxes: number;
+  countedBags: number;
+  countedBoxes: number;
+  totalExpected: number;
+  totalCounted: number;
+  discrepancy: number;
+  confidenceAvg: number;
+  status: string;
+  zone: string;
+  camera: string;
+  timestamp: string;
+}
+
+interface BatchTally {
+  id: string;
+  batchCode: string;
+  product: string;
+  expected: number;
+  counted: number;
+  variance: number;
+  variancePct: number;
+  status: string;
+}
+
+interface TimeSeriesPoint {
+  time: string;
+  bags: number;
+  boxes: number;
+  cumulative: number;
+}
+
+// ---------------------------------------------------------------------------
+// Data-shaping helpers
+// ---------------------------------------------------------------------------
+
+function buildSessionRows(
+  sessions: CountSessionResponse[],
+  manifests: ManifestResponse[],
+): SessionRow[] {
+  const manifestMap = new Map<string, ManifestResponse>();
+  for (const m of manifests) manifestMap.set(m.id, m);
+
+  return sessions.map((s) => {
+    const m = s.manifest_id ? manifestMap.get(s.manifest_id) : undefined;
+    return {
+      id: s.id,
+      manifestCode: m?.manifest_code ?? "—",
+      vehicleNumber: m?.vehicle_number ?? "—",
+      expectedBags: m?.expected_bags ?? 0,
+      expectedBoxes: m?.expected_boxes ?? 0,
+      countedBags: s.counted_bags,
+      countedBoxes: s.counted_boxes,
+      totalExpected: m?.total_expected ?? 0,
+      totalCounted: s.total_counted,
+      discrepancy: s.discrepancy_total,
+      confidenceAvg: s.confidence_avg,
+      status: s.reconciliation_status,
+      zone: s.zone ?? "—",
+      camera: s.camera_id ?? "—",
+      timestamp: new Date(s.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true }).toUpperCase(),
+    };
+  });
+}
+
+function buildBatchTallies(
+  sessions: CountSessionResponse[],
+  manifests: ManifestResponse[],
+): BatchTally[] {
+  const manifestMap = new Map<string, ManifestResponse>();
+  for (const m of manifests) manifestMap.set(m.id, m);
+
+  return sessions
+    .filter((s) => s.manifest_id)
+    .map((s) => {
+      const m = manifestMap.get(s.manifest_id!);
+      const expected = m?.total_expected ?? 0;
+      const counted = s.total_counted;
+      const variance = counted - expected;
+      const variancePct = expected > 0 ? parseFloat(((variance / expected) * 100).toFixed(1)) : 0;
+      return {
+        id: s.id,
+        batchCode: m?.manifest_code ?? s.id,
+        product: m?.shipment_ref ?? m?.manifest_code ?? "—",
+        expected,
+        counted,
+        variance,
+        variancePct,
+        status: s.reconciliation_status,
+      };
+    });
+}
+
+// Time-series computed client-side by aggregating all sessions by hour.
+// Per-session time-series available at /sessions/{id}/timeseries endpoint.
+function buildTimeSeries(sessions: CountSessionResponse[]): TimeSeriesPoint[] {
+  // Group sessions by hour of created_at
+  const hourMap = new Map<number, { bags: number; boxes: number }>();
+  for (const s of sessions) {
+    const h = new Date(s.created_at).getHours();
+    const cur = hourMap.get(h) ?? { bags: 0, boxes: 0 };
+    cur.bags += s.counted_bags;
+    cur.boxes += s.counted_boxes;
+    hourMap.set(h, cur);
+  }
+
+  // Build sorted array from earliest to latest hour present
+  const hours = Array.from(hourMap.keys()).sort((a, b) => a - b);
+  if (hours.length === 0) return [];
+
+  const points: TimeSeriesPoint[] = [];
+  let cumulative = 0;
+  for (const h of hours) {
+    const d = hourMap.get(h)!;
+    cumulative += d.bags + d.boxes;
+    points.push({
+      time: `${h.toString().padStart(2, "0")}:00`,
+      bags: d.bags,
+      boxes: d.boxes,
+      cumulative,
+    });
+  }
+  return points;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export default function CountingSummaryPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedSession, setSelectedSession] = useState<CountingSession | null>(null);
+  const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null);
 
-  const filtered = COUNTING_SESSIONS.filter((s) => {
+  // API data
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [batchTallies, setBatchTallies] = useState<BatchTally[]>([]);
+  const [timeSeries, setTimeSeries] = useState<TimeSeriesPoint[]>([]);
+  const [report, setReport] = useState<ReconciliationReport | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [sessionsRaw, manifests, reportData] = await Promise.all([
+        getCountSessions(),
+        getManifests(),
+        getReconciliationReport(),
+      ]);
+      setSessions(buildSessionRows(sessionsRaw, manifests));
+      setBatchTallies(buildBatchTallies(sessionsRaw, manifests));
+      setTimeSeries(buildTimeSeries(sessionsRaw));
+      setReport(reportData);
+    } catch (err) {
+      console.error("CountingSummaryPage: failed to fetch data", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // Derived KPI values (from report when available, fallback to local)
+  const totalExpected = report?.total_expected ?? sessions.reduce((a, s) => a + s.totalExpected, 0);
+  const totalCounted = report?.total_counted ?? sessions.reduce((a, s) => a + s.totalCounted, 0);
+  const totalDisc = report?.total_discrepancy ?? (totalCounted - totalExpected);
+  const matchedCount = report?.matched_sessions ?? sessions.filter((s) => s.status === "matched").length;
+  const totalSessions = report?.total_sessions ?? sessions.length;
+  const mismatchCount = report?.mismatch_sessions ?? sessions.filter((s) => s.status === "mismatch").length;
+  const avgConf = sessions.length > 0
+    ? (sessions.reduce((a, s) => a + s.confidenceAvg, 0) / sessions.length).toFixed(1)
+    : "0.0";
+
+  const filtered = sessions.filter((s) => {
     const matchSearch =
       s.manifestCode.toLowerCase().includes(search.toLowerCase()) ||
       s.vehicleNumber.toLowerCase().includes(search.toLowerCase());
@@ -38,14 +230,37 @@ export default function CountingSummaryPage() {
     return matchSearch && matchStatus;
   });
 
-  const totalExpected = COUNTING_SESSIONS.reduce((a, s) => a + s.totalExpected, 0);
-  const totalCounted = COUNTING_SESSIONS.reduce((a, s) => a + s.totalCounted, 0);
-  const totalDisc = totalCounted - totalExpected;
-  const matchedCount = COUNTING_SESSIONS.filter((s) => s.status === "matched").length;
-  const mismatchCount = COUNTING_SESSIONS.filter((s) => s.status === "mismatch").length;
-  const avgConf = (COUNTING_SESSIONS.reduce((a, s) => a + s.confidenceAvg, 0) / COUNTING_SESSIONS.length).toFixed(1);
+  const maxCumulative = timeSeries.length > 0 ? Math.max(...timeSeries.map((t) => t.cumulative)) : 0;
 
-  const maxCumulative = Math.max(...COUNT_TIMESERIES.map((t) => t.cumulative));
+  const handleExport = useCallback(() => {
+    if (sessions.length === 0) return;
+    const headers = ["Manifest Code","Vehicle","Expected","Counted","Discrepancy","Confidence","Status","Zone","Camera","Time"];
+    const rows = sessions.map(r => [
+      r.manifestCode, r.vehicleNumber, r.totalExpected, r.totalCounted,
+      r.discrepancy, r.confidenceAvg.toFixed(1) + "%", r.status, r.zone, r.camera,
+      r.timestamp,
+    ]);
+    const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `counting-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [sessions]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="p-5 flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-[#E5521A] border-t-transparent rounded-full animate-spin" />
+          <span className="text-[12px] text-[#8A9BBF] font-bold tracking-wide">Loading counting data...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-5">
@@ -62,10 +277,16 @@ export default function CountingSummaryPage() {
             DeepSORT MOT tracking · Batch tallies · Manifest cross-verification
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#E5521A]/10 border border-[#E5521A]/25 rounded-xl text-[#E5521A] text-[12px] font-bold hover:bg-[#E5521A]/20 transition-colors">
-          <Download className="w-3.5 h-3.5" />
-          Export Report
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => exportCountingReport(sessions)} className="flex items-center gap-2 px-4 py-2 bg-[#E5521A]/10 border border-[#E5521A]/25 rounded-xl text-[#E5521A] text-[12px] font-bold hover:bg-[#E5521A]/20 transition-colors">
+            <FileText className="w-3.5 h-3.5" />
+            PDF
+          </button>
+          <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 bg-[#22D3A1]/10 border border-[#22D3A1]/25 rounded-xl text-[#22D3A1] text-[12px] font-bold hover:bg-[#22D3A1]/20 transition-colors">
+            <Download className="w-3.5 h-3.5" />
+            CSV
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -74,7 +295,7 @@ export default function CountingSummaryPage() {
           { label: "Total Expected", value: totalExpected.toLocaleString(), icon: Target, color: "#5B9BF5" },
           { label: "Total Counted", value: totalCounted.toLocaleString(), icon: Package, color: "#22D3A1" },
           { label: "Discrepancy", value: `${totalDisc >= 0 ? "+" : ""}${totalDisc}`, icon: AlertTriangle, color: totalDisc === 0 ? "#22D3A1" : "#F04A4A" },
-          { label: "Matched", value: `${matchedCount}/${COUNTING_SESSIONS.length}`, icon: CheckCircle2, color: "#22D3A1" },
+          { label: "Matched", value: `${matchedCount}/${totalSessions}`, icon: CheckCircle2, color: "#22D3A1" },
           { label: "Mismatches", value: mismatchCount.toString(), icon: AlertTriangle, color: mismatchCount > 0 ? "#F04A4A" : "#22D3A1" },
           { label: "Avg Confidence", value: `${avgConf}%`, icon: TrendingUp, color: "#5B9BF5" },
         ].map((kpi) => (
@@ -135,7 +356,7 @@ export default function CountingSummaryPage() {
             ))}
             {/* Bars */}
             <div className="flex items-end gap-1.5 h-full pl-8">
-              {COUNT_TIMESERIES.map((t, i) => {
+              {timeSeries.map((t, i) => {
                 const bagH = maxCumulative > 0 ? (t.bags / maxCumulative) * 100 : 0;
                 const boxH = maxCumulative > 0 ? (t.boxes / maxCumulative) * 100 : 0;
                 const cumH = maxCumulative > 0 ? (t.cumulative / maxCumulative) * 100 : 0;
@@ -171,11 +392,11 @@ export default function CountingSummaryPage() {
               Batch Tallies
             </span>
             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#5B9BF5]/12 text-[#5B9BF5] border border-[#5B9BF5]/25">
-              {BATCH_TALLIES.length} Batches
+              {batchTallies.length} Batches
             </span>
           </div>
           <div className="space-y-2">
-            {BATCH_TALLIES.map((b) => (
+            {batchTallies.map((b) => (
               <div
                 key={b.id}
                 className="p-2.5 rounded-[10px] bg-[#0F1A30] hover:bg-[#E5521A]/5 transition-colors"

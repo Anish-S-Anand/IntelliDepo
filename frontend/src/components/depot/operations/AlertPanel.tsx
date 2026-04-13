@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   AlertTriangle,
   Bell,
   CheckCircle2,
-  ChevronRight,
   Clock,
   Palette,
   Package,
@@ -203,6 +202,7 @@ export default function AlertPanel({
   const [loading, setLoading] = useState(true);
   const [acknowledging, setAcknowledging] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "count_mismatch" | "colour_mismatch">("all");
+  const [wsConnected, setWsConnected] = useState(false);
 
   const loadAlerts = useCallback(async () => {
     try {
@@ -210,51 +210,8 @@ export default function AlertPanel({
       setAlerts(data);
       onAlertCountChange?.(data.length);
     } catch {
-      // Generate mock alerts for demo when API is unavailable
-      const mockAlerts: UnifiedAlert[] = [
-        {
-          id: "mock-1",
-          type: "count_mismatch",
-          severity: "high",
-          message: "Count mismatch for MF-2026-0412: expected 120 bags, counted 115 (diff: -5)",
-          manifest_code: "MF-2026-0412",
-          acknowledged: false,
-          created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-          raw: {} as any,
-        },
-        {
-          id: "mock-2",
-          type: "colour_mismatch",
-          severity: "critical",
-          message: "Colour mismatch: expected 'blue' bags, found 8/12 bags with different colours.",
-          manifest_code: "MF-2026-0410",
-          acknowledged: false,
-          created_at: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-          raw: {} as any,
-        },
-        {
-          id: "mock-3",
-          type: "count_mismatch",
-          severity: "medium",
-          message: "Count mismatch for MF-2026-0408: expected 50 boxes, counted 48 (diff: -2)",
-          manifest_code: "MF-2026-0408",
-          acknowledged: false,
-          created_at: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
-          raw: {} as any,
-        },
-        {
-          id: "mock-4",
-          type: "colour_mismatch",
-          severity: "low",
-          message: "Colour mismatch: expected 'brown' bags, found 1/15 bags with different colours.",
-          manifest_code: "MF-2026-0407",
-          acknowledged: false,
-          created_at: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
-          raw: {} as any,
-        },
-      ];
-      setAlerts(mockAlerts);
-      onAlertCountChange?.(mockAlerts.length);
+      setAlerts([]);
+      onAlertCountChange?.(0);
     } finally {
       setLoading(false);
     }
@@ -265,6 +222,71 @@ export default function AlertPanel({
     const interval = setInterval(() => void loadAlerts(), 15000);
     return () => clearInterval(interval);
   }, [loadAlerts]);
+
+  const wsUrl = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const token = window.localStorage.getItem("token");
+    if (!token) return null;
+    const configured = process.env.NEXT_PUBLIC_WS_URL;
+    const base = configured
+      ? configured.replace(/\/$/, "")
+      : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.hostname}:8000`;
+    return `${base}/api/v1/realtime/ws/depot.alerts?token=${encodeURIComponent(token)}`;
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen || !wsUrl) return;
+
+    let ws: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+
+    const connect = () => {
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        setWsConnected(true);
+      };
+
+      ws.onclose = () => {
+        setWsConnected(false);
+        if (isOpen) {
+          reconnectTimer = window.setTimeout(connect, 2000);
+        }
+      };
+
+      ws.onerror = () => {
+        setWsConnected(false);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (!msg || typeof msg !== "object") return;
+
+          const eventType = msg.event_type as string | undefined;
+          if (!eventType || (eventType !== "count_mismatch" && eventType !== "colour_mismatch")) {
+            return;
+          }
+
+          void loadAlerts();
+        } catch {
+          // Ignore malformed realtime payloads
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+      }
+      if (ws) {
+        ws.close();
+      }
+      setWsConnected(false);
+    };
+  }, [isOpen, loadAlerts, wsUrl]);
 
   const handleAcknowledge = async (alert: UnifiedAlert) => {
     setAcknowledging(alert.id);
@@ -277,7 +299,7 @@ export default function AlertPanel({
       setAlerts((prev) => prev.filter((a) => a.id !== alert.id));
       onAlertCountChange?.(alerts.length - 1);
     } catch {
-      // For mock alerts, just remove from list
+      // API call failed — remove from UI optimistically
       setAlerts((prev) => prev.filter((a) => a.id !== alert.id));
       onAlertCountChange?.(alerts.length - 1);
     } finally {
@@ -367,9 +389,9 @@ export default function AlertPanel({
       <div className="px-4 py-2.5 border-t border-[#1E2F50] flex-shrink-0">
         <div className="flex items-center justify-between text-[9px] text-[#4E6090]">
           <span>Auto-escalation: 15 min window</span>
-          <span className="flex items-center gap-1">
+          <span className={`flex items-center gap-1 ${wsConnected ? "text-emerald-400" : "text-amber-400"}`}>
             <Bell className="w-3 h-3" />
-            WebSocket connected
+            {wsConnected ? "WebSocket connected" : "WebSocket reconnecting"}
           </span>
         </div>
       </div>

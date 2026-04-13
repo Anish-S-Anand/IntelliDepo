@@ -15,8 +15,12 @@ import {
   Hash,
   Map,
   Sliders,
+  Layers,
+  Shield,
+  Radar,
 } from "lucide-react";
 import { getAllActiveAlerts } from "@/services/depotVision";
+import { getPerimeterAlertCount } from "@/services/depotPerimeter";
 
 const NAV_ITEMS = [
   { label: "CMD", fullLabel: "Command", href: "/depot/command", icon: Radio },
@@ -26,7 +30,10 @@ const NAV_ITEMS = [
   { label: "CNT", fullLabel: "Counting", href: "/depot/counting", icon: Hash },
   { label: "MAP", fullLabel: "Heatmap", href: "/depot/heatmap", icon: Map },
   { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
-  { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle, hasPulse: true },
+  { label: "SEQ", fullLabel: "Sequencing", href: "/depot/sequencing", icon: Layers },
+  { label: "GTE", fullLabel: "Gate & LPR", href: "/depot/gate", icon: Shield },
+  { label: "SEC", fullLabel: "Perimeter", href: "/depot/perimeter", icon: Radar, hasPulse: true },
+  { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle },
   { label: "ANL", fullLabel: "Analytics", href: "/depot/analytics", icon: BarChart3 },
 ];
 
@@ -43,8 +50,16 @@ export default function DepotSidebar() {
     let cancelled = false;
     const fetchAlerts = async () => {
       try {
-        const alerts = await getAllActiveAlerts();
-        if (!cancelled) setAlertCount(alerts.length);
+        const [visionAlerts, perimeterCount] = await Promise.allSettled([
+          getAllActiveAlerts(),
+          getPerimeterAlertCount(),
+        ]);
+        if (!cancelled) {
+          let total = 0;
+          if (visionAlerts.status === "fulfilled") total += visionAlerts.value.length;
+          if (perimeterCount.status === "fulfilled") total += perimeterCount.value;
+          setAlertCount(total);
+        }
       } catch {
         if (!cancelled) setAlertCount(3);
       }

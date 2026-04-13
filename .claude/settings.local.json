@@ -6,7 +6,33 @@
       "Bash(gh auth:*)",
       "Bash(sed -n '232,265p' c:/Intelli/Intelli/backend/app/stream/macropulse/cost_routing.py)",
       "Bash(sed -n '247,275p' c:/Intelli/Intelli/backend/app/stream/macropulse/event_publisher.py)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(mkdir -p \"c:/Intelli/Intelli/frontend/public/legacy\")",
+      "Bash(cp \"c:/Users/DELL/IntelliDepo/frontend/public/legacy/fidelis-chart-updated.html\" \"c:/Intelli/Intelli/frontend/public/legacy/fidelis-chart-updated.html\")",
+      "Bash(docker-compose up:*)",
+      "Bash(powershell -Command \"Start-Process 'C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe'\")",
+      "Bash(docker info:*)",
+      "Bash(break)",
+      "Bash(docker version:*)",
+      "Bash(powershell -Command \"Get-Process 'Docker Desktop' -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep -Seconds 3; Start-Process 'C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe'; echo 'Docker Desktop restarting...'\")",
+      "Bash(python -m alembic upgrade head)",
+      "Bash(grep -n \"^revision\\\\|^down_revision\" alembic/versions/*.py)",
+      "Bash(ALLOW_SIMULATED_CAMERA=true python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload)",
+      "Bash(curl -s http://localhost:8000/docs -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s http://localhost:3000 -o /dev/null -w \"%{http_code}\")",
+      "Bash(taskkill //F //IM \"Docker Desktop.exe\")",
+      "Bash(taskkill //F //IM \"com.docker.backend.exe\")",
+      "Bash(taskkill //F //IM \"com.docker.build.exe\")",
+      "Bash(start \"\" \"C:/Program Files/Docker/Docker/Docker Desktop.exe\")",
+      "Bash(grep -E \"\\\\.py$\")",
+      "Bash(wsl -l -v)",
+      "Bash(wsl -d docker-desktop -- cat /var/log/docker.log)",
+      "Bash(wsl -d docker-desktop sh -c \"dockerd --version 2>&1; ls /var/log/ 2>&1 | head -10\")",
+      "Bash(net stop:*)",
+      "Bash(net start:*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Intelli\\Intelli\\frontend\\src\\components\\depot"
     ]
   }
 }

@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 revision = "008"
-down_revision = "007"
+down_revision = "007_macropulse_day5"
 branch_labels = None
 depends_on = None
 

@@ -31,6 +31,22 @@ services:
       timeout: 5s
       retries: 5
 
+  # ---- RabbitMQ (Message Queue) ----
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: intelli-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: intelli
+      RABBITMQ_DEFAULT_PASS: intelli
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ---- MinIO (S3-compatible storage) ----
   minio:
     image: minio/minio:latest
@@ -52,6 +68,9 @@ services:
       dockerfile: Dockerfile
     container_name: intelli-backend
     env_file: .env
+    environment:
+      - ALLOW_SIMULATED_CAMERA=true
+      - ALLOW_SIMULATED_VISION=true
     ports:
       - "8000:8000"
     volumes:
@@ -60,6 +79,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 

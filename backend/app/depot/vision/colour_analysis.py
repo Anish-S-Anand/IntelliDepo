@@ -6,20 +6,20 @@ OpenCV-based RGB/HSV colour extraction per detected bounding box.
 Bag colour classification with mismatch alert event publishing
 when count vs manifest delta exceeds threshold.
 
-Dependency note: AUTH-6.2 (RBAC) is active.
+Uses real OpenCV for colour extraction from camera frames when available.
+Falls back to simulation when OpenCV is unavailable or no frame data exists.
 
-OpenCV note: Real colour extraction requires `opencv-python` + frame data.
-This module ships a SimulatedColourAnalyser that generates realistic
-synthetic colour results so the full API, persistence, and downstream
-alert pipeline can be developed and tested.
+Dependency note: AUTH-6.2 (RBAC) is active.
 """
 import uuid
 import random
 import logging
+import os
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text
@@ -35,6 +35,13 @@ from app.shared.models.user import User
 import redis.asyncio as aioredis
 
 logger = logging.getLogger("intelli.depot.colour_analysis")
+ALLOW_SIMULATED_VISION = os.getenv("ALLOW_SIMULATED_VISION", "false").lower() in {"1", "true", "yes"}
+
+try:
+    import cv2
+    _HAS_CV2 = True
+except ImportError:
+    _HAS_CV2 = False
 
 router = APIRouter(prefix="/depot/vision/colour", tags=["Depot - Colour Analysis"])
 
@@ -238,20 +245,87 @@ def _classify_colour(h: float, s: float, v: float) -> str:
     return "unknown"
 
 
-def _simulate_colour_analysis(
+def _extract_colour_from_roi(frame: np.ndarray, bbox_x: float, bbox_y: float,
+                              bbox_w: float, bbox_h: float) -> dict:
+    """
+    Extract dominant colour from a bounding box region using real OpenCV.
+    Returns dict with rgb, hsv, colour_category, and confidence.
+    """
+    h_frame, w_frame = frame.shape[:2]
+    x1 = max(0, int(bbox_x * w_frame))
+    y1 = max(0, int(bbox_y * h_frame))
+    x2 = min(w_frame, int((bbox_x + bbox_w) * w_frame))
+    y2 = min(h_frame, int((bbox_y + bbox_h) * h_frame))
+
+    roi = frame[y1:y2, x1:x2]
+    if roi.size == 0:
+        return {"rgb": (128, 128, 128), "hsv": (0.0, 0.0, 0.5),
+                "colour_category": "grey", "confidence": 0.5}
+
+    # Convert ROI to HSV and compute mean
+    hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+    mean_hsv = cv2.mean(hsv_roi)[:3]  # H(0-180), S(0-255), V(0-255)
+    mean_bgr = cv2.mean(roi)[:3]
+
+    # Convert OpenCV HSV scale to standard (H: 0-360, S: 0-1, V: 0-1)
+    h_deg = mean_hsv[0] * 2.0        # OpenCV H is 0-180
+    s_norm = mean_hsv[1] / 255.0
+    v_norm = mean_hsv[2] / 255.0
+
+    colour_name = _classify_colour(h_deg, s_norm, v_norm)
+
+    # Confidence based on colour saturation/value consistency
+    std_hsv = np.std(hsv_roi.reshape(-1, 3).astype(float), axis=0)
+    uniformity = 1.0 - min(1.0, (std_hsv[1] / 128.0 + std_hsv[2] / 128.0) / 2.0)
+    confidence = round(max(0.5, min(0.99, uniformity)), 4)
+
+    return {
+        "rgb": (int(mean_bgr[2]), int(mean_bgr[1]), int(mean_bgr[0])),  # BGR->RGB
+        "hsv": (round(h_deg, 2), round(s_norm, 4), round(v_norm, 4)),
+        "colour_category": colour_name,
+        "confidence": confidence,
+    }
+
+
+def _analyse_colours_real(
+    detected_objects: list,
+    analysis_run_id: uuid.UUID,
+    frames: dict[int, np.ndarray],
+) -> list[ColourResult]:
+    """Real OpenCV colour analysis using actual frame data."""
+    results: list[ColourResult] = []
+    for obj in detected_objects:
+        frame = frames.get(obj.frame_number)
+        if frame is None:
+            continue
+        info = _extract_colour_from_roi(frame, obj.bbox_x, obj.bbox_y, obj.bbox_w, obj.bbox_h)
+        r, g, b = info["rgb"]
+        h, s, v = info["hsv"]
+        results.append(ColourResult(
+            analysis_run_id=analysis_run_id,
+            detected_object_id=obj.id,
+            class_label=obj.class_label,
+            colour_category=info["colour_category"],
+            rgb_r=r, rgb_g=g, rgb_b=b,
+            hsv_h=h, hsv_s=s, hsv_v=v,
+            confidence=info["confidence"],
+            bbox_x=obj.bbox_x, bbox_y=obj.bbox_y,
+            bbox_w=obj.bbox_w, bbox_h=obj.bbox_h,
+            frame_number=obj.frame_number,
+        ))
+    return results
+
+
+def _analyse_colours_fallback(
     detected_objects: list,
     analysis_run_id: uuid.UUID,
 ) -> list[ColourResult]:
-    """
-    Generate synthetic colour analysis results for detected objects.
-    Replace with real OpenCV RGB/HSV extraction when frame data is available.
-    """
+    """Fallback simulation when no frame data is available."""
     results: list[ColourResult] = []
     available_colours = list(_COLOUR_HSV_MAP.keys())
 
     for obj in detected_objects:
-        # Pick a random colour and generate realistic HSV values
-        colour_name = random.choice(available_colours[:6])  # Exclude white/black/grey mostly
+        colour_name = random.choice(available_colours[:6])
         ranges = _COLOUR_HSV_MAP[colour_name]
         h = random.uniform(ranges[0][0], ranges[0][1])
         s = random.uniform(ranges[1][0], ranges[1][1])
@@ -263,17 +337,11 @@ def _simulate_colour_analysis(
             detected_object_id=obj.id,
             class_label=obj.class_label,
             colour_category=colour_name,
-            rgb_r=r,
-            rgb_g=g,
-            rgb_b=b,
-            hsv_h=round(h, 2),
-            hsv_s=round(s, 4),
-            hsv_v=round(v, 4),
+            rgb_r=r, rgb_g=g, rgb_b=b,
+            hsv_h=round(h, 2), hsv_s=round(s, 4), hsv_v=round(v, 4),
             confidence=round(random.uniform(0.80, 0.99), 4),
-            bbox_x=obj.bbox_x,
-            bbox_y=obj.bbox_y,
-            bbox_w=obj.bbox_w,
-            bbox_h=obj.bbox_h,
+            bbox_x=obj.bbox_x, bbox_y=obj.bbox_y,
+            bbox_w=obj.bbox_w, bbox_h=obj.bbox_h,
             frame_number=obj.frame_number,
         ))
 
@@ -335,8 +403,33 @@ async def run_colour_analysis(
             alert=None,
         )
 
-    # Run colour extraction (simulated)
-    colour_results = _simulate_colour_analysis(detected_objects, analysis_run.id)
+    # Run colour extraction — try real OpenCV with frames from camera
+    frames: dict[int, np.ndarray] = {}
+    if _HAS_CV2 and det_run.camera_id:
+        try:
+            from app.depot.vision.camera import stream_read_frame
+            frame_numbers = sorted(set(obj.frame_number for obj in detected_objects))
+            for fn in frame_numbers:
+                f = await stream_read_frame(str(det_run.camera_id))
+                if f is not None:
+                    frames[fn] = f
+        except Exception as e:
+            logger.warning(f"Could not capture frames for colour analysis: {e}")
+
+    if _HAS_CV2 and frames:
+        colour_results = _analyse_colours_real(detected_objects, analysis_run.id, frames)
+        logger.info(f"Colour analysis used real OpenCV extraction on {len(frames)} frames")
+    elif ALLOW_SIMULATED_VISION:
+        colour_results = _analyse_colours_fallback(detected_objects, analysis_run.id)
+        logger.info("Colour analysis used fallback simulation")
+    else:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Real colour analysis unavailable: ensure OpenCV is installed and camera frames "
+                "are accessible. Set ALLOW_SIMULATED_VISION=true to enable simulation fallback."
+            ),
+        )
     for cr in colour_results:
         db.add(cr)
 
@@ -387,7 +480,14 @@ async def run_colour_analysis(
             )
             db.add(alert)
 
-            # Dispatch alert notification
+            # Dispatch alert notification (in-app + RabbitMQ + WebSocket)
+            alert_payload = {
+                "manifest_code": payload.manifest_code,
+                "expected_colour": expected,
+                "mismatch_count": mismatch_count,
+                "total_bags": total_bags,
+                "distribution": distribution,
+            }
             try:
                 priority_map = {"critical": "CRITICAL", "high": "HIGH", "medium": "NORMAL", "low": "LOW"}
                 await NotificationService.send_alert(
@@ -398,17 +498,35 @@ async def run_colour_analysis(
                     title=f"Colour Mismatch — {payload.manifest_code or 'Unlinked'}",
                     message=alert.message,
                     priority=priority_map.get(severity, "NORMAL"),
-                    payload={
-                        "manifest_code": payload.manifest_code,
-                        "expected_colour": expected,
-                        "mismatch_count": mismatch_count,
-                        "total_bags": total_bags,
-                        "distribution": distribution,
-                    },
+                    payload=alert_payload,
                     channel="in_app",
                 )
             except Exception as e:
                 logger.warning(f"Failed to dispatch colour mismatch notification: {e}")
+
+            # Publish to RabbitMQ
+            try:
+                from app.core.rabbitmq import publish_alert
+                await publish_alert("colour_mismatch", severity, alert_payload)
+            except Exception as e:
+                logger.warning(f"Failed to publish colour mismatch to RabbitMQ: {e}")
+
+            # Broadcast via WebSocket (RealTimeHub)
+            try:
+                from app.core.gateway.realtime import realtime_hub
+                await realtime_hub.publish(
+                    topic="depot.alerts",
+                    event_type="colour_mismatch",
+                    payload={
+                        "alert_id": str(alert.id) if hasattr(alert, "id") else None,
+                        "severity": severity,
+                        "message": alert.message,
+                        **alert_payload,
+                    },
+                    sender="depot-vision",
+                )
+            except Exception as e:
+                logger.warning(f"Failed to broadcast colour mismatch via WebSocket: {e}")
 
     await db.commit()
     await db.refresh(analysis_run)

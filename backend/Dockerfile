@@ -1,7 +1,11 @@
 FROM python:3.11-slim
 WORKDIR /app
-# Install system dependencies for PostgreSQL
-RUN apt-get update && apt-get install -y libpq-dev gcc && rm -rf /var/lib/apt/lists/*
+# System deps: PostgreSQL, OpenCV (libGL + libglib), tesseract
+RUN apt-get update && apt-get install -y \
+    libpq-dev gcc \
+    libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
+    tesseract-ocr \
+    && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
