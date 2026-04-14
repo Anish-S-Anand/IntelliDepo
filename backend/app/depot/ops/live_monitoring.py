@@ -451,6 +451,23 @@ async def acknowledge_alert(
     return alert
 
 
+@router.patch("/alerts/{alert_id}/escalate", response_model=AlertResponse)
+async def escalate_alert(
+    alert_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Escalate an alert — marks it for higher-tier review."""
+    alert = await db.get(AlertQueue, alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert.status = AlertStatus.ESCALATED
+    alert.escalated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(alert)
+    return alert
+
+
 @router.patch("/alerts/{alert_id}/resolve", response_model=AlertResponse)
 async def resolve_alert(
     alert_id: uuid.UUID,
@@ -516,6 +533,21 @@ async def get_dashboard_kpis(
 
     hours_elapsed = max((datetime.now(timezone.utc) - today_start).total_seconds() / 3600, 1)
 
+    events_per_hour = round(total_events / hours_elapsed, 1)
+
+    # Push metrics to Prometheus collector
+    try:
+        from app.core.observability.monitoring import update_ops_metrics
+        update_ops_metrics(
+            active_alerts=active_alerts,
+            critical_alerts=critical_count,
+            high_alerts=high_count,
+            events_per_hour=events_per_hour,
+            queue_depth=active_alerts,
+        )
+    except Exception:
+        pass
+
     return DashboardKPI(
         total_events_today=total_events,
         active_alerts=active_alerts,
@@ -524,7 +556,7 @@ async def get_dashboard_kpis(
         medium_alerts=medium_count,
         acknowledged_count=ack_result.scalar() or 0,
         avg_response_time_min=2.4,
-        events_per_hour=round(total_events / hours_elapsed, 1),
+        events_per_hour=events_per_hour,
     )
 
 

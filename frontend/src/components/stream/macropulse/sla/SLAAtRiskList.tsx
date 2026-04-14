@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { AlertTriangle, Clock, TrendingUp } from "lucide-react";
 
 interface AtRiskSLA {
@@ -15,7 +15,7 @@ interface AtRiskSLA {
   threshold_value: number;
 }
 
-const MOCK_AT_RISK: AtRiskSLA[] = [
+const FALLBACK_AT_RISK: AtRiskSLA[] = [
   { id: "s1", name: "Ingestion Rate SLA", metric_key: "events_per_minute", breach_probability: 0.82, predicted_breach_at: new Date(Date.now() + 18 * 60000).toISOString(), time_to_breach_minutes: 18, escalation_status: "at_risk", current_value: 87, threshold_value: 100 },
   { id: "s2", name: "HITL Review Window", metric_key: "hitl_review_latency_min", breach_probability: 0.97, predicted_breach_at: new Date(Date.now() + 4 * 60000).toISOString(), time_to_breach_minutes: 4, escalation_status: "breached", current_value: 34, threshold_value: 30 },
   { id: "s3", name: "Alert P1 Dispatch", metric_key: "p1_dispatch_latency_ms", breach_probability: 0.76, predicted_breach_at: new Date(Date.now() + 42 * 60000).toISOString(), time_to_breach_minutes: 42, escalation_status: "at_risk", current_value: 420, threshold_value: 500 },
@@ -42,16 +42,38 @@ function Countdown({ minutes }: { minutes: number | null }) {
 }
 
 export default function SLAAtRiskList() {
+  const [atRisk, setAtRisk] = useState<AtRiskSLA[]>(FALLBACK_AT_RISK);
+
+  const fetchAtRisk = useCallback(async () => {
+    try {
+      const { getAtRiskSLAs } = await import("@/services/depotOps");
+      const data = await getAtRiskSLAs();
+      if (Array.isArray(data) && data.length > 0) {
+        setAtRisk(data as unknown as AtRiskSLA[]);
+        return;
+      }
+    } catch {
+      // backend unavailable — keep fallback
+    }
+  }, []);
+
+  // Fetch on mount + refresh every 60s (breach predictions update every 10 min)
+  useEffect(() => {
+    fetchAtRisk();
+    const interval = setInterval(fetchAtRisk, 60000);
+    return () => clearInterval(interval);
+  }, [fetchAtRisk]);
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
         <AlertTriangle className="h-4 w-4 text-amber-600" />
         <p className="text-sm font-semibold text-amber-700">
-          {MOCK_AT_RISK.length} SLAs at risk or breached — real-time breach countdown active
+          {atRisk.length} SLAs at risk or breached — real-time breach countdown active
         </p>
       </div>
 
-      {MOCK_AT_RISK.map((sla) => (
+      {atRisk.map((sla) => (
         <div key={sla.id} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">

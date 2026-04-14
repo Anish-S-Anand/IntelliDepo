@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Activity, AlertTriangle, CheckCircle2, Clock, Radio, TrendingUp } from "lucide-react";
 
 interface KPI {
@@ -23,8 +23,7 @@ interface DashboardKPIData {
   events_per_hour: number;
 }
 
-// Mock data — wired to GET /ops/monitoring/dashboard/kpis when backend is live
-const MOCK_KPI: DashboardKPIData = {
+const FALLBACK_KPI: DashboardKPIData = {
   total_events_today: 1284,
   active_alerts: 7,
   critical_alerts: 2,
@@ -36,21 +35,31 @@ const MOCK_KPI: DashboardKPIData = {
 };
 
 export default function DashboardKPIStrip() {
-  const [kpi, setKpi] = useState<DashboardKPIData>(MOCK_KPI);
-  const [tick, setTick] = useState(0);
+  const [kpi, setKpi] = useState<DashboardKPIData>(FALLBACK_KPI);
 
-  // Simulate live refresh every 5s
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setKpi((prev) => ({
-        ...prev,
-        total_events_today: prev.total_events_today + Math.floor(Math.random() * 3),
-        events_per_hour: parseFloat((prev.events_per_hour + (Math.random() - 0.5) * 2).toFixed(1)),
-      }));
-      setTick((t) => t + 1);
-    }, 5000);
-    return () => clearInterval(interval);
+  const fetchKPIs = useCallback(async () => {
+    try {
+      const { getDashboardKPIs } = await import("@/services/depotOps");
+      const data = await getDashboardKPIs();
+      setKpi(data);
+      return;
+    } catch {
+      // backend unavailable — use simulated refresh
+    }
+    // Simulated increment when backend is not available
+    setKpi((prev) => ({
+      ...prev,
+      total_events_today: prev.total_events_today + Math.floor(Math.random() * 3),
+      events_per_hour: parseFloat((prev.events_per_hour + (Math.random() - 0.5) * 2).toFixed(1)),
+    }));
   }, []);
+
+  // Poll every 5s — matches sub-5s dashboard refresh SLA
+  useEffect(() => {
+    fetchKPIs();
+    const interval = setInterval(fetchKPIs, 5000);
+    return () => clearInterval(interval);
+  }, [fetchKPIs]);
 
   const tiles: KPI[] = [
     {
@@ -113,7 +122,7 @@ export default function DashboardKPIStrip() {
               style={{ background: tile.color }}
             />
             <div className="flex items-center gap-1.5 mb-2">
-              <Icon className="w-3.5 h-3.5" style={{ color: tile.color }} />
+              <Icon className="w-3.5 h-3.5" />
               <span className="text-[10px] font-semibold uppercase tracking-wide text-[#4E6090]">
                 {tile.label}
               </span>

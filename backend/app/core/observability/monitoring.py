@@ -11,6 +11,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 from fastapi import APIRouter
+from fastapi.responses import PlainTextResponse
 
 from app.config import settings
 from app.database import check_db_health
@@ -78,6 +79,20 @@ class MetricsCollector:
 # Singleton
 metrics = MetricsCollector()
 
+# IntelliOps metrics store — updated by the ops module endpoints
+_ops_metrics: dict[str, float] = {
+    "active_alerts": 0,
+    "critical_alerts": 0,
+    "high_alerts": 0,
+    "events_per_hour": 0,
+    "queue_depth": 0,
+}
+
+
+def update_ops_metrics(**kwargs: float) -> None:
+    """Called by IntelliOps endpoints to push live metrics for Prometheus scrape."""
+    _ops_metrics.update(kwargs)
+
 
 # ── Health Check Endpoints ───────────────────────────────────
 
@@ -113,6 +128,45 @@ async def get_metrics():
         "python_version": platform.python_version(),
         "metrics": metrics.snapshot(),
     }
+
+
+@router.get("/metrics/prometheus", response_class=PlainTextResponse)
+async def prometheus_metrics():
+    """Prometheus-compatible scrape endpoint for alert volume, ingestion rate, queue depth."""
+    snap = metrics.snapshot()
+    lines = [
+        "# HELP intelli_http_requests_total Total HTTP requests",
+        "# TYPE intelli_http_requests_total counter",
+        f'intelli_http_requests_total {snap["total_requests"]}',
+        "",
+        "# HELP intelli_http_errors_total Total HTTP 5xx errors",
+        "# TYPE intelli_http_errors_total counter",
+        f'intelli_http_errors_total {snap["total_errors"]}',
+        "",
+        "# HELP intelli_http_avg_latency_ms Average request latency in milliseconds",
+        "# TYPE intelli_http_avg_latency_ms gauge",
+        f'intelli_http_avg_latency_ms {snap["avg_latency_ms"]}',
+        "",
+        "# HELP intelli_uptime_seconds Service uptime in seconds",
+        "# TYPE intelli_uptime_seconds gauge",
+        f'intelli_uptime_seconds {snap["uptime_seconds"]}',
+        "",
+        "# HELP intelli_ops_alert_volume Active alert count by severity",
+        "# TYPE intelli_ops_alert_volume gauge",
+        f'intelli_ops_alert_volume{{severity="total"}} {_ops_metrics.get("active_alerts", 0)}',
+        f'intelli_ops_alert_volume{{severity="critical"}} {_ops_metrics.get("critical_alerts", 0)}',
+        f'intelli_ops_alert_volume{{severity="high"}} {_ops_metrics.get("high_alerts", 0)}',
+        "",
+        "# HELP intelli_ops_event_ingestion_rate Events ingested per hour",
+        "# TYPE intelli_ops_event_ingestion_rate gauge",
+        f'intelli_ops_event_ingestion_rate {_ops_metrics.get("events_per_hour", 0)}',
+        "",
+        "# HELP intelli_ops_queue_depth Number of items in alert queue",
+        "# TYPE intelli_ops_queue_depth gauge",
+        f'intelli_ops_queue_depth {_ops_metrics.get("queue_depth", 0)}',
+        "",
+    ]
+    return "\n".join(lines) + "\n"
 
 
 @router.get("/observability")

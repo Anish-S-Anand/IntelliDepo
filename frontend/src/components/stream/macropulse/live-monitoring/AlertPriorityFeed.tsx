@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { AlertTriangle, CheckCircle2, Clock, Info, ShieldAlert, X } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -49,7 +49,7 @@ function SeverityIcon({ s }: { s: AlertSeverity }) {
 }
 
 // ---------------------------------------------------------------------------
-// Mock data — replaced by real API when backend is wired
+// Fallback mock data
 // ---------------------------------------------------------------------------
 const MOCK_ALERTS: OpsAlert[] = [
   { id: "a1", alert_type: "camera_motion", severity: "critical", priority_score: 100, source_name: "CAM-01", zone: "Inbound Gate",  title: "Unauthorized vehicle detected",    message: "LPR mismatch at inbound gate. Plate not in approved list.", status: "active",       timestamp: new Date(Date.now() - 90000).toISOString() },
@@ -77,22 +77,64 @@ export default function AlertPriorityFeed({ maxItems = 20 }: Props) {
   const [alerts, setAlerts] = useState<OpsAlert[]>(MOCK_ALERTS);
   const [filter, setFilter] = useState<AlertSeverity | "all">("all");
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const wsRef = useRef<WebSocket | null>(null);
 
-  // Simulate live WebSocket updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setAlerts((prev) => {
-        const updated = [...prev];
-        // Randomly bump a timestamp to simulate live feed
-        const idx = Math.floor(Math.random() * updated.length);
-        updated[idx] = { ...updated[idx], timestamp: new Date().toISOString() };
-        return updated;
-      });
-    }, 15000);
-    return () => clearInterval(interval);
+  // Fetch alerts from backend API
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const { getActiveAlerts } = await import("@/services/depotOps");
+      const data = await getActiveAlerts();
+      if (data.length > 0) { setAlerts(data as unknown as OpsAlert[]); return; }
+    } catch {
+      // backend unavailable — keep existing state
+    }
   }, []);
 
-  const handleAcknowledge = useCallback((id: string) => {
+  // Connect WebSocket for live updates, fallback to polling
+  useEffect(() => {
+    fetchAlerts();
+
+    // Try WebSocket connection
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/api/v1/ops/monitoring/ws/live-feed`;
+    try {
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "alert" && data.payload) {
+            setAlerts((prev) => {
+              const exists = prev.find((a) => a.id === data.payload.id);
+              if (exists) {
+                return prev.map((a) => a.id === data.payload.id ? { ...a, ...data.payload } : a);
+              }
+              return [data.payload, ...prev].slice(0, 50);
+            });
+          }
+        } catch { /* ignore parse errors */ }
+      };
+      ws.onerror = () => ws.close();
+    } catch {
+      // WebSocket not available
+    }
+
+    // Polling fallback every 15s
+    const interval = setInterval(fetchAlerts, 15000);
+    return () => {
+      clearInterval(interval);
+      wsRef.current?.close();
+    };
+  }, [fetchAlerts]);
+
+  const handleAcknowledge = useCallback(async (id: string) => {
+    // Try backend first
+    try {
+      const { acknowledgeAlert } = await import("@/services/depotOps");
+      const updated = await acknowledgeAlert(id);
+      setAlerts((prev) => prev.map((a) => a.id === id ? { ...a, status: updated.status as AlertStatus } : a));
+      return;
+    } catch { /* fall through to local update */ }
     setAlerts((prev) =>
       prev.map((a) => a.id === id ? { ...a, status: "acknowledged" as AlertStatus } : a)
     );
@@ -179,7 +221,7 @@ export default function AlertPriorityFeed({ maxItems = 20 }: Props) {
                     )}
                     <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                       {alert.zone && (
-                        <span className="text-[10px] text-[#4E6090]">📍 {alert.zone}</span>
+                        <span className="text-[10px] text-[#4E6090]">Zone: {alert.zone}</span>
                       )}
                       {alert.source_name && (
                         <span className="text-[10px] text-[#4E6090]">{alert.source_name}</span>

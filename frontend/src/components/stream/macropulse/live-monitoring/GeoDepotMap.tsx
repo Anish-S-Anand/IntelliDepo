@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { AlertTriangle, CheckCircle, Info, ZoomIn, ZoomOut } from "lucide-react";
 
 export type EventSeverity = "critical" | "warning" | "info" | "ok";
@@ -36,7 +36,17 @@ const ZONES: Zone[] = [
   { id: "Z6", label: "Outbound Gate",   x: 460, y: 180, w: 140, h: 110, color: "#ffedd5" },
 ];
 
-const MOCK_EVENTS: DepotEvent[] = [
+// Map backend zone names to display zone IDs
+const ZONE_MAP: Record<string, string> = {
+  "inbound_gate": "Z1", "Inbound Gate": "Z1",
+  "staging_area": "Z2", "Staging Area": "Z2",
+  "cold_storage": "Z3", "Cold Storage": "Z3",
+  "dispatch_bay": "Z4", "Dispatch Bay": "Z4",
+  "parking_yard": "Z5", "Yard / Parking": "Z5", "yard": "Z5",
+  "outbound_gate": "Z6", "Outbound Gate": "Z6",
+};
+
+const FALLBACK_EVENTS: DepotEvent[] = [
   { id: "E1", zone: "Z1", title: "Unauthorized vehicle detected", description: "LPR mismatch at inbound gate. Vehicle plate not in approved list.", severity: "critical", timestamp: new Date(Date.now() - 120000).toISOString(), camera_feed: "CAM-01", status: "open" },
   { id: "E2", zone: "Z2", title: "Dwell time exceeded", description: "Pallet in staging area for 4h 22m — SLA threshold is 3h.", severity: "warning", timestamp: new Date(Date.now() - 300000).toISOString(), camera_feed: "CAM-03", status: "open" },
   { id: "E3", zone: "Z3", title: "Temperature alert", description: "Cold storage zone dropped below -2°C. Threshold: 0°C.", severity: "critical", timestamp: new Date(Date.now() - 60000).toISOString(), camera_feed: "CAM-05", status: "acknowledged" },
@@ -50,6 +60,14 @@ const SEVERITY_COLOR: Record<EventSeverity, string> = {
   info:     "#3b82f6",
   ok:       "#22c55e",
 };
+
+// Map backend severity to display severity
+function mapSeverity(s: string): EventSeverity {
+  if (s === "critical") return "critical";
+  if (s === "high" || s === "medium") return "warning";
+  if (s === "low") return "info";
+  return "ok";
+}
 
 function severityIcon(s: EventSeverity) {
   if (s === "critical") return <AlertTriangle className="h-3.5 w-3.5 text-red-500" />;
@@ -68,7 +86,38 @@ function relTime(iso: string) {
 export default function GeoDepotMap({ onEventClick }: { onEventClick: (e: DepotEvent) => void }) {
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [events] = useState<DepotEvent[]>(MOCK_EVENTS);
+  const [events, setEvents] = useState<DepotEvent[]>(FALLBACK_EVENTS);
+
+  // Fetch live events from backend
+  const fetchEvents = useCallback(async () => {
+    try {
+      const { getEvents } = await import("@/services/depotOps");
+      const data = await getEvents(20);
+      if (data.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const mapped: DepotEvent[] = data.map((e: any) => ({
+            id: e.id,
+            zone: ZONE_MAP[e.zone || ""] || "Z1",
+            title: e.message || `${e.event_type} event`,
+            description: e.message || `${e.event_type} from ${e.source_name || e.source_id}`,
+            severity: mapSeverity(e.severity),
+            timestamp: e.timestamp,
+            camera_feed: e.source_name || undefined,
+            status: "open" as const,
+          }));
+          setEvents(mapped);
+          return;
+        }
+    } catch {
+      // backend unavailable — keep fallback
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchEvents();
+    const interval = setInterval(fetchEvents, 10000);
+    return () => clearInterval(interval);
+  }, [fetchEvents]);
 
   const eventsPerZone = (zoneId: string) => events.filter((e) => e.zone === zoneId);
 

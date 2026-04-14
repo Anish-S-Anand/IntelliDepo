@@ -1,8 +1,17 @@
 "use client";
 
+import { useEffect, useState, useCallback } from "react";
 import { AlertTriangle, CheckCircle, Clock, TrendingDown } from "lucide-react";
 
-const MOCK_SLAS = [
+interface SLAEntry {
+  id?: string;
+  name: string;
+  compliance: number;
+  threshold: string;
+  status: "ok" | "at_risk" | "breached";
+}
+
+const FALLBACK_SLAS: SLAEntry[] = [
   { name: "Alert Dispatch Latency", compliance: 94, threshold: "< 500ms", status: "ok" },
   { name: "Ingestion Rate SLA",     compliance: 78, threshold: "> 100 events/min", status: "at_risk" },
   { name: "HITL Review Window",     compliance: 61, threshold: "< 30 min", status: "breached" },
@@ -11,8 +20,6 @@ const MOCK_SLAS = [
 
 function GaugeArc({ pct }: { pct: number }) {
   const r = 52;
-  const cx = 64;
-  const cy = 64;
   const circumference = Math.PI * r; // half circle
   const offset = circumference * (1 - pct / 100);
   const color = pct >= 90 ? "#22c55e" : pct >= 70 ? "#f59e0b" : "#ef4444";
@@ -38,7 +45,46 @@ function GaugeArc({ pct }: { pct: number }) {
 }
 
 export default function SLAComplianceGauge() {
-  const overall = Math.round(MOCK_SLAS.reduce((s, x) => s + x.compliance, 0) / MOCK_SLAS.length);
+  const [slas, setSlas] = useState<SLAEntry[]>(FALLBACK_SLAS);
+
+  const fetchSLAs = useCallback(async () => {
+    try {
+      const { getSLAs, getBreachPrediction } = await import("@/services/depotOps");
+      const data = await getSLAs();
+      if (Array.isArray(data) && data.length > 0) {
+        const enriched: SLAEntry[] = [];
+        for (const sla of data.slice(0, 10)) {
+          let compliance = 85;
+          let status: "ok" | "at_risk" | "breached" = "ok";
+          try {
+            const pred = await getBreachPrediction(sla.id);
+            compliance = Math.round((1 - pred.breach_probability) * 100);
+            status = pred.escalation_status === "breached" ? "breached"
+                   : pred.escalation_status === "at_risk" ? "at_risk"
+                   : "ok";
+          } catch { /* use defaults */ }
+          enriched.push({
+            id: sla.id,
+            name: sla.name,
+            compliance,
+            threshold: `${sla.threshold_value} ${sla.threshold_unit || ""}`,
+            status,
+          });
+        }
+        if (enriched.length > 0) {
+          setSlas(enriched);
+        }
+      }
+    } catch {
+      // backend unavailable
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSLAs();
+  }, [fetchSLAs]);
+
+  const overall = Math.round(slas.reduce((s, x) => s + x.compliance, 0) / slas.length);
 
   return (
     <div className="space-y-4">
@@ -51,9 +97,9 @@ export default function SLAComplianceGauge() {
           </div>
           <div className="flex-1 grid grid-cols-3 gap-4">
             {[
-              { label: "Compliant", value: MOCK_SLAS.filter((s) => s.status === "ok").length, icon: CheckCircle, color: "text-emerald-600 bg-emerald-50" },
-              { label: "At Risk",   value: MOCK_SLAS.filter((s) => s.status === "at_risk").length, icon: AlertTriangle, color: "text-amber-600 bg-amber-50" },
-              { label: "Breached",  value: MOCK_SLAS.filter((s) => s.status === "breached").length, icon: TrendingDown, color: "text-red-600 bg-red-50" },
+              { label: "Compliant", value: slas.filter((s) => s.status === "ok").length, icon: CheckCircle, color: "text-emerald-600 bg-emerald-50" },
+              { label: "At Risk",   value: slas.filter((s) => s.status === "at_risk").length, icon: AlertTriangle, color: "text-amber-600 bg-amber-50" },
+              { label: "Breached",  value: slas.filter((s) => s.status === "breached").length, icon: TrendingDown, color: "text-red-600 bg-red-50" },
             ].map((stat) => (
               <div key={stat.label} className={`rounded-xl p-4 ${stat.color.split(" ")[1]}`}>
                 <stat.icon className={`h-5 w-5 ${stat.color.split(" ")[0]}`} />
@@ -71,7 +117,7 @@ export default function SLAComplianceGauge() {
           <p className="text-sm font-bold text-gray-900">SLA Definitions</p>
         </div>
         <div className="divide-y divide-gray-50">
-          {MOCK_SLAS.map((sla) => (
+          {slas.map((sla) => (
             <div key={sla.name} className="flex items-center gap-4 px-5 py-4">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-900">{sla.name}</p>

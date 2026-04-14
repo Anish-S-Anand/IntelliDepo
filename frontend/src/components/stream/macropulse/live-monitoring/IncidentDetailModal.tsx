@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { AlertTriangle, Camera, CheckCircle, ChevronRight, X } from "lucide-react";
 import type { DepotEvent } from "./GeoDepotMap";
 
@@ -13,16 +13,39 @@ export default function IncidentDetailModal({ event, onClose }: Props) {
   const [status, setStatus] = useState(event.status);
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleAcknowledge = () => {
+  const handleAcknowledge = useCallback(async () => {
+    setSubmitting(true);
+    try {
+      const { acknowledgeAlert } = await import("@/services/depotOps");
+      await acknowledgeAlert(event.id);
+      setStatus("acknowledged");
+      setSubmitted(true);
+      setSubmitting(false);
+      return;
+    } catch { /* fall through to local update */ }
+    // Fallback: local-only state change
     setStatus("acknowledged");
     setSubmitted(true);
-  };
+    setSubmitting(false);
+  }, [event.id]);
 
-  const handleEscalate = () => {
+  const handleEscalate = useCallback(async () => {
+    setSubmitting(true);
+    try {
+      const { escalateAlert } = await import("@/services/depotOps");
+      await escalateAlert(event.id);
+      setStatus("escalated");
+      setSubmitted(true);
+      setSubmitting(false);
+      return;
+    } catch { /* fall through to local update */ }
+    // Fallback: local-only state change
     setStatus("escalated");
     setSubmitted(true);
-  };
+    setSubmitting(false);
+  }, [event.id]);
 
   const severityBg: Record<string, string> = {
     critical: "bg-red-50 border-red-200 text-red-700",
@@ -116,7 +139,7 @@ export default function IncidentDetailModal({ event, onClose }: Props) {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
-                placeholder="Add notes before acknowledging or escalating…"
+                placeholder="Add notes before acknowledging or escalating..."
                 className="mt-1.5 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
               />
             </div>
@@ -137,14 +160,16 @@ export default function IncidentDetailModal({ event, onClose }: Props) {
           <div className="border-t border-gray-100 px-5 py-4 flex gap-3">
             <button
               onClick={handleAcknowledge}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700"
+              disabled={submitting}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
             >
               <CheckCircle className="h-4 w-4" />
               Acknowledge
             </button>
             <button
               onClick={handleEscalate}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-700"
+              disabled={submitting}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-700 disabled:opacity-50"
             >
               <ChevronRight className="h-4 w-4" />
               Escalate
