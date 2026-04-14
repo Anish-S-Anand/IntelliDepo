@@ -31,7 +31,7 @@ const accentByState: Record<IntegrationState, string> = {
 };
 
 const moduleRail = [
-  { label: "Vision", href: "/depot/applications/intellivision", tone: "#12808f" },
+  { label: "Vision", href: "/depot", tone: "#12808f" },
   { label: "Ops", href: "/depot/applications/intelliops", tone: "#2f6a4f" },
   { label: "Command", href: "/depot/applications/intellicommand", tone: "#234b78" },
   { label: "Risk", href: "/depot/applications/risk", tone: "#6f5f27" },
@@ -355,7 +355,7 @@ export default function DashboardLivePage() {
 
                     <div className="flex justify-end">
                       <Link
-                        href={selectedCamera ? `/depot/cameras?camera=${selectedCamera.id}` : "/depot/cameras"}
+                        href="/depot"
                         className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-white/[0.1]"
                       >
                         Open camera console

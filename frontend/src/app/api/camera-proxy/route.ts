@@ -22,7 +22,7 @@ const CACHE_TTL = 30_000; // serve cached frame for up to 30s
 function cachedResponse(url: string): NextResponse | null {
   const entry = frameCache.get(url);
   if (entry && Date.now() - entry.ts < CACHE_TTL) {
-    return new NextResponse(entry.data, {
+    return new NextResponse(Buffer.from(entry.data), {
       status: 200,
       headers: {
         "Content-Type": "image/jpeg",
@@ -44,7 +44,7 @@ function cacheFrame(url: string, data: Uint8Array) {
 }
 
 function makeJpegResponse(data: Uint8Array): NextResponse {
-  return new NextResponse(data, {
+  return new NextResponse(Buffer.from(data), {
     status: 200,
     headers: {
       "Content-Type": "image/jpeg",

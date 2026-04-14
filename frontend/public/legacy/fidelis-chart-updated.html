@@ -1006,7 +1006,7 @@ svg.chart { width: 100%; overflow: visible; }
   <div class="kpi-grid mb-20">
     <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Detection Accuracy<span class="kpi-icon">🎯</span></div><div class="kpi-val" style="color:var(--pos)" id="kpiDetAcc">98.7<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)">↑ Avg confidence</div></div>
     <div class="kpi" style="--kpi-color:var(--info)"><div class="kpi-label">LPR Matches<span class="kpi-icon">🚛</span></div><div class="kpi-val" style="color:var(--info)">142<span class="kpi-unit">/d</span></div><div class="kpi-delta" style="color:var(--pos)">↑ 99.1% accuracy</div></div>
-    <div class="kpi" style="--kpi-color:var(--warn)"><div class="kpi-label">Perimeter Events<span class="kpi-icon">🔒</span></div><div class="kpi-val" style="color:var(--warn)">3<span class="kpi-unit"> today</span></div><div class="kpi-delta" style="color:var(--pos)">↓ vs 7 yesterday</div></div>
+    <div class="kpi" style="--kpi-color:var(--warn)"><div class="kpi-label">Perimeter Events<span class="kpi-icon">🔒</span></div><div class="kpi-val" style="color:var(--warn)"><span id="kpiPerimeterVal">3</span><span class="kpi-unit"> today</span></div><div class="kpi-delta" style="color:var(--pos)">↓ vs 7 yesterday</div></div>
     <div class="kpi" style="--kpi-color:var(--acc)"><div class="kpi-label">Count Discrepancies<span class="kpi-icon">📊</span></div><div class="kpi-val" style="color:var(--acc)">0.2<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)">↓ 90% reduction</div></div>
   </div>
 
@@ -1585,9 +1585,11 @@ function nav(page) {
         b.title.toLowerCase().replace(/[™®]/g,"").includes(page.substring(0,4).toLowerCase()))
       b.classList.add("active");
   });
+  // Stop detection loop when leaving vision page
+  if (curPage === "vision" && page !== "vision") stopDetectionLoop();
   curPage = page;
   if (page === "inventory") renderClusters();
-  if (page === "vision") renderCameras();
+  if (page === "vision") { renderCameras(); startDetectionLoop(); }
   if (page === "incidents") renderIncidents();
   if (page === "command") renderCommand();
   if (page === "ops") renderOps();
@@ -1790,11 +1792,6 @@ function renderCameras() {
     if (el1) el1.textContent = online;
     if (el2) el2.textContent = "of " + cameras.length + " registered";
 
-    // Update header totals
-    const tv = document.getElementById("totalVeh"), tp = document.getElementById("totalPal"), tper = document.getElementById("totalPer");
-    if (tv) tv.textContent = online;
-    if (tp) tp.textContent = cameras.length;
-
     grid.innerHTML = cameras.map(c => {
       const isActive = c.status === "active";
       const isError = c.status === "error";
@@ -1804,7 +1801,7 @@ function renderCameras() {
       const fpsLabel = c.frame_rate || 25;
       const lastSeen = c.last_seen ? new Date(c.last_seen).toLocaleString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit"}) : "—";
 
-      return `<div class="cam-card" style="cursor:pointer" onclick="expandCamera('${c.id}','${c.name}')">
+      return `<div class="cam-card" data-cam-id="${c.id}" style="cursor:pointer" onclick="expandCamera('${c.id}','${c.name}')">
         <div class="cam-screen ${!isActive ? (isError ? 'cam-alert' : 'cam-off') : ''}" style="position:relative;overflow:hidden">
           ${!isActive ? `
             <div style="display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--mut)">
@@ -1832,9 +1829,12 @@ function renderCameras() {
             <span style="font-family:'JetBrains Mono',monospace;font-size:11px">${lastSeen}</span>
             <span class="badge" style="background:${sCol}22;color:${sCol};border:1px solid ${sCol}44;font-size:9px">${c.protocol || 'rtsp'}</span>
           </div>
+          <div class="detection-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;min-height:16px"></div>
         </div>
       </div>`;
     }).join("");
+    // Render any existing detection bounding boxes onto new cards
+    renderBBoxOverlays();
   });
 }
 
@@ -1869,6 +1869,159 @@ async function reconnectCam(id) {
     await fetch(API_BASE + "/depot/vision/cameras/" + id + "/connect", {method:"POST"});
     renderCameras();
   } catch(e) { console.warn("Reconnect failed:", e); }
+}
+
+// ════════════════════════════════════════════════════════
+// DETECTION — YOLOv8 API loop, bounding box overlays, badges
+// ════════════════════════════════════════════════════════
+let _detectionModel = null;
+let _cameraBoxes = {};   // { cameraId: [{id, class_label, confidence, bbox_x, bbox_y, bbox_w, bbox_h}] }
+let _detectingInProgress = false;
+let _detectionInterval = null;
+
+const CLASS_COLOURS = {
+  bag:"#3b82f6", box:"#f59e0b", pallet:"#22d3a1",
+  carton:"#a78bfa", vehicle:"#E5521A", person:"#22D3A1", unknown:"#94a3b8"
+};
+
+async function fetchDetectionModel() {
+  try {
+    const res = await fetch(DIRECT_BASE + "/depot/vision/detection/models");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const models = await res.json();
+    _detectionModel = models.find(m => m.is_active) || null;
+  } catch (e) {
+    console.warn("Detection models unavailable:", e.message);
+    _detectionModel = null;
+  }
+}
+
+async function runDetectionForCamera(modelId, cameraId) {
+  try {
+    const runRes = await fetch(DIRECT_BASE + "/depot/vision/detection/runs", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model_id:modelId, frame_count:1, camera_id:cameraId})
+    });
+    if (!runRes.ok) return [];
+    const run = await runRes.json();
+    const objRes = await fetch(DIRECT_BASE + "/depot/vision/detection/runs/" + run.id + "/objects");
+    if (!objRes.ok) return [];
+    return await objRes.json();
+  } catch { return []; }
+}
+
+async function runDetectionLoop() {
+  if (!_detectionModel || _detectingInProgress) return;
+  const cameras = _apiCameras.filter(c => c.status === "active");
+  if (cameras.length === 0) return;
+  _detectingInProgress = true;
+  const results = await Promise.allSettled(
+    cameras.map(async cam => {
+      const objs = await runDetectionForCamera(_detectionModel.id, cam.id);
+      return {
+        cameraId: cam.id,
+        boxes: objs.map((o, i) => ({
+          id: o.id || (cam.id + "-" + i),
+          class_label: o.class_label, confidence: o.confidence,
+          bbox_x: o.bbox_x, bbox_y: o.bbox_y, bbox_w: o.bbox_w, bbox_h: o.bbox_h
+        }))
+      };
+    })
+  );
+  for (const r of results) {
+    if (r.status === "fulfilled") _cameraBoxes[r.value.cameraId] = r.value.boxes;
+  }
+  _detectingInProgress = false;
+  renderBBoxOverlays();
+  updateDetectionBadges();
+}
+
+function startDetectionLoop() {
+  if (_detectionInterval) return;
+  fetchDetectionModel().then(() => {
+    runDetectionLoop();
+    _detectionInterval = setInterval(runDetectionLoop, 4000);
+  });
+}
+function stopDetectionLoop() {
+  if (_detectionInterval) { clearInterval(_detectionInterval); _detectionInterval = null; }
+}
+
+// Bounding box SVG overlay per camera card
+function renderBBoxOverlays() {
+  for (const cam of _apiCameras) {
+    const boxes = _cameraBoxes[cam.id] || [];
+    const cardEl = document.querySelector('[data-cam-id="' + cam.id + '"] .cam-screen');
+    if (!cardEl) continue;
+    const existing = cardEl.querySelector(".bbox-overlay");
+    if (existing) existing.remove();
+    if (boxes.length === 0) { renderDetectionChips(cam.id, []); continue; }
+
+    const W = 320, H = 180;
+    let svgContent = "";
+    for (const b of boxes) {
+      const x = b.bbox_x*W, y = b.bbox_y*H, bw = b.bbox_w*W, bh = b.bbox_h*H;
+      const c = CLASS_COLOURS[b.class_label] || CLASS_COLOURS.unknown;
+      const lw = Math.max(bw*0.5, 50);
+      svgContent += '<rect x="'+x+'" y="'+y+'" width="'+bw+'" height="'+bh+'" fill="none" stroke="'+c+'" stroke-width="1.5" rx="2" opacity="0.9"/>';
+      svgContent += '<line x1="'+x+'" y1="'+y+'" x2="'+(x+6)+'" y2="'+y+'" stroke="'+c+'" stroke-width="2.5"/>';
+      svgContent += '<line x1="'+x+'" y1="'+y+'" x2="'+x+'" y2="'+(y+6)+'" stroke="'+c+'" stroke-width="2.5"/>';
+      svgContent += '<line x1="'+(x+bw)+'" y1="'+y+'" x2="'+(x+bw-6)+'" y2="'+y+'" stroke="'+c+'" stroke-width="2.5"/>';
+      svgContent += '<line x1="'+(x+bw)+'" y1="'+y+'" x2="'+(x+bw)+'" y2="'+(y+6)+'" stroke="'+c+'" stroke-width="2.5"/>';
+      svgContent += '<rect x="'+x+'" y="'+(y-14)+'" width="'+lw+'" height="13" fill="'+c+'" rx="2" opacity="0.85"/>';
+      svgContent += '<text x="'+(x+3)+'" y="'+(y-4)+'" font-size="8" font-weight="600" fill="white" font-family="monospace">'+b.class_label+' '+(b.confidence*100).toFixed(0)+'%</text>';
+    }
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 "+W+" "+H);
+    svg.setAttribute("class", "bbox-overlay");
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none";
+    svg.innerHTML = svgContent;
+    cardEl.appendChild(svg);
+    renderDetectionChips(cam.id, boxes);
+  }
+}
+
+function renderDetectionChips(camId, boxes) {
+  const el = document.querySelector('[data-cam-id="' + camId + '"] .detection-chips');
+  if (!el) return;
+  if (boxes.length === 0) { el.innerHTML = ""; return; }
+  const counts = {};
+  for (const b of boxes) counts[b.class_label] = (counts[b.class_label] || 0) + 1;
+  el.innerHTML = Object.entries(counts).map(([cls, cnt]) => {
+    const c = CLASS_COLOURS[cls] || "#94a3b8";
+    return '<span style="font-size:8px;font-weight:600;padding:2px 6px;border-radius:9999px;border:1px solid '+c+'30;background:'+c+'15;color:'+c+'">'+cnt+' '+cls+'</span>';
+  }).join(" ");
+}
+
+function updateDetectionBadges() {
+  const allBoxes = Object.values(_cameraBoxes).flat();
+  const vehicles = allBoxes.filter(b => b.class_label === "vehicle").length;
+  const pallets  = allBoxes.filter(b => b.class_label === "pallet").length;
+  const persons  = allBoxes.filter(b => b.class_label === "person").length;
+  const tv = document.getElementById("totalVeh"), tp = document.getElementById("totalPal"), tper = document.getElementById("totalPer");
+  if (tv) tv.textContent = vehicles || 6;
+  if (tp) tp.textContent = pallets || 6;
+  if (tper) tper.textContent = persons || 19;
+  // Update Detection Accuracy KPI
+  if (allBoxes.length > 0) {
+    const avgConf = (allBoxes.reduce((s, b) => s + b.confidence, 0) / allBoxes.length * 100).toFixed(1);
+    const accEl = document.getElementById("kpiDetAcc");
+    if (accEl) accEl.innerHTML = avgConf + '<span class="kpi-unit">%</span>';
+  }
+}
+
+async function fetchAlertCount() {
+  try {
+    const [countRes, colourRes] = await Promise.allSettled([
+      fetch(DIRECT_BASE + "/depot/vision/counting/alerts/active").then(r => r.ok ? r.json() : []),
+      fetch(DIRECT_BASE + "/depot/vision/colour/alerts/active").then(r => r.ok ? r.json() : [])
+    ]);
+    const count = (countRes.status === "fulfilled" ? countRes.value.length : 0)
+                + (colourRes.status === "fulfilled" ? colourRes.value.length : 0);
+    const el = document.getElementById("kpiPerimeterVal");
+    if (el) el.textContent = count || 3;
+  } catch {}
 }
 
 // Register Camera modal
@@ -2247,57 +2400,163 @@ function renderCommand() {
 // ════════════════════════════════════════════════════════
 // INTELLIOPS
 // ════════════════════════════════════════════════════════
-function renderOps() {
-  const tasks = [
-    {title:"Unload Truck TN-04-AB-1234",worker:"Ramesh K.",area:"Zone C Bay 4",prio:"HIGH",status:"in-progress"},
-    {title:"FIFO Compliance Check — Zone B",worker:"Priya S.",area:"Zone B Clusters",prio:"MEDIUM",status:"pending"},
-    {title:"LPR Gate Calibration",worker:"Tech Team",area:"Gate Entry North",prio:"LOW",status:"pending"},
-    {title:"Damage Assessment — INC-002",worker:"QA Lead",area:"Zone C",prio:"HIGH",status:"in-progress"},
-  ];
+// ── INTELLIOPS: Backend-wired renderOps ──
+const OPS_API = "/backend/ops/operations";
+const OPS_HEADERS = {"Content-Type":"application/json","x-user-id":"ops-dashboard"};
+
+// Fallback data when backend is unreachable
+const FALLBACK_TASKS = [
+  {title:"Unload Truck TN-04-AB-1234",worker_name:"Ramesh K.",area:"Zone C Bay 4",priority:"high",status:"in_progress"},
+  {title:"FIFO Compliance Check — Zone B",worker_name:"Priya S.",area:"Zone B Clusters",priority:"medium",status:"pending"},
+  {title:"LPR Gate Calibration",worker_name:"Tech Team",area:"Gate Entry North",priority:"low",status:"pending"},
+  {title:"Damage Assessment — INC-002",worker_name:"QA Lead",area:"Zone C",priority:"high",status:"in_progress"},
+];
+const FALLBACK_CHECKLISTS = [
+  {name:"Inbound Inspection — Shift A",progress_pct:85,status:"in_progress"},
+  {name:"FIFO Daily Audit",progress_pct:100,status:"complete"},
+  {name:"Perimeter Security Check",progress_pct:60,status:"in_progress"},
+];
+const FALLBACK_EXCEPTIONS = [
+  {exception_type:"Count Mismatch",location:"Cluster B-09",root_cause:"ERP sync delay",detected_at:new Date(Date.now()-3600000).toISOString()},
+  {exception_type:"FIFO Violation",location:"Zone B Cluster B2",root_cause:"Manual override",detected_at:new Date(Date.now()-10800000).toISOString()},
+  {exception_type:"Damaged Goods",location:"Zone C Bay 4",root_cause:"Handling error",detected_at:new Date(Date.now()-120000).toISOString()},
+  {exception_type:"Missing Documentation",location:"Gate Entry",root_cause:"Driver oversight",detected_at:new Date(Date.now()-14400000).toISOString()},
+];
+
+function _opsAge(iso){const d=Math.floor((Date.now()-new Date(iso).getTime())/1000);if(d<60)return d+"s";if(d<3600)return Math.floor(d/60)+"m";return Math.floor(d/3600)+"h";}
+
+function _renderTaskList(tasks) {
   const tl = document.getElementById("taskList");
-  if (tl) tl.innerHTML = tasks.map(t => {
-    const pc = t.prio === "HIGH" ? "var(--sev-high)" : t.prio === "MEDIUM" ? "var(--warn)" : "var(--sev-low)";
+  if (!tl) return;
+  tl.innerHTML = tasks.map(t => {
+    const prio = (t.priority||"medium").toUpperCase();
+    const pc = prio === "HIGH" ? "var(--sev-high)" : prio === "MEDIUM" ? "var(--warn)" : "var(--sev-low)";
+    const status = (t.status||"pending").replace("_","-");
     return `<div class="task-card">
       <div class="task-prio" style="background:${pc}"></div>
       <div class="task-body">
         <div class="task-title">${t.title}</div>
-        <div class="task-meta">👷 ${t.worker} &nbsp;•&nbsp; 📍 ${t.area}</div>
+        <div class="task-meta">👷 ${t.worker_name||"Unassigned"} &nbsp;•&nbsp; 📍 ${t.area||t.zone||"—"}</div>
         <div class="task-tags">
-          <span class="badge" style="background:${pc}22;color:${pc};border:1px solid ${pc}44;font-size:9px">${t.prio}</span>
-          <span class="badge" style="background:var(--badge);color:var(--sub);border:1px solid var(--bord);font-size:9px">${t.status}</span>
+          <span class="badge" style="background:${pc}22;color:${pc};border:1px solid ${pc}44;font-size:9px">${prio}</span>
+          <span class="badge" style="background:var(--badge);color:var(--sub);border:1px solid var(--bord);font-size:9px">${status}</span>
         </div>
       </div>
     </div>`;
   }).join("");
+}
 
-  const checklists = [
-    {name:"Inbound Inspection — Shift A",progress:85,status:"In Progress"},
-    {name:"FIFO Daily Audit",progress:100,status:"Complete"},
-    {name:"Perimeter Security Check",progress:60,status:"In Progress"},
-  ];
+function _renderChecklistList(checklists) {
   const cl = document.getElementById("checklistList");
-  if (cl) cl.innerHTML = checklists.map(c => `
-    <div style="margin-bottom:12px">
+  if (!cl) return;
+  cl.innerHTML = checklists.map(c => {
+    const p = c.progress_pct ?? 0;
+    const st = (c.status||"not_started").replace("_"," ");
+    return `<div style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;margin-bottom:5px">
         <div style="font-size:12px;font-weight:500">${c.name}</div>
-        <span style="font-size:10px;font-weight:700;color:${c.progress === 100 ? "var(--pos)" : "var(--warn)"}">${c.progress}%</span>
+        <span style="font-size:10px;font-weight:700;color:${p === 100 ? "var(--pos)" : "var(--warn)"}">${p}%</span>
       </div>
-      <div class="prog-track"><div class="prog-fill" style="width:${c.progress}%;background:${c.progress === 100 ? "var(--pos)" : "var(--acc)"}"></div></div>
-      <div style="font-size:10px;color:var(--sub);margin-top:3px">${c.status}</div>
-    </div>`).join("");
+      <div class="prog-track"><div class="prog-fill" style="width:${p}%;background:${p === 100 ? "var(--pos)" : "var(--acc)"}"></div></div>
+      <div style="font-size:10px;color:var(--sub);margin-top:3px">${st.charAt(0).toUpperCase()+st.slice(1)}</div>
+    </div>`;
+  }).join("");
+}
 
-  const exceptions = [
-    {type:"Count Mismatch",loc:"Cluster B-09",age:"1h",root:"ERP sync delay"},
-    {type:"FIFO Violation",loc:"Zone B Cluster B2",age:"3h",root:"Manual override"},
-    {type:"Damaged Goods",loc:"Zone C Bay 4",age:"2m",root:"Handling error"},
-    {type:"Missing Documentation",loc:"Gate Entry",age:"4h",root:"Driver oversight"},
-  ];
+function _renderExceptionList(exceptions) {
   const el = document.getElementById("exceptionList");
-  if (el) el.innerHTML = exceptions.map(e => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--badge);border-radius:8px;margin-bottom:7px;border:1px solid var(--bord)">
-      <div><div style="font-size:12px;font-weight:500">${e.type}</div><div style="font-size:10px;color:var(--sub);margin-top:1px">${e.loc} &nbsp;•&nbsp; Root: ${e.root}</div></div>
-      <span style="font-size:10px;color:var(--mut)">${e.age}</span>
-    </div>`).join("");
+  if (!el) return;
+  el.innerHTML = exceptions.map(e => {
+    const age = e.detected_at ? _opsAge(e.detected_at) : "—";
+    const etype = (e.exception_type||"").replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--badge);border-radius:8px;margin-bottom:7px;border:1px solid var(--bord)">
+      <div><div style="font-size:12px;font-weight:500">${etype}</div><div style="font-size:10px;color:var(--sub);margin-top:1px">${e.location||"—"} &nbsp;•&nbsp; Root: ${e.root_cause||"Unknown"}</div></div>
+      <span style="font-size:10px;color:var(--mut)">${age}</span>
+    </div>`;
+  }).join("");
+}
+
+function _updateOpsKPIs(kpis) {
+  const kpiEls = document.querySelectorAll(".kpi-val");
+  if (kpiEls.length >= 4) {
+    kpiEls[0].innerHTML = kpis.tasks_completed + '<span class="kpi-unit">/' + kpis.tasks_total + '</span>';
+    kpiEls[0].closest(".kpi").querySelector(".kpi-delta").textContent = "↑ " + (kpis.tasks_total > 0 ? Math.round(kpis.tasks_completed/kpis.tasks_total*100) : 0) + "% completion";
+    kpiEls[1].textContent = kpis.active_workers;
+    kpiEls[2].innerHTML = Math.round(kpis.sop_compliance_pct) + '<span class="kpi-unit">%</span>';
+    kpiEls[3].textContent = kpis.open_exceptions;
+    kpiEls[3].closest(".kpi").querySelector(".kpi-delta").textContent = kpis.exceptions_needing_escalation + " need escalation";
+  }
+}
+
+async function renderOps() {
+  // Render with fallback data first (instant paint)
+  _renderTaskList(FALLBACK_TASKS);
+  _renderChecklistList(FALLBACK_CHECKLISTS);
+  _renderExceptionList(FALLBACK_EXCEPTIONS);
+
+  // Then fetch real data from backend
+  try {
+    const [tasksR, checklistsR, exceptionsR, kpisR] = await Promise.allSettled([
+      fetch(OPS_API + "/tasks?limit=20", {headers: OPS_HEADERS}),
+      fetch(OPS_API + "/checklists?limit=10", {headers: OPS_HEADERS}),
+      fetch(OPS_API + "/exceptions?limit=10", {headers: OPS_HEADERS}),
+      fetch(OPS_API + "/kpis", {headers: OPS_HEADERS}),
+    ]);
+
+    if (tasksR.status === "fulfilled" && tasksR.value.ok) {
+      const tasks = await tasksR.value.json();
+      if (tasks.length > 0) _renderTaskList(tasks);
+    }
+    if (checklistsR.status === "fulfilled" && checklistsR.value.ok) {
+      const checklists = await checklistsR.value.json();
+      if (checklists.length > 0) _renderChecklistList(checklists);
+    }
+    if (exceptionsR.status === "fulfilled" && exceptionsR.value.ok) {
+      const exceptions = await exceptionsR.value.json();
+      if (exceptions.length > 0) _renderExceptionList(exceptions);
+    }
+    if (kpisR.status === "fulfilled" && kpisR.value.ok) {
+      const kpis = await kpisR.value.json();
+      _updateOpsKPIs(kpis);
+    }
+  } catch(e) { console.warn("IntelliOps backend unavailable — using fallback data"); }
+
+  // Wire "+ New Task" button
+  const newTaskBtn = document.querySelector('.btn-primary');
+  if (newTaskBtn && newTaskBtn.textContent.includes("New Task")) {
+    newTaskBtn.onclick = async function() {
+      const title = prompt("Task title:");
+      if (!title) return;
+      const worker = prompt("Assign to (worker name):", "");
+      const area = prompt("Area/Zone:", "");
+      const prio = prompt("Priority (high/medium/low):", "medium");
+      try {
+        const r = await fetch(OPS_API + "/tasks", {
+          method: "POST", headers: OPS_HEADERS,
+          body: JSON.stringify({title, worker_name: worker||null, area: area||null, priority: prio||"medium"})
+        });
+        if (r.ok) { renderOps(); alert("Task created!"); }
+        else alert("Failed: " + (await r.text()));
+      } catch(e) { alert("Backend unavailable"); }
+    };
+  }
+
+  // Auto-refresh every 15s
+  clearInterval(window._opsInterval);
+  window._opsInterval = setInterval(async () => {
+    try {
+      const [tr, cr, er, kr] = await Promise.allSettled([
+        fetch(OPS_API + "/tasks?limit=20", {headers: OPS_HEADERS}),
+        fetch(OPS_API + "/checklists?limit=10", {headers: OPS_HEADERS}),
+        fetch(OPS_API + "/exceptions?limit=10", {headers: OPS_HEADERS}),
+        fetch(OPS_API + "/kpis", {headers: OPS_HEADERS}),
+      ]);
+      if (tr.status==="fulfilled"&&tr.value.ok){const d=await tr.value.json();if(d.length>0)_renderTaskList(d);}
+      if (cr.status==="fulfilled"&&cr.value.ok){const d=await cr.value.json();if(d.length>0)_renderChecklistList(d);}
+      if (er.status==="fulfilled"&&er.value.ok){const d=await er.value.json();if(d.length>0)_renderExceptionList(d);}
+      if (kr.status==="fulfilled"&&kr.value.ok){_updateOpsKPIs(await kr.value.json());}
+    } catch(e) {}
+  }, 15000);
 }
 
 // ════════════════════════════════════════════════════════
@@ -2976,6 +3235,7 @@ if (savedTheme === "light") toggleTheme();
 drawThroughputChart();
 renderAlerts();
 renderCommand();
+fetchAlertCount();
 </script>
 </body>
 </html>

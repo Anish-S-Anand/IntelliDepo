@@ -1,7 +1,7 @@
 "use client";
 
-import VisionPage from "@/components/depot/operations/VisionPage";
+import { redirect } from "next/navigation";
 
 export default function IntelliVisionPage() {
-  return <VisionPage />;
+  redirect("/depot");
 }
