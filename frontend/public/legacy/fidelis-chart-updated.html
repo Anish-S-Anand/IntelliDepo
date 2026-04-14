@@ -1585,8 +1585,8 @@ function nav(page) {
         b.title.toLowerCase().replace(/[™®]/g,"").includes(page.substring(0,4).toLowerCase()))
       b.classList.add("active");
   });
-  // Stop detection loop when leaving vision page
-  if (curPage === "vision" && page !== "vision") stopDetectionLoop();
+  // Stop detection loop when leaving vision page, reset render flag
+  if (curPage === "vision" && page !== "vision") { stopDetectionLoop(); _camerasRendered = false; }
   curPage = page;
   if (page === "inventory") renderClusters();
   if (page === "vision") { renderCameras(); startDetectionLoop(); }
@@ -1788,6 +1788,7 @@ function renderCameras() {
   fetchCamerasFromAPI().then(cameras => {
     const grid = document.getElementById("cameraGrid");
     if (!grid) return;
+    _camerasRendered = true; // prevent re-rendering (would kill MJPEG streams)
 
     // Update KPIs
     const online = cameras.filter(c => c.status === "active").length;
@@ -3224,21 +3225,22 @@ function loadData() {
 // ════════════════════════════════════════════════════════
 // REAL-TIME SIMULATION
 // ════════════════════════════════════════════════════════
+let _camerasRendered = false; // avoid re-rendering while MJPEG streams are playing
 setInterval(() => {
   if (!liveActive) return;
-  // Refresh camera list from API when on vision page
-  if (curPage === "vision") renderCameras();
+  // Only render cameras ONCE — re-rendering destroys MJPEG stream connections
+  if (curPage === "vision" && !_camerasRendered) renderCameras();
 }, 10000);
 
-// Fast live-feed refresh: update camera img src every 5s with new timestamp
+// For JPEG proxy feeds: refresh src every 5s. Skip MJPEG streams (they're continuous)
 setInterval(() => {
   if (!liveActive || curPage !== "vision") return;
   const grid = document.getElementById("cameraGrid");
   if (!grid) return;
   grid.querySelectorAll("img[alt]").forEach(img => {
     const src = img.getAttribute("src") || "";
+    // Only refresh proxy JPEG feeds, NOT mjpeg streams
     if (src.includes("/api/camera-proxy")) {
-      // Update cache-bust timestamp
       img.src = src.replace(/&t=\d+/, "&t=" + Date.now());
     }
   });
