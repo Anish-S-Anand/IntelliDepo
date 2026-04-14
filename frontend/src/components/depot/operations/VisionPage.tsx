@@ -32,9 +32,8 @@ import {
 // ---------------------------------------------------------------------------
 // Camera seed data — live public CCTV / traffic camera feeds
 // ---------------------------------------------------------------------------
-// LIVE_FEEDS: direct MJPEG or auto-refresh JPEG URLs for the camera grid
-// These are publicly accessible cameras (no auth) used for demo purposes.
-const LIVE_FEEDS: Record<string, string> = {
+// Raw upstream URLs for each camera scene
+const RAW_FEEDS: Record<string, string> = {
   gate_entry:    "http://88.53.197.250/axis-cgi/mjpg/video.cgi?resolution=640x480",          // Italy outdoor — live MJPEG
   zone_overhead: "http://cam-mckeldin-eastview.umd.edu/axis-cgi/mjpg/video.cgi?resolution=640x480",  // UMD campus — live MJPEG
   loading_bay:   "https://weathercam.digitraffic.fi/C0450501.jpg",   // Finland highway — trucks/traffic
@@ -43,14 +42,23 @@ const LIVE_FEEDS: Record<string, string> = {
   yard_overview: "https://weathercam.digitraffic.fi/C0870101.jpg",   // Finland road cam — wide yard-like view
 };
 
+// Proxied through Next.js API route to avoid CORS/mixed-content issues
+function proxyUrl(rawUrl: string): string {
+  return `/api/camera-proxy?url=${encodeURIComponent(rawUrl)}`;
+}
+
 const SEED_CAMERAS = [
-  { name: "Gate Entry North",   stream_url: LIVE_FEEDS.gate_entry,    protocol: "http" as const, zone: "Entry Gate",  frame_rate: 30, resolution: "640x480" },
-  { name: "Zone A Overhead",    stream_url: LIVE_FEEDS.zone_overhead, protocol: "http" as const, zone: "Zone-A",      frame_rate: 25, resolution: "640x480" },
-  { name: "Loading Bay 1-4",    stream_url: LIVE_FEEDS.loading_bay,   protocol: "https" as const, zone: "Loading Dock",frame_rate: 1,  resolution: "1920x1080" },
-  { name: "Zone C Perimeter",   stream_url: LIVE_FEEDS.perimeter,     protocol: "https" as const, zone: "Zone-C",      frame_rate: 1,  resolution: "1920x1080" },
-  { name: "Gate Exit South",    stream_url: LIVE_FEEDS.gate_exit,     protocol: "https" as const, zone: "Exit Gate",   frame_rate: 1,  resolution: "1920x1080" },
-  { name: "Yard Overview",      stream_url: LIVE_FEEDS.yard_overview, protocol: "https" as const, zone: "Yard",        frame_rate: 1,  resolution: "1920x1080" },
+  { name: "Gate Entry North",   stream_url: RAW_FEEDS.gate_entry,    proxy_url: proxyUrl(RAW_FEEDS.gate_entry),    zone: "Entry Gate",   frame_rate: 30, resolution: "640x480" },
+  { name: "Zone A Overhead",    stream_url: RAW_FEEDS.zone_overhead, proxy_url: proxyUrl(RAW_FEEDS.zone_overhead), zone: "Zone-A",       frame_rate: 25, resolution: "640x480" },
+  { name: "Loading Bay 1-4",    stream_url: RAW_FEEDS.loading_bay,   proxy_url: proxyUrl(RAW_FEEDS.loading_bay),   zone: "Loading Dock", frame_rate: 1,  resolution: "1920x1080" },
+  { name: "Zone C Perimeter",   stream_url: RAW_FEEDS.perimeter,     proxy_url: proxyUrl(RAW_FEEDS.perimeter),     zone: "Zone-C",       frame_rate: 1,  resolution: "1920x1080" },
+  { name: "Gate Exit South",    stream_url: RAW_FEEDS.gate_exit,     proxy_url: proxyUrl(RAW_FEEDS.gate_exit),     zone: "Exit Gate",    frame_rate: 1,  resolution: "1920x1080" },
+  { name: "Yard Overview",      stream_url: RAW_FEEDS.yard_overview, proxy_url: proxyUrl(RAW_FEEDS.yard_overview), zone: "Yard",         frame_rate: 1,  resolution: "1920x1080" },
 ];
+
+// Map zone → proxied live URL for merging into backend cameras
+const ZONE_PROXY_MAP: Record<string, string> = {};
+SEED_CAMERAS.forEach((s) => { ZONE_PROXY_MAP[s.zone] = s.proxy_url; });
 
 // ---------------------------------------------------------------------------
 // Bounding box overlay
@@ -111,8 +119,8 @@ export default function VisionPage() {
   const clientCameras: CameraRecord[] = SEED_CAMERAS.map((s, i) => ({
     id: `local-cam-${i}`,
     name: s.name,
-    stream_url: s.stream_url,
-    protocol: s.protocol,
+    stream_url: s.proxy_url, // Use proxied URL so browser can load it
+    protocol: "http",
     zone: s.zone,
     status: "active" as const,
     is_active: true,
@@ -128,12 +136,10 @@ export default function VisionPage() {
       const snap = await getDepotCommandSnapshot();
       const cams = snap.cameras.data;
       if (cams.length > 0) {
-        // Merge live feed URLs into backend cameras by matching zone/name
-        const liveMap: Record<string, string> = {};
-        SEED_CAMERAS.forEach((s) => { liveMap[s.zone] = s.stream_url; });
+        // Override stream_url with proxied live feeds by zone match
         const merged = cams.map((c) => ({
           ...c,
-          stream_url: liveMap[c.zone ?? ""] || c.stream_url,
+          stream_url: ZONE_PROXY_MAP[c.zone ?? ""] || c.stream_url,
           status: "active" as const,
         }));
         setCameras(merged);
@@ -141,7 +147,7 @@ export default function VisionPage() {
         seededRef.current = true;
         setSeeding(true);
         const registered = await Promise.allSettled(
-          SEED_CAMERAS.map((c) => registerCamera(c))
+          SEED_CAMERAS.map((c) => registerCamera({ name: c.name, stream_url: c.stream_url, protocol: "http", zone: c.zone, frame_rate: c.frame_rate, resolution: c.resolution }))
         );
         const ids = registered
           .filter((r): r is PromiseFulfilledResult<CameraRecord> => r.status === "fulfilled")
@@ -378,12 +384,10 @@ function CameraCard({ cam, boxes, tick, busyId, timeStr, theme, onReconnect }: {
   onReconnect: (id: string) => void;
 }) {
   const online = cam.status === "active";
-  // For live public feeds: use stream_url directly as PRIMARY source
-  const isJpegFeed = cam.stream_url?.endsWith(".jpg") || cam.stream_url?.endsWith(".jpeg");
-  const primaryUrl = cam.stream_url
-    ? isJpegFeed ? `${cam.stream_url}?t=${tick}` : cam.stream_url
-    : null;
-  // Backend proxy as fallback
+  // stream_url is now a proxied /api/camera-proxy URL (or backend camera URL)
+  // Add cache-bust for refreshing JPEG feeds every tick
+  const feedUrl = cam.stream_url ? `${cam.stream_url}${cam.stream_url.includes("?") ? "&" : "?"}t=${tick}` : null;
+  // Backend fallback
   const isLocalCam = cam.id.startsWith("local-cam-");
   const backendMjpeg = (!isLocalCam && online) ? getCameraMjpegUrl(cam.id, theme) : null;
   const backendSnapshot = (!isLocalCam && online) ? `${getCameraSnapshotUrl(cam.id, theme)}?t=${tick}` : null;
@@ -397,17 +401,17 @@ function CameraCard({ cam, boxes, tick, busyId, timeStr, theme, onReconnect }: {
       <div className="relative overflow-hidden bg-[#06101E]" style={{ aspectRatio: "16/9" }}>
         {online ? (
           <>
-            {(primaryUrl || backendMjpeg) && (
+            {(feedUrl || backendMjpeg) && (
               <img
-                key={isJpegFeed ? `feed-${cam.id}-${tick}` : `feed-${cam.id}`}
-                src={primaryUrl || backendMjpeg || ""}
+                key={`feed-${cam.id}-${tick}`}
+                src={feedUrl || backendMjpeg || ""}
                 alt={cam.name}
                 className="absolute inset-0 w-full h-full object-cover"
                 onError={(e) => {
                   const t = e.target as HTMLImageElement;
-                  // Fallback chain: direct feed → backend proxy → backend snapshot
-                  if (backendMjpeg && t.src !== backendMjpeg) { t.src = backendMjpeg; return; }
-                  if (backendSnapshot && t.src !== backendSnapshot) { t.src = backendSnapshot; return; }
+                  // Fallback: backend proxy → backend snapshot
+                  if (backendMjpeg && !t.src.includes(backendMjpeg)) { t.src = backendMjpeg; return; }
+                  if (backendSnapshot && !t.src.includes("snapshot")) { t.src = backendSnapshot; return; }
                   t.style.display = "none";
                 }}
               />
@@ -497,15 +501,20 @@ function StatBlock({ label, value, color, small }: { label: string; value: strin
 // ---------------------------------------------------------------------------
 // RTSP Live Feed panel
 // ---------------------------------------------------------------------------
-// Live MJPEG feed URL — public Axis camera (Italy outdoor, true real-time)
-const LIVE_MJPEG_URL = "http://88.53.197.250/axis-cgi/mjpg/video.cgi?resolution=640x480";
+// Live feed — proxied through Next.js API to bypass CORS
+const LIVE_MAIN_FEED = RAW_FEEDS.gate_entry;
 
 function RtspLiveFeed() {
   const [error, setError] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  // Try backend RTSP proxy first, fall back to direct MJPEG
-  const proxyUrl = getRtspProxyUrl(LIVE_MJPEG_URL);
-  const directUrl = LIVE_MJPEG_URL;
+  const [tick, setTick] = useState(0);
+  const proxiedUrl = `${proxyUrl(LIVE_MAIN_FEED)}&t=${tick}`;
+
+  // Auto-refresh every 3s for live frames
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 3000);
+    return () => clearInterval(t);
+  }, []);
 
   return (
     <div className="mb-4 bg-white dark:bg-[#14203A] border border-[#E8EDF8] dark:border-[#1E2F50] rounded-[12px] overflow-hidden shadow-sm">
@@ -513,13 +522,13 @@ function RtspLiveFeed() {
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
           <span className="text-[11px] font-bold text-[#111827] dark:text-[#E8EDF8] font-mono">LIVE CCTV FEED</span>
-          <span className="text-[9px] text-[#9CA3AF] dark:text-[#4E6090] font-mono truncate max-w-[280px]">Public MJPEG · Real-time</span>
+          <span className="text-[9px] text-[#9CA3AF] dark:text-[#4E6090] font-mono truncate max-w-[280px]">Italy · Axis Camera · Proxied MJPEG</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/20 bg-emerald-500/10">
-            LIVE MJPEG
+            LIVE
           </span>
-          <span className="text-[9px] text-[#9CA3AF] dark:text-[#4E6090]">Real-time · HUD overlay · Detection boxes</span>
+          <span className="text-[9px] text-[#9CA3AF] dark:text-[#4E6090]">Real-time · Frame extraction · Auto-refresh 3s</span>
         </div>
       </div>
       <div className="relative bg-black" style={{ aspectRatio: "16/9", maxHeight: 340 }}>
@@ -528,27 +537,23 @@ function RtspLiveFeed() {
             {!loaded && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10">
                 <div className="w-5 h-5 border-2 border-[#E5521A] border-t-transparent rounded-full animate-spin" />
-                <span className="text-[10px] text-[#4E6090]">Connecting to live MJPEG stream…</span>
+                <span className="text-[10px] text-[#4E6090]">Connecting to live camera…</span>
               </div>
             )}
             <img
-              src={proxyUrl}
+              key={`live-main-${tick}`}
+              src={proxiedUrl}
               alt="Live CCTV feed"
               className="w-full h-full object-contain"
               onLoad={() => setLoaded(true)}
-              onError={(e) => {
-                // If proxy fails, try direct MJPEG URL
-                const t = e.target as HTMLImageElement;
-                if (t.src !== directUrl) { t.src = directUrl; return; }
-                setError(true);
-              }}
+              onError={() => setError(true)}
             />
           </>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
             <Camera className="w-7 h-7 text-[#4E6090]" />
             <span className="text-[11px] text-[#4E6090]">Live stream unavailable</span>
-            <span className="text-[9px] text-[#2A3F68]">Public MJPEG camera may be offline or blocked by CORS</span>
+            <span className="text-[9px] text-[#2A3F68]">Camera may be offline — will retry automatically</span>
             <button
               onClick={() => { setError(false); setLoaded(false); }}
               className="mt-1 flex items-center gap-1.5 px-3 py-1 rounded-lg border border-[#1E2F50] text-[10px] text-[#8A9BBF] hover:border-[#E5521A]/30 hover:text-[#E5521A] transition-colors"
