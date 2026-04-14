@@ -107,32 +107,53 @@ export default function VisionPage() {
 
   // theme is controlled by the ☀/☾ toggle button in the header
 
-  // Load cameras from backend, seed if empty
+  // Build client-side camera records from SEED_CAMERAS (always available)
+  const clientCameras: CameraRecord[] = SEED_CAMERAS.map((s, i) => ({
+    id: `local-cam-${i}`,
+    name: s.name,
+    stream_url: s.stream_url,
+    protocol: s.protocol,
+    zone: s.zone,
+    status: "active" as const,
+    is_active: true,
+    last_seen: new Date().toISOString(),
+    frame_rate: s.frame_rate,
+    resolution: s.resolution,
+    created_at: new Date().toISOString(),
+  }));
+
+  // Load cameras from backend; fall back to client-side live feeds
   const loadCameras = useCallback(async () => {
     try {
       const snap = await getDepotCommandSnapshot();
       const cams = snap.cameras.data;
-      if (cams.length === 0 && !seededRef.current) {
+      if (cams.length > 0) {
+        // Merge live feed URLs into backend cameras by matching zone/name
+        const liveMap: Record<string, string> = {};
+        SEED_CAMERAS.forEach((s) => { liveMap[s.zone] = s.stream_url; });
+        const merged = cams.map((c) => ({
+          ...c,
+          stream_url: liveMap[c.zone ?? ""] || c.stream_url,
+          status: "active" as const,
+        }));
+        setCameras(merged);
+      } else if (!seededRef.current) {
         seededRef.current = true;
         setSeeding(true);
-        // Register all seed cameras in parallel
         const registered = await Promise.allSettled(
           SEED_CAMERAS.map((c) => registerCamera(c))
         );
-        // Connect each registered camera
         const ids = registered
           .filter((r): r is PromiseFulfilledResult<CameraRecord> => r.status === "fulfilled")
           .map((r) => r.value.id);
         await Promise.allSettled(ids.map((id) => reconnectCamera(id)));
         setSeeding(false);
-        // Reload after seeding
         const snap2 = await getDepotCommandSnapshot();
-        setCameras(snap2.cameras.data);
-      } else {
-        setCameras(cams);
+        setCameras(snap2.cameras.data.length > 0 ? snap2.cameras.data : clientCameras);
       }
     } catch {
-      // backend unavailable
+      // Backend unavailable — use client-side live feeds directly
+      setCameras(clientCameras);
     }
   }, []);
 
@@ -357,13 +378,15 @@ function CameraCard({ cam, boxes, tick, busyId, timeStr, theme, onReconnect }: {
   onReconnect: (id: string) => void;
 }) {
   const online = cam.status === "active";
-  const mjpegUrl = online ? getCameraMjpegUrl(cam.id, theme) : null;
-  const snapshotUrl = online ? `${getCameraSnapshotUrl(cam.id, theme)}?t=${tick}` : null;
-  // For live public feeds: use stream_url directly (MJPEG or auto-refresh JPEG)
+  // For live public feeds: use stream_url directly as PRIMARY source
   const isJpegFeed = cam.stream_url?.endsWith(".jpg") || cam.stream_url?.endsWith(".jpeg");
-  const directFeedUrl = cam.stream_url
+  const primaryUrl = cam.stream_url
     ? isJpegFeed ? `${cam.stream_url}?t=${tick}` : cam.stream_url
     : null;
+  // Backend proxy as fallback
+  const isLocalCam = cam.id.startsWith("local-cam-");
+  const backendMjpeg = (!isLocalCam && online) ? getCameraMjpegUrl(cam.id, theme) : null;
+  const backendSnapshot = (!isLocalCam && online) ? `${getCameraSnapshotUrl(cam.id, theme)}?t=${tick}` : null;
 
   // Zone display — large colored text matching screenshot
   const zoneColor = "#5B9BF5";
@@ -374,17 +397,17 @@ function CameraCard({ cam, boxes, tick, busyId, timeStr, theme, onReconnect }: {
       <div className="relative overflow-hidden bg-[#06101E]" style={{ aspectRatio: "16/9" }}>
         {online ? (
           <>
-            {mjpegUrl && (
+            {(primaryUrl || backendMjpeg) && (
               <img
-                key={isJpegFeed ? `${mjpegUrl}-${tick}` : mjpegUrl}
-                src={mjpegUrl}
+                key={isJpegFeed ? `feed-${cam.id}-${tick}` : `feed-${cam.id}`}
+                src={primaryUrl || backendMjpeg || ""}
                 alt={cam.name}
                 className="absolute inset-0 w-full h-full object-cover"
                 onError={(e) => {
                   const t = e.target as HTMLImageElement;
-                  // Fallback chain: backend proxy → direct feed → snapshot
-                  if (directFeedUrl && t.src !== directFeedUrl) { t.src = directFeedUrl; return; }
-                  if (snapshotUrl && t.src !== snapshotUrl) { t.src = snapshotUrl; return; }
+                  // Fallback chain: direct feed → backend proxy → backend snapshot
+                  if (backendMjpeg && t.src !== backendMjpeg) { t.src = backendMjpeg; return; }
+                  if (backendSnapshot && t.src !== backendSnapshot) { t.src = backendSnapshot; return; }
                   t.style.display = "none";
                 }}
               />
