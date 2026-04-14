@@ -1727,14 +1727,15 @@ const API_BASE = "/backend";
 const DIRECT_BASE = window.location.protocol + '//' + window.location.hostname + ':8000';
 let _apiCameras = []; // cached from last fetch
 
-// Live public CCTV feeds — proxied through Next.js to bypass CORS
+// Live public CCTV feeds — Finnish Digitraffic highway cams (JPEG, reliable, clear images)
+// Proxied through Next.js /api/camera-proxy to bypass CORS
 const LIVE_PROXY_FEEDS = {
-  "Entry Gate":   "/api/camera-proxy?url=" + encodeURIComponent("http://88.53.197.250/axis-cgi/mjpg/video.cgi?resolution=640x480"),
-  "Zone-A":       "/api/camera-proxy?url=" + encodeURIComponent("http://cam-mckeldin-eastview.umd.edu/axis-cgi/mjpg/video.cgi?resolution=640x480"),
+  "Entry Gate":   "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0450502.jpg"),
+  "Zone-A":       "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0450601.jpg"),
   "Loading Dock": "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0450501.jpg"),
-  "Zone-C":       "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0460701.jpg"),
-  "Exit Gate":    "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0150200.jpg"),
-  "Yard":         "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0870101.jpg"),
+  "Zone-C":       "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0450701.jpg"),
+  "Exit Gate":    "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0150301.jpg"),
+  "Yard":         "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0650101.jpg"),
 };
 // Also match by camera name for mock fallback
 const LIVE_PROXY_BY_NAME = {
@@ -1838,14 +1839,19 @@ function renderCameras() {
   });
 }
 
-// Expanded camera modal
+// Expanded camera modal — uses live proxy feed with backend fallback
 function expandCamera(id, name) {
-  const mjpeg = getMjpegUrl(id);
-  const snap = getSnapshotUrl(id) + "?t=" + Date.now();
+  const cam = _apiCameras.find(c => c.id === id) || {zone:"", name:name};
+  const liveUrl = getLiveProxyUrl(cam);
+  const feedSrc = liveUrl ? liveUrl + "&t=" + Date.now() : getMjpegUrl(id);
+  const fallbackSrc = getMjpegUrl(id);
   const modal = document.createElement("div");
   modal.id = "camExpandModal";
   modal.style.cssText = "position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px)";
   modal.onclick = function(e){ if(e.target===modal){modal.remove();} };
+
+  // Auto-refresh the expanded image every 5s
+  let refreshTimer = null;
   modal.innerHTML = `
     <div style="width:90%;max-width:960px;background:var(--card);border:1px solid var(--bord);border-radius:16px;overflow:hidden">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--bord)">
@@ -1853,14 +1859,23 @@ function expandCamera(id, name) {
           <span style="font-size:16px;font-weight:700;color:var(--text)">📷 ${name}</span>
           <span style="display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:#22C55E"><span style="width:6px;height:6px;border-radius:50%;background:#22C55E;animation:blink 1.4s ease-in-out infinite"></span>LIVE</span>
         </div>
-        <button onclick="document.getElementById('camExpandModal').remove()" style="background:var(--badge);border:1px solid var(--bord);border-radius:8px;padding:6px 12px;color:var(--sub);cursor:pointer;font-size:12px">✕ Close</button>
+        <button onclick="clearInterval(window._expandRefresh);document.getElementById('camExpandModal').remove()" style="background:var(--badge);border:1px solid var(--bord);border-radius:8px;padding:6px 12px;color:var(--sub);cursor:pointer;font-size:12px">✕ Close</button>
       </div>
       <div style="position:relative;width:100%;aspect-ratio:16/9;background:#000">
-        <img src="${mjpeg}" alt="${name} live" style="width:100%;height:100%;object-fit:contain"
-          onerror="this.onerror=null;this.src='${snap}'">
+        <img id="expandedFeedImg" src="${feedSrc}" alt="${name} live" style="width:100%;height:100%;object-fit:contain"
+          onerror="this.onerror=null;this.src='${fallbackSrc}'">
       </div>
     </div>`;
   document.body.appendChild(modal);
+
+  // Auto-refresh expanded feed
+  if (liveUrl) {
+    window._expandRefresh = setInterval(() => {
+      const img = document.getElementById("expandedFeedImg");
+      if (img) img.src = liveUrl + "&t=" + Date.now();
+      else clearInterval(window._expandRefresh);
+    }, 5000);
+  }
 }
 
 // Reconnect camera via API
