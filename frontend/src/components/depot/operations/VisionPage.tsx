@@ -30,15 +30,26 @@ import {
 } from "@/services/depotVision";
 
 // ---------------------------------------------------------------------------
-// Camera seed data — matches the screenshot exactly
+// Camera seed data — live public CCTV / traffic camera feeds
 // ---------------------------------------------------------------------------
+// LIVE_FEEDS: direct MJPEG or auto-refresh JPEG URLs for the camera grid
+// These are publicly accessible cameras (no auth) used for demo purposes.
+const LIVE_FEEDS: Record<string, string> = {
+  gate_entry:    "http://88.53.197.250/axis-cgi/mjpg/video.cgi?resolution=640x480",          // Italy outdoor — live MJPEG
+  zone_overhead: "http://cam-mckeldin-eastview.umd.edu/axis-cgi/mjpg/video.cgi?resolution=640x480",  // UMD campus — live MJPEG
+  loading_bay:   "https://weathercam.digitraffic.fi/C0450501.jpg",   // Finland highway — trucks/traffic
+  perimeter:     "https://weathercam.digitraffic.fi/C0460701.jpg",   // Finland road cam — perimeter view
+  gate_exit:     "https://weathercam.digitraffic.fi/C0150200.jpg",   // Finland highway — vehicle exit view
+  yard_overview: "https://weathercam.digitraffic.fi/C0870101.jpg",   // Finland road cam — wide yard-like view
+};
+
 const SEED_CAMERAS = [
-  { name: "Gate Entry North",   stream_url: "rtsp://wowzaec2demo.streamlock.net:554/vod/mp4:BigBuckBunny_115k.mov", protocol: "rtsp" as const, zone: "Entry Gate", frame_rate: 30, resolution: "3840x2160" },
-  { name: "Zone A Overhead",    stream_url: "rtsp://wowzaec2demo.streamlock.net:554/vod/mp4:BigBuckBunny_115k.mov", protocol: "rtsp" as const, zone: "Zone-A",     frame_rate: 25, resolution: "3840x2160" },
-  { name: "Loading Bay 1-4",    stream_url: "rtsp://wowzaec2demo.streamlock.net:554/vod/mp4:BigBuckBunny_115k.mov", protocol: "rtsp" as const, zone: "Loading Dock",frame_rate: 30, resolution: "1920x1080" },
-  { name: "Zone C Perimeter",   stream_url: "rtsp://wowzaec2demo.streamlock.net:554/vod/mp4:BigBuckBunny_115k.mov", protocol: "rtsp" as const, zone: "Zone-C",     frame_rate: 25, resolution: "1920x1080" },
-  { name: "Gate Exit South",    stream_url: "rtsp://wowzaec2demo.streamlock.net:554/vod/mp4:BigBuckBunny_115k.mov", protocol: "rtsp" as const, zone: "Exit Gate",  frame_rate: 30, resolution: "3840x2160" },
-  { name: "Yard Overview",      stream_url: "rtsp://wowzaec2demo.streamlock.net:554/vod/mp4:BigBuckBunny_115k.mov", protocol: "rtsp" as const, zone: "Yard",       frame_rate: 25, resolution: "1920x1080" },
+  { name: "Gate Entry North",   stream_url: LIVE_FEEDS.gate_entry,    protocol: "http" as const, zone: "Entry Gate",  frame_rate: 30, resolution: "640x480" },
+  { name: "Zone A Overhead",    stream_url: LIVE_FEEDS.zone_overhead, protocol: "http" as const, zone: "Zone-A",      frame_rate: 25, resolution: "640x480" },
+  { name: "Loading Bay 1-4",    stream_url: LIVE_FEEDS.loading_bay,   protocol: "https" as const, zone: "Loading Dock",frame_rate: 1,  resolution: "1920x1080" },
+  { name: "Zone C Perimeter",   stream_url: LIVE_FEEDS.perimeter,     protocol: "https" as const, zone: "Zone-C",      frame_rate: 1,  resolution: "1920x1080" },
+  { name: "Gate Exit South",    stream_url: LIVE_FEEDS.gate_exit,     protocol: "https" as const, zone: "Exit Gate",   frame_rate: 1,  resolution: "1920x1080" },
+  { name: "Yard Overview",      stream_url: LIVE_FEEDS.yard_overview, protocol: "https" as const, zone: "Yard",        frame_rate: 1,  resolution: "1920x1080" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -348,6 +359,11 @@ function CameraCard({ cam, boxes, tick, busyId, timeStr, theme, onReconnect }: {
   const online = cam.status === "active";
   const mjpegUrl = online ? getCameraMjpegUrl(cam.id, theme) : null;
   const snapshotUrl = online ? `${getCameraSnapshotUrl(cam.id, theme)}?t=${tick}` : null;
+  // For live public feeds: use stream_url directly (MJPEG or auto-refresh JPEG)
+  const isJpegFeed = cam.stream_url?.endsWith(".jpg") || cam.stream_url?.endsWith(".jpeg");
+  const directFeedUrl = cam.stream_url
+    ? isJpegFeed ? `${cam.stream_url}?t=${tick}` : cam.stream_url
+    : null;
 
   // Zone display — large colored text matching screenshot
   const zoneColor = "#5B9BF5";
@@ -360,12 +376,14 @@ function CameraCard({ cam, boxes, tick, busyId, timeStr, theme, onReconnect }: {
           <>
             {mjpegUrl && (
               <img
-                key={mjpegUrl}
+                key={isJpegFeed ? `${mjpegUrl}-${tick}` : mjpegUrl}
                 src={mjpegUrl}
                 alt={cam.name}
                 className="absolute inset-0 w-full h-full object-cover"
                 onError={(e) => {
                   const t = e.target as HTMLImageElement;
+                  // Fallback chain: backend proxy → direct feed → snapshot
+                  if (directFeedUrl && t.src !== directFeedUrl) { t.src = directFeedUrl; return; }
                   if (snapshotUrl && t.src !== snapshotUrl) { t.src = snapshotUrl; return; }
                   t.style.display = "none";
                 }}
@@ -456,26 +474,29 @@ function StatBlock({ label, value, color, small }: { label: string; value: strin
 // ---------------------------------------------------------------------------
 // RTSP Live Feed panel
 // ---------------------------------------------------------------------------
-const DEMO_RTSP = "rtsp://wowzaec2demo.streamlock.net:554/vod/mp4:BigBuckBunny_115k.mov";
+// Live MJPEG feed URL — public Axis camera (Italy outdoor, true real-time)
+const LIVE_MJPEG_URL = "http://88.53.197.250/axis-cgi/mjpg/video.cgi?resolution=640x480";
 
 function RtspLiveFeed() {
   const [error, setError] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const proxyUrl = getRtspProxyUrl(DEMO_RTSP);
+  // Try backend RTSP proxy first, fall back to direct MJPEG
+  const proxyUrl = getRtspProxyUrl(LIVE_MJPEG_URL);
+  const directUrl = LIVE_MJPEG_URL;
 
   return (
     <div className="mb-4 bg-white dark:bg-[#14203A] border border-[#E8EDF8] dark:border-[#1E2F50] rounded-[12px] overflow-hidden shadow-sm">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#E8EDF8] dark:border-[#1E2F50]">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-[11px] font-bold text-[#111827] dark:text-[#E8EDF8] font-mono">LIVE RTSP FEED</span>
-          <span className="text-[9px] text-[#9CA3AF] dark:text-[#4E6090] font-mono truncate max-w-[280px]">{DEMO_RTSP}</span>
+          <span className="text-[11px] font-bold text-[#111827] dark:text-[#E8EDF8] font-mono">LIVE CCTV FEED</span>
+          <span className="text-[9px] text-[#9CA3AF] dark:text-[#4E6090] font-mono truncate max-w-[280px]">Public MJPEG · Real-time</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/20 bg-emerald-500/10">
-            RTSP PROXY
+            LIVE MJPEG
           </span>
-          <span className="text-[9px] text-[#9CA3AF] dark:text-[#4E6090]">25fps · HUD overlay · Detection boxes</span>
+          <span className="text-[9px] text-[#9CA3AF] dark:text-[#4E6090]">Real-time · HUD overlay · Detection boxes</span>
         </div>
       </div>
       <div className="relative bg-black" style={{ aspectRatio: "16/9", maxHeight: 340 }}>
@@ -484,22 +505,27 @@ function RtspLiveFeed() {
             {!loaded && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10">
                 <div className="w-5 h-5 border-2 border-[#E5521A] border-t-transparent rounded-full animate-spin" />
-                <span className="text-[10px] text-[#4E6090]">Connecting to RTSP stream…</span>
+                <span className="text-[10px] text-[#4E6090]">Connecting to live MJPEG stream…</span>
               </div>
             )}
             <img
               src={proxyUrl}
-              alt="Live RTSP feed"
+              alt="Live CCTV feed"
               className="w-full h-full object-contain"
               onLoad={() => setLoaded(true)}
-              onError={() => setError(true)}
+              onError={(e) => {
+                // If proxy fails, try direct MJPEG URL
+                const t = e.target as HTMLImageElement;
+                if (t.src !== directUrl) { t.src = directUrl; return; }
+                setError(true);
+              }}
             />
           </>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
             <Camera className="w-7 h-7 text-[#4E6090]" />
-            <span className="text-[11px] text-[#4E6090]">RTSP stream unavailable</span>
-            <span className="text-[9px] text-[#2A3F68]">Backend needs OpenCV + network access to the RTSP host</span>
+            <span className="text-[11px] text-[#4E6090]">Live stream unavailable</span>
+            <span className="text-[9px] text-[#2A3F68]">Public MJPEG camera may be offline or blocked by CORS</span>
             <button
               onClick={() => { setError(false); setLoaded(false); }}
               className="mt-1 flex items-center gap-1.5 px-3 py-1 rounded-lg border border-[#1E2F50] text-[10px] text-[#8A9BBF] hover:border-[#E5521A]/30 hover:text-[#E5521A] transition-colors"

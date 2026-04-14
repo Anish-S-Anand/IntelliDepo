@@ -22,43 +22,91 @@ if sys.platform == "win32":
 else:
     VIDEO_DIR = Path("/tmp/depot_videos")
 
-# 6 royalty-free warehouse/logistics clips from Mixkit (free, no watermark)
-# Direct MP4 links — short clips (8-30s) that loop well as CCTV feeds
+# ---------------------------------------------------------------------------
+# Live public camera feeds (real-time MJPEG or auto-refresh JPEG)
+# ---------------------------------------------------------------------------
+LIVE_FEEDS = [
+    {
+        "scene": "gate_entry",
+        "label": "GATE ENTRY NORTH",
+        "live_url": "http://88.53.197.250/axis-cgi/mjpg/video.cgi?resolution=640x480",
+        "type": "mjpeg",
+        "description": "Live outdoor camera — Italy (Axis MJPEG, real-time)",
+    },
+    {
+        "scene": "zone_overhead",
+        "label": "ZONE-A OVERHEAD",
+        "live_url": "http://cam-mckeldin-eastview.umd.edu/axis-cgi/mjpg/video.cgi?resolution=640x480",
+        "type": "mjpeg",
+        "description": "Live campus camera — UMD (Axis MJPEG, real-time)",
+    },
+    {
+        "scene": "loading_bay",
+        "label": "LOADING BAY 1-4",
+        "live_url": "https://weathercam.digitraffic.fi/C0450501.jpg",
+        "type": "jpeg_refresh",
+        "description": "Finland highway cam — trucks/traffic (JPEG, ~10s refresh)",
+    },
+    {
+        "scene": "perimeter",
+        "label": "ZONE-C PERIMETER",
+        "live_url": "https://weathercam.digitraffic.fi/C0460701.jpg",
+        "type": "jpeg_refresh",
+        "description": "Finland road cam — perimeter view (JPEG, ~10s refresh)",
+    },
+    {
+        "scene": "gate_exit",
+        "label": "GATE EXIT SOUTH",
+        "live_url": "https://weathercam.digitraffic.fi/C0150200.jpg",
+        "type": "jpeg_refresh",
+        "description": "Finland highway cam — exit view (JPEG, ~10s refresh)",
+    },
+    {
+        "scene": "yard",
+        "label": "YARD OVERVIEW",
+        "live_url": "https://weathercam.digitraffic.fi/C0870101.jpg",
+        "type": "jpeg_refresh",
+        "description": "Finland road cam — wide overview (JPEG, ~10s refresh)",
+    },
+]
+
+# 6 royalty-free warehouse/logistics clips from Mixkit (offline fallback)
+# Direct MP4 links — short clips (8-30s) that loop when live feeds are unavailable
 SCENE_VIDEOS = [
     {
         "scene": "gate_entry",
         "label": "GATE ENTRY NORTH",
-        "url": "https://assets.mixkit.co/videos/23011/23011-720.mp4",  # freight truck arriving at warehouse
+        "url": "https://assets.mixkit.co/videos/23011/23011-720.mp4",
         "description": "Truck arriving at warehouse gate — gate entry view",
     },
     {
         "scene": "zone_overhead",
         "label": "ZONE-A OVERHEAD",
-        "url": "https://assets.mixkit.co/videos/23551/23551-720.mp4",  # man walking through warehouse
+        "url": "https://assets.mixkit.co/videos/23551/23551-720.mp4",
         "description": "Warehouse interior walkthrough — overhead zone monitoring",
     },
     {
         "scene": "loading_bay",
         "label": "LOADING BAY 1-4",
-        "url": "https://assets.mixkit.co/videos/13067/13067-720.mp4",  # men working loading a freight truck
+        "url": "https://assets.mixkit.co/videos/13067/13067-720.mp4",
         "description": "Workers loading boxes onto freight truck at loading bay",
     },
     {
         "scene": "perimeter",
         "label": "ZONE-C PERIMETER",
-        "url": "https://assets.mixkit.co/videos/39453/39453-720.mp4",  # large warehouse area high shot
+        "url": "https://assets.mixkit.co/videos/39453/39453-720.mp4",
         "description": "High-angle perimeter overview of warehouse complex",
     },
     {
         "scene": "gate_exit",
         "label": "GATE EXIT SOUTH",
-        "url": "https://assets.mixkit.co/videos/23852/23852-720.mp4",  # worker giving directions to freight truck
-        "description": "Worker directing freight truck at exit gate — number plate visible",
+        "url": "https://assets.mixkit.co/videos/23852/23852-720.mp4",
+        "description": "Worker directing freight truck at exit gate",
     },
     {
         "scene": "yard",
         "label": "YARD OVERVIEW",
-        "url": "https://assets.mixkit.co/videos/39462/39462-720.mp4",  # warehouse port overview
+        "url": "https://assets.mixkit.co/videos/39462/39462-720.mp4",
         "description": "Aerial yard overview with trucks and cargo operations",
     },
 ]
