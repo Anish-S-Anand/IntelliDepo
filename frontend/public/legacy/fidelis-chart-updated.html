@@ -1814,7 +1814,7 @@ function renderCameras() {
             </div>` : `
             <img src="${getLiveProxyUrl(c) ? getLiveProxyUrl(c) + '&t=' + Date.now() : getMjpegUrl(c.id)}" alt="${c.name}"
               style="width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0"
-              onerror="this.onerror=null;this.src='${getMjpegUrl(c.id)}';this.style.objectFit='cover'">
+              onerror="if(!this.dataset.retried){this.dataset.retried='1';this.src=this.src.replace(/&t=\\d+/,'&t='+Date.now());}">
             <div class="cam-overlay" style="z-index:2">
               <span class="cam-tag">${c.zone || c.name}</span>
               <span class="cam-stag"><span class="cam-dot" style="background:${sCol};box-shadow:0 0 4px ${sCol}"></span><span style="color:${sCol};font-weight:700">${statusLabel}</span></span>

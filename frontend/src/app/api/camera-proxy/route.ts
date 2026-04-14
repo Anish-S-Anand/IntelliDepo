@@ -4,20 +4,55 @@ import { NextRequest, NextResponse } from "next/server";
  * Camera Proxy — fetches live MJPEG/JPEG frames from public cameras
  * and serves them to the browser, bypassing CORS/mixed-content restrictions.
  *
- * Usage:
- *   /api/camera-proxy?url=https://weathercam.digitraffic.fi/C0150200.jpg
- *   /api/camera-proxy?url=http://88.53.197.250/axis-cgi/mjpg/video.cgi
- *
  * For MJPEG streams, extracts a single JPEG frame.
  * For JPEG endpoints, proxies the image directly.
+ * Caches last successful frame per URL so transient failures still show an image.
  */
 
-// Whitelist of allowed camera host patterns (security)
 const ALLOWED_HOSTS = [
   "weathercam.digitraffic.fi",
   "88.53.197.250",
   "cam-mckeldin-eastview.umd.edu",
 ];
+
+// In-memory frame cache: url → { data, timestamp }
+const frameCache = new Map<string, { data: Uint8Array; ts: number }>();
+const CACHE_TTL = 30_000; // serve cached frame for up to 30s
+
+function cachedResponse(url: string): NextResponse | null {
+  const entry = frameCache.get(url);
+  if (entry && Date.now() - entry.ts < CACHE_TTL) {
+    return new NextResponse(entry.data, {
+      status: 200,
+      headers: {
+        "Content-Type": "image/jpeg",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "X-Cache": "HIT",
+      },
+    });
+  }
+  return null;
+}
+
+function cacheFrame(url: string, data: Uint8Array) {
+  frameCache.set(url, { data, ts: Date.now() });
+  // Evict old entries
+  if (frameCache.size > 20) {
+    const oldest = [...frameCache.entries()].sort((a, b) => a[1].ts - b[1].ts)[0];
+    if (oldest) frameCache.delete(oldest[0]);
+  }
+}
+
+function makeJpegResponse(data: Uint8Array): NextResponse {
+  return new NextResponse(data, {
+    status: 200,
+    headers: {
+      "Content-Type": "image/jpeg",
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
 
 export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get("url");
@@ -32,52 +67,50 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid url" }, { status: 400 });
   }
 
-  // Security: only allow whitelisted camera hosts
   if (!ALLOWED_HOSTS.some((h) => parsed.hostname === h || parsed.hostname.endsWith(`.${h}`))) {
     return NextResponse.json({ error: "Host not allowed" }, { status: 403 });
   }
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    // Connection timeout: 10s to establish connection
+    const connectCtrl = new AbortController();
+    const connectTimer = setTimeout(() => connectCtrl.abort(), 10_000);
 
     const resp = await fetch(url, {
-      signal: controller.signal,
+      signal: connectCtrl.signal,
       headers: { "User-Agent": "IntelliVision/1.0" },
     });
-    clearTimeout(timeout);
+    clearTimeout(connectTimer);
 
     if (!resp.ok) {
-      return NextResponse.json({ error: `Upstream ${resp.status}` }, { status: 502 });
+      return cachedResponse(url) ?? NextResponse.json({ error: `Upstream ${resp.status}` }, { status: 502 });
     }
 
     const contentType = resp.headers.get("content-type") || "";
 
-    // --- Single JPEG image (Finnish cams) ---
+    // --- Single JPEG image ---
     if (contentType.includes("image/jpeg") || contentType.includes("image/png") || url.endsWith(".jpg")) {
-      const buf = await resp.arrayBuffer();
-      return new NextResponse(buf, {
-        status: 200,
-        headers: {
-          "Content-Type": "image/jpeg",
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          "Access-Control-Allow-Origin": "*",
-        },
-      });
+      const buf = new Uint8Array(await resp.arrayBuffer());
+      cacheFrame(url, buf);
+      return makeJpegResponse(buf);
     }
 
-    // --- MJPEG stream: extract one frame ---
+    // --- MJPEG stream: extract one frame with its own read timeout ---
     if (contentType.includes("multipart/x-mixed-replace")) {
       const body = resp.body;
       if (!body) {
-        return NextResponse.json({ error: "No stream body" }, { status: 502 });
+        return cachedResponse(url) ?? NextResponse.json({ error: "No stream body" }, { status: 502 });
       }
 
-      // Read chunks until we find a complete JPEG frame
       const reader = body.getReader();
       const chunks: Uint8Array[] = [];
       let totalLen = 0;
-      const MAX_BYTES = 2 * 1024 * 1024; // 2MB safety limit
+      const MAX_BYTES = 2 * 1024 * 1024;
+
+      // Read timeout: 12s to extract a complete frame
+      const readTimeout = setTimeout(() => {
+        reader.cancel().catch(() => {});
+      }, 12_000);
 
       try {
         while (totalLen < MAX_BYTES) {
@@ -86,43 +119,46 @@ export async function GET(req: NextRequest) {
           chunks.push(value);
           totalLen += value.length;
 
-          // Check if we have a complete JPEG (FFD8 start, FFD9 end)
+          // Check for complete JPEG (FFD8...FFD9)
           const combined = concat(chunks);
           const jpegStart = findBytes(combined, [0xff, 0xd8]);
           const jpegEnd = findBytes(combined, [0xff, 0xd9], jpegStart);
 
           if (jpegStart >= 0 && jpegEnd > jpegStart) {
+            clearTimeout(readTimeout);
             const frame = combined.slice(jpegStart, jpegEnd + 2);
-            reader.cancel();
-            return new NextResponse(frame, {
-              status: 200,
-              headers: {
-                "Content-Type": "image/jpeg",
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Access-Control-Allow-Origin": "*",
-              },
-            });
+            reader.cancel().catch(() => {});
+            cacheFrame(url, frame);
+            return makeJpegResponse(frame);
           }
         }
+      } catch {
+        // Read timed out or was cancelled
       } finally {
+        clearTimeout(readTimeout);
         reader.cancel().catch(() => {});
       }
 
-      return NextResponse.json({ error: "No JPEG frame found" }, { status: 502 });
+      // No frame extracted — return cached if available
+      return cachedResponse(url) ?? NextResponse.json({ error: "No JPEG frame found" }, { status: 502 });
     }
 
-    // Unknown content type — try to pass through
-    const buf = await resp.arrayBuffer();
+    // Unknown content type — try to pass through as image
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    if (buf.length > 100 && buf[0] === 0xff && buf[1] === 0xd8) {
+      // It's a JPEG despite wrong content-type
+      cacheFrame(url, buf);
+      return makeJpegResponse(buf);
+    }
     return new NextResponse(buf, {
       status: 200,
-      headers: {
-        "Content-Type": contentType || "application/octet-stream",
-        "Cache-Control": "no-cache",
-      },
+      headers: { "Content-Type": contentType || "application/octet-stream", "Cache-Control": "no-cache" },
     });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Proxy error";
-    return NextResponse.json({ error: msg }, { status: 502 });
+  } catch {
+    // Connection failed — serve cached frame if available
+    const cached = cachedResponse(url);
+    if (cached) return cached;
+    return NextResponse.json({ error: "Camera unreachable" }, { status: 502 });
   }
 }
 
