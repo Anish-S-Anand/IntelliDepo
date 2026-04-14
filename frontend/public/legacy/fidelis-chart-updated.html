@@ -1727,15 +1727,18 @@ const API_BASE = "/backend";
 const DIRECT_BASE = window.location.protocol + '//' + window.location.hostname + ':8000';
 let _apiCameras = []; // cached from last fetch
 
-// Live public CCTV feeds — Finnish Digitraffic highway cams (JPEG, reliable, clear images)
-// Proxied through Next.js /api/camera-proxy to bypass CORS
+// Live CCTV feeds — MJPEG streams play as smooth continuous video in <img> tags
+// Browsers natively render multipart/x-mixed-replace as real-time video
+const MJPEG_UMD   = "http://cam-mckeldin-eastview.umd.edu/axis-cgi/mjpg/video.cgi?resolution=640x480";
+const MJPEG_ITALY = "http://88.53.197.250/axis-cgi/mjpg/video.cgi?resolution=640x480";
+
 const LIVE_PROXY_FEEDS = {
-  "Entry Gate":   "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0450502.jpg"),
-  "Zone-A":       "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0450601.jpg"),
-  "Loading Dock": "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0450501.jpg"),
-  "Zone-C":       "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0450701.jpg"),
-  "Exit Gate":    "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0150301.jpg"),
-  "Yard":         "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0650101.jpg"),
+  "Entry Gate":   MJPEG_UMD,               // smooth live video — UMD campus
+  "Zone-A":       MJPEG_ITALY,             // smooth live video — Italy outdoor
+  "Loading Dock": MJPEG_UMD,               // smooth live video — UMD
+  "Zone-C":       MJPEG_ITALY,             // smooth live video — Italy
+  "Exit Gate":    MJPEG_UMD,               // smooth live video — UMD
+  "Yard":         MJPEG_ITALY,             // smooth live video — Italy
 };
 // Also match by camera name for mock fallback
 const LIVE_PROXY_BY_NAME = {
@@ -3252,5 +3255,6 @@ renderAlerts();
 renderCommand();
 fetchAlertCount();
 </script>
+<script src="/legacy/intelliops-backend-wire.js"></script>
 </body>
 </html>
