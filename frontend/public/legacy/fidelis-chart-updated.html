@@ -1725,6 +1725,28 @@ const API_BASE = "/backend";
 const DIRECT_BASE = window.location.protocol + '//' + window.location.hostname + ':8000';
 let _apiCameras = []; // cached from last fetch
 
+// Live public CCTV feeds — proxied through Next.js to bypass CORS
+const LIVE_PROXY_FEEDS = {
+  "Entry Gate":   "/api/camera-proxy?url=" + encodeURIComponent("http://88.53.197.250/axis-cgi/mjpg/video.cgi?resolution=640x480"),
+  "Zone-A":       "/api/camera-proxy?url=" + encodeURIComponent("http://cam-mckeldin-eastview.umd.edu/axis-cgi/mjpg/video.cgi?resolution=640x480"),
+  "Loading Dock": "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0450501.jpg"),
+  "Zone-C":       "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0460701.jpg"),
+  "Exit Gate":    "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0150200.jpg"),
+  "Yard":         "/api/camera-proxy?url=" + encodeURIComponent("https://weathercam.digitraffic.fi/C0870101.jpg"),
+};
+// Also match by camera name for mock fallback
+const LIVE_PROXY_BY_NAME = {
+  "Gate Entry North": LIVE_PROXY_FEEDS["Entry Gate"],
+  "Zone A Overhead":  LIVE_PROXY_FEEDS["Zone-A"],
+  "Loading Bay 1-4":  LIVE_PROXY_FEEDS["Loading Dock"],
+  "Zone C Perimeter": LIVE_PROXY_FEEDS["Zone-C"],
+  "Gate Exit South":  LIVE_PROXY_FEEDS["Exit Gate"],
+  "Yard Overview":    LIVE_PROXY_FEEDS["Yard"],
+};
+function getLiveProxyUrl(cam) {
+  return LIVE_PROXY_FEEDS[cam.zone] || LIVE_PROXY_BY_NAME[cam.name] || null;
+}
+
 async function fetchCamerasFromAPI() {
   try {
     const res = await fetch(DIRECT_BASE + "/depot/vision/cameras/");
@@ -1790,9 +1812,9 @@ function renderCameras() {
               <div style="font-size:11px;font-weight:500">${isError ? 'Connection Error' : 'Camera Offline'}</div>
               <button class="fbtn" onclick="event.stopPropagation();reconnectCam('${c.id}')" style="margin-top:4px;font-size:10px">↻ Reconnect</button>
             </div>` : `
-            <img src="${getMjpegUrl(c.id)}" alt="${c.name}"
-              style="width:100%;height:100%;object-cover;position:absolute;top:0;left:0"
-              onerror="this.onerror=null;this.src='${getSnapshotUrl(c.id)}&t='+Date.now();this.style.objectFit='cover'">
+            <img src="${getLiveProxyUrl(c) ? getLiveProxyUrl(c) + '&t=' + Date.now() : getMjpegUrl(c.id)}" alt="${c.name}"
+              style="width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0"
+              onerror="this.onerror=null;this.src='${getMjpegUrl(c.id)}';this.style.objectFit='cover'">
             <div class="cam-overlay" style="z-index:2">
               <span class="cam-tag">${c.zone || c.name}</span>
               <span class="cam-stag"><span class="cam-dot" style="background:${sCol};box-shadow:0 0 4px ${sCol}"></span><span style="color:${sCol};font-weight:700">${statusLabel}</span></span>
@@ -2930,6 +2952,20 @@ setInterval(() => {
   // Refresh camera list from API when on vision page
   if (curPage === "vision") renderCameras();
 }, 10000);
+
+// Fast live-feed refresh: update camera img src every 5s with new timestamp
+setInterval(() => {
+  if (!liveActive || curPage !== "vision") return;
+  const grid = document.getElementById("cameraGrid");
+  if (!grid) return;
+  grid.querySelectorAll("img[alt]").forEach(img => {
+    const src = img.getAttribute("src") || "";
+    if (src.includes("/api/camera-proxy")) {
+      // Update cache-bust timestamp
+      img.src = src.replace(/&t=\d+/, "&t=" + Date.now());
+    }
+  });
+}, 5000);
 
 // ════════════════════════════════════════════════════════
 // INIT
