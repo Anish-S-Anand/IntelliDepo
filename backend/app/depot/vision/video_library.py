@@ -9,6 +9,7 @@ Each camera scene maps to a specific clip so all 6 cameras show different footag
 import asyncio
 import logging
 import os
+import sys
 import hashlib
 from pathlib import Path
 from typing import Optional
@@ -16,59 +17,60 @@ import numpy as np
 
 logger = logging.getLogger("intelli.depot.video_library")
 
-VIDEO_DIR = Path("/tmp/depot_videos")
+if sys.platform == "win32":
+    VIDEO_DIR = Path(os.environ.get("TEMP", "C:\\Temp")) / "depot_videos"
+else:
+    VIDEO_DIR = Path("/tmp/depot_videos")
 
-# 6 CC-licensed / royalty-free warehouse/logistics YouTube clips
-# Short clips (10-60s) that loop well
+# 6 royalty-free warehouse/logistics clips from Mixkit (free, no watermark)
+# Direct MP4 links — short clips (8-30s) that loop well as CCTV feeds
 SCENE_VIDEOS = [
     {
         "scene": "gate_entry",
         "label": "GATE ENTRY NORTH",
-        "url": "https://www.youtube.com/watch?v=7sRwGFNKMKQ",  # warehouse gate/entry
-        "description": "Gate entry with vehicles",
+        "url": "https://assets.mixkit.co/videos/23011/23011-720.mp4",  # freight truck arriving at warehouse
+        "description": "Truck arriving at warehouse gate — gate entry view",
     },
     {
         "scene": "zone_overhead",
         "label": "ZONE-A OVERHEAD",
-        "url": "https://www.youtube.com/watch?v=Gu_1S77XkiM",  # warehouse overhead
-        "description": "Overhead warehouse storage",
+        "url": "https://assets.mixkit.co/videos/23551/23551-720.mp4",  # man walking through warehouse
+        "description": "Warehouse interior walkthrough — overhead zone monitoring",
     },
     {
         "scene": "loading_bay",
         "label": "LOADING BAY 1-4",
-        "url": "https://www.youtube.com/watch?v=2Gg6Seob5Mg",  # loading dock
-        "description": "Loading dock operations",
+        "url": "https://assets.mixkit.co/videos/13067/13067-720.mp4",  # men working loading a freight truck
+        "description": "Workers loading boxes onto freight truck at loading bay",
     },
     {
         "scene": "perimeter",
         "label": "ZONE-C PERIMETER",
-        "url": "https://www.youtube.com/watch?v=oHg5SJYRHA0",  # perimeter/exterior
-        "description": "Perimeter monitoring",
+        "url": "https://assets.mixkit.co/videos/39453/39453-720.mp4",  # large warehouse area high shot
+        "description": "High-angle perimeter overview of warehouse complex",
     },
     {
         "scene": "gate_exit",
         "label": "GATE EXIT SOUTH",
-        "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",  # exit gate
-        "description": "Gate exit with LPR",
+        "url": "https://assets.mixkit.co/videos/23852/23852-720.mp4",  # worker giving directions to freight truck
+        "description": "Worker directing freight truck at exit gate — number plate visible",
     },
     {
         "scene": "yard",
         "label": "YARD OVERVIEW",
-        "url": "https://www.youtube.com/watch?v=9bZkp7q19f0",  # yard overview
-        "description": "Yard overview",
+        "url": "https://assets.mixkit.co/videos/39462/39462-720.mp4",  # warehouse port overview
+        "description": "Aerial yard overview with trucks and cargo operations",
     },
 ]
 
-# Fallback: use Big Buck Bunny segments (always available, different timestamps)
-# These are public domain and hosted reliably
-BBB_BASE = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample"
+# Fallback: direct Mixkit MP4 links (same scene videos, always reachable)
 FALLBACK_VIDEOS = [
-    f"{BBB_BASE}/ForBiggerBlazes.mp4",       # ~15s
-    f"{BBB_BASE}/ForBiggerEscapes.mp4",      # ~15s
-    f"{BBB_BASE}/ForBiggerFun.mp4",          # ~60s
-    f"{BBB_BASE}/ForBiggerJoyrides.mp4",     # ~15s
-    f"{BBB_BASE}/ForBiggerMeltdowns.mp4",    # ~15s
-    f"{BBB_BASE}/SubaruOutbackOnStreetAndDirt.mp4",  # ~60s
+    "https://assets.mixkit.co/videos/23011/23011-720.mp4",   # gate entry — truck arriving
+    "https://assets.mixkit.co/videos/23551/23551-720.mp4",   # zone overhead — warehouse walk
+    "https://assets.mixkit.co/videos/13067/13067-720.mp4",   # loading bay — workers loading truck
+    "https://assets.mixkit.co/videos/39453/39453-720.mp4",   # perimeter — high-angle overview
+    "https://assets.mixkit.co/videos/23852/23852-720.mp4",   # gate exit — truck with worker
+    "https://assets.mixkit.co/videos/39462/39462-720.mp4",   # yard — port/yard overview
 ]
 
 # In-memory video capture cache: scene -> cv2.VideoCapture
