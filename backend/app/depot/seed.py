@@ -32,12 +32,14 @@ logger = logging.getLogger("intelli.depot.seed")
 # ---------------------------------------------------------------------------
 
 CAMERAS = [
-    {"name": "Gate Entry North",  "stream_url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov", "zone": "Entry Gate",    "frame_rate": 25, "resolution": "1280x720"},
-    {"name": "Zone A Overhead",   "stream_url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov", "zone": "Zone-A",        "frame_rate": 25, "resolution": "1280x720"},
-    {"name": "Loading Bay 1-4",   "stream_url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov", "zone": "Loading Dock",  "frame_rate": 25, "resolution": "1280x720"},
-    {"name": "Zone C Perimeter",  "stream_url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov", "zone": "Zone-C",        "frame_rate": 25, "resolution": "1280x720"},
-    {"name": "Gate Exit South",   "stream_url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov", "zone": "Exit Gate",     "frame_rate": 25, "resolution": "1280x720"},
-    {"name": "Yard Overview",     "stream_url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov", "zone": "Yard",          "frame_rate": 25, "resolution": "1280x720"},
+    # TfL JamCam IDs — real London road cameras, free public API, no auth
+    # stream_url uses "tfl:{cam_id}" prefix; backend /tfl-proxy/stream serves MJPEG
+    {"name": "Gate Entry North",  "stream_url": "tfl:00001.07450", "zone": "Entry Gate",   "frame_rate": 2, "resolution": "704x576"},  # Piccadilly Circus
+    {"name": "Zone A Overhead",   "stream_url": "tfl:00001.06600", "zone": "Zone-A",       "frame_rate": 2, "resolution": "704x576"},  # Cromwell Rd / Earls Court
+    {"name": "Loading Bay 1-4",   "stream_url": "tfl:00001.03675", "zone": "Loading Dock", "frame_rate": 2, "resolution": "704x576"},  # Blackheath Rd / Greenwich
+    {"name": "Zone C Perimeter",  "stream_url": "tfl:00001.09747", "zone": "Zone-C",       "frame_rate": 2, "resolution": "704x576"},  # Edgware Way / Broadfields
+    {"name": "Gate Exit South",   "stream_url": "tfl:00001.02151", "zone": "Exit Gate",    "frame_rate": 2, "resolution": "704x576"},  # Romford Rd / Tennyson Rd
+    {"name": "Yard Overview",     "stream_url": "tfl:00002.00865", "zone": "Yard",         "frame_rate": 2, "resolution": "704x576"},  # A406 Billet Upass E
 ]
 
 GATES = [

@@ -222,7 +222,6 @@ class LiveStateSnapshot(BaseModel):
 async def ingest_event(
     payload: EventCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """Ingest a single sensor/camera/gate event into TimescaleDB."""
@@ -246,7 +245,6 @@ async def ingest_event(
 async def ingest_event_batch(
     payload: EventBatch,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """Batch ingest multiple events — optimized for high-throughput sensor feeds."""
@@ -282,7 +280,6 @@ async def list_events(
     zone: Optional[str] = None,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List recent events with optional filters."""
     query = select(SensorEvent)
@@ -367,12 +364,11 @@ async def _evaluate_thresholds(db: AsyncSession, event: SensorEvent) -> Optional
 async def create_threshold(
     payload: ThresholdCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Configure a threshold rule for the alert engine."""
     threshold = AlertThreshold(
         **payload.model_dump(),
-        created_by=str(current_user.id),
+        created_by="dashboard",
     )
     db.add(threshold)
     await db.commit()
@@ -385,7 +381,6 @@ async def create_threshold(
 async def list_thresholds(
     event_type: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List all configured alert thresholds."""
     query = select(AlertThreshold).where(AlertThreshold.is_active == True)
@@ -405,7 +400,6 @@ async def list_alerts(
     severity: Optional[str] = None,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Get priority-ranked alert feed."""
     query = select(AlertQueue)
@@ -422,7 +416,6 @@ async def list_alerts(
 @router.get("/alerts/active", response_model=list[AlertResponse])
 async def get_active_alerts(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Get all unresolved alerts, priority-ranked."""
     result = await db.execute(
@@ -437,14 +430,13 @@ async def get_active_alerts(
 async def acknowledge_alert(
     alert_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Acknowledge an alert — records operator ID and timestamp."""
     alert = await db.get(AlertQueue, alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
     alert.status = AlertStatus.ACKNOWLEDGED
-    alert.acknowledged_by = str(current_user.id)
+    alert.acknowledged_by = "dashboard"
     alert.acknowledged_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(alert)
@@ -455,7 +447,6 @@ async def acknowledge_alert(
 async def escalate_alert(
     alert_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Escalate an alert — marks it for higher-tier review."""
     alert = await db.get(AlertQueue, alert_id)
@@ -473,7 +464,6 @@ async def resolve_alert(
     alert_id: uuid.UUID,
     notes: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Resolve an alert with optional resolution notes."""
     alert = await db.get(AlertQueue, alert_id)
@@ -494,7 +484,6 @@ async def resolve_alert(
 @router.get("/dashboard/kpis", response_model=DashboardKPI)
 async def get_dashboard_kpis(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """Get live KPI counts for the multi-feed dashboard. Uses Redis cache."""
@@ -563,11 +552,10 @@ async def get_dashboard_kpis(
 @router.get("/dashboard/state", response_model=LiveStateSnapshot)
 async def get_live_state(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """Get full live state snapshot for the dashboard — KPIs + recent alerts + feed status."""
-    kpis_resp = await get_dashboard_kpis(db=db, current_user=current_user, redis=redis)
+    kpis_resp = await get_dashboard_kpis(db=db, redis=redis)
 
     alerts_result = await db.execute(
         select(AlertQueue)

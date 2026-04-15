@@ -826,3 +826,52 @@ async def list_active_streams():
         ],
     }
 
+
+
+# ---------------------------------------------------------------------------
+# TfL JamCam MJPEG proxy
+# Fetches real London road JPEG images from TfL's public S3 bucket and
+# re-streams them as MJPEG so the browser sees smooth live footage.
+# ---------------------------------------------------------------------------
+
+@router.get("/tfl-proxy/stream")
+async def tfl_jamcam_stream(cam_id: str):
+    """
+    Proxy a TfL JamCam JPEG as a smooth MJPEG stream.
+    cam_id: TfL camera ID e.g. '00001.07450' (Piccadilly Circus)
+
+    The TfL S3 bucket updates each image every ~1-2 seconds.
+    We fetch it as fast as possible and re-stream as multipart MJPEG.
+    """
+    try:
+        import httpx
+    except ImportError:
+        raise HTTPException(status_code=501, detail="httpx not installed")
+
+    image_url = f"https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/{cam_id}.jpg"
+
+    async def generate():
+        boundary = b"--frame\r\n"
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            while True:
+                try:
+                    resp = await client.get(image_url, params={"t": str(asyncio.get_event_loop().time())})
+                    if resp.status_code == 200:
+                        jpeg = resp.content
+                        yield (
+                            boundary
+                            + b"Content-Type: image/jpeg\r\n"
+                            + f"Content-Length: {len(jpeg)}\r\n\r\n".encode()
+                            + jpeg
+                            + b"\r\n"
+                        )
+                except Exception as e:
+                    logger.warning(f"TfL fetch error for {cam_id}: {e}")
+                # TfL updates ~every 1-2s; poll at ~2fps for smooth feel
+                await asyncio.sleep(0.5)
+
+    return StreamingResponse(
+        generate(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-cache", "Access-Control-Allow-Origin": "*"},
+    )

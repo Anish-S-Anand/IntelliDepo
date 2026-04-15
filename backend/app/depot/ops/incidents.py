@@ -412,7 +412,6 @@ async def _send_notification(db: AsyncSession, incident_id: uuid.UUID,
 async def create_incident(
     body: IncidentCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Create an incident, auto-classifying severity if priority not provided (F-070)."""
     if body.priority:
@@ -444,7 +443,7 @@ async def create_incident(
     db.add(incident)
     await db.flush()
 
-    await _log_audit(db, incident.id, "created", actor=str(current_user.id),
+    await _log_audit(db, incident.id, "created", actor="dashboard",
                      actor_role="operator", new_state=IncidentStatus.OPEN,
                      details=f"Priority: {priority}, Source: {body.source}")
 
@@ -463,7 +462,6 @@ async def list_incidents(
     source: Optional[str] = None,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     q = select(OpsIncident)
     if status:
@@ -480,7 +478,6 @@ async def list_incidents(
 @router.get("/active", response_model=list[IncidentResponse])
 async def list_active_incidents(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
         select(OpsIncident)
@@ -497,7 +494,6 @@ async def list_active_incidents(
 async def get_incident(
     incident_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(OpsIncident).where(OpsIncident.id == incident_id))
     incident = result.scalar_one_or_none()
@@ -511,7 +507,6 @@ async def acknowledge_incident(
     incident_id: uuid.UUID,
     body: IncidentAcknowledge,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(OpsIncident).where(OpsIncident.id == incident_id))
     incident = result.scalar_one_or_none()
@@ -521,9 +516,9 @@ async def acknowledge_incident(
     prev = incident.status
     incident.status = IncidentStatus.ACKNOWLEDGED
     incident.acknowledged_at = datetime.now(timezone.utc)
-    incident.acknowledged_by = str(current_user.id)
+    incident.acknowledged_by = "dashboard"
 
-    await _log_audit(db, incident_id, "acknowledged", actor=str(current_user.id),
+    await _log_audit(db, incident_id, "acknowledged", actor="dashboard",
                      actor_role="operator", prev_state=prev,
                      new_state=IncidentStatus.ACKNOWLEDGED, details=body.reason)
 
@@ -537,7 +532,6 @@ async def resolve_incident(
     incident_id: uuid.UUID,
     body: IncidentResolve,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Resolve incident with notes + resolution steps checklist (F-072)."""
     result = await db.execute(select(OpsIncident).where(OpsIncident.id == incident_id))
@@ -548,11 +542,11 @@ async def resolve_incident(
     prev = incident.status
     incident.status = IncidentStatus.RESOLVED
     incident.resolved_at = datetime.now(timezone.utc)
-    incident.resolved_by = str(current_user.id)
+    incident.resolved_by = "dashboard"
     incident.resolution_notes = body.resolution_notes
     incident.resolution_steps = body.resolution_steps
 
-    await _log_audit(db, incident_id, "resolved", actor=str(current_user.id),
+    await _log_audit(db, incident_id, "resolved", actor="dashboard",
                      actor_role="operator", prev_state=prev,
                      new_state=IncidentStatus.RESOLVED, details=body.resolution_notes)
 
@@ -572,9 +566,8 @@ async def resolve_incident(
 async def create_auto_escalation_rule(
     body: RuleCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
-    rule = AutoEscalationRule(**body.model_dump(), created_by=str(current_user.id))
+    rule = AutoEscalationRule(**body.model_dump(), created_by="dashboard")
     db.add(rule)
     await db.commit()
     await db.refresh(rule)
@@ -585,7 +578,6 @@ async def create_auto_escalation_rule(
 async def list_auto_escalation_rules(
     active_only: bool = True,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     q = select(AutoEscalationRule)
     if active_only:
@@ -597,7 +589,6 @@ async def list_auto_escalation_rules(
 @router.post("/evaluate-escalations", response_model=dict)
 async def evaluate_auto_escalations(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """
     F-069 — Periodic evaluation: auto-escalate incidents past their deadline.
@@ -663,7 +654,6 @@ async def classify_incident_severity(
     title: str = Query(...),
     description: str = Query(default=""),
     source: str = Query(default="manual"),
-    current_user: User = Depends(get_current_user),
 ):
     """Classify incident severity using NLP + rule-based agent (F-070)."""
     return classify_severity(title, description, source)
@@ -677,7 +667,6 @@ async def classify_incident_severity(
 async def list_incident_notifications(
     incident_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Get alert history per incident — all channels (F-071)."""
     result = await db.execute(
@@ -694,7 +683,6 @@ async def send_incident_notification(
     channel: str = Query(...),
     recipient: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Manually send notification for an incident via specified channel (F-071)."""
     result = await db.execute(select(OpsIncident).where(OpsIncident.id == incident_id))
@@ -703,7 +691,7 @@ async def send_incident_notification(
         raise HTTPException(404, "Incident not found")
 
     await _send_notification(db, incident_id, channel, recipient, incident)
-    await _log_audit(db, incident_id, "notification_sent", actor=str(current_user.id),
+    await _log_audit(db, incident_id, "notification_sent", actor="dashboard",
                      actor_role="operator", details=f"Channel: {channel}, Recipient: {recipient}")
 
     await db.commit()
@@ -725,7 +713,6 @@ async def send_incident_notification(
 async def get_incident_audit_trail(
     incident_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Immutable audit timeline for an incident (F-073)."""
     result = await db.execute(
@@ -741,7 +728,6 @@ async def list_all_audit_entries(
     action: Optional[str] = None,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List all audit entries, optionally filtered by action type."""
     q = select(IncidentAuditEntry)
@@ -760,7 +746,6 @@ async def list_all_audit_entries(
 async def create_incident_from_sla_breach(
     body: SLABreachIncidentRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """When SLA breach confirmed, auto-create incident + fire escalation pipeline."""
     classification = classify_severity(

@@ -317,7 +317,6 @@ async def ingest_gps(
     body: GPSUpdate,
     db: AsyncSession = Depends(get_db),
     redis: aioredis.Redis = Depends(get_redis),
-    current_user: User = Depends(get_current_user),
 ):
     """Ingest a single GPS position update for a vehicle (F-064)."""
     now = datetime.now(timezone.utc)
@@ -394,7 +393,6 @@ async def ingest_gps_batch(
     body: GPSBatch,
     db: AsyncSession = Depends(get_db),
     redis: aioredis.Redis = Depends(get_redis),
-    current_user: User = Depends(get_current_user),
 ):
     """Batch ingest GPS updates (F-064)."""
     now = datetime.now(timezone.utc)
@@ -441,7 +439,6 @@ async def list_vehicles(
     zone: Optional[str] = None,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List all tracked vehicles, optionally filtered by status or zone."""
     q = select(Vehicle)
@@ -458,7 +455,6 @@ async def list_vehicles(
 async def get_vehicle(
     vehicle_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Vehicle).where(Vehicle.vehicle_id == vehicle_id))
     vehicle = result.scalar_one_or_none()
@@ -471,7 +467,6 @@ async def get_vehicle(
 async def yard_vehicle_summary(
     db: AsyncSession = Depends(get_db),
     redis: aioredis.Redis = Depends(get_redis),
-    current_user: User = Depends(get_current_user),
 ):
     """KPI summary of vehicles currently in the yard."""
     result = await db.execute(
@@ -522,7 +517,6 @@ async def yard_vehicle_summary(
 async def create_dock_slot(
     body: DockSlotCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Register a dock bay in the yard."""
     dock = DockSlot(**body.model_dump())
@@ -536,7 +530,6 @@ async def create_dock_slot(
 async def list_dock_slots(
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     q = select(DockSlot)
     if status:
@@ -551,7 +544,6 @@ async def assign_vehicle_to_dock(
     dock_id: str,
     vehicle_id: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Assign a vehicle to a dock slot."""
     result = await db.execute(select(DockSlot).where(DockSlot.dock_id == dock_id))
@@ -580,7 +572,6 @@ async def assign_vehicle_to_dock(
 async def release_dock(
     dock_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Release a dock slot."""
     result = await db.execute(select(DockSlot).where(DockSlot.dock_id == dock_id))
@@ -620,7 +611,6 @@ async def dwell_check_in(
     zone: Optional[str] = None,
     dock_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Record vehicle check-in for dwell time tracking (F-066)."""
     # Look up vehicle type
@@ -644,7 +634,6 @@ async def dwell_check_in(
 async def dwell_check_out(
     record_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Record vehicle departure, calculate final dwell time."""
     result = await db.execute(select(DwellRecord).where(DwellRecord.id == record_id))
@@ -664,7 +653,6 @@ async def dwell_check_out(
 @router.post("/dwell/evaluate-alerts", response_model=dict)
 async def evaluate_dwell_alerts(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """
     Periodic evaluation: flag vehicles exceeding dwell thresholds (F-066).
@@ -718,7 +706,6 @@ async def evaluate_dwell_alerts(
 async def list_active_dwell(
     zone: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List all vehicles currently dwelling (no checkout)."""
     q = select(DwellRecord).where(DwellRecord.exited_at.is_(None))
@@ -732,7 +719,6 @@ async def list_active_dwell(
 @router.get("/dwell/heatmap", response_model=list[DwellHeatmapEntry])
 async def dwell_heatmap(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Aggregate dwell time data by zone for heatmap visualization (F-066)."""
     result = await db.execute(
@@ -766,7 +752,6 @@ async def dwell_heatmap(
 async def create_dock_schedule(
     body: DockScheduleCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Book a dock slot in advance (F-067)."""
     # Check dock exists
@@ -806,7 +791,6 @@ async def list_dock_schedules(
     dock_id: Optional[str] = None,
     week_offset: int = Query(default=0, ge=-4, le=4),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List dock schedules for a given week (F-067)."""
     now = datetime.now(timezone.utc)
@@ -829,7 +813,6 @@ async def list_dock_schedules(
 async def cancel_schedule(
     schedule_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(DockSchedule).where(DockSchedule.id == schedule_id))
     schedule = result.scalar_one_or_none()
@@ -854,7 +837,6 @@ async def cancel_schedule(
 @router.get("/queue/optimize", response_model=QueueOptimizationResult)
 async def optimize_queue(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """
     Dwell Time Optimization Agent: ranks waiting vehicles by dwell time,
@@ -941,7 +923,6 @@ async def optimize_queue(
 @router.get("/queue/departure-schedule", response_model=list[dict])
 async def departure_schedule(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Live queue counter + departure schedule with delay risk scoring (Day 4 UI support)."""
     now = datetime.now(timezone.utc)

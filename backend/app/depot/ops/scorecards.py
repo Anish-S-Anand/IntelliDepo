@@ -110,7 +110,6 @@ DEFAULT_SCORECARDS = [
 async def create_scorecard_entry(
     body: ScorecardCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Create a scorecard entry for a period + group."""
     compliance = (body.compliant / body.total_slas * 100) if body.total_slas > 0 else 100
@@ -129,7 +128,6 @@ async def list_scorecard_entries(
     period: Optional[str] = None,
     group_type: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List scorecard entries, optionally filtered by period or group type."""
     q = select(ScorecardEntry)
@@ -170,7 +168,6 @@ async def scorecard_summary(
     period: Optional[str] = None,
     group_type: str = "module",
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Aggregate scorecard summary (F-063)."""
     q = select(ScorecardEntry).where(ScorecardEntry.group_type == group_type)

@@ -324,10 +324,9 @@ async def _dispatch_notification(tier: str, workflow: EscalationWorkflow, channe
 async def create_escalation_rule(
     body: EscalationRuleCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Create a configurable escalation rule (F-061)."""
-    rule = EscalationRule(**body.model_dump(), created_by=str(current_user.id))
+    rule = EscalationRule(**body.model_dump(), created_by="dashboard")
     db.add(rule)
     await db.commit()
     await db.refresh(rule)
@@ -338,7 +337,6 @@ async def create_escalation_rule(
 async def list_escalation_rules(
     active_only: bool = True,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List all escalation rules."""
     q = select(EscalationRule)
@@ -353,7 +351,6 @@ async def list_escalation_rules(
 async def get_escalation_rule(
     rule_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(EscalationRule).where(EscalationRule.id == rule_id))
     rule = result.scalar_one_or_none()
@@ -367,7 +364,6 @@ async def update_escalation_rule(
     rule_id: uuid.UUID,
     body: EscalationRuleUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(EscalationRule).where(EscalationRule.id == rule_id))
     rule = result.scalar_one_or_none()
@@ -384,7 +380,6 @@ async def update_escalation_rule(
 async def delete_escalation_rule(
     rule_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(EscalationRule).where(EscalationRule.id == rule_id))
     rule = result.scalar_one_or_none()
@@ -400,7 +395,6 @@ async def delete_escalation_rule(
 async def trigger_escalation(
     body: WorkflowTrigger,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """
     Trigger a new escalation workflow (F-061).
@@ -448,7 +442,6 @@ async def trigger_escalation(
 async def escalate_to_next_tier(
     workflow_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Manually escalate a workflow to the next tier."""
     result = await db.execute(
@@ -494,7 +487,6 @@ async def resolve_workflow(
     workflow_id: uuid.UUID,
     body: WorkflowResolve,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Resolve an escalation workflow."""
     result = await db.execute(
@@ -506,7 +498,7 @@ async def resolve_workflow(
 
     wf.status = EscalationStatus.RESOLVED
     wf.resolved_at = datetime.now(timezone.utc)
-    wf.resolved_by = str(current_user.id)
+    wf.resolved_by = "dashboard"
     wf.resolution_notes = body.resolution_notes
     await db.commit()
     await db.refresh(wf)
@@ -519,7 +511,6 @@ async def list_workflows(
     severity: Optional[str] = None,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List escalation workflows with optional status/severity filter."""
     q = select(EscalationWorkflow)
@@ -536,7 +527,6 @@ async def list_workflows(
 async def get_workflow(
     workflow_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
         select(EscalationWorkflow).where(EscalationWorkflow.id == workflow_id)
@@ -550,7 +540,6 @@ async def get_workflow(
 @router.post("/workflows/check-deadlines", response_model=dict)
 async def check_escalation_deadlines(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """
     Periodic check: auto-escalate workflows past their tier deadline.
@@ -615,7 +604,6 @@ def _calculate_penalty(breach_start: datetime, breach_end: Optional[datetime], r
 async def create_penalty(
     body: PenaltyCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Record an SLA breach penalty (F-062)."""
     duration_minutes, amount = _calculate_penalty(
@@ -646,7 +634,6 @@ async def list_penalties(
     status: Optional[str] = None,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List all penalty records, optionally filtered by client or status."""
     q = select(SLAPenalty)
@@ -662,7 +649,6 @@ async def list_penalties(
 @router.get("/penalties/forecast", response_model=PenaltyCalculation)
 async def penalty_forecast(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Aggregate penalty forecast: total penalties, by client, by status (F-062)."""
     result = await db.execute(select(SLAPenalty))
@@ -700,7 +686,6 @@ async def penalty_forecast(
 async def get_penalty(
     penalty_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(SLAPenalty).where(SLAPenalty.id == penalty_id))
     penalty = result.scalar_one_or_none()
@@ -713,7 +698,6 @@ async def get_penalty(
 async def close_penalty(
     penalty_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Close an open breach — recalculate final penalty amount."""
     result = await db.execute(select(SLAPenalty).where(SLAPenalty.id == penalty_id))
@@ -739,7 +723,6 @@ async def waive_penalty(
     penalty_id: uuid.UUID,
     body: PenaltyWaiver,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Waive a penalty with justification."""
     result = await db.execute(select(SLAPenalty).where(SLAPenalty.id == penalty_id))
@@ -758,7 +741,6 @@ async def waive_penalty(
 async def mark_invoiced(
     penalty_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Mark penalty as invoiced."""
     result = await db.execute(select(SLAPenalty).where(SLAPenalty.id == penalty_id))
