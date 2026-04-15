@@ -97,7 +97,7 @@ async def lifespan(app: FastAPI):
 
             async def _reconnect_one(cam):
                 try:
-                    ok = await stream_connect(str(cam.id), cam.stream_url)
+                    ok = await stream_connect(str(cam.id), cam.stream_url, cam.zone or "")
                     _cam_log.info(f"  {'✓' if ok else '✗'} {cam.name}")
                 except Exception as ce:
                     _cam_log.warning(f"  ✗ {cam.name}: {ce}")

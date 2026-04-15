@@ -28,6 +28,16 @@ def _apply_theme(frame, theme):
 
 
 def render_scene(scene_idx: int, frame_num: int, theme: str = 'dark') -> np.ndarray:
+    if not _HAS_CV2:
+        # cv2 unavailable — return a plain solid-color frame
+        h, w = 480, 854
+        palettes = [
+            (28, 32, 28), (20, 20, 25), (30, 28, 22),
+            (8, 18, 8),   (28, 26, 32), (32, 30, 25),
+        ]
+        bg = palettes[scene_idx % len(palettes)]
+        frame = np.full((h, w, 3), bg, dtype=np.uint8)
+        return _apply_theme(frame, theme)
     t = time.time() + frame_num * 0.04
     h, w = 480, 854
     if scene_idx == 0:

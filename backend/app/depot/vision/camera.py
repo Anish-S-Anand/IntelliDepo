@@ -149,7 +149,7 @@ class _StreamEntry:
 _active_streams: dict[str, _StreamEntry] = {}
 
 
-def _cv_connect(stream_url: str) -> Optional[object]:
+def _cv_connect(stream_url: str, seek_seconds: float = 0.0) -> Optional[object]:
     """Blocking OpenCV connect — run in thread pool. 3-second timeout."""
     if not _HAS_CV2:
         return None
@@ -158,6 +158,10 @@ def _cv_connect(stream_url: str) -> Optional[object]:
     cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000)
     cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000)
     if cap.isOpened():
+        # Seek to a different offset per camera so feeds look distinct
+        if seek_seconds > 0:
+            fps = cap.get(cv2.CAP_PROP_FPS) or 25
+            cap.set(cv2.CAP_PROP_POS_FRAMES, int(seek_seconds * fps))
         # Try reading one frame to confirm the stream is live
         ret, _ = cap.read()
         if ret:
@@ -190,19 +194,33 @@ def _cv_encode_jpeg(frame: np.ndarray, quality: int = 85) -> bytes:
     raise RuntimeError("Neither cv2 nor Pillow available for JPEG encoding")
 
 
-async def stream_connect(camera_id: str, stream_url: str) -> bool:
+async def stream_connect(camera_id: str, stream_url: str, zone: str = "") -> bool:
     """Connect to a camera stream. Uses OpenCV for real streams, 5s hard timeout."""
     loop = asyncio.get_running_loop()
+
+    # Assign scene index based on zone name for deterministic unique scenes
+    zone_key = zone.lower().strip()
+    if zone_key in _ZONE_SCENE_MAP:
+        _scene_counter[camera_id] = _ZONE_SCENE_MAP[zone_key]
+    elif camera_id not in _scene_counter:
+        global _scene_counter_next
+        _scene_counter[camera_id] = _scene_counter_next % 6
+        _scene_counter_next += 1
+
+    scene_idx = _scene_counter.get(camera_id, 0)
+    # Seek each camera to a different offset (0, 10, 20, 30, 40, 50 seconds)
+    # so all 6 feeds show different parts of the same stream
+    seek_offset = scene_idx * 10.0
 
     # Try real OpenCV connection with a hard 5-second timeout
     try:
         cap = await asyncio.wait_for(
-            loop.run_in_executor(_cv_pool, _cv_connect, stream_url),
-            timeout=5.0
+            loop.run_in_executor(_cv_pool, _cv_connect, stream_url, seek_offset),
+            timeout=8.0
         )
     except asyncio.TimeoutError:
         cap = None
-        logger.warning(f"Camera {camera_id} RTSP connect timed out after 5s: {stream_url}")
+        logger.warning(f"Camera {camera_id} RTSP connect timed out after 8s: {stream_url}")
 
     if cap is not None:
         entry = _StreamEntry(camera_id, stream_url)
@@ -216,7 +234,7 @@ async def stream_connect(camera_id: str, stream_url: str) -> bool:
         entry = _StreamEntry(camera_id, stream_url)
         entry.is_real = False
         _active_streams[camera_id] = entry
-        logger.info(f"Camera {camera_id} using simulated stream (OpenCV unavailable or URL unreachable): {stream_url}")
+        logger.info(f"Camera {camera_id} using simulated stream: {stream_url}")
         return True
 
     _active_streams.pop(camera_id, None)
@@ -246,13 +264,35 @@ _SCENE_DETECTIONS = [
 ]
 
 
+# Map zone names to fixed scene indices so each camera always gets a unique scene
+_ZONE_SCENE_MAP: dict[str, int] = {
+    "entry gate":   0,
+    "zone-a":       1,
+    "loading dock": 2,
+    "zone-c":       3,
+    "exit gate":    4,
+    "yard":         5,
+}
+
+# Global counter to assign unique scene indices to cameras as they connect
+_scene_counter: dict[str, int] = {}
+_scene_counter_next = 0
+
+
 def _get_scene_idx(camera_id: str) -> int:
-    import hashlib
-    return int(hashlib.md5(camera_id.encode()).hexdigest(), 16) % 6
+    """Return a unique scene index (0-5) for this camera, assigned on first call."""
+    global _scene_counter_next
+    if camera_id not in _scene_counter:
+        _scene_counter[camera_id] = _scene_counter_next % 6
+        _scene_counter_next += 1
+    return _scene_counter[camera_id]
 
 
 def _apply_cctv_overlay(frame: np.ndarray, entry: _StreamEntry, scene_idx: int, theme: str = "dark") -> np.ndarray:
     """Burn CCTV HUD + detection boxes onto a frame. Themed for light/dark."""
+    if not _HAS_CV2:
+        # cv2 unavailable — return frame as-is (no HUD overlay)
+        return frame
     import time, math
     h, w = frame.shape[:2]
     t = time.time()
@@ -390,7 +430,19 @@ async def stream_read_frame(camera_id: str, theme: str = "dark") -> Optional[np.
         frame = await loop.run_in_executor(_cv_pool, _cv_read_frame, entry.capture)
         if frame is not None:
             return frame
-        logger.warning(f"Camera {camera_id} stream dropped, switching to simulation")
+        # End of stream — loop back to start
+        def _seek_start(cap):
+            try:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # type: ignore[union-attr]
+                ret, f = cap.read()  # type: ignore[union-attr]
+                return f if ret else None
+            except Exception:
+                return None
+        if _HAS_CV2:
+            frame = await loop.run_in_executor(_cv_pool, _seek_start, entry.capture)
+            if frame is not None:
+                return frame
+        logger.warning(f"Camera {camera_id} stream ended, switching to simulation")
         entry.is_real = False
 
     return _generate_simulated_frame(entry, theme=theme)
@@ -436,7 +488,7 @@ async def register_camera(payload: CameraRegister, db: AsyncSession = Depends(ge
     db.add(camera)
     await db.flush()
 
-    connected = await stream_connect(str(camera.id), payload.stream_url)
+    connected = await stream_connect(str(camera.id), payload.stream_url, payload.zone or "")
     camera.status = CameraStatus.ACTIVE if connected else CameraStatus.ERROR
     camera.last_seen = datetime.now(timezone.utc) if connected else None
 
@@ -479,7 +531,7 @@ async def connect_camera(camera_id: uuid.UUID, db: AsyncSession = Depends(get_db
     # Disconnect old stream if any
     stream_disconnect(str(camera_id))
 
-    connected = await stream_connect(str(camera_id), camera.stream_url)
+    connected = await stream_connect(str(camera_id), camera.stream_url, camera.zone or "")
     camera.status = CameraStatus.ACTIVE if connected else CameraStatus.ERROR
     camera.last_seen = datetime.now(timezone.utc) if connected else camera.last_seen
     await db.commit()
@@ -531,6 +583,10 @@ async def get_camera_snapshot(camera_id: uuid.UUID, theme: str = "light", db: As
     if camera.status != CameraStatus.ACTIVE:
         raise HTTPException(status_code=409, detail=f"Camera is not active (status={camera.status})")
 
+    # Auto-reconnect if the stream entry was lost (e.g. after server restart)
+    if str(camera_id) not in _active_streams:
+        await stream_connect(str(camera_id), camera.stream_url)
+
     frame = await stream_read_frame(str(camera_id), theme=theme)
     if frame is None:
         raise HTTPException(status_code=503, detail="Stream not connected")
@@ -561,16 +617,36 @@ async def mjpeg_stream(camera_id: uuid.UUID, theme: str = "light", db: AsyncSess
     if camera.status != CameraStatus.ACTIVE:
         raise HTTPException(status_code=409, detail=f"Camera is not active (status={camera.status})")
 
+    # Auto-reconnect if the stream entry was lost (e.g. after server restart)
+    if str(camera_id) not in _active_streams:
+        await stream_connect(str(camera_id), camera.stream_url)
+
+    # If still not connected after reconnect attempt, return 503
+    if str(camera_id) not in _active_streams:
+        raise HTTPException(status_code=503, detail="Stream could not be connected")
+
+    # Capture primitive values before DB session closes
+    cam_id_str = str(camera_id)
+    cam_stream_url = camera.stream_url
+    cam_fps = camera.frame_rate or 25
+    cam_zone = camera.zone or ""
+
     async def generate():
         boundary = b"--frame\r\n"
-        fps_delay = 1.0 / (camera.frame_rate or 25)
+        fps_delay = 1.0 / cam_fps
+        loop = asyncio.get_running_loop()
         while True:
-            frame = await stream_read_frame(str(camera_id), theme=theme)
+            entry = _active_streams.get(cam_id_str)
+            if entry is None:
+                await stream_connect(cam_id_str, cam_stream_url, cam_zone)
+                entry = _active_streams.get(cam_id_str)
+            if entry is None:
+                break
+            # Run blocking frame generation in thread pool to avoid blocking event loop
+            frame = await loop.run_in_executor(_cv_pool, _generate_simulated_frame, entry, theme)
             if frame is None:
                 break
-            jpeg_bytes = await asyncio.get_running_loop().run_in_executor(
-                _cv_pool, _cv_encode_jpeg, frame, 70
-            )
+            jpeg_bytes = await loop.run_in_executor(_cv_pool, _cv_encode_jpeg, frame, 70)
             yield (
                 boundary
                 + b"Content-Type: image/jpeg\r\n"

@@ -32,12 +32,12 @@ logger = logging.getLogger("intelli.depot.seed")
 # ---------------------------------------------------------------------------
 
 CAMERAS = [
-    {"name": "Gate Entry North", "stream_url": "rtsp://192.168.1.101:554/stream1", "zone": "Entry Gate", "frame_rate": 30, "resolution": "3840x2160"},
-    {"name": "Zone A Overhead", "stream_url": "rtsp://192.168.1.102:554/stream1", "zone": "Zone-A", "frame_rate": 25, "resolution": "3840x2160"},
-    {"name": "Loading Bay 1-4", "stream_url": "rtsp://192.168.1.103:554/stream1", "zone": "Loading Dock", "frame_rate": 30, "resolution": "1920x1080"},
-    {"name": "Zone C Perimeter", "stream_url": "rtsp://192.168.1.104:554/stream1", "zone": "Zone-C", "frame_rate": 25, "resolution": "1920x1080"},
-    {"name": "Gate Exit South", "stream_url": "rtsp://192.168.1.105:554/stream1", "zone": "Exit Gate", "frame_rate": 30, "resolution": "3840x2160"},
-    {"name": "Yard Overview", "stream_url": "rtsp://192.168.1.106:554/stream1", "zone": "Yard", "frame_rate": 20, "resolution": "3840x2160"},
+    {"name": "Gate Entry North",  "stream_url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov", "zone": "Entry Gate",    "frame_rate": 25, "resolution": "1280x720"},
+    {"name": "Zone A Overhead",   "stream_url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov", "zone": "Zone-A",        "frame_rate": 25, "resolution": "1280x720"},
+    {"name": "Loading Bay 1-4",   "stream_url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov", "zone": "Loading Dock",  "frame_rate": 25, "resolution": "1280x720"},
+    {"name": "Zone C Perimeter",  "stream_url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov", "zone": "Zone-C",        "frame_rate": 25, "resolution": "1280x720"},
+    {"name": "Gate Exit South",   "stream_url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov", "zone": "Exit Gate",     "frame_rate": 25, "resolution": "1280x720"},
+    {"name": "Yard Overview",     "stream_url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov", "zone": "Yard",          "frame_rate": 25, "resolution": "1280x720"},
 ]
 
 GATES = [
