@@ -454,115 +454,6 @@ window.renderCommand = async function() {
 };
 
 // ════════════════════════════════════════════════════════
-// FLEET & YARD VIEW (F-064–F-068)
-// ════════════════════════════════════════════════════════
-
-window.renderFleet = async function() {
-  const _s = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
-  const H = _WIRE_HEADERS;
-
-  // Fetch all fleet data
-  let vehicles = [], docks = [], queue = [], heatmap = [];
-  try {
-    const [vR, dR, qR, hR] = await Promise.allSettled([
-      fetch("/backend/ops/fleet/vehicles?limit=50", {headers:H}),
-      fetch("/backend/ops/fleet/docks", {headers:H}),
-      fetch("/backend/ops/fleet/queue/optimize", {headers:H}),
-      fetch("/backend/ops/fleet/dwell/heatmap", {headers:H}),
-    ]);
-    if (vR.status==="fulfilled"&&vR.value.ok) vehicles = await vR.value.json();
-    if (dR.status==="fulfilled"&&dR.value.ok) docks = await dR.value.json();
-    if (qR.status==="fulfilled"&&qR.value.ok) { const d = await qR.value.json(); queue = d.recommendations || []; }
-    if (hR.status==="fulfilled"&&hR.value.ok) heatmap = await hR.value.json();
-  } catch {}
-
-  // KPIs
-  const inYard = vehicles.filter(v => ["in_yard","at_dock","at_gate"].includes(v.status)).length;
-  const atDock = vehicles.filter(v => v.status === "at_dock").length;
-  const freeDocks = docks.filter(d => d.status === "free").length;
-  const dwellAlerts = vehicles.filter(v => {
-    if (!v.entered_yard_at) return false;
-    return (Date.now() - new Date(v.entered_yard_at).getTime()) / 60000 >= 120;
-  }).length;
-  _s("fleetInYard", inYard || "0");
-  _s("fleetAtDock", atDock || "0");
-  _s("fleetFreeDocks", freeDocks + "/" + docks.length);
-  _s("fleetDwellAlerts", dwellAlerts || "0");
-
-  // Vehicle list
-  const vl = document.getElementById("fleetVehicleList");
-  if (vl) {
-    if (vehicles.length === 0) { vl.innerHTML = '<div style="color:var(--sub);font-size:12px;padding:16px">No vehicles tracked yet. Use POST /ops/fleet/gps to add vehicles.</div>'; }
-    else vl.innerHTML = vehicles.map(v => {
-      const dwell = v.entered_yard_at ? Math.round((Date.now()-new Date(v.entered_yard_at).getTime())/60000) : 0;
-      const dc = dwell>120?"var(--sev-high)":dwell>60?"var(--warn)":"var(--pos)";
-      const sc = v.status==="at_dock"?"var(--info)":v.status==="in_transit"?"var(--pos)":"var(--mut)";
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--badge);border-radius:8px;margin-bottom:6px;border:1px solid var(--bord)">
-        <div>
-          <div style="font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace">${v.vehicle_id}</div>
-          <div style="font-size:10px;color:var(--sub);margin-top:2px">${v.driver_name||"—"} &bull; ${(v.current_zone||"in transit").replace(/_/g," ")}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:11px;font-weight:700;color:${dc}">${dwell}m</span>
-          <span class="badge" style="background:${sc}22;color:${sc};border:1px solid ${sc}44;font-size:9px">${(v.status||"").replace(/_/g," ")}</span>
-        </div>
-      </div>`;
-    }).join("");
-  }
-
-  // Queue recommendations
-  const ql = document.getElementById("fleetQueueList");
-  if (ql) {
-    if (queue.length === 0) { ql.innerHTML = '<div style="color:var(--sub);font-size:12px;padding:16px">No vehicles waiting — queue is clear</div>'; }
-    else ql.innerHTML = queue.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--badge);border-radius:8px;margin-bottom:6px;border:1px solid var(--bord)">
-      <div>
-        <div style="font-size:12px;font-weight:600">${r.vehicle_id} <span style="font-size:10px;color:var(--sub)">(${r.vehicle_type||"truck"})</span></div>
-        <div style="font-size:10px;color:var(--sub);margin-top:2px">${r.reason}</div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-size:12px;font-weight:700;color:var(--warn)">${Math.round(r.wait_minutes)}m wait</div>
-        <div style="font-size:10px;color:var(--info);font-family:'JetBrains Mono',monospace">&rarr; ${r.recommended_dock}</div>
-      </div>
-    </div>`).join("");
-  }
-
-  // Dwell heatmap
-  const hm = document.getElementById("fleetHeatmap");
-  if (hm) {
-    if (heatmap.length === 0) { hm.innerHTML = '<div style="color:var(--sub);font-size:12px;padding:16px">No dwell data available</div>'; }
-    else hm.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">' + heatmap.map(h => {
-      const col = h.avg_dwell_minutes>=180?"var(--sev-high)":h.avg_dwell_minutes>=120?"var(--warn)":h.avg_dwell_minutes>=60?"var(--info)":"var(--pos)";
-      return `<div style="background:var(--badge);border:1px solid var(--bord);border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:11px;font-weight:600;text-transform:capitalize">${(h.zone||"").replace(/_/g," ")}</div>
-        <div style="font-size:20px;font-weight:800;color:${col};margin:4px 0">${Math.round(h.avg_dwell_minutes)}m</div>
-        <div style="font-size:9px;color:var(--sub)">${h.total_vehicles} vehicles &bull; ${h.over_threshold_count} over</div>
-      </div>`;
-    }).join("") + '</div>';
-  }
-
-  // Dock grid
-  const dg = document.getElementById("fleetDockGrid");
-  if (dg) {
-    if (docks.length === 0) { dg.innerHTML = '<div style="color:var(--sub);font-size:12px;padding:16px">No docks configured. Use POST /ops/fleet/docks to add.</div>'; }
-    else dg.innerHTML = docks.map(d => {
-      const col = d.status==="free"?"var(--pos)":d.status==="occupied"?"var(--info)":d.status==="reserved"?"var(--warn)":"var(--sev-high)";
-      return `<div style="background:var(--badge);border:1px solid ${col}44;border-radius:8px;padding:12px;border-left:3px solid ${col}">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace">${d.dock_id}</span>
-          <span class="badge" style="background:${col}22;color:${col};border:1px solid ${col}44;font-size:9px">${d.status}</span>
-        </div>
-        <div style="font-size:10px;color:var(--sub);margin-top:4px">${d.dock_type||"standard"} &bull; ${d.assigned_vehicle_id||"—"}</div>
-      </div>`;
-    }).join("");
-  }
-
-  // Auto-refresh
-  clearInterval(window._fleetInt);
-  window._fleetInt = setInterval(() => renderFleet(), 10000);
-};
-
-
-// ════════════════════════════════════════════════════════
 // DOCK SCHEDULING (F-067)
 // ════════════════════════════════════════════════════════
 
@@ -907,10 +798,8 @@ window.loadData = async function() {
           if (dayIdx >= 0 && dayIdx < 7) dayCounts[dayIdx] += 1;
         }
       });
-      // Scale up to realistic throughput range (events represent a sample)
-      const scale = Math.max(1, Math.ceil(800 / Math.max(...dayCounts, 1)));
       for (var i = 0; i < 7; i++) {
-        window.THROUGHPUT[i] = dayCounts[i] * scale + Math.round(Math.random() * 50);
+        window.THROUGHPUT[i] = dayCounts[i];
       }
       if (typeof drawThroughputChart === "function") drawThroughputChart();
     }
