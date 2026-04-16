@@ -267,7 +267,6 @@ async def list_tasks(
     zone:     Optional[str] = None,
     limit:    int = 50,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     q = select(OpsTask)
     if status:   q = q.where(OpsTask.status == status)
@@ -332,7 +331,6 @@ async def list_checklists(
     zone:   Optional[str] = None,
     limit:  int = 50,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     q = select(SOPChecklist)
     if status: q = q.where(SOPChecklist.status == status)
@@ -395,7 +393,6 @@ async def list_exceptions(
     exception_type: Optional[str] = None,
     limit:          int = 50,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     q = select(OpsException)
     if status:         q = q.where(OpsException.status == status)
@@ -430,7 +427,6 @@ async def update_exception(
 @router.get("/kpis", response_model=OpsKPISummary)
 async def get_ops_kpis(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Aggregate KPI summary for the IntelliOps dashboard."""
     # Tasks

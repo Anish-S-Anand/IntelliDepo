@@ -90,16 +90,8 @@ class ScorecardSummary(BaseModel):
     by_group: list[ScorecardResponse]
 
 
-# ---------------------------------------------------------------------------
-# Seed / default scorecards
-# ---------------------------------------------------------------------------
 
-DEFAULT_SCORECARDS = [
-    {"group_name": "Live Monitoring", "total_slas": 12, "compliant": 12, "at_risk": 0, "breached": 0, "penalty_amount": 0},
-    {"group_name": "SLA Tracking", "total_slas": 18, "compliant": 11, "at_risk": 4, "breached": 3, "penalty_amount": 4500},
-    {"group_name": "Fleet & Yard View", "total_slas": 15, "compliant": 14, "at_risk": 1, "breached": 0, "penalty_amount": 0},
-    {"group_name": "Incident Escalation", "total_slas": 10, "compliant": 7, "at_risk": 1, "breached": 2, "penalty_amount": 2200},
-]
+
 
 
 # ---------------------------------------------------------------------------
@@ -138,29 +130,7 @@ async def list_scorecard_entries(
     q = q.order_by(desc(ScorecardEntry.compliance_pct))
     result = await db.execute(q)
     rows = result.scalars().all()
-    if rows:
-        return [ScorecardResponse.model_validate(r) for r in rows]
-
-    # Return default data when no entries exist yet
-    now = datetime.now(timezone.utc)
-    iso_week = now.strftime("%G-W%V")
-    return [
-        ScorecardResponse(
-            id=uuid.uuid4(),
-            period=iso_week,
-            group_type="module",
-            group_name=d["group_name"],
-            total_slas=d["total_slas"],
-            compliant=d["compliant"],
-            at_risk=d["at_risk"],
-            breached=d["breached"],
-            compliance_pct=round(d["compliant"] / d["total_slas"] * 100, 1) if d["total_slas"] > 0 else 100,
-            penalty_amount=d["penalty_amount"],
-            currency="USD",
-            created_at=now,
-        )
-        for d in DEFAULT_SCORECARDS
-    ]
+    return [ScorecardResponse.model_validate(r) for r in rows]
 
 
 @router.get("/summary", response_model=ScorecardSummary)
@@ -177,33 +147,12 @@ async def scorecard_summary(
     result = await db.execute(q)
     entries = result.scalars().all()
 
-    # Fall back to defaults when empty
     if not entries:
-        now = datetime.now(timezone.utc)
-        iso_week = now.strftime("%G-W%V")
-        entries_data = DEFAULT_SCORECARDS
-        total_slas = sum(d["total_slas"] for d in entries_data)
-        total_compliant = sum(d["compliant"] for d in entries_data)
-        total_at_risk = sum(d["at_risk"] for d in entries_data)
-        total_breached = sum(d["breached"] for d in entries_data)
-        total_penalty = sum(d["penalty_amount"] for d in entries_data)
-        overall_pct = round(total_compliant / total_slas * 100, 1) if total_slas > 0 else 100
-
-        by_group = [
-            ScorecardResponse(
-                id=uuid.uuid4(), period=iso_week, group_type="module",
-                group_name=d["group_name"], total_slas=d["total_slas"],
-                compliant=d["compliant"], at_risk=d["at_risk"], breached=d["breached"],
-                compliance_pct=round(d["compliant"] / d["total_slas"] * 100, 1) if d["total_slas"] > 0 else 100,
-                penalty_amount=d["penalty_amount"], currency="USD", created_at=now,
-            )
-            for d in entries_data
-        ]
         return ScorecardSummary(
-            overall_compliance_pct=overall_pct, total_slas=total_slas,
-            total_compliant=total_compliant, total_at_risk=total_at_risk,
-            total_breached=total_breached, total_penalty=total_penalty,
-            by_group=by_group,
+            overall_compliance_pct=0, total_slas=0,
+            total_compliant=0, total_at_risk=0,
+            total_breached=0, total_penalty=0,
+            by_group=[],
         )
 
     total_slas = sum(e.total_slas for e in entries)
