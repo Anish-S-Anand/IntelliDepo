@@ -180,15 +180,15 @@ if settings.ENABLE_DEPOT_MODULES:
     from app.depot.ops.live_monitoring import router as ops_monitoring_router
     from app.depot.ops.operations import router as ops_operations_router
     from app.depot.ops.escalation import router as ops_escalation_router
-    from app.depot.ops.fleet_yard import router as ops_fleet_yard_router
     from app.depot.ops.scorecards import router as ops_scorecards_router
     from app.depot.ops.incidents import router as ops_incidents_router
+    from app.depot.ops.fleet_yard import router as ops_fleet_router
     app.include_router(ops_monitoring_router)
     app.include_router(ops_operations_router)
     app.include_router(ops_escalation_router)
-    app.include_router(ops_fleet_yard_router)
     app.include_router(ops_scorecards_router)
     app.include_router(ops_incidents_router)
+    app.include_router(ops_fleet_router)
 
 from app.core.data_infra.storage_router import router as storage_router
 

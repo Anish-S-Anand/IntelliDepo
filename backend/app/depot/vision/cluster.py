@@ -200,7 +200,6 @@ async def list_zones(
     zone_type: Optional[str] = None,
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     query = select(DepotZone).where(DepotZone.is_active == True)
     if zone_type:

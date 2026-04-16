@@ -947,7 +947,7 @@ svg.chart { width: 100%; overflow: visible; }
   <button class="nav-item incident-nav has-critical" onclick="nav('incidents')" title="Incidents"><span class="ni-icon">🚨</span><span class="ni-label">Incidents</span><div class="nav-badge" id="navIncBadge">3</div></button>
   <button class="nav-item" onclick="nav('sla')" title="SLA & Fleet"><span class="ni-icon">🚛</span><span class="ni-label">Fleet & SLA</span></button>
 
-  <button class="nav-item" onclick="nav('dockschedule')" title="Dock Schedule"><span class="ni-icon">📅</span><span class="ni-label">Dock Schedule</span></button>
+
   <button class="nav-item" onclick="nav('escalation')" title="Escalation"><span class="ni-icon">📢</span><span class="ni-label">Escalation</span></button>
   <button class="nav-item" onclick="nav('analytics')" title="Analytics"><span class="ni-icon">📊</span><span class="ni-label">Analytics</span></button>
   <div class="nav-sep"></div>
@@ -1285,7 +1285,7 @@ svg.chart { width: 100%; overflow: visible; }
     <div>
       <div class="layer-badge">Layer 3 — Command Layer</div>
       <div class="page-title">SLA Tracking</div>
-      <div class="page-sub">SLA breach prediction • Penalty engine • Dwell analytics • Dock scheduling • Queue optimization</div>
+      <div class="page-sub">SLA breach prediction • Penalty engine • Escalation workflows</div>
       <div style="font-size:10px;color:var(--mut);margin-top:4px" id="slaLastUpdate">Updates on navigation</div>
     </div>
   </div>
@@ -1293,17 +1293,12 @@ svg.chart { width: 100%; overflow: visible; }
   <div class="kpi-grid mb-20">
     <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">SLA Compliance<span class="kpi-icon">📑</span></div><div class="kpi-val" style="color:var(--pos)" id="slaKpiComp">--<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--sub)" id="slaKpiCompD">loading…</div></div>
     <div class="kpi" style="--kpi-color:var(--warn)"><div class="kpi-label">Active Penalties<span class="kpi-icon">⚠</span></div><div class="kpi-val" style="color:var(--warn)" id="slaKpiPen">--</div><div class="kpi-delta" style="color:var(--sub)" id="slaKpiPenD">loading…</div></div>
-    <div class="kpi" style="--kpi-color:var(--info)"><div class="kpi-label">Vehicles in Yard<span class="kpi-icon">🚛</span></div><div class="kpi-val" style="color:var(--info)" id="slaKpiVeh">--</div><div class="kpi-delta" style="color:var(--sub)" id="slaKpiVehD">loading…</div></div>
-    <div class="kpi" style="--kpi-color:var(--acc)"><div class="kpi-label">Dock Utilization<span class="kpi-icon">🚢</span></div><div class="kpi-val" style="color:var(--acc)" id="slaKpiDock">--<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--sub)" id="slaKpiDockD">loading…</div></div>
   </div>
 
   <div class="ops-tabs" style="flex-wrap:wrap">
     <div class="ops-tab active" onclick="slaTab(this,'slaTabContracts')">SLA Contracts</div>
     <div class="ops-tab" onclick="slaTab(this,'slaTabEsc')">Escalation</div>
     <div class="ops-tab" onclick="slaTab(this,'slaTabScore')">Scorecards</div>
-    <div class="ops-tab" onclick="slaTab(this,'slaTabDwell')">Dwell Analytics</div>
-    <div class="ops-tab" onclick="slaTab(this,'slaTabSched')">Dock Schedule</div>
-    <div class="ops-tab" onclick="slaTab(this,'slaTabQueue')">Queue Optimizer</div>
   </div>
 
   <div class="ops-tab-panel active" id="slaTabContracts">
@@ -1327,23 +1322,7 @@ svg.chart { width: 100%; overflow: visible; }
     </div>
   </div>
 
-  <div class="ops-tab-panel" id="slaTabDwell">
-    <div class="grid-2 mb-20">
-      <div class="card"><div class="card-title">Active Dwell Records</div><div id="dwellActiveList" style="max-height:360px;overflow-y:auto"><div style="color:var(--sub);font-size:13px;padding:14px;text-align:center">Loading…</div></div></div>
-      <div class="card"><div class="card-title">Dwell Heatmap by Zone</div><div id="dwellHeatmap"><div style="color:var(--sub);font-size:13px;padding:14px;text-align:center">Loading…</div></div></div>
-    </div>
-  </div>
 
-  <div class="ops-tab-panel" id="slaTabSched">
-    <div class="card"><div class="card-title">Weekly Dock Schedule <button class="fbtn" onclick="schedShowForm()" style="font-size:11px;padding:4px 12px;margin-left:12px">+ Book Slot</button></div><div id="schedCalendar"><div style="color:var(--sub);font-size:13px;padding:14px;text-align:center">Loading…</div></div></div>
-  </div>
-
-  <div class="ops-tab-panel" id="slaTabQueue">
-    <div class="card"><div class="card-title">Queue Optimization Recommendations</div>
-      <div style="display:flex;gap:16px;margin-bottom:14px"><div style="font-size:12px;color:var(--sub)">Vehicles waiting: <strong id="queueWaiting" style="color:var(--warn)">--</strong></div><div style="font-size:12px;color:var(--sub)">Avg wait: <strong id="queueAvgWait" style="color:var(--info)">--</strong></div></div>
-      <div id="queueRecList"><div style="color:var(--sub);font-size:13px;padding:14px;text-align:center">Loading…</div></div>
-    </div>
-  </div>
 </div>
 
 <!-- ════════════════════════════════
@@ -1592,29 +1571,6 @@ svg.chart { width: 100%; overflow: visible; }
 
 
 <!-- ════════════════════════════════
-     DOCK SCHEDULING (F-067)
-════════════════════════════════ -->
-<div class="page" id="pg-dockschedule">
-  <div class="ph">
-    <div>
-      <div class="layer-badge">Layer 3 — Operations Layer</div>
-      <div class="page-title">Dock Scheduling</div>
-      <div class="page-sub">Weekly dock schedule &bull; Advance booking &bull; Delay risk tracking</div>
-    </div>
-    <button class="btn btn-primary" id="btnBookDock">+ Book Slot</button>
-  </div>
-  <div class="kpi-grid mb-20">
-    <div class="kpi" style="--kpi-color:var(--info)"><div class="kpi-label">Bookings Today<span class="kpi-icon">📅</span></div><div class="kpi-val" id="dockBookings" style="color:var(--info)">—</div><div class="kpi-delta" style="color:var(--sub)">Scheduled</div></div>
-    <div class="kpi" style="--kpi-color:var(--warn)"><div class="kpi-label">Delay Risks<span class="kpi-icon">⚠</span></div><div class="kpi-val" id="dockDelays" style="color:var(--warn)">—</div><div class="kpi-delta" style="color:var(--warn)">Running late</div></div>
-    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Dock Utilization<span class="kpi-icon">📊</span></div><div class="kpi-val" id="dockUtil" style="color:var(--pos)">—</div><div class="kpi-delta" style="color:var(--pos)">Today</div></div>
-  </div>
-  <div class="card">
-    <div class="card-title">Schedule Grid</div>
-    <div id="dockScheduleGrid" style="overflow-x:auto"></div>
-  </div>
-</div>
-
-<!-- ════════════════════════════════
      ESCALATION (F-069–F-073)
 ════════════════════════════════ -->
 <div class="page" id="pg-escalation">
@@ -1736,7 +1692,7 @@ function nav(page) {
   if (page === "settings") renderSettings();
   if (page === "analytics") renderAnomaly();
 
-  if (page === "dockschedule") renderDockSchedule();
+
   if (page === "escalation") renderEscalation();
 }
 
@@ -2642,14 +2598,6 @@ async function slaResolveWf(id){try{await fetch(API_BASE+'/ops/escalation/workfl
 function slaTriggerEsc(){const m=document.createElement('div');m.className='ops-modal-overlay';m.onclick=function(e){if(e.target===m)m.remove();};m.innerHTML=`<div class="ops-modal"><div class="ops-modal-title">Trigger Escalation <button class="close-btn" onclick="this.closest('.ops-modal-overlay').remove()">✕</button></div><div style="display:flex;flex-direction:column;gap:10px"><div><label style="font-size:11px;font-weight:600;color:var(--sub);display:block;margin-bottom:4px">Severity</label><select id="escSev" class="search-box" style="min-width:auto;width:100%"><option>critical</option><option>high</option><option>medium</option></select></div><div><label style="font-size:11px;font-weight:600;color:var(--sub);display:block;margin-bottom:4px">SLA Name</label><input id="escSla" class="search-box" style="min-width:auto;width:100%" placeholder="e.g. Mumbai Port SLA"></div><button class="fbtn" onclick="slaDoTriggerEsc()">Trigger</button></div></div>`;document.body.appendChild(m);}
 async function slaDoTriggerEsc(){const body={severity:document.getElementById('escSev').value,trigger_type:'sla_breach',sla_name:document.getElementById('escSla').value};try{await fetch(API_BASE+'/ops/escalation/workflows/trigger',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});document.querySelector('.ops-modal-overlay').remove();slaLoadEscalations();}catch(e){alert('Failed');}}
 async function slaLoadScorecards(){try{const data=await(await fetch(API_BASE+'/ops/scorecards/summary')).json();const pct=data.overall_compliance_pct??0;const circ=2*Math.PI*34;document.getElementById('scoreRingArc').setAttribute('stroke-dashoffset',circ*(1-pct/100));document.getElementById('scoreRingArc').setAttribute('stroke',pct>90?'var(--pos)':pct>70?'var(--warn)':'var(--sev-critical)');document.getElementById('scoreRingTxt').textContent=pct.toFixed(0)+'%';document.getElementById('scoreRingTxt').setAttribute('fill',pct>90?'var(--pos)':pct>70?'var(--warn)':'var(--sev-critical)');const s=data.summary||{};document.getElementById('scoreSummary').innerHTML=`<div style="text-align:center;padding:10px;background:var(--badge);border-radius:8px;border:1px solid var(--bord)"><div style="font-size:18px;font-weight:800;color:var(--pos)">${s.total_compliant||0}</div><div style="font-size:10px;color:var(--sub)">Compliant</div></div><div style="text-align:center;padding:10px;background:var(--badge);border-radius:8px;border:1px solid var(--bord)"><div style="font-size:18px;font-weight:800;color:var(--warn)">${s.total_at_risk||0}</div><div style="font-size:10px;color:var(--sub)">At Risk</div></div><div style="text-align:center;padding:10px;background:var(--badge);border-radius:8px;border:1px solid var(--bord)"><div style="font-size:18px;font-weight:800;color:var(--sev-critical)">${s.total_breached||0}</div><div style="font-size:10px;color:var(--sub)">Breached</div></div>`;const entries=data.entries||[];document.getElementById('scoreCards').innerHTML=entries.map(e=>{const col=e.compliance_pct>90?'var(--pos)':e.compliance_pct>70?'var(--warn)':'var(--sev-critical)';return`<div style="padding:14px;background:var(--badge);border-radius:10px;border:1px solid var(--bord);border-top:3px solid ${col}"><div style="font-size:13px;font-weight:700;margin-bottom:6px">${e.group_name||'--'}</div><div style="font-size:24px;font-weight:800;color:${col}">${(e.compliance_pct||0).toFixed(1)}%</div><div style="font-size:10px;color:var(--sub);margin-top:4px">${e.compliant||0} ok &bull; ${e.at_risk||0} risk &bull; ${e.breached||0} breach</div></div>`;}).join('');}catch(e){}}
-async function slaLoadFleet(){try{const[vehicles,docks]=await Promise.all([fetch(API_BASE+'/ops/fleet/vehicles').then(r=>r.json()),fetch(API_BASE+'/ops/fleet/docks').then(r=>r.json())]);const dl=document.getElementById('fleetDockList');dl.innerHTML=docks.map(d=>{const col=d.status==='free'?'var(--pos)':d.status==='occupied'?'var(--acc)':d.status==='reserved'?'var(--info)':'var(--danger)';return`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--badge);border-radius:8px;margin-bottom:6px;border:1px solid var(--bord);border-left:3px solid ${col}"><div><div style="font-size:12px;font-weight:600">${d.name||'Dock '+d.dock_number}</div><div style="font-size:10px;color:var(--sub);margin-top:2px">Type: ${d.dock_type||'standard'}</div></div><span class="badge" style="background:${col}22;color:${col};border:1px solid ${col}44;font-size:9px">${(d.status||'').toUpperCase()}</span></div>`;}).join('');const vl=document.getElementById('fleetVehicleList');vl.innerHTML=vehicles.map(v=>{const col=v.status==='at_dock'?'var(--pos)':v.status==='in_yard'?'var(--acc)':v.status==='at_gate'?'var(--warn)':'var(--info)';return`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--badge);border-radius:8px;margin-bottom:6px;border:1px solid var(--bord)"><div><div style="font-size:12px;font-weight:600">${v.plate_number||v.vehicle_id||'--'}</div><div style="font-size:10px;color:var(--sub);margin-top:2px">${v.vehicle_type||'--'} &bull; Zone: ${v.current_zone||'--'}</div></div><span class="badge" style="background:${col}22;color:${col};border:1px solid ${col}44;font-size:9px">${(v.status||'').toUpperCase()}</span></div>`;}).join('');const ym=document.getElementById('fleetYardMap');const zones={inbound_gate:{x:2,y:5,w:18,h:40,c:'var(--info)'},staging_area:{x:22,y:5,w:22,h:40,c:'var(--warn)'},dock_area:{x:46,y:5,w:26,h:40,c:'var(--acc)'},cold_storage:{x:74,y:5,w:24,h:40,c:'var(--info)'},parking_yard:{x:2,y:52,w:46,h:42,c:'var(--pos)'},outbound_gate:{x:50,y:52,w:48,h:42,c:'var(--danger)'}};let mh='';for(const[zn,zd]of Object.entries(zones)){const cnt=vehicles.filter(v=>v.current_zone===zn).length;mh+=`<div class="yard-zone" style="top:${zd.y}%;left:${zd.x}%;width:${zd.w}%;height:${zd.h}%;background:${zd.c}08"><span>${zn.replace(/_/g,' ')}</span><span style="font-size:18px;font-weight:800;color:${zd.c}">${cnt}</span></div>`;}ym.innerHTML=mh;}catch(e){}}
-async function slaLoadDwell(){try{const[active,heatmap]=await Promise.all([fetch(API_BASE+'/ops/fleet/dwell/active').then(r=>r.json()),fetch(API_BASE+'/ops/fleet/dwell/heatmap').then(r=>r.json())]);const al=document.getElementById('dwellActiveList');if(!active.length){al.innerHTML='<div style="color:var(--sub);font-size:13px;padding:14px;text-align:center">No active dwell records</div>';}else{al.innerHTML=active.map(d=>{const col=d.alert_level==='critical'?'var(--sev-critical)':d.alert_level==='warning'?'var(--warn)':'var(--pos)';return`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--badge);border-radius:8px;margin-bottom:6px;border:1px solid var(--bord);border-left:3px solid ${col}"><div><div style="font-size:12px;font-weight:600">${d.vehicle_id?.slice(0,8)||'--'}</div><div style="font-size:10px;color:var(--sub);margin-top:2px">Zone: ${d.zone||'--'}</div></div><span class="badge" style="background:${col}22;color:${col};font-size:9px">${(d.alert_level||'normal').toUpperCase()}</span></div>`;}).join('');}const hm=document.getElementById('dwellHeatmap');if(!heatmap.length){hm.innerHTML='<div style="color:var(--sub);font-size:13px;padding:14px;text-align:center">No heatmap data</div>';}else{hm.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">'+heatmap.map(h=>{const avg=h.avg_dwell_minutes||0;const col=avg>120?'var(--sev-critical)':avg>60?'var(--warn)':'var(--pos)';return`<div style="padding:14px;background:var(--badge);border-radius:10px;border:1px solid var(--bord);border-top:3px solid ${col};text-align:center"><div style="font-size:11px;color:var(--sub);margin-bottom:6px">${h.zone||'--'}</div><div style="font-size:22px;font-weight:800;color:${col}">${avg.toFixed(0)}m</div><div style="font-size:10px;color:var(--sub);margin-top:4px">${h.vehicle_count||0} vehicles</div></div>`;}).join('')+'</div>';}}catch(e){}}
-async function slaLoadSchedules(){try{const[schedules,docks]=await Promise.all([fetch(API_BASE+'/ops/fleet/schedules?week_offset=0').then(r=>r.json()),fetch(API_BASE+'/ops/fleet/docks').then(r=>r.json())]);const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];let html='<div class="sched-grid"><div class="sched-cell hdr">Dock</div>';days.forEach(d=>{html+=`<div class="sched-cell hdr">${d}</div>`;});docks.forEach(dk=>{html+=`<div class="sched-cell dock-label">${dk.name||'Dock '+dk.dock_number}</div>`;days.forEach((d,di)=>{const ds=schedules.filter(s=>s.dock_id===dk.id&&new Date(s.scheduled_start).getDay()===(di+1)%7);if(ds.length){html+='<div class="sched-cell">'+ds.map(s=>`<span class="slot-booked">${s.client_name||'Booked'}</span>`).join(' ')+'</div>';}else{html+='<div class="sched-cell"><span class="slot-free">—</span></div>';}});});html+='</div>';document.getElementById('schedCalendar').innerHTML=html;}catch(e){}}
-function schedShowForm(){const m=document.createElement('div');m.className='ops-modal-overlay';m.onclick=function(e){if(e.target===m)m.remove();};m.innerHTML=`<div class="ops-modal"><div class="ops-modal-title">Book Dock Slot <button class="close-btn" onclick="this.closest('.ops-modal-overlay').remove()">✕</button></div><div style="display:flex;flex-direction:column;gap:10px"><div><label style="font-size:11px;font-weight:600;color:var(--sub);display:block;margin-bottom:4px">Dock ID</label><input id="schedDock" class="search-box" style="min-width:auto;width:100%"></div><div><label style="font-size:11px;font-weight:600;color:var(--sub);display:block;margin-bottom:4px">Client</label><input id="schedClient" class="search-box" style="min-width:auto;width:100%"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label style="font-size:11px;font-weight:600;color:var(--sub);display:block;margin-bottom:4px">Start</label><input id="schedStart" type="datetime-local" class="search-box" style="min-width:auto;width:100%"></div><div><label style="font-size:11px;font-weight:600;color:var(--sub);display:block;margin-bottom:4px">End</label><input id="schedEnd" type="datetime-local" class="search-box" style="min-width:auto;width:100%"></div></div><button class="fbtn" onclick="schedCreate()">Book</button></div></div>`;document.body.appendChild(m);}
-async function schedCreate(){const body={dock_id:document.getElementById('schedDock').value,client_name:document.getElementById('schedClient').value,scheduled_start:document.getElementById('schedStart').value,scheduled_end:document.getElementById('schedEnd').value};try{await fetch(API_BASE+'/ops/fleet/schedules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});document.querySelector('.ops-modal-overlay').remove();slaLoadSchedules();}catch(e){alert('Failed');}}
-async function slaLoadQueue(){try{const data=await(await fetch(API_BASE+'/ops/fleet/queue/optimize')).json();document.getElementById('queueWaiting').textContent=data.total_waiting??'--';document.getElementById('queueAvgWait').textContent=(data.avg_wait_minutes??0).toFixed(0)+' min';const recs=data.recommendations||[];const el=document.getElementById('queueRecList');if(!recs.length){el.innerHTML='<div style="color:var(--sub);font-size:13px;padding:14px;text-align:center">No vehicles waiting</div>';return;}el.innerHTML=recs.map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--badge);border-radius:8px;margin-bottom:7px;border:1px solid var(--bord)"><div><div style="font-size:12px;font-weight:600">${r.vehicle_id?.slice(0,8)||'--'}</div><div style="font-size:10px;color:var(--sub);margin-top:2px">Wait: ${r.wait_minutes||0}min &bull; Dock: ${r.recommended_dock||'--'}</div></div><div style="display:flex;align-items:center;gap:10px"><div style="font-size:14px;font-weight:800;color:var(--acc)">${(r.priority_score||0).toFixed(0)}</div><button class="fbtn" onclick="slaAssignDock('${r.recommended_dock_id||''}','${r.vehicle_id||''}')" style="font-size:10px;padding:3px 10px">Assign</button></div></div>`).join('');}catch(e){}}
-async function slaAssignDock(dockId,vehicleId){if(!dockId)return;try{await fetch(API_BASE+'/ops/fleet/docks/'+dockId+'/assign?vehicle_id='+vehicleId,{method:'PATCH'});slaLoadQueue();slaLoadFleet();}catch(e){alert('Failed');}}
-
 
 // ════════════════════════════════════════════════════════
 // COMMAND CENTER
