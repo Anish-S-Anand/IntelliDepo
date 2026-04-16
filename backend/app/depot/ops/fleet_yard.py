@@ -213,9 +213,9 @@ class DwellRecordResponse(BaseModel):
     dock_id: Optional[str]
     entered_at: datetime
     exited_at: Optional[datetime]
-    dwell_minutes: float
-    alert_level: str
-    alert_sent: bool
+    dwell_minutes: Optional[float] = 0
+    alert_level: Optional[str] = "normal"
+    alert_sent: Optional[bool] = False
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 

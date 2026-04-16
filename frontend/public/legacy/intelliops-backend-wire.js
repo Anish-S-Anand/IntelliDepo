@@ -772,4 +772,222 @@ window.selectEscIncident = async function(id) {
   renderEscalation();
 };
 
-console.log("[IntelliOps] Backend wiring loaded — All sections now use real APIs: Ops, SLA, Fleet, Dock, Incidents, Escalation, Command");
+// ════════════════════════════════════════════════════════
+// DASHBOARD — wire KPIs to real monitoring + fleet data
+// ════════════════════════════════════════════════════════
+
+window._origLoadData = window.loadData;
+window.loadData = async function() {
+  if (window._origLoadData) window._origLoadData();
+  try {
+    const [kR, fR, bR] = await Promise.allSettled([
+      fetch("/backend/ops/monitoring/dashboard/kpis", {headers:_WIRE_HEADERS}),
+      fetch("/backend/ops/fleet/vehicles/yard/summary", {headers:_WIRE_HEADERS}),
+      fetch("/backend/depot/vision/perimeter/breaches/active", {headers:_WIRE_HEADERS}),
+    ]);
+    if (kR.status==="fulfilled"&&kR.value.ok){
+      const k=await kR.value.json();
+      const _s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+      const _h=(id,v)=>{const e=document.getElementById(id);if(e)e.innerHTML=v;};
+      _s("heroHealth",(100-Math.min(k.critical_alerts*5,30))+"%");
+      _h("throughputVal",(k.total_events_today||0)+'<span class="kpi-unit"> events</span>');
+      _s("hHealth",(100-Math.min(k.critical_alerts*5,30))+"%");
+      const hb=document.getElementById("healthBar");if(hb)hb.style.width=(100-Math.min(k.critical_alerts*5,30))+"%";
+    }
+    if (fR.status==="fulfilled"&&fR.value.ok){
+      const f=await fR.value.json();
+      const _s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+      _s("heroTrucks",(f.total_in_yard||0)+"/15");
+      _s("hTrucks",(f.total_in_yard||0)+" / 15");
+    }
+    if (bR.status==="fulfilled"&&bR.value.ok){
+      const b=await bR.value.json();
+      const pe=document.getElementById("kpiPerimeterVal");if(pe)pe.textContent=b.length||0;
+    }
+  } catch{}
+};
+// Re-fire on page load
+setTimeout(()=>{if(typeof loadData==="function")loadData();},500);
+
+
+// ════════════════════════════════════════════════════════
+// INVENTORY — wire clusters/zones to real cluster API
+// ════════════════════════════════════════════════════════
+
+window.renderClusters = async function(search, filter) {
+  search = search || "";
+  filter = filter || "all";
+  const grid = document.getElementById("clusterGrid");
+  const zoneGrid = document.getElementById("zoneGrid");
+  if (!grid) return;
+
+  let zones = [];
+  try {
+    const r = await fetch("/backend/depot/vision/cluster/zones", {headers:_WIRE_HEADERS});
+    if (r.ok) zones = await r.json();
+  } catch {}
+
+  // Zone cards
+  if (zoneGrid && zones.length) {
+    zoneGrid.innerHTML = zones.map(function(z){
+      const pct = z.utilization_pct||Math.round((z.current_occupancy||0)/(z.max_capacity_units||1)*100);
+      const col = pct>90?"var(--sev-critical)":pct>75?"var(--warn)":"var(--pos)";
+      return '<div class="zone-card"><div class="zone-hdr"><div class="zone-name">'+z.name+'</div><div style="font-size:18px;font-weight:800;color:'+col+'">'+pct+'%</div></div><div class="prog-track" style="margin:8px 0"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div><div style="font-size:10px;color:var(--sub)">'+(z.current_occupancy||0)+' / '+(z.max_capacity_units||0)+' units &bull; '+z.zone_type+'</div></div>';
+    }).join("");
+  }
+
+  // Use zones as clusters too
+  if (zones.length) {
+    let items = zones;
+    if (search) items = items.filter(function(z){return (z.name||"").toLowerCase().includes(search.toLowerCase());});
+    if (filter==="near_full") items=items.filter(function(z){return (z.utilization_pct||0)>75;});
+    if (filter==="empty") items=items.filter(function(z){return (z.utilization_pct||0)<25;});
+    if (filter==="fifo") items=items.filter(function(z){return z.zone_type==="storage";});
+    grid.innerHTML = items.map(function(z){
+      const pct=z.utilization_pct||0;const col=pct>90?"var(--sev-critical)":pct>75?"var(--warn)":"var(--pos)";
+      return '<div class="cluster-card"><div class="cl-hdr"><span class="cl-id">'+(z.zone_code||z.name)+'</span><span class="cl-product">'+(z.zone_type||"storage")+'</span></div><div class="cl-cap"><div class="prog-track"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div><span class="cl-pct" style="color:'+col+'">'+pct+'%</span></div><div class="cl-meta"><span class="dm-l">Capacity</span><span class="dm-v">'+(z.max_capacity_units||0)+'</span><span class="dm-l">Occupied</span><span class="dm-v">'+(z.current_occupancy||0)+'</span><span class="dm-l">Floor</span><span class="dm-v">'+(z.floor||"G")+'</span></div></div>';
+    }).join("");
+  } else {
+    grid.innerHTML = '<div style="color:var(--sub);font-size:13px;padding:24px;text-align:center">No cluster data — backend offline</div>';
+  }
+};
+
+
+// ════════════════════════════════════════════════════════
+// ANALYTICS — wire to real monitoring events + anomalies
+// ════════════════════════════════════════════════════════
+
+window.renderAnomaly = async function() {
+  const el = document.getElementById("anomalyList")||document.querySelector("#pg-analytics .card");
+  if (!el) return;
+
+  let events = [];
+  try {
+    const r = await fetch("/backend/ops/monitoring/events?limit=20", {headers:_WIRE_HEADERS});
+    if (r.ok) events = await r.json();
+  } catch {}
+
+  if (events.length) {
+    el.innerHTML = '<div class="card-title">Recent Sensor Events</div>' + events.map(function(e){
+      const col = e.severity==="critical"?"var(--sev-critical)":e.severity==="high"?"var(--sev-high)":e.severity==="medium"?"var(--warn)":"var(--pos)";
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--badge);border-radius:8px;margin-bottom:6px;border:1px solid var(--bord);border-left:3px solid '+col+'"><div><div style="font-size:12px;font-weight:600">'+(e.event_type||"")+" — "+(e.source_name||"")+'</div><div style="font-size:10px;color:var(--sub);margin-top:2px">'+(e.zone||"--")+" &bull; "+(e.message||e.value||"")+'</div></div><div style="text-align:right"><span class="badge" style="background:'+col+'22;color:'+col+';border:1px solid '+col+'44;font-size:9px">'+(e.severity||"").toUpperCase()+'</span><div style="font-size:10px;color:var(--mut);margin-top:3px">'+(e.timestamp?new Date(e.timestamp).toLocaleTimeString():"")+'</div></div></div>';
+    }).join("");
+  } else {
+    el.innerHTML = '<div class="card-title">Analytics</div><div style="color:var(--sub);font-size:13px;padding:24px;text-align:center">No event data available</div>';
+  }
+};
+
+
+// ════════════════════════════════════════════════════════
+// AI BRAIN — wire to real ops KPIs + platform status
+// ════════════════════════════════════════════════════════
+
+window.renderBrain = async function() {
+  const el = document.getElementById("brainRecs")||document.querySelector("#pg-brain .card");
+  if (!el) return;
+
+  let kpis = null;
+  try { const r=await fetch("/backend/ops/operations/kpis",{headers:_WIRE_HEADERS}); if(r.ok)kpis=await r.json(); } catch{}
+  let alerts = null;
+  try { const r=await fetch("/backend/ops/monitoring/dashboard/kpis",{headers:_WIRE_HEADERS}); if(r.ok)alerts=await r.json(); } catch{}
+
+  const items = [];
+  if (alerts) {
+    items.push({title:"Active Alerts",value:alerts.active_alerts||0,icon:"🚨",color:alerts.critical_alerts>0?"var(--sev-critical)":"var(--pos)"});
+    items.push({title:"Events/Hour",value:(alerts.events_per_hour||0).toFixed(1),icon:"📊",color:"var(--info)"});
+    items.push({title:"Critical",value:alerts.critical_alerts||0,icon:"🔴",color:"var(--sev-critical)"});
+  }
+  if (kpis) {
+    items.push({title:"Tasks Total",value:kpis.tasks_total||0,icon:"📋",color:"var(--acc)"});
+    items.push({title:"SOP Compliance",value:Math.round(kpis.sop_compliance_pct||0)+"%",icon:"✅",color:kpis.sop_compliance_pct>75?"var(--pos)":"var(--warn)"});
+    items.push({title:"Open Exceptions",value:kpis.open_exceptions||0,icon:"⚠",color:kpis.open_exceptions>0?"var(--warn)":"var(--pos)"});
+  }
+  if (items.length) {
+    el.innerHTML = '<div class="card-title">AI Brain — Platform Intelligence</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">' +
+      items.map(function(i){return '<div style="padding:16px;background:var(--badge);border-radius:10px;border:1px solid var(--bord);text-align:center"><div style="font-size:24px">'+i.icon+'</div><div style="font-size:22px;font-weight:800;color:'+i.color+';margin:6px 0">'+i.value+'</div><div style="font-size:11px;color:var(--sub)">'+i.title+'</div></div>';}).join("") + '</div>';
+  } else {
+    el.innerHTML = '<div class="card-title">AI Brain</div><div style="color:var(--sub);font-size:13px;padding:24px;text-align:center">Backend unavailable</div>';
+  }
+};
+
+
+// ════════════════════════════════════════════════════════
+// INTELLICONNECT — wire to real API health checks
+// ════════════════════════════════════════════════════════
+
+window.renderConnect = async function() {
+  const el = document.getElementById("connectApis")||document.querySelector("#pg-connect .card");
+  if (!el) return;
+
+  const endpoints = [
+    {name:"Monitoring KPIs",url:"/backend/ops/monitoring/dashboard/kpis"},
+    {name:"Fleet Vehicles",url:"/backend/ops/fleet/vehicles"},
+    {name:"Incidents",url:"/backend/ops/incidents/?limit=1"},
+    {name:"Escalation Workflows",url:"/backend/ops/escalation/workflows"},
+    {name:"Cameras",url:"/backend/depot/vision/cameras/"},
+    {name:"Perimeter Zones",url:"/backend/depot/vision/perimeter/zones"},
+    {name:"Cluster Zones",url:"/backend/depot/vision/cluster/zones"},
+    {name:"Scorecards",url:"/backend/ops/scorecards/summary"},
+  ];
+  const results = await Promise.allSettled(endpoints.map(function(ep){
+    return fetch(ep.url,{headers:_WIRE_HEADERS}).then(function(r){return{name:ep.name,ok:r.ok,status:r.status};}).catch(function(){return{name:ep.name,ok:false,status:0};});
+  }));
+  el.innerHTML = '<div class="card-title">IntelliConnect — API Health</div>' + results.map(function(r){
+    var d = r.value;
+    var col = d.ok?"var(--pos)":"var(--sev-critical)";
+    var icon = d.ok?"✅":"❌";
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--badge);border-radius:8px;margin-bottom:7px;border:1px solid var(--bord);border-left:3px solid '+col+'"><div style="display:flex;align-items:center;gap:8px"><span>'+icon+'</span><span style="font-size:12px;font-weight:600">'+d.name+'</span></div><span class="badge" style="background:'+col+'22;color:'+col+';border:1px solid '+col+'44;font-size:9px">'+(d.ok?"ONLINE "+d.status:"OFFLINE")+'</span></div>';
+  }).join("");
+};
+
+
+// ════════════════════════════════════════════════════════
+// RISK & COMPLIANCE — wire to real incident + breach data
+// ════════════════════════════════════════════════════════
+
+window.renderRisk = async function() {
+  const el = document.getElementById("complianceList")||document.querySelector("#pg-risk .card");
+  if (!el) return;
+
+  let incidents=[],breaches=[],scorecards=null;
+  try{const r=await fetch("/backend/ops/incidents/?limit=50",{headers:_WIRE_HEADERS});if(r.ok)incidents=await r.json();}catch{}
+  try{const r=await fetch("/backend/depot/vision/perimeter/breaches",{headers:_WIRE_HEADERS});if(r.ok)breaches=await r.json();}catch{}
+  try{const r=await fetch("/backend/ops/scorecards/summary",{headers:_WIRE_HEADERS});if(r.ok)scorecards=await r.json();}catch{}
+
+  const openInc = incidents.filter(function(i){return i.status!=="resolved";}).length;
+  const p1 = incidents.filter(function(i){return i.priority==="P1"&&i.status!=="resolved";}).length;
+  const unresolvedBreaches = breaches.filter(function(b){return !b.resolved_at;}).length;
+  const comp = scorecards?scorecards.overall_compliance_pct:0;
+
+  el.innerHTML = '<div class="card-title">Risk & Compliance Dashboard</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px">' +
+    '<div style="padding:16px;background:var(--badge);border-radius:10px;border:1px solid var(--bord);text-align:center;border-top:3px solid '+(comp>80?"var(--pos)":"var(--warn)")+'"><div style="font-size:28px;font-weight:800;color:'+(comp>80?"var(--pos)":"var(--warn)")+'">'+Math.round(comp)+'%</div><div style="font-size:11px;color:var(--sub);margin-top:4px">SLA Compliance</div></div>' +
+    '<div style="padding:16px;background:var(--badge);border-radius:10px;border:1px solid var(--bord);text-align:center;border-top:3px solid '+(openInc>5?"var(--sev-critical)":"var(--warn)")+'"><div style="font-size:28px;font-weight:800;color:'+(openInc>5?"var(--sev-critical)":"var(--warn)")+'">'+openInc+'</div><div style="font-size:11px;color:var(--sub);margin-top:4px">Open Incidents</div></div>' +
+    '<div style="padding:16px;background:var(--badge);border-radius:10px;border:1px solid var(--bord);text-align:center;border-top:3px solid '+(p1>0?"var(--sev-critical)":"var(--pos)")+'"><div style="font-size:28px;font-weight:800;color:'+(p1>0?"var(--sev-critical)":"var(--pos)")+'">'+p1+'</div><div style="font-size:11px;color:var(--sub);margin-top:4px">P1 Critical</div></div>' +
+    '<div style="padding:16px;background:var(--badge);border-radius:10px;border:1px solid var(--bord);text-align:center;border-top:3px solid '+(unresolvedBreaches>0?"var(--sev-high)":"var(--pos)")+'"><div style="font-size:28px;font-weight:800;color:'+(unresolvedBreaches>0?"var(--sev-high)":"var(--pos)")+'">'+unresolvedBreaches+'</div><div style="font-size:11px;color:var(--sub);margin-top:4px">Active Breaches</div></div>' +
+    '</div>' +
+    (incidents.length ? '<div class="card-title" style="margin-top:16px">Recent Incidents</div>' + incidents.slice(0,8).map(function(i){
+      var col={P1:"var(--sev-critical)",P2:"var(--sev-high)",P3:"var(--warn)",P4:"var(--pos)"}[i.priority]||"var(--sub)";
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--badge);border-radius:8px;margin-bottom:5px;border:1px solid var(--bord);border-left:3px solid '+col+'"><div style="font-size:12px;font-weight:500">'+i.title+'</div><div style="display:flex;gap:6px"><span class="badge" style="background:'+col+'22;color:'+col+';font-size:9px">'+i.priority+'</span><span class="badge" style="font-size:9px">'+(i.status||"").toUpperCase()+'</span></div></div>';
+    }).join("") : '');
+};
+
+
+// ════════════════════════════════════════════════════════
+// SETTINGS — wire to real auth/user info
+// ════════════════════════════════════════════════════════
+
+window.renderSettings = async function() {
+  const el = document.getElementById("settingsIntegrations")||document.querySelector("#pg-settings .card");
+  if (!el) return;
+
+  let user = null;
+  try { const r=await fetch("/backend/api/v1/auth/me",{headers:_WIRE_HEADERS}); if(r.ok)user=await r.json(); } catch{}
+
+  el.innerHTML = '<div class="card-title">Settings & User Profile</div>' +
+    (user ? '<div style="padding:16px;background:var(--badge);border-radius:10px;border:1px solid var(--bord);margin-bottom:16px"><div style="font-size:14px;font-weight:700">'+user.full_name+'</div><div style="font-size:12px;color:var(--sub);margin-top:4px">'+user.email+'</div><div style="font-size:10px;color:var(--mut);margin-top:4px">Account: '+user.account_type+' &bull; Active: '+(user.is_active?"Yes":"No")+'</div></div>' : '') +
+    '<div style="padding:16px;background:var(--badge);border-radius:10px;border:1px solid var(--bord)"><div style="font-size:13px;font-weight:600;margin-bottom:8px">Backend Connection</div><div style="font-size:12px;color:var(--sub)">API Base: /backend</div><div style="font-size:12px;color:var(--sub)">Auth: JWT Bearer Token</div><div style="font-size:12px;color:var(--pos);margin-top:4px">✓ Connected</div></div>';
+};
+
+
+console.log("[IntelliOps] Backend wiring loaded — ALL pages now use real APIs: Dashboard, Ops, SLA, Fleet, Dock, Incidents, Escalation, Command, Inventory, Analytics, Brain, Connect, Risk, Settings");

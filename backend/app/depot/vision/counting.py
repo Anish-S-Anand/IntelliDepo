@@ -134,11 +134,11 @@ class ManifestResponse(BaseModel):
     id: uuid.UUID
     manifest_code: str
     shipment_ref: Optional[str]
-    expected_bags: int
-    expected_boxes: int
-    expected_pallets: int
-    expected_cartons: int
-    total_expected: int
+    expected_bags: Optional[int] = 0
+    expected_boxes: Optional[int] = 0
+    expected_pallets: Optional[int] = 0
+    expected_cartons: Optional[int] = 0
+    total_expected: Optional[int] = 0
     gate_id: Optional[str]
     vehicle_number: Optional[str]
     status: str
