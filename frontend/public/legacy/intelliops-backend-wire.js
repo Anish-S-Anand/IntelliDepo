@@ -660,7 +660,7 @@ window.loadData = async function() {
   const _s = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
   const _h = (id, v) => { const e = document.getElementById(id); if (e) e.innerHTML = v; };
   try {
-    const [kR, fR, bR, zR, dwR, scR, accR, lprR] = await Promise.allSettled([
+    const [kR, fR, bR, zR, dwR, scR, accR, lprR, camR] = await Promise.allSettled([
       fetch("/backend/ops/monitoring/dashboard/kpis", {headers:_WIRE_HEADERS}),
       fetch("/backend/ops/fleet/vehicles/yard/summary", {headers:_WIRE_HEADERS}),
       fetch("/backend/depot/vision/perimeter/breaches/active", {headers:_WIRE_HEADERS}),
@@ -669,6 +669,7 @@ window.loadData = async function() {
       fetch("/backend/ops/scorecards/summary", {headers:_WIRE_HEADERS}),
       fetch("/backend/depot/gate/access-logs?limit=200", {headers:_WIRE_HEADERS}),
       fetch("/backend/depot/vision/counting/manifests", {headers:_WIRE_HEADERS}),
+      fetch("/backend/depot/vision/cameras/", {headers:_WIRE_HEADERS}),
     ]);
 
     // Monitoring KPIs — health, throughput, alerts
@@ -688,6 +689,7 @@ window.loadData = async function() {
       const totalFleet = f.total_vehicles || total;
       _s("heroTrucks", total + "/" + totalFleet);
       _s("hTrucks", total + " / " + totalFleet);
+      const tb=document.getElementById("trucksBar");if(tb)tb.style.width=Math.round(total/Math.max(totalFleet,1)*100)+"%";
     }
 
     // Perimeter breaches
@@ -703,9 +705,20 @@ window.loadData = async function() {
       if (zones.length) {
         const avgUtil = Math.round(zones.reduce((s,z) => s + (z.utilization_pct || Math.round((z.current_occupancy||0)/(z.max_capacity_units||1)*100)), 0) / zones.length);
         _s("heroClusterUtil", avgUtil + "%");
+        _s("hClusterUtil", avgUtil + "%");
+        const cb=document.getElementById("clusterBar");if(cb)cb.style.width=avgUtil+"%";
         _h("kpiOccupancy", avgUtil + '<span class="kpi-unit">%</span>');
         _s("kpiOccupancyDelta", zones.length + " zones tracked");
       }
+    }
+
+    // Active cameras — count from cameras API
+    if (camR.status==="fulfilled"&&camR.value.ok){
+      const cams = await camR.value.json();
+      const active = cams.filter(c => c.is_active !== false).length;
+      _s("heroCams", active + "/" + cams.length);
+      _s("hCameras", active + " / " + cams.length);
+      const camBar=document.getElementById("camerasBar");if(camBar)camBar.style.width=Math.round(active/Math.max(cams.length,1)*100)+"%";
     }
 
     // Dwell heatmap — compute avg loading time
