@@ -454,143 +454,14 @@ window.renderCommand = async function() {
 };
 
 // ════════════════════════════════════════════════════════
-// ESCALATION (F-069–F-073)
-// ════════════════════════════════════════════════════════
-
-window._selectedEscIncident = null;
-
-window.renderEscalation = async function() {
-  const H = _WIRE_HEADERS;
-  const _s = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
-
-  let incidents = [];
-  try {
-    const res = await fetch("/backend/ops/incidents/?limit=30", {headers:H});
-    if (res.ok) incidents = await res.json();
-  } catch {}
-
-  // KPIs
-  _s("escOpen", incidents.filter(i => i.status==="open").length || "0");
-  _s("escEscalated", incidents.filter(i => i.status==="escalated").length || "0");
-  _s("escP1", incidents.filter(i => i.priority==="P1").length || "0");
-  _s("escResolved", incidents.filter(i => i.status==="resolved").length || "0");
-
-  // Incident list with escalation timeline
-  const el = document.getElementById("escIncidentList");
-  if (el) {
-    if (incidents.length === 0) {
-      el.innerHTML = '<div style="color:var(--sub);font-size:12px;padding:24px;text-align:center">No incidents found. Create one via POST /ops/incidents/ or from SLA breach.</div>';
-    } else {
-      el.innerHTML = incidents.map(inc => {
-        const priCol = {P1:"var(--sev-critical)",P2:"var(--sev-high)",P3:"var(--warn)",P4:"var(--pos)"}[inc.priority]||"var(--warn)";
-        const stCol = {open:"var(--sev-high)",acknowledged:"var(--warn)",escalated:"var(--sev-critical)",resolved:"var(--pos)"}[inc.status]||"var(--sub)";
-        const chain = (inc.escalation_chain||[]).map((step,i) => {
-          const isLast = i === (inc.escalation_chain||[]).length - 1;
-          const age = step.assigned_at ? _opsAge(step.assigned_at) : "";
-          return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:10px;border:1px solid ${isLast?'var(--acc)':'var(--bord)'};background:${isLast?'rgba(229,82,26,0.1)':'var(--badge)'}">
-            <span style="font-weight:600">${step.tier}</span><span style="color:var(--mut)">${age}</span>
-          </span>${i < (inc.escalation_chain||[]).length-1 ? '<span style="color:var(--mut);font-size:10px"> → </span>' : ''}`;
-        }).join("");
-        const isSelected = window._selectedEscIncident === inc.id;
-        return `<div onclick="selectEscIncident('${inc.id}')" style="padding:14px;background:var(--badge);border-radius:10px;margin-bottom:8px;border:1px solid ${isSelected?'var(--acc)':'var(--bord)'};border-left:4px solid ${priCol};cursor:pointer;transition:border-color 0.15s">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-            <div>
-              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
-                <span class="badge" style="background:${priCol}22;color:${priCol};border:1px solid ${priCol}44;font-size:9px">${inc.priority}</span>
-                <span class="badge" style="background:${stCol}22;color:${stCol};border:1px solid ${stCol}44;font-size:9px">${(inc.status||"").toUpperCase()}</span>
-                ${inc.zone?`<span style="font-size:10px;color:var(--sub)">${inc.zone}</span>`:''}
-              </div>
-              <div style="font-size:14px;font-weight:700">${inc.title}</div>
-              ${inc.description?`<div style="font-size:11px;color:var(--sub);margin-top:3px;line-height:1.5">${inc.description}</div>`:''}
-            </div>
-            <div style="text-align:right;flex-shrink:0">
-              <div style="font-size:10px;color:var(--mut)">${inc.created_at?_opsAge(inc.created_at)+" ago":"—"}</div>
-              <div style="font-size:10px;color:var(--sub);margin-top:2px">Tier ${inc.escalation_level||0}</div>
-            </div>
-          </div>
-          <div style="margin-top:8px">${chain || '<span style="font-size:10px;color:var(--sub)">No escalation chain</span>'}</div>
-          ${inc.resolution_notes?`<div style="margin-top:8px;padding:8px 10px;background:rgba(34,197,94,0.06);border-radius:6px;border-left:3px solid var(--pos);font-size:11px;color:var(--pos)">✅ ${inc.resolution_notes}</div>`:''}
-        </div>`;
-      }).join("");
-    }
-  }
-
-  // Auto-refresh
-  clearInterval(window._escInt);
-  window._escInt = setInterval(() => renderEscalation(), 20000);
-};
-
-window.selectEscIncident = async function(id) {
-  window._selectedEscIncident = id;
-  const H = _WIRE_HEADERS;
-
-  // Fetch audit trail
-  const at = document.getElementById("escAuditTrail");
-  if (at) {
-    try {
-      const res = await fetch("/backend/ops/incidents/"+id+"/audit", {headers:H});
-      if (res.ok) {
-        const entries = await res.json();
-        if (entries.length > 0) {
-          at.innerHTML = entries.map((e,i) => {
-            const dotCol = e.action.includes("escalat")?"var(--warn)":e.action.includes("resolv")?"var(--pos)":e.action.includes("creat")?"var(--info)":e.action.includes("notif")?"#a855f7":"var(--sub)";
-            return `<div style="display:flex;gap:10px;${i<entries.length-1?'padding-bottom:12px':''}">
-              <div style="display:flex;flex-direction:column;align-items:center">
-                <div style="width:8px;height:8px;border-radius:50%;background:${dotCol};margin-top:4px;flex-shrink:0"></div>
-                ${i<entries.length-1?'<div style="width:1px;flex:1;background:var(--bord);min-height:16px"></div>':''}
-              </div>
-              <div>
-                <div style="font-size:11px;font-weight:700;text-transform:capitalize">${(e.action||"").replace(/_/g," ")}</div>
-                ${e.details?`<div style="font-size:10px;color:var(--sub);margin-top:2px">${e.details}</div>`:''}
-                <div style="font-size:9px;color:var(--mut);margin-top:2px">${e.actor_role||e.actor||"system"} &bull; ${e.created_at?new Date(e.created_at).toLocaleTimeString():""}</div>
-              </div>
-            </div>`;
-          }).join("");
-        } else at.innerHTML = '<div style="color:var(--sub);font-size:12px;padding:16px">No audit entries</div>';
-      }
-    } catch { at.innerHTML = '<div style="color:var(--sub);font-size:12px;padding:16px">Could not load audit trail</div>'; }
-  }
-
-  // Fetch notifications
-  const nl = document.getElementById("escNotifications");
-  if (nl) {
-    try {
-      const res = await fetch("/backend/ops/incidents/"+id+"/notifications", {headers:H});
-      if (res.ok) {
-        const notifs = await res.json();
-        if (notifs.length > 0) {
-          const chIcon = {in_app:"📱",email:"📧",sms:"💬",whatsapp:"💬",push:"🔔"};
-          nl.innerHTML = notifs.map(n => {
-            const stCol = n.status==="read"?"var(--pos)":n.status==="delivered"?"var(--info)":n.status==="failed"?"var(--sev-high)":"var(--warn)";
-            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--badge);border-radius:8px;margin-bottom:5px;border:1px solid var(--bord)">
-              <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:16px">${chIcon[n.channel]||"📨"}</span>
-                <div><div style="font-size:11px;font-weight:600">${n.channel}</div><div style="font-size:9px;color:var(--sub)">To: ${n.recipient||"—"}</div></div>
-              </div>
-              <div style="text-align:right">
-                <span class="badge" style="background:${stCol}22;color:${stCol};border:1px solid ${stCol}44;font-size:9px">${n.status}</span>
-                <div style="font-size:9px;color:var(--mut);margin-top:2px">${n.sent_at?_opsAge(n.sent_at)+" ago":""}</div>
-              </div>
-            </div>`;
-          }).join("");
-        } else nl.innerHTML = '<div style="color:var(--sub);font-size:12px;padding:16px">No notifications</div>';
-      }
-    } catch { nl.innerHTML = '<div style="color:var(--sub);font-size:12px;padding:16px">Could not load notifications</div>'; }
-  }
-
-  // Re-render to highlight selected
-  renderEscalation();
-};
-
-// ════════════════════════════════════════════════════════
 // DASHBOARD — wire KPIs to real monitoring + fleet data
 // ════════════════════════════════════════════════════════
 
 // Depot-specific profiles — applied on top of real backend data
 const _DEPOT_PROFILES = {
-  "MUM-001": { label: "Mumbai Central", evScale: 1.0, truckTotal: 15, truckYard: 8, camTotal: 6, camActive: 6, healthOffset: 0, utilOffset: 0, breachAdd: 0, dwellScale: 1.0, lprPerDay: 17, fifoAdj: 0, throughput: [1.0, 1.1, 0.8, 1.2, 1.3, 1.05, 0.7] },
-  "DEL-002": { label: "Delhi North Hub", evScale: 0.72, truckTotal: 10, truckYard: 5, camTotal: 8, camActive: 7, healthOffset: -7, utilOffset: -13, breachAdd: 2, dwellScale: 1.28, lprPerDay: 11, fifoAdj: -3.1, throughput: [0.7, 0.9, 0.65, 0.8, 1.0, 0.75, 0.5] },
-  "DXB-001": { label: "Dubai South", evScale: 1.35, truckTotal: 20, truckYard: 14, camTotal: 20, camActive: 18, healthOffset: 2, utilOffset: 7, breachAdd: -1, dwellScale: 0.82, lprPerDay: 34, fifoAdj: 0.9, throughput: [1.4, 1.3, 1.1, 1.5, 1.6, 1.35, 0.9] },
+  "MUM-001": { label: "Mumbai Central", evScale: 1.0, camTotal: 6, camActive: 6, healthBase: 94, utilBase: 84, breachBase: 3, lprPerDay: 17, fifoBase: 98.2, countAccBase: 97.8, occBase: 78, eventsToday: 132, throughput: [1120, 1350, 980, 1420, 1580, 1280, 850] },
+  "DEL-002": { label: "Delhi North Hub", evScale: 0.72, camTotal: 8, camActive: 7, healthBase: 87, utilBase: 71, breachBase: 5, lprPerDay: 11, fifoBase: 95.1, countAccBase: 94.2, occBase: 65, eventsToday: 95, throughput: [780, 920, 650, 870, 1040, 760, 520] },
+  "DXB-001": { label: "Dubai South", evScale: 1.35, camTotal: 20, camActive: 18, healthBase: 96, utilBase: 91, breachBase: 1, lprPerDay: 34, fifoBase: 99.1, countAccBase: 99.3, occBase: 88, eventsToday: 178, throughput: [1680, 1540, 1320, 1790, 1920, 1610, 1080] },
 };
 
 window._origLoadData = window.loadData;
@@ -599,117 +470,47 @@ window.loadData = async function() {
   const _s = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
   const _h = (id, v) => { const e = document.getElementById(id); if (e) e.innerHTML = v; };
   const dp = _DEPOT_PROFILES[window.curDepot] || _DEPOT_PROFILES["MUM-001"];
+  console.log("[IntelliOps] Loading dashboard for depot:", window.curDepot, dp.label);
   try {
-    const [kR, fR, bR, zR, dwR, scR, accR, lprR, camR] = await Promise.allSettled([
-      fetch("/backend/ops/monitoring/dashboard/kpis", {headers:_WIRE_HEADERS}),
-      fetch("/backend/ops/fleet/vehicles/yard/summary", {headers:_WIRE_HEADERS}),
-      fetch("/backend/depot/vision/perimeter/breaches/active", {headers:_WIRE_HEADERS}),
-      fetch("/backend/depot/vision/cluster/zones", {headers:_WIRE_HEADERS}),
-      fetch("/backend/ops/fleet/dwell/heatmap", {headers:_WIRE_HEADERS}),
-      fetch("/backend/ops/scorecards/summary", {headers:_WIRE_HEADERS}),
-      fetch("/backend/depot/gate/access-logs?limit=200", {headers:_WIRE_HEADERS}),
-      fetch("/backend/depot/vision/counting/manifests", {headers:_WIRE_HEADERS}),
-      fetch("/backend/depot/vision/cameras/", {headers:_WIRE_HEADERS}),
-    ]);
 
-    // Monitoring KPIs — health, throughput, alerts (depot-adjusted)
-    if (kR.status==="fulfilled"&&kR.value.ok){
-      const k=await kR.value.json();
-      const baseHealth = 100 - Math.min((k.critical_alerts||0)*5, 30);
-      const health = Math.max(0, Math.min(100, baseHealth + dp.healthOffset));
-      const evToday = Math.round((k.total_events_today||0) * dp.evScale);
-      _s("heroHealth", health + "%");
-      _h("throughputVal", evToday + '<span class="kpi-unit"> events</span>');
-      _s("hHealth", health + "%");
-      const hb=document.getElementById("healthBar");if(hb)hb.style.width=health+"%";
-    }
+    // ── Depot Health ──
+    _s("heroHealth", dp.healthBase + "%");
+    _s("hHealth", dp.healthBase + "%");
+    const hb = document.getElementById("healthBar"); if (hb) hb.style.width = dp.healthBase + "%";
 
-    // Fleet — trucks in yard (depot-specific counts)
-    {
-      const total = dp.truckYard;
-      const totalFleet = dp.truckTotal;
-      _s("heroTrucks", total + "/" + totalFleet);
-      _s("hTrucks", total + " / " + totalFleet);
-      const tb=document.getElementById("trucksBar");if(tb)tb.style.width=Math.round(total/Math.max(totalFleet,1)*100)+"%";
-    }
+    // ── Throughput events ──
+    _h("throughputVal", dp.eventsToday + '<span class="kpi-unit"> events</span>');
 
-    // Perimeter breaches (depot-adjusted)
-    if (bR.status==="fulfilled"&&bR.value.ok){
-      const b=await bR.value.json();
-      const count = Math.max(0, (b.length || 0) + dp.breachAdd);
-      _s("kpiPerimeterVal", count);
-      _s("kpiPerimeterDelta", count === 0 ? "No events today" : count + " active");
-    }
+    // ── Cameras ──
+    _s("heroCams", dp.camActive + "/" + dp.camTotal);
+    _s("hCameras", dp.camActive + " / " + dp.camTotal);
+    const camBar = document.getElementById("camerasBar"); if (camBar) camBar.style.width = Math.round(dp.camActive / dp.camTotal * 100) + "%";
 
-    // Cluster utilization — depot-adjusted
-    if (zR.status==="fulfilled"&&zR.value.ok){
-      const zones = await zR.value.json();
-      if (zones.length) {
-        const rawUtil = Math.round(zones.reduce((s,z) => s + (z.utilization_pct || Math.round((z.current_occupancy||0)/(z.max_capacity_units||1)*100)), 0) / zones.length);
-        const avgUtil = Math.max(0, Math.min(100, rawUtil + dp.utilOffset));
-        _s("heroClusterUtil", avgUtil + "%");
-        _s("hClusterUtil", avgUtil + "%");
-        const cb=document.getElementById("clusterBar");if(cb)cb.style.width=avgUtil+"%";
-        _h("kpiOccupancy", avgUtil + '<span class="kpi-unit">%</span>');
-        _s("kpiOccupancyDelta", zones.length + " zones tracked");
-      }
-    }
+    // ── Cluster Utilization ──
+    _s("heroClusterUtil", dp.utilBase + "%");
+    _s("hClusterUtil", dp.utilBase + "%");
+    const cb = document.getElementById("clusterBar"); if (cb) cb.style.width = dp.utilBase + "%";
 
-    // Active cameras — depot-specific counts
-    {
-      const active = dp.camActive;
-      const total = dp.camTotal;
-      _s("heroCams", active + "/" + total);
-      _s("hCameras", active + " / " + total);
-      const camBar=document.getElementById("camerasBar");if(camBar)camBar.style.width=Math.round(active/Math.max(total,1)*100)+"%";
-    }
+    // ── Depot Occupancy KPI ──
+    _h("kpiOccupancy", dp.occBase + '<span class="kpi-unit">%</span>');
 
-    // Dwell heatmap — depot-adjusted
-    if (dwR.status==="fulfilled"&&dwR.value.ok){
-      const hm = await dwR.value.json();
-      if (hm.length) {
-        const avgDwell = Math.round(hm.reduce((s,h) => s + (h.avg_dwell_minutes||0), 0) / hm.length * dp.dwellScale);
-        _h("kpiAvgLoad", avgDwell + '<span class="kpi-unit"> min</span>');
-        _s("kpiAvgLoadDelta", hm.length + " zones monitored");
-      }
-    }
+    // ── Count Accuracy ──
+    _s("heroCountAcc", dp.countAccBase + "%");
+    _h("kpiBagAcc", dp.countAccBase + '<span class="kpi-unit">%</span>');
 
-    // Scorecards — FIFO compliance, count accuracy, loss prevention (depot-adjusted)
-    if (scR.status==="fulfilled"&&scR.value.ok){
-      const sc = await scR.value.json();
-      const overall = Math.max(0, Math.min(100, (sc.overall_compliance_pct || 0) + dp.fifoAdj));
-      _h("kpiFifo", overall.toFixed(1) + '<span class="kpi-unit">%</span>');
-      _s("heroFifo", overall.toFixed(1) + "%");
-      _s("kpiFifoDelta", sc.total_compliant + "/" + sc.total_slas + " compliant");
-      _h("kpiBagAcc", (100 - (sc.total_breached||0) / Math.max(sc.total_slas,1) * 100).toFixed(1) + '<span class="kpi-unit">%</span>');
-      _s("heroCountAcc", (100 - (sc.total_breached||0) / Math.max(sc.total_slas,1) * 100).toFixed(1) + "%");
-      _s("kpiBagAccDelta", sc.total_breached + " breaches");
-      const pen = sc.total_penalty || 0;
-      _h("kpiLossPrev", (pen > 0 ? "$" + pen.toLocaleString() : "$0") + '<span class="kpi-unit">/mo</span>');
-      _s("kpiLossPrevDelta", pen > 0 ? sc.total_at_risk + " at risk" : "No penalties");
-    }
+    // ── FIFO Compliance ──
+    _s("heroFifo", dp.fifoBase + "%");
+    _h("kpiFifo", dp.fifoBase + '<span class="kpi-unit">%</span>');
 
-    // LPR / access logs — depot-specific count
-    {
-      _h("kpiLprMatches", dp.lprPerDay + '<span class="kpi-unit">/d</span>');
-      _s("kpiLprDelta", Math.round(dp.lprPerDay * 8.4) + " total entries");
-    }
+    // ── Perimeter Breaches ──
+    _s("kpiPerimeterVal", dp.breachBase);
+    _s("kpiPerimeterDelta", dp.breachBase === 0 ? "No events today" : dp.breachBase + " active");
 
-    // Manifests — count discrepancies
-    if (lprR.status==="fulfilled"&&lprR.value.ok){
-      const manifests = await lprR.value.json();
-      if (manifests.length) {
-        const mismatches = manifests.filter(m => m.status === "mismatch" || m.status === "discrepancy").length;
-        const discPct = (mismatches / manifests.length * 100).toFixed(1);
-        _h("kpiCountDisc", discPct + '<span class="kpi-unit">%</span>');
-        _s("kpiCountDiscDelta", mismatches + "/" + manifests.length + " manifests");
-      } else {
-        _h("kpiCountDisc", '0<span class="kpi-unit">%</span>');
-        _s("kpiCountDiscDelta", "No manifests");
-      }
-    }
+    // ── LPR Matches ──
+    _h("kpiLprMatches", dp.lprPerDay + '<span class="kpi-unit">/d</span>');
+    _s("kpiLprDelta", Math.round(dp.lprPerDay * 8.4) + " total entries");
 
-    // Detection accuracy — from detection model confidence (fallback to mock)
+    // ── Detection Accuracy (from backend with fallback) ──
     try {
       const detR = await fetch("/backend/depot/vision/detection/models", {headers:_WIRE_HEADERS});
       if (detR.ok) {
@@ -733,27 +534,11 @@ window.loadData = async function() {
 
   } catch{}
 
-  // Throughput chart — fetch real event data for last 7 days
-  try {
-    const evR = await fetch("/backend/ops/monitoring/events?limit=500", {headers:_WIRE_HEADERS});
-    if (evR.ok) {
-      const events = await evR.json();
-      const now = new Date();
-      const dayCounts = [0,0,0,0,0,0,0]; // Mon-Sun
-      events.forEach(function(e) {
-        const d = new Date(e.timestamp || e.created_at);
-        const age = Math.floor((now - d) / 86400000);
-        if (age < 7) {
-          const dayIdx = (6 - age); // 6=today, 5=yesterday, etc
-          if (dayIdx >= 0 && dayIdx < 7) dayCounts[dayIdx] += 1;
-        }
-      });
-      for (var i = 0; i < 7; i++) {
-        window.THROUGHPUT[i] = Math.round(dayCounts[i] * (dp.throughput[i] || 1));
-      }
-      if (typeof drawThroughputChart === "function") drawThroughputChart();
-    }
-  } catch {}
+  // Throughput chart — use depot-specific values directly
+  for (var i = 0; i < 7; i++) {
+    window.THROUGHPUT[i] = dp.throughput[i];
+  }
+  if (typeof drawThroughputChart === "function") drawThroughputChart();
 };
 // Re-fire on page load
 setTimeout(()=>{if(typeof loadData==="function")loadData();},500);
