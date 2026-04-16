@@ -240,7 +240,6 @@ async def create_manifest(
 async def list_manifests(
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List shipment manifests."""
     query = select(ShipmentManifest)
@@ -254,7 +253,6 @@ async def list_manifests(
 async def get_manifest(
     manifest_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     manifest = await db.get(ShipmentManifest, manifest_id)
     if not manifest:

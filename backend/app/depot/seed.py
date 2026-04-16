@@ -499,6 +499,73 @@ async def seed_database(db_url: str | None = None):
                 })
             logger.info("Seeded 5 monitoring alerts")
 
+            # ── Auto-Escalation Rules ──
+            esc_rules = [
+                {"name": "P1 Auto-Escalate (5min)", "priority_trigger": "P1", "time_window_minutes": 5, "target_tier": "2", "channels": '["in_app","email","sms"]'},
+                {"name": "P2 Auto-Escalate (15min)", "priority_trigger": "P2", "time_window_minutes": 15, "target_tier": "2", "channels": '["in_app","email"]'},
+                {"name": "P3 Supervisor Notify (60min)", "priority_trigger": "P3", "time_window_minutes": 60, "target_tier": "1", "channels": '["in_app"]'},
+            ]
+            for er in esc_rules:
+                await db.execute(text("""
+                    INSERT INTO ops_auto_escalation_rules (id, name, priority_trigger, time_window_minutes, target_tier, notification_channels, is_active, created_at, updated_at)
+                    VALUES (:id, :name, :pt, :tw, :tt, :ch, true, :now, :now)
+                    ON CONFLICT DO NOTHING
+                """), {"id": uuid.uuid4(), "name": er["name"], "pt": er["priority_trigger"], "tw": er["time_window_minutes"], "tt": er["target_tier"], "ch": er["channels"], "now": now})
+            logger.info(f"Seeded {len(esc_rules)} auto-escalation rules")
+
+            # ── Sequencing Batches (fixed columns) ──
+            try:
+                async with db.begin_nested():
+                    seq_batches = [
+                        {"sku_code": "CEM-53", "product_name": "OPC Cement 53 Grade", "zone": "A", "rack": "A-01", "bin_location": "A-01-L1", "quantity": 498, "rule": "FIFO", "days": 365},
+                        {"sku_code": "FERT-DAP", "product_name": "DAP Fertilizer 50kg", "zone": "A", "rack": "A-03", "bin_location": "A-03-L2", "quantity": 320, "rule": "FEFO", "days": 180},
+                        {"sku_code": "CHEM-H2SO4", "product_name": "Sulfuric Acid Drums", "zone": "C", "rack": "C-01", "bin_location": "C-01-L1", "quantity": 50, "rule": "FIFO", "days": 730},
+                        {"sku_code": "STEEL-TMT", "product_name": "TMT Steel Bars 12mm", "zone": "B", "rack": "B-05", "bin_location": "B-05-L3", "quantity": 1200, "rule": "FIFO", "days": 9999},
+                        {"sku_code": "RICE-BAS", "product_name": "Basmati Rice 25kg", "zone": "D", "rack": "D-02", "bin_location": "D-02-L1", "quantity": 800, "rule": "FEFO", "days": 365},
+                    ]
+                    for sb in seq_batches:
+                        mfg = now - timedelta(days=30)
+                        exp = now + timedelta(days=sb["days"])
+                        days_to = sb["days"]
+                        await db.execute(text("""
+                            INSERT INTO depot_inventory_batches (id, batch_code, sku_code, product_name, zone, rack, bin_location, quantity, original_quantity, manufacture_date, expiry_date, received_at, sequencing_rule, priority_score, status, is_near_expiry, days_to_expiry, created_at, updated_at)
+                            VALUES (:id, :batch_code, :sku, :name, :zone, :rack, :bin, :qty, :qty, :mfg, :exp, :now, :rule, 0.0, 'available', :near, :days, :now, :now)
+                            ON CONFLICT DO NOTHING
+                        """), {
+                            "id": uuid.uuid4(), "batch_code": f"B2026-{sb['sku_code']}", "sku": sb["sku_code"], "name": sb["product_name"],
+                            "zone": sb["zone"], "rack": sb["rack"], "bin": sb["bin_location"],
+                            "qty": sb["quantity"], "mfg": mfg, "exp": exp,
+                            "rule": sb["rule"], "near": days_to < 60, "days": days_to, "now": now,
+                        })
+                logger.info(f"Seeded {len(seq_batches)} sequencing batches")
+            except Exception as e:
+                logger.warning(f"Skipped sequencing batches: {e}")
+
+            # ── Scorecard Entries ──
+            try:
+                async with db.begin_nested():
+                    iso_week = now.strftime("%G-W%V")
+                    scorecards = [
+                        {"group_name": "Live Monitoring", "total": 12, "compliant": 12, "at_risk": 0, "breached": 0, "penalty": 0},
+                        {"group_name": "SLA Tracking", "total": 18, "compliant": 15, "at_risk": 2, "breached": 1, "penalty": 1500},
+                        {"group_name": "Fleet & Yard View", "total": 15, "compliant": 14, "at_risk": 1, "breached": 0, "penalty": 0},
+                        {"group_name": "Incident Escalation", "total": 10, "compliant": 8, "at_risk": 1, "breached": 1, "penalty": 1100},
+                    ]
+                    for sc in scorecards:
+                        comp_pct = round(sc["compliant"] / sc["total"] * 100, 1) if sc["total"] > 0 else 100
+                        await db.execute(text("""
+                            INSERT INTO ops_scorecard_entries (id, period, group_type, group_name, total_slas, compliant, at_risk, breached, compliance_pct, penalty_amount, currency, created_at, updated_at)
+                            VALUES (:id, :period, 'module', :gn, :total, :comp, :ar, :br, :pct, :pen, 'USD', :now, :now)
+                            ON CONFLICT DO NOTHING
+                        """), {
+                            "id": uuid.uuid4(), "period": iso_week, "gn": sc["group_name"],
+                            "total": sc["total"], "comp": sc["compliant"], "ar": sc["at_risk"],
+                            "br": sc["breached"], "pct": comp_pct, "pen": sc["penalty"], "now": now,
+                        })
+                logger.info(f"Seeded {len(scorecards)} scorecard entries")
+            except Exception as e:
+                logger.warning(f"Skipped scorecard entries: {e}")
+
             await db.commit()
             logger.info("=== Depot seed complete ===")
             print("\n✓ Depot database seeded successfully with demo data.")

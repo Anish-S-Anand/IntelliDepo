@@ -992,19 +992,19 @@ svg.chart { width: 100%; overflow: visible; }
       <div class="exec-kpi"><div class="exec-kpi-v" style="color:var(--acc)" id="heroHealth">94%</div><div class="exec-kpi-l">Depot Health</div></div>
       <div class="exec-kpi"><div class="exec-kpi-v" style="color:var(--pos)" id="heroTrucks">8/15</div><div class="exec-kpi-l">Active Trucks</div></div>
       <div class="exec-kpi"><div class="exec-kpi-v" style="color:var(--info)" id="heroCams">6/6</div><div class="exec-kpi-l">Cameras Online</div></div>
-      <div class="exec-kpi"><div class="exec-kpi-v" style="color:var(--warn)">91.2%</div><div class="exec-kpi-l">Cluster Util.</div></div>
-      <div class="exec-kpi"><div class="exec-kpi-v" style="color:var(--pos)">99.8%</div><div class="exec-kpi-l">Count Accuracy</div></div>
-      <div class="exec-kpi"><div class="exec-kpi-v" style="color:var(--pos)">96.4%</div><div class="exec-kpi-l">FIFO Compliance</div></div>
+      <div class="exec-kpi"><div class="exec-kpi-v" style="color:var(--warn)" id="heroClusterUtil">--</div><div class="exec-kpi-l">Cluster Util.</div></div>
+      <div class="exec-kpi"><div class="exec-kpi-v" style="color:var(--pos)" id="heroCountAcc">--</div><div class="exec-kpi-l">Count Accuracy</div></div>
+      <div class="exec-kpi"><div class="exec-kpi-v" style="color:var(--pos)" id="heroFifo">--</div><div class="exec-kpi-l">FIFO Compliance</div></div>
     </div>
   </div>
 
   <div class="kpi-grid mb-20">
-    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Bag Count Accuracy<span class="kpi-icon">🎯</span></div><div class="kpi-val" style="color:var(--pos)">99.8<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)">↑ +12.5% vs manual</div></div>
-    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">FIFO Compliance<span class="kpi-icon">🔄</span></div><div class="kpi-val" style="color:var(--pos)">96.4<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)">↑ +8.2% MoM</div></div>
-    <div class="kpi" style="--kpi-color:var(--info)"><div class="kpi-label">Avg Loading Time<span class="kpi-icon">⏱</span></div><div class="kpi-val" style="color:var(--info)">22<span class="kpi-unit"> min</span></div><div class="kpi-delta" style="color:var(--pos)">↓ 35% faster</div></div>
-    <div class="kpi" style="--kpi-color:var(--acc)"><div class="kpi-label">Depot Occupancy<span class="kpi-icon">🏭</span></div><div class="kpi-val" style="color:var(--acc)">84.5<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--sub)">Optimal range</div></div>
-    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Throughput<span class="kpi-icon">📦</span></div><div class="kpi-val" id="throughputVal" style="color:var(--pos)">850<span class="kpi-unit"> t/d</span></div><div class="kpi-delta" style="color:var(--pos)">↑ +15% capacity</div></div>
-    <div class="kpi" style="--kpi-color:var(--warn)"><div class="kpi-label">Loss Prevention<span class="kpi-icon">🛡</span></div><div class="kpi-val" style="color:var(--warn)">₹42K<span class="kpi-unit">/mo</span></div><div class="kpi-delta" style="color:var(--pos)">↑ +₹8K gain</div></div>
+    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Bag Count Accuracy<span class="kpi-icon">🎯</span></div><div class="kpi-val" style="color:var(--pos)" id="kpiBagAcc">--<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)" id="kpiBagAccDelta"></div></div>
+    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">FIFO Compliance<span class="kpi-icon">🔄</span></div><div class="kpi-val" style="color:var(--pos)" id="kpiFifo">--<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)" id="kpiFifoDelta"></div></div>
+    <div class="kpi" style="--kpi-color:var(--info)"><div class="kpi-label">Avg Loading Time<span class="kpi-icon">⏱</span></div><div class="kpi-val" style="color:var(--info)" id="kpiAvgLoad">--<span class="kpi-unit"> min</span></div><div class="kpi-delta" style="color:var(--pos)" id="kpiAvgLoadDelta"></div></div>
+    <div class="kpi" style="--kpi-color:var(--acc)"><div class="kpi-label">Depot Occupancy<span class="kpi-icon">🏭</span></div><div class="kpi-val" style="color:var(--acc)" id="kpiOccupancy">--<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--sub)" id="kpiOccupancyDelta"></div></div>
+    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Throughput<span class="kpi-icon">📦</span></div><div class="kpi-val" id="throughputVal" style="color:var(--pos)">--<span class="kpi-unit"> t/d</span></div><div class="kpi-delta" style="color:var(--pos)" id="throughputDelta"></div></div>
+    <div class="kpi" style="--kpi-color:var(--warn)"><div class="kpi-label">Loss Prevention<span class="kpi-icon">🛡</span></div><div class="kpi-val" style="color:var(--warn)" id="kpiLossPrev">--<span class="kpi-unit">/mo</span></div><div class="kpi-delta" style="color:var(--pos)" id="kpiLossPrevDelta"></div></div>
   </div>
 
   <div class="col-2-1 mb-20">
@@ -1075,10 +1075,10 @@ svg.chart { width: 100%; overflow: visible; }
 
   <!-- Vision KPIs (live from API) -->
   <div class="kpi-grid mb-20">
-    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Detection Accuracy<span class="kpi-icon">🎯</span></div><div class="kpi-val" style="color:var(--pos)" id="kpiDetAcc">98.7<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)">↑ Avg confidence</div></div>
-    <div class="kpi" style="--kpi-color:var(--info)"><div class="kpi-label">LPR Matches<span class="kpi-icon">🚛</span></div><div class="kpi-val" style="color:var(--info)">142<span class="kpi-unit">/d</span></div><div class="kpi-delta" style="color:var(--pos)">↑ 99.1% accuracy</div></div>
-    <div class="kpi" style="--kpi-color:var(--warn)"><div class="kpi-label">Perimeter Events<span class="kpi-icon">🔒</span></div><div class="kpi-val" style="color:var(--warn)"><span id="kpiPerimeterVal">3</span><span class="kpi-unit"> today</span></div><div class="kpi-delta" style="color:var(--pos)">↓ vs 7 yesterday</div></div>
-    <div class="kpi" style="--kpi-color:var(--acc)"><div class="kpi-label">Count Discrepancies<span class="kpi-icon">📊</span></div><div class="kpi-val" style="color:var(--acc)">0.2<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)">↓ 90% reduction</div></div>
+    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Detection Accuracy<span class="kpi-icon">🎯</span></div><div class="kpi-val" style="color:var(--pos)" id="kpiDetAcc">--<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)" id="kpiDetAccDelta"></div></div>
+    <div class="kpi" style="--kpi-color:var(--info)"><div class="kpi-label">LPR Matches<span class="kpi-icon">🚛</span></div><div class="kpi-val" style="color:var(--info)" id="kpiLprMatches">--<span class="kpi-unit">/d</span></div><div class="kpi-delta" style="color:var(--pos)" id="kpiLprDelta"></div></div>
+    <div class="kpi" style="--kpi-color:var(--warn)"><div class="kpi-label">Perimeter Events<span class="kpi-icon">🔒</span></div><div class="kpi-val" style="color:var(--warn)"><span id="kpiPerimeterVal">--</span><span class="kpi-unit"> today</span></div><div class="kpi-delta" style="color:var(--pos)" id="kpiPerimeterDelta"></div></div>
+    <div class="kpi" style="--kpi-color:var(--acc)"><div class="kpi-label">Count Discrepancies<span class="kpi-icon">📊</span></div><div class="kpi-val" style="color:var(--acc)" id="kpiCountDisc">--<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)" id="kpiCountDiscDelta"></div></div>
   </div>
 
   <div class="cam-grid" id="cameraGrid"></div>
@@ -3494,8 +3494,6 @@ function exportReport(fmt) {
   a.click();
 }
 function loadData() {
-  const tv = document.getElementById("throughputVal");
-  if (tv) { const v = 820 + Math.round(Math.random() * 100); tv.innerHTML = v + '<span class="kpi-unit"> t/d</span>'; }
   drawThroughputChart();
   renderAlerts();
 }

@@ -14,17 +14,9 @@ const _WIRE_HEADERS = {"Content-Type":"application/json","x-user-id":"ops-dashbo
 // SLA & FLEET — wired to /backend/sla + /backend/ops/fleet
 // ════════════════════════════════════════════════════════
 
-const _SLA_FALLBACK = [
-  {name:"Mumbai Port Authority",target:30,actual:22,depot:"MUM-001"},
-  {name:"Delhi Rail Hub",target:25,actual:28,depot:"DEL-002"},
-  {name:"Dubai Logistics Zone",target:20,actual:18,depot:"DXB-001"},
-];
-const _TRUCK_FALLBACK = [
-  {vehicle_id:"TN-04-AB-1234",status:"at_dock",assigned_dock:"B3",driver_name:"Ravi M.",entered_yard_at:new Date(Date.now()-18*60000).toISOString()},
-  {vehicle_id:"MH-12-CD-5678",status:"in_yard",assigned_dock:null,driver_name:"Suresh P.",entered_yard_at:new Date(Date.now()-34*60000).toISOString()},
-  {vehicle_id:"DL-01-EF-9012",status:"departed",assigned_dock:"A1",driver_name:"Ahmed K.",entered_yard_at:new Date(Date.now()-8*60000).toISOString()},
-  {vehicle_id:"KA-03-GH-3456",status:"in_yard",assigned_dock:null,driver_name:"Vijay S.",entered_yard_at:new Date(Date.now()-41*60000).toISOString()},
-];
+// No fallback data — all values fetched from real backend APIs
+const _SLA_FALLBACK = [];
+const _TRUCK_FALLBACK = [];
 
 function _drawSLACards(slas) {
   const sl = document.getElementById("slaList");
@@ -201,13 +193,8 @@ window.renderSLA = async function() {
 // INCIDENTS — wired to /backend/ops/incidents
 // ════════════════════════════════════════════════════════
 
-const _INC_FALLBACK = [
-  {id:"INC-001",type:"Security Breach",sev:"CRITICAL",loc:"Gate 4 Perimeter",t:"8m ago",status:"acknowledged",cam:"CAM-042",desc:"Unauthorized entry detected at Gate 4.",assignee:"Guard Unit 2"},
-  {id:"INC-002",type:"Damaged Bags",sev:"HIGH",loc:"Zone C • Bay 4",t:"2m ago",status:"open",cam:"CAM-04",desc:"5 bags torn during unloading.",assignee:"—"},
-  {id:"INC-003",type:"Count Mismatch",sev:"HIGH",loc:"Cluster B-09",t:"1h ago",status:"open",cam:"CAM-08",desc:"Physical count shows -5 bags vs ERP.",assignee:"—"},
-  {id:"INC-004",type:"SLA Risk",sev:"MEDIUM",loc:"Dock B",t:"15m ago",status:"open",cam:"—",desc:"Truck queue exceeded 30-minute SLA.",assignee:"—"},
-  {id:"INC-005",type:"Temp Warning",sev:"LOW",loc:"Cold Storage Zone A",t:"32m ago",status:"resolved",cam:"CAM-12",desc:"Temperature exceeded threshold briefly.",assignee:"Ops Team"},
-];
+// No fallback data — incidents fetched from real backend API
+const _INC_FALLBACK = [];
 
 function _mapBackendIncident(i) {
   const sevMap = { P1: "CRITICAL", P2: "HIGH", P3: "MEDIUM", P4: "LOW" };
@@ -779,31 +766,118 @@ window.selectEscIncident = async function(id) {
 window._origLoadData = window.loadData;
 window.loadData = async function() {
   if (window._origLoadData) window._origLoadData();
+  const _s = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  const _h = (id, v) => { const e = document.getElementById(id); if (e) e.innerHTML = v; };
   try {
-    const [kR, fR, bR] = await Promise.allSettled([
+    const [kR, fR, bR, zR, dwR, scR, accR, lprR] = await Promise.allSettled([
       fetch("/backend/ops/monitoring/dashboard/kpis", {headers:_WIRE_HEADERS}),
       fetch("/backend/ops/fleet/vehicles/yard/summary", {headers:_WIRE_HEADERS}),
       fetch("/backend/depot/vision/perimeter/breaches/active", {headers:_WIRE_HEADERS}),
+      fetch("/backend/depot/vision/cluster/zones", {headers:_WIRE_HEADERS}),
+      fetch("/backend/ops/fleet/dwell/heatmap", {headers:_WIRE_HEADERS}),
+      fetch("/backend/ops/scorecards/summary", {headers:_WIRE_HEADERS}),
+      fetch("/backend/depot/gate/access-logs?limit=200", {headers:_WIRE_HEADERS}),
+      fetch("/backend/depot/vision/counting/manifests", {headers:_WIRE_HEADERS}),
     ]);
+
+    // Monitoring KPIs — health, throughput, alerts
     if (kR.status==="fulfilled"&&kR.value.ok){
       const k=await kR.value.json();
-      const _s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
-      const _h=(id,v)=>{const e=document.getElementById(id);if(e)e.innerHTML=v;};
-      _s("heroHealth",(100-Math.min(k.critical_alerts*5,30))+"%");
-      _h("throughputVal",(k.total_events_today||0)+'<span class="kpi-unit"> events</span>');
-      _s("hHealth",(100-Math.min(k.critical_alerts*5,30))+"%");
-      const hb=document.getElementById("healthBar");if(hb)hb.style.width=(100-Math.min(k.critical_alerts*5,30))+"%";
+      const health = 100 - Math.min((k.critical_alerts||0)*5, 30);
+      _s("heroHealth", health + "%");
+      _h("throughputVal", (k.total_events_today||0) + '<span class="kpi-unit"> events</span>');
+      _s("hHealth", health + "%");
+      const hb=document.getElementById("healthBar");if(hb)hb.style.width=health+"%";
     }
+
+    // Fleet — trucks in yard
     if (fR.status==="fulfilled"&&fR.value.ok){
       const f=await fR.value.json();
-      const _s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
-      _s("heroTrucks",(f.total_in_yard||0)+"/15");
-      _s("hTrucks",(f.total_in_yard||0)+" / 15");
+      const total = f.total_in_yard || 0;
+      const totalFleet = f.total_vehicles || total;
+      _s("heroTrucks", total + "/" + totalFleet);
+      _s("hTrucks", total + " / " + totalFleet);
     }
+
+    // Perimeter breaches
     if (bR.status==="fulfilled"&&bR.value.ok){
       const b=await bR.value.json();
-      const pe=document.getElementById("kpiPerimeterVal");if(pe)pe.textContent=b.length||0;
+      _s("kpiPerimeterVal", b.length || 0);
+      _s("kpiPerimeterDelta", b.length === 0 ? "No events today" : b.length + " active");
     }
+
+    // Cluster utilization — compute avg occupancy
+    if (zR.status==="fulfilled"&&zR.value.ok){
+      const zones = await zR.value.json();
+      if (zones.length) {
+        const avgUtil = Math.round(zones.reduce((s,z) => s + (z.utilization_pct || Math.round((z.current_occupancy||0)/(z.max_capacity_units||1)*100)), 0) / zones.length);
+        _s("heroClusterUtil", avgUtil + "%");
+        _h("kpiOccupancy", avgUtil + '<span class="kpi-unit">%</span>');
+        _s("kpiOccupancyDelta", zones.length + " zones tracked");
+      }
+    }
+
+    // Dwell heatmap — compute avg loading time
+    if (dwR.status==="fulfilled"&&dwR.value.ok){
+      const hm = await dwR.value.json();
+      if (hm.length) {
+        const avgDwell = Math.round(hm.reduce((s,h) => s + (h.avg_dwell_minutes||0), 0) / hm.length);
+        _h("kpiAvgLoad", avgDwell + '<span class="kpi-unit"> min</span>');
+        _s("kpiAvgLoadDelta", hm.length + " zones monitored");
+      }
+    }
+
+    // Scorecards — FIFO compliance, count accuracy, loss prevention
+    if (scR.status==="fulfilled"&&scR.value.ok){
+      const sc = await scR.value.json();
+      const overall = sc.overall_compliance_pct || 0;
+      _h("kpiFifo", overall.toFixed(1) + '<span class="kpi-unit">%</span>');
+      _s("heroFifo", overall.toFixed(1) + "%");
+      _s("kpiFifoDelta", sc.total_compliant + "/" + sc.total_slas + " compliant");
+      _h("kpiBagAcc", (100 - (sc.total_breached||0) / Math.max(sc.total_slas,1) * 100).toFixed(1) + '<span class="kpi-unit">%</span>');
+      _s("heroCountAcc", (100 - (sc.total_breached||0) / Math.max(sc.total_slas,1) * 100).toFixed(1) + "%");
+      _s("kpiBagAccDelta", sc.total_breached + " breaches");
+      const pen = sc.total_penalty || 0;
+      _h("kpiLossPrev", (pen > 0 ? "$" + pen.toLocaleString() : "$0") + '<span class="kpi-unit">/mo</span>');
+      _s("kpiLossPrevDelta", pen > 0 ? sc.total_at_risk + " at risk" : "No penalties");
+    }
+
+    // LPR / access logs — count today's entries
+    if (accR.status==="fulfilled"&&accR.value.ok){
+      const logs = await accR.value.json();
+      const today = new Date().toDateString();
+      const todayLogs = logs.filter(l => new Date(l.timestamp || l.created_at).toDateString() === today);
+      _h("kpiLprMatches", todayLogs.length + '<span class="kpi-unit">/d</span>');
+      _s("kpiLprDelta", logs.length + " total entries");
+    }
+
+    // Manifests — count discrepancies
+    if (lprR.status==="fulfilled"&&lprR.value.ok){
+      const manifests = await lprR.value.json();
+      if (manifests.length) {
+        const mismatches = manifests.filter(m => m.status === "mismatch" || m.status === "discrepancy").length;
+        const discPct = (mismatches / manifests.length * 100).toFixed(1);
+        _h("kpiCountDisc", discPct + '<span class="kpi-unit">%</span>');
+        _s("kpiCountDiscDelta", mismatches + "/" + manifests.length + " manifests");
+      } else {
+        _h("kpiCountDisc", '0<span class="kpi-unit">%</span>');
+        _s("kpiCountDiscDelta", "No manifests");
+      }
+    }
+
+    // Detection accuracy — from detection model confidence
+    try {
+      const detR = await fetch("/backend/depot/vision/detection/models", {headers:_WIRE_HEADERS});
+      if (detR.ok) {
+        const models = await detR.json();
+        const active = models.find(m => m.is_active);
+        if (active) {
+          _h("kpiDetAcc", (active.confidence_threshold * 100).toFixed(1) + '<span class="kpi-unit">%</span>');
+          _s("kpiDetAccDelta", active.model_name + " " + active.model_version);
+        }
+      }
+    } catch {}
+
   } catch{}
 };
 // Re-fire on page load

@@ -490,18 +490,6 @@ async def list_active_incidents(
     return [IncidentResponse.model_validate(i) for i in result.scalars().all()]
 
 
-@router.get("/{incident_id}", response_model=IncidentResponse)
-async def get_incident(
-    incident_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-):
-    result = await db.execute(select(OpsIncident).where(OpsIncident.id == incident_id))
-    incident = result.scalar_one_or_none()
-    if not incident:
-        raise HTTPException(404, "Incident not found")
-    return IncidentResponse.model_validate(incident)
-
-
 @router.patch("/{incident_id}/acknowledge", response_model=IncidentResponse)
 async def acknowledge_incident(
     incident_id: uuid.UUID,
@@ -793,4 +781,20 @@ async def create_incident_from_sla_breach(
 
     await db.commit()
     await db.refresh(incident)
+    return IncidentResponse.model_validate(incident)
+
+
+# ---------------------------------------------------------------------------
+# Single incident by ID — MUST be after all literal routes to avoid conflicts
+# ---------------------------------------------------------------------------
+
+@router.get("/{incident_id}", response_model=IncidentResponse)
+async def get_incident(
+    incident_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(OpsIncident).where(OpsIncident.id == incident_id))
+    incident = result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(404, "Incident not found")
     return IncidentResponse.model_validate(incident)
