@@ -172,15 +172,15 @@ class IncidentResponse(BaseModel):
     status: str
     zone: Optional[str]
     assigned_to: Optional[str]
-    escalation_level: int
-    escalation_chain: list
+    escalation_level: Optional[int] = 0
+    escalation_chain: Optional[list] = None
     escalation_deadline: Optional[datetime]
     acknowledged_at: Optional[datetime]
     acknowledged_by: Optional[str]
     resolved_at: Optional[datetime]
     resolved_by: Optional[str]
     resolution_notes: Optional[str]
-    resolution_steps: list
+    resolution_steps: Optional[list] = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 

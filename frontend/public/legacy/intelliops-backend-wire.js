@@ -80,15 +80,25 @@ function _drawTruckGrid(trucks) {
   }).join("");
 }
 
-// Override renderSLA
+// Override renderSLA — includes KPI cards + penalty panels from original
 window.renderSLA = async function() {
+  const _s = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  const _h = (id, v) => { const e = document.getElementById(id); if (e) e.innerHTML = v; };
+
   _drawSLACards(_SLA_FALLBACK);
   _drawTruckGrid(_TRUCK_FALLBACK);
+
   try {
-    const [sR, tR] = await Promise.allSettled([
+    const [sR, tR, pfR, ysR, dkR, penR] = await Promise.allSettled([
       fetch("/backend/sla", { headers: _WIRE_HEADERS }),
       fetch("/backend/ops/fleet/vehicles?limit=20", { headers: _WIRE_HEADERS }),
+      fetch("/backend/ops/escalation/penalties/forecast", { headers: _WIRE_HEADERS }),
+      fetch("/backend/ops/fleet/vehicles/yard/summary", { headers: _WIRE_HEADERS }),
+      fetch("/backend/ops/fleet/docks", { headers: _WIRE_HEADERS }),
+      fetch("/backend/ops/escalation/penalties", { headers: _WIRE_HEADERS }),
     ]);
+
+    // SLA cards
     if (sR.status === "fulfilled" && sR.value.ok) {
       const slas = await sR.value.json();
       if (slas.length > 0) {
@@ -109,11 +119,73 @@ window.renderSLA = async function() {
         _drawSLACards(enriched);
       }
     }
+
+    // Truck grid
     if (tR.status === "fulfilled" && tR.value.ok) {
       const trucks = await tR.value.json();
       if (trucks.length > 0) _drawTruckGrid(trucks);
     }
+
+    // KPI: SLA Compliance + Active Penalties (from penalty forecast)
+    if (pfR.status === "fulfilled" && pfR.value.ok) {
+      const pf = await pfR.value.json();
+      const comp = 100 - (pf.total_breaches || 0) * 5;
+      _h("slaKpiComp", comp.toFixed(1) + '<span class="kpi-unit">%</span>');
+      _s("slaKpiCompD", (pf.total_breaches || 0) + " breaches");
+      _s("slaKpiPen", pf.total_penalties || 0);
+      _s("slaKpiPenD", "$" + (pf.total_amount || 0).toFixed(0));
+
+      // Penalty Forecast panel
+      _h("slaPenaltyForecast", '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;text-align:center">' +
+        '<div style="padding:14px;background:var(--badge);border-radius:10px;border:1px solid var(--bord)"><div style="font-size:22px;font-weight:800;color:var(--warn)">' + (pf.total_penalties||0) + '</div><div style="font-size:11px;color:var(--sub);margin-top:4px">Total Penalties</div></div>' +
+        '<div style="padding:14px;background:var(--badge);border-radius:10px;border:1px solid var(--bord)"><div style="font-size:22px;font-weight:800;color:var(--sev-critical)">' + (pf.total_breaches||0) + '</div><div style="font-size:11px;color:var(--sub);margin-top:4px">Total Breaches</div></div>' +
+        '<div style="padding:14px;background:var(--badge);border-radius:10px;border:1px solid var(--bord)"><div style="font-size:22px;font-weight:800;color:var(--acc)">$' + (pf.total_amount||0).toFixed(0) + '</div><div style="font-size:11px;color:var(--sub);margin-top:4px">Total Amount</div></div></div>');
+    }
+
+    // KPI: Vehicles in Yard
+    if (ysR.status === "fulfilled" && ysR.value.ok) {
+      const ys = await ysR.value.json();
+      _s("slaKpiVeh", ys.total_in_yard ?? "--");
+      _s("slaKpiVehD", (ys.at_dock ?? 0) + " at dock");
+    }
+
+    // KPI: Dock Utilization + Penalty list
+    if (dkR.status === "fulfilled" && dkR.value.ok) {
+      const docks = await dkR.value.json();
+      if (docks.length) {
+        const occ = docks.filter(d => d.status === "occupied").length;
+        _h("slaKpiDock", Math.round(occ / docks.length * 100) + '<span class="kpi-unit">%</span>');
+        _s("slaKpiDockD", occ + "/" + docks.length + " occupied");
+      } else {
+        _h("slaKpiDock", '0<span class="kpi-unit">%</span>');
+        _s("slaKpiDockD", "No docks");
+      }
+    }
+
+    // Active Penalties list
+    if (penR.status === "fulfilled" && penR.value.ok) {
+      const penalties = await penR.value.json();
+      const el = document.getElementById("slaPenaltyList");
+      if (el) {
+        if (!penalties.length) {
+          el.innerHTML = '<div style="color:var(--sub);font-size:13px;padding:14px;text-align:center">No penalties</div>';
+        } else {
+          el.innerHTML = penalties.map(function(p) {
+            var col = p.status === "pending" ? "var(--warn)" : p.status === "waived" ? "var(--pos)" : "var(--sev-high)";
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--badge);border-radius:8px;margin-bottom:7px;border:1px solid var(--bord);border-left:3px solid '+col+'">' +
+              '<div><div style="font-size:12px;font-weight:600">'+(p.sla_name||"SLA")+'</div><div style="font-size:10px;color:var(--sub);margin-top:2px">'+(p.client_name||"--")+" &bull; "+(p.breach_duration_minutes||0)+'min breach</div></div>' +
+              '<div style="text-align:right"><div style="font-size:16px;font-weight:800;color:'+col+'">$'+(p.penalty_amount||0).toFixed(0)+'</div><div style="font-size:10px;color:var(--sub)">'+(p.status||"").toUpperCase()+'</div></div></div>';
+          }).join("");
+        }
+      }
+    }
+
   } catch {}
+
+  // Update timestamp
+  var slaTs = document.getElementById("slaLastUpdate");
+  if (slaTs) slaTs.textContent = "Last updated: " + new Date().toLocaleTimeString();
+
   // Auto-refresh trucks every 15s
   clearInterval(window._slaInt);
   window._slaInt = setInterval(async () => {

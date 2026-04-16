@@ -151,14 +151,18 @@ async def seed_database(db_url: str | None = None):
                 """), {**gate, "id": gid, "code": f"GATE-{chr(65+i)}", "now": now})
             logger.info(f"Seeded {len(GATES)} gates")
 
-            # ── Vehicles ──
-            for v in VEHICLES:
-                await db.execute(text("""
-                    INSERT INTO depot_vehicles (id, plate_number, vehicle_type, owner_name, company, status, is_active, created_at, updated_at)
-                    VALUES (:id, :plate_number, :vehicle_type, :owner_name, :company, :status, true, :now, :now)
-                    ON CONFLICT DO NOTHING
-                """), {**v, "id": uuid.uuid4(), "now": now})
-            logger.info(f"Seeded {len(VEHICLES)} vehicles")
+            # ── Vehicles (gate registry) ──
+            try:
+                async with db.begin_nested():
+                    for v in VEHICLES:
+                        await db.execute(text("""
+                            INSERT INTO depot_vehicle_registry (id, plate_number, vehicle_type, owner_name, company, status, is_active, created_at, updated_at)
+                            VALUES (:id, :plate_number, :vehicle_type, :owner_name, :company, :status, true, :now, :now)
+                            ON CONFLICT DO NOTHING
+                        """), {**v, "id": uuid.uuid4(), "now": now})
+                logger.info(f"Seeded {len(VEHICLES)} vehicles")
+            except Exception as e:
+                logger.warning(f"Skipped vehicles: {e}")
 
             # ── Visitors ──
             for vis in VISITORS:
@@ -237,18 +241,23 @@ async def seed_database(db_url: str | None = None):
             logger.info(f"Seeded {len(MANIFESTS)} shipment manifests")
 
             # ── Inventory Batches ──
-            for batch in BATCHES:
-                await db.execute(text("""
-                    INSERT INTO depot_inventory_batches (id, sku_id, product_name, batch_number, quantity, zone, rack, bin_location, manufacturing_date, expiry_date, rule_type, status, priority_score, created_at, updated_at)
-                    VALUES (:id, :sku_id, :product_name, :batch_number, :quantity, :zone, :rack, :bin_location, :mfg, :exp, :rule_type, 'available', 0.0, :now, :now)
-                    ON CONFLICT DO NOTHING
-                """), {
-                    **batch, "id": uuid.uuid4(),
-                    "mfg": batch["manufacturing_date"],
-                    "exp": batch["expiry_date"],
-                    "now": now,
-                })
-            logger.info(f"Seeded {len(BATCHES)} inventory batches")
+            try:
+                async with db.begin_nested():
+                    for batch in BATCHES:
+                        await db.execute(text("""
+                            INSERT INTO depot_inventory_batches (id, product_name, batch_number, quantity, zone, rack, bin_location, manufacturing_date, expiry_date, rule_type, status, priority_score, created_at, updated_at)
+                            VALUES (:id, :product_name, :batch_number, :quantity, :zone, :rack, :bin_location, :mfg, :exp, :rule_type, 'available', 0.0, :now, :now)
+                            ON CONFLICT DO NOTHING
+                        """), {
+                            "id": uuid.uuid4(), "product_name": batch["product_name"],
+                            "batch_number": batch["batch_number"], "quantity": batch["quantity"],
+                            "zone": batch["zone"], "rack": batch["rack"], "bin_location": batch["bin_location"],
+                            "mfg": batch["manufacturing_date"], "exp": batch["expiry_date"],
+                            "rule_type": batch["rule_type"], "now": now,
+                        })
+                logger.info(f"Seeded {len(BATCHES)} inventory batches")
+            except Exception as e:
+                logger.warning(f"Skipped inventory batches: {e}")
 
             # ── IntelliOps Tasks ──
             ops_tasks = [
@@ -296,6 +305,200 @@ async def seed_database(db_url: str | None = None):
                 """), {**ex, "id": uuid.uuid4(), "now": now})
             logger.info(f"Seeded {len(exceptions)} IntelliOps exceptions")
 
+            # ── Dashboard User (for legacy HTML auth) ──
+            from passlib.context import CryptContext
+            pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+            dash_email = "dashboard@intelli.ai"
+            dash_pass = pwd_ctx.hash("DashboardOps2026!")
+            existing = await db.execute(text("SELECT id FROM users WHERE email = :e"), {"e": dash_email})
+            if not existing.scalar_one_or_none():
+                await db.execute(text("""
+                    INSERT INTO users (id, email, hashed_password, full_name, is_active, is_superuser, account_type, failed_login_attempts, mfa_enabled, email_verified, created_at, updated_at)
+                    VALUES (:id, :email, :pw, 'Dashboard Operator', true, false, 'platform_user', 0, false, true, :now, :now)
+                    ON CONFLICT DO NOTHING
+                """), {"id": uuid.uuid4(), "email": dash_email, "pw": dash_pass, "now": now})
+                logger.info("Seeded dashboard user: dashboard@intelli.ai")
+            else:
+                logger.info("Dashboard user already exists")
+
+            # ── Fleet Dock Slots ──
+            dock_slots = [
+                {"dock_id": "DOCK-A1", "dock_name": "Dock A1", "zone": "dock_area", "dock_type": "standard", "capacity_tonnes": 25.0},
+                {"dock_id": "DOCK-A2", "dock_name": "Dock A2", "zone": "dock_area", "dock_type": "standard", "capacity_tonnes": 25.0},
+                {"dock_id": "DOCK-B1", "dock_name": "Dock B1", "zone": "dock_area", "dock_type": "refrigerated", "capacity_tonnes": 15.0},
+                {"dock_id": "DOCK-B2", "dock_name": "Dock B2", "zone": "dock_area", "dock_type": "refrigerated", "capacity_tonnes": 15.0},
+                {"dock_id": "DOCK-C1", "dock_name": "Dock C1", "zone": "dock_area", "dock_type": "heavy", "capacity_tonnes": 40.0},
+                {"dock_id": "DOCK-C2", "dock_name": "Dock C2", "zone": "dock_area", "dock_type": "standard", "capacity_tonnes": 25.0},
+            ]
+            dock_ids = []
+            for ds in dock_slots:
+                did = uuid.uuid4()
+                dock_ids.append({"id": did, "dock_id": ds["dock_id"]})
+                await db.execute(text("""
+                    INSERT INTO ops_dock_slots (id, dock_id, dock_name, zone, dock_type, capacity_tonnes, status, x_position, y_position, created_at, updated_at)
+                    VALUES (:id, :dock_id, :dock_name, :zone, :dock_type, :cap, 'free', 0, 0, :now, :now)
+                    ON CONFLICT DO NOTHING
+                """), {**ds, "id": did, "cap": ds["capacity_tonnes"], "now": now})
+            logger.info(f"Seeded {len(dock_slots)} dock slots")
+
+            # ── Fleet Vehicles (ops_vehicles — different from gate vehicles) ──
+            fleet_vehicles = [
+                {"vehicle_id": "TN-04-AB-1234", "plate_number": "TN-04-AB-1234", "vehicle_type": "truck_20ft", "status": "at_dock", "current_zone": "dock_area", "assigned_dock": "DOCK-A1"},
+                {"vehicle_id": "MH-12-CD-5678", "plate_number": "MH-12-CD-5678", "vehicle_type": "truck_40ft", "status": "in_yard", "current_zone": "staging_area", "assigned_dock": None},
+                {"vehicle_id": "DL-01-EF-9012", "plate_number": "DL-01-EF-9012", "vehicle_type": "truck_20ft", "status": "at_dock", "current_zone": "dock_area", "assigned_dock": "DOCK-B1"},
+                {"vehicle_id": "KA-03-GH-3456", "plate_number": "KA-03-GH-3456", "vehicle_type": "refrigerated", "status": "in_yard", "current_zone": "parking_yard", "assigned_dock": None},
+                {"vehicle_id": "GJ-06-IJ-7890", "plate_number": "GJ-06-IJ-7890", "vehicle_type": "truck_40ft", "status": "at_gate", "current_zone": "inbound_gate", "assigned_dock": None},
+                {"vehicle_id": "RJ-14-KL-2345", "plate_number": "RJ-14-KL-2345", "vehicle_type": "truck_20ft", "status": "at_dock", "current_zone": "dock_area", "assigned_dock": "DOCK-C1"},
+                {"vehicle_id": "AP-09-MN-6789", "plate_number": "AP-09-MN-6789", "vehicle_type": "refrigerated", "status": "in_yard", "current_zone": "cold_storage", "assigned_dock": None},
+                {"vehicle_id": "UP-32-OP-1234", "plate_number": "UP-32-OP-1234", "vehicle_type": "truck_20ft", "status": "departed", "current_zone": "outbound_gate", "assigned_dock": None},
+            ]
+            for idx_fv, fv in enumerate(fleet_vehicles):
+                yard_time = now - timedelta(minutes=[22, 45, 38, 67, 5, 55, 30, 2][idx_fv])
+                await db.execute(text("""
+                    INSERT INTO ops_vehicles (id, vehicle_id, vehicle_type, status, current_zone, assigned_dock, entered_yard_at, last_gps_at, latitude, longitude, created_at, updated_at)
+                    VALUES (:id, :vid, :vtype, :status, :zone, :dock, :yard_at, :now, :lat, :lng, :now, :now)
+                    ON CONFLICT DO NOTHING
+                """), {
+                    "id": uuid.uuid4(), "vid": fv["vehicle_id"],
+                    "vtype": fv["vehicle_type"], "status": fv["status"], "zone": fv["current_zone"],
+                    "dock": fv["assigned_dock"], "yard_at": yard_time, "now": now,
+                    "lat": 12.97 + (idx_fv * 0.005),
+                    "lng": 77.59 + (idx_fv * 0.003),
+                })
+            logger.info(f"Seeded {len(fleet_vehicles)} fleet vehicles")
+
+            # Mark occupied docks
+            for fv in fleet_vehicles:
+                if fv["assigned_dock"]:
+                    await db.execute(text("""
+                        UPDATE ops_dock_slots SET status = 'occupied', assigned_vehicle_id = :vid
+                        WHERE dock_id = :dock_id
+                    """), {"vid": fv["vehicle_id"], "dock_id": fv["assigned_dock"]})
+
+            # ── Dwell Records ──
+            for i, fv in enumerate(fleet_vehicles[:5]):
+                dwell_mins = [22, 45, 38, 67, 5][i]
+                alert_lvl = "critical" if dwell_mins > 60 else "warning" if dwell_mins > 30 else "normal"
+                await db.execute(text("""
+                    INSERT INTO ops_dwell_records (id, vehicle_id, zone, entered_at, dwell_minutes, alert_level, created_at, updated_at)
+                    VALUES (:id, :vid, :zone, :checkin, :dwell, :alert, :now, :now)
+                    ON CONFLICT DO NOTHING
+                """), {
+                    "id": uuid.uuid4(), "vid": fv["vehicle_id"], "zone": fv["current_zone"],
+                    "checkin": now - timedelta(minutes=dwell_mins), "dwell": dwell_mins,
+                    "alert": alert_lvl, "now": now,
+                })
+            logger.info("Seeded 5 dwell records")
+
+            # ── Dock Schedules ──
+            for i in range(4):
+                sched_start = now + timedelta(hours=i * 2 + 1)
+                sched_end = sched_start + timedelta(hours=2)
+                clients = ["Mumbai Port Authority", "Delhi Rail Hub", "Gujarat Logistics", "Hyderabad Freight"]
+                await db.execute(text("""
+                    INSERT INTO ops_dock_schedules (id, dock_id, vehicle_id, client_name, scheduled_start, scheduled_end, status, delay_risk, created_at, updated_at)
+                    VALUES (:id, :dock_id, :vid, :client, :start, :end, 'scheduled', :delay, :now, :now)
+                    ON CONFLICT DO NOTHING
+                """), {
+                    "id": uuid.uuid4(),
+                    "dock_id": dock_ids[i % len(dock_ids)]["dock_id"],
+                    "vid": fleet_vehicles[i]["vehicle_id"] if i < len(fleet_vehicles) else None,
+                    "client": clients[i], "start": sched_start, "end": sched_end,
+                    "delay": i == 1, "now": now,
+                })
+            logger.info("Seeded 4 dock schedules")
+
+            # ── Incidents ──
+            incidents = [
+                {"title": "Unauthorized entry at Gate 4 perimeter", "description": "Person detected in restricted zone after hours. Camera CAM-042 triggered alert.", "source": "camera", "priority": "P1", "severity_score": 0.95, "status": "open", "zone": "Gate 4 Perimeter", "category": "security"},
+                {"title": "Damaged bags during unloading Zone C", "description": "5 bags torn during truck unloading at Bay 4. Estimated loss ₹4,200.", "source": "manual", "priority": "P2", "severity_score": 0.75, "status": "open", "zone": "Zone C Bay 4", "category": "damage"},
+                {"title": "Count mismatch in Cluster B-09", "description": "Physical count shows -5 bags vs ERP record for batch B2025-1021.", "source": "counting", "priority": "P2", "severity_score": 0.70, "status": "acknowledged", "zone": "Cluster B-09", "category": "inventory"},
+                {"title": "SLA breach risk — Dock B queue", "description": "Truck queue at Dock B exceeded 30-minute SLA window.", "source": "sla_breach", "priority": "P3", "severity_score": 0.55, "status": "open", "zone": "Dock B", "category": "sla"},
+                {"title": "Cold storage temperature spike", "description": "Temperature exceeded 4°C threshold in Zone C cold storage.", "source": "sensor", "priority": "P3", "severity_score": 0.50, "status": "open", "zone": "Zone C Cold Storage", "category": "environment"},
+                {"title": "Forklift collision near Zone A", "description": "Minor collision between forklift and pallet stack. No injuries.", "source": "camera", "priority": "P1", "severity_score": 0.90, "status": "escalated", "zone": "Zone A", "category": "safety"},
+            ]
+            for j, inc in enumerate(incidents):
+                inc_id = uuid.uuid4()
+                created = now - timedelta(minutes=[8, 25, 62, 15, 45, 3][j])
+                chain = [{"tier": "Shift Supervisor", "assigned_at": created.isoformat()}]
+                if inc["status"] == "escalated":
+                    chain.append({"tier": "Operations Manager", "assigned_at": (created + timedelta(minutes=5)).isoformat()})
+                import json as _json
+                await db.execute(text("""
+                    INSERT INTO ops_incidents (id, title, description, source, priority, severity_score, status, zone, incident_type, escalation_level, escalation_chain, escalation_deadline, assigned_to, created_at, updated_at)
+                    VALUES (:id, :title, :desc, :source, :priority, :sev, :status, :zone, :cat, :elevel, :echain, :deadline, :assigned, :created, :now)
+                    ON CONFLICT DO NOTHING
+                """), {
+                    "id": inc_id, "title": inc["title"], "desc": inc["description"],
+                    "source": inc["source"], "priority": inc["priority"], "sev": inc["severity_score"],
+                    "status": inc["status"], "zone": inc["zone"], "cat": inc["category"],
+                    "elevel": len(chain) - 1, "echain": _json.dumps(chain),
+                    "deadline": created + timedelta(minutes={"P1": 5, "P2": 15, "P3": 60, "P4": 240}[inc["priority"]]),
+                    "assigned": chain[-1]["tier"], "created": created, "now": now,
+                })
+            logger.info(f"Seeded {len(incidents)} incidents")
+
+            # ── Escalation Workflows ──
+            esc_workflows = [
+                {"severity": "critical", "trigger_type": "sla_breach", "trigger_source": "Mumbai Port SLA", "current_tier": "2", "status": "active", "bp": 0.85},
+                {"severity": "high", "trigger_type": "incident", "trigger_source": "Safety Response SLA", "current_tier": "1", "status": "active", "bp": 0.72},
+            ]
+            for ew in esc_workflows:
+                triggered = now - timedelta(minutes=20)
+                await db.execute(text("""
+                    INSERT INTO ops_escalation_workflows (id, severity, trigger_type, trigger_source, breach_probability, current_tier, status, tier_1_notified_at, tier_1_deadline, notifications_sent, created_at, updated_at)
+                    VALUES (:id, :sev, :trigger, :src, :bp, :tier, :status, :notified, :deadline, '[]', :now, :now)
+                    ON CONFLICT DO NOTHING
+                """), {
+                    "id": uuid.uuid4(), "sev": ew["severity"], "trigger": ew["trigger_type"],
+                    "src": ew["trigger_source"], "bp": ew["bp"], "tier": ew["current_tier"],
+                    "status": ew["status"], "notified": triggered,
+                    "deadline": now + timedelta(minutes=10), "now": now,
+                })
+            logger.info(f"Seeded {len(esc_workflows)} escalation workflows")
+
+            # ── Monitoring Events + Alerts (so Live Monitoring has data) ──
+            event_types = ["sensor", "camera", "gate", "security", "equipment"]
+            severities = ["critical", "high", "medium", "low", "info"]
+            zones = ["Zone-A", "Zone-B", "Zone-C", "Entry Gate", "Loading Dock", "Perimeter"]
+            for i in range(12):
+                eid = uuid.uuid4()
+                ev_sev = severities[i % 5]
+                ev_zone = zones[i % 6]
+                ev_time = now - timedelta(minutes=i * 8)
+                await db.execute(text("""
+                    INSERT INTO ops_sensor_events (id, event_type, source_id, source_name, zone, severity, value, unit, message, timestamp, processed, created_at, updated_at)
+                    VALUES (:id, :etype, :src_id, :src_name, :zone, :sev, :val, :unit, :msg, :ts, false, :now, :now)
+                    ON CONFLICT DO NOTHING
+                """), {
+                    "id": eid, "etype": event_types[i % 5], "src_id": f"SRC-{i:03d}",
+                    "src_name": f"Sensor-{i+1}", "zone": ev_zone, "sev": ev_sev,
+                    "val": [38.5, 72.0, 1.0, 3.2, 101.5, 45.0, 0.0, 8.1, 0.5, 2.0, 39.0, 65.0][i],
+                    "unit": ["°C", "%RH", "bool", "mm/s", "kPa"][i % 5],
+                    "msg": f"Seed event {i+1} for demo", "ts": ev_time, "now": now,
+                })
+            logger.info("Seeded 12 sensor events")
+
+            # Alerts from those events
+            alert_statuses = ["active", "active", "acknowledged", "active", "resolved"]
+            for i in range(5):
+                await db.execute(text("""
+                    INSERT INTO ops_alert_queue (id, alert_type, severity, priority_score, source_id, source_name, zone, title, message, status, timestamp, created_at, updated_at)
+                    VALUES (:id, :atype, :sev, :score, :src_id, :src_name, :zone, :title, :msg, :status, :ts, :now, :now)
+                    ON CONFLICT DO NOTHING
+                """), {
+                    "id": uuid.uuid4(), "atype": event_types[i],
+                    "src_id": f"SRC-{i:03d}", "src_name": f"Sensor-{i+1}",
+                    "zone": zones[i], "sev": severities[i],
+                    "title": ["Critical temperature in Zone-A", "Unauthorized motion Zone-B", "Gate sensor anomaly", "Perimeter vibration alert", "Equipment pressure warning"][i],
+                    "msg": ["Temperature 38.5°C exceeds 35°C threshold", "Motion detected after hours in Zone-B", "Gate A sensor malfunction detected", "Vibration spike 3.2mm/s in Perimeter", "Pressure drop to 101.5kPa in equipment"][i],
+                    "score": [100, 75, 50, 75, 25][i],
+                    "status": alert_statuses[i],
+                    "ts": now - timedelta(minutes=i * 12),
+                    "now": now,
+                })
+            logger.info("Seeded 5 monitoring alerts")
+
             await db.commit()
             logger.info("=== Depot seed complete ===")
             print("\n✓ Depot database seeded successfully with demo data.")
@@ -308,6 +511,13 @@ async def seed_database(db_url: str | None = None):
             print(f"  • 1 detection model (YOLOv8n)")
             print(f"  • {len(MANIFESTS)} shipment manifests")
             print(f"  • {len(BATCHES)} inventory batches")
+            print(f"  • {len(dock_slots)} dock slots")
+            print(f"  • {len(fleet_vehicles)} fleet vehicles + 5 dwell records")
+            print(f"  • 4 dock schedules")
+            print(f"  • {len(incidents)} incidents")
+            print(f"  • {len(esc_workflows)} escalation workflows")
+            print(f"  • 12 sensor events + 5 alerts")
+            print(f"  • 1 dashboard user")
 
         except Exception as e:
             await db.rollback()
