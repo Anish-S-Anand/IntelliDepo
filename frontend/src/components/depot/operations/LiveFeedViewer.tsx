@@ -508,7 +508,16 @@ export default function LiveFeedViewer() {
   }, [live]);
 
   // Run detection on active cameras via backend API
-  const cameras = snapshot?.cameras.data ?? [];
+  const cameras = (() => {
+    const all = snapshot?.cameras.data ?? [];
+    // Deduplicate by name, preferring cameras with tfl: stream URLs (working feeds)
+    const byName = new Map<string, CameraRecord>();
+    for (const c of all) {
+      const hasTfl = c.stream_url?.startsWith("tfl:");
+      if (!byName.has(c.name) || hasTfl) byName.set(c.name, c);
+    }
+    return Array.from(byName.values()).slice(0, 6);
+  })();
 
   useEffect(() => {
     if (!live || !detectionModel || detectingRef.current) return;
