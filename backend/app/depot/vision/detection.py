@@ -388,7 +388,6 @@ async def register_model(
 @router.get("/models", response_model=list[DetectionModelResponse])
 async def list_models(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List active detection models."""
     result = await db.execute(select(DetectionModel).where(DetectionModel.is_active == True))
@@ -399,7 +398,6 @@ async def list_models(
 async def get_model(
     model_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Get a specific detection model."""
     model = await db.get(DetectionModel, model_id)

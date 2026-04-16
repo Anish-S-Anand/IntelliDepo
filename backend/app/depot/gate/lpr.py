@@ -601,7 +601,6 @@ async def list_access_logs(
     plate_number: Optional[str] = None,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     query = select(GateAccessLog)
     if gate_id:
