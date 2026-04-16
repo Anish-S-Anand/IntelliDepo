@@ -977,7 +977,6 @@ svg.chart { width: 100%; overflow: visible; }
     <div style="font-size:12px;color:var(--sub);font-weight:600;margin-bottom:14px;">DEPOT HEALTH OVERVIEW</div>
     <div class="exec-kpi-row">
       <div class="exec-kpi"><div class="exec-kpi-v" style="color:var(--acc)" id="heroHealth">--%</div><div class="exec-kpi-l">Depot Health</div></div>
-      <div class="exec-kpi"><div class="exec-kpi-v" style="color:var(--pos)" id="heroTrucks">--/--</div><div class="exec-kpi-l">Active Trucks</div></div>
       <div class="exec-kpi"><div class="exec-kpi-v" style="color:var(--info)" id="heroCams">--/--</div><div class="exec-kpi-l">Cameras Online</div></div>
       <div class="exec-kpi"><div class="exec-kpi-v" style="color:var(--warn)" id="heroClusterUtil">--</div><div class="exec-kpi-l">Cluster Util.</div></div>
       <div class="exec-kpi"><div class="exec-kpi-v" style="color:var(--pos)" id="heroCountAcc">--</div><div class="exec-kpi-l">Count Accuracy</div></div>
@@ -988,10 +987,8 @@ svg.chart { width: 100%; overflow: visible; }
   <div class="kpi-grid mb-20">
     <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Bag Count Accuracy<span class="kpi-icon">🎯</span></div><div class="kpi-val" style="color:var(--pos)" id="kpiBagAcc">--<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)" id="kpiBagAccDelta"></div></div>
     <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">FIFO Compliance<span class="kpi-icon">🔄</span></div><div class="kpi-val" style="color:var(--pos)" id="kpiFifo">--<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--pos)" id="kpiFifoDelta"></div></div>
-    <div class="kpi" style="--kpi-color:var(--info)"><div class="kpi-label">Avg Loading Time<span class="kpi-icon">⏱</span></div><div class="kpi-val" style="color:var(--info)" id="kpiAvgLoad">--<span class="kpi-unit"> min</span></div><div class="kpi-delta" style="color:var(--pos)" id="kpiAvgLoadDelta"></div></div>
     <div class="kpi" style="--kpi-color:var(--acc)"><div class="kpi-label">Depot Occupancy<span class="kpi-icon">🏭</span></div><div class="kpi-val" style="color:var(--acc)" id="kpiOccupancy">--<span class="kpi-unit">%</span></div><div class="kpi-delta" style="color:var(--sub)" id="kpiOccupancyDelta"></div></div>
-    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Throughput<span class="kpi-icon">📦</span></div><div class="kpi-val" id="throughputVal" style="color:var(--pos)">--<span class="kpi-unit"> t/d</span></div><div class="kpi-delta" style="color:var(--pos)" id="throughputDelta"></div></div>
-    <div class="kpi" style="--kpi-color:var(--warn)"><div class="kpi-label">Loss Prevention<span class="kpi-icon">🛡</span></div><div class="kpi-val" style="color:var(--warn)" id="kpiLossPrev">--<span class="kpi-unit">/mo</span></div><div class="kpi-delta" style="color:var(--pos)" id="kpiLossPrevDelta"></div></div>
+    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Throughput<span class="kpi-icon">📦</span></div><div class="kpi-val" id="throughputVal" style="color:var(--pos)">--<span class="kpi-unit"> events</span></div><div class="kpi-delta" style="color:var(--pos)" id="throughputDelta"></div></div>
   </div>
 
   <div class="col-2-1 mb-20">
@@ -1026,7 +1023,6 @@ svg.chart { width: 100%; overflow: visible; }
   </div>
 
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
-    <div class="card card-sm"><div class="label-caps" style="margin-bottom:8px">Active Trucks</div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span id="hTrucks" style="font-weight:600">-- / --</span></div><div class="prog-track"><div class="prog-fill" id="trucksBar" style="width:0%;background:var(--info)"></div></div></div>
     <div class="card card-sm"><div class="label-caps" style="margin-bottom:8px">Active Cameras</div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span id="hCameras" style="font-weight:600">-- / --</span></div><div class="prog-track"><div class="prog-fill" id="camerasBar" style="width:0%;background:var(--pos)"></div></div></div>
     <div class="card card-sm"><div class="label-caps" style="margin-bottom:8px">Depot Health</div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span id="hHealth" style="font-weight:600;color:var(--pos)">--%</span></div><div class="prog-track"><div class="prog-fill" id="healthBar" style="width:0%;background:var(--pos)"></div></div></div>
     <div class="card card-sm"><div class="label-caps" style="margin-bottom:8px">Cluster Utilization</div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span id="hClusterUtil" style="font-weight:600">--%</span></div><div class="prog-track"><div class="prog-fill" id="clusterBar" style="width:0%;background:var(--acc)"></div></div></div>
@@ -1250,7 +1246,6 @@ svg.chart { width: 100%; overflow: visible; }
 
   <div class="ops-tabs">
     <div class="ops-tab active" onclick="incTab(this,'incTabList')">Active Incidents</div>
-    <div class="ops-tab" onclick="incTab(this,'incTabRules')">Escalation Rules</div>
     <div class="ops-tab" onclick="incTab(this,'incTabAudit')">Audit Trail</div>
   </div>
 
@@ -1264,17 +1259,13 @@ svg.chart { width: 100%; overflow: visible; }
     <div id="incidentList" style="max-height:500px;overflow-y:auto"><div style="color:var(--sub);font-size:13px;padding:20px;text-align:center">Loading incidents…</div></div>
   </div>
 
-  <div class="ops-tab-panel" id="incTabRules">
-    <div class="card"><div class="card-title">Auto-Escalation Rules <button class="fbtn" onclick="incShowRuleForm()" style="font-size:11px;padding:4px 12px;margin-left:12px">+ Add Rule</button></div><div id="incRulesList"><div style="color:var(--sub);font-size:13px;padding:14px;text-align:center">Loading…</div></div></div>
-  </div>
-
   <div class="ops-tab-panel" id="incTabAudit">
     <div class="card"><div class="card-title">Incident Audit Trail</div><div id="incAuditList" style="max-height:500px;overflow-y:auto"><div style="color:var(--sub);font-size:13px;padding:14px;text-align:center">Loading…</div></div></div>
   </div>
 </div>
 
 <!-- ════════════════════════════════
-     SLA TRACKING & FLEET YARD (F-059 – F-068)
+     SLA TRACKING (F-059 – F-063)
 ════════════════════════════════ -->
 <div class="page" id="pg-sla">
   <div class="ph">
@@ -1293,7 +1284,6 @@ svg.chart { width: 100%; overflow: visible; }
 
   <div class="ops-tabs" style="flex-wrap:wrap">
     <div class="ops-tab active" onclick="slaTab(this,'slaTabContracts')">SLA Contracts</div>
-    <div class="ops-tab" onclick="slaTab(this,'slaTabEsc')">Escalation</div>
     <div class="ops-tab" onclick="slaTab(this,'slaTabScore')">Scorecards</div>
   </div>
 
@@ -1302,10 +1292,6 @@ svg.chart { width: 100%; overflow: visible; }
       <div class="card"><div class="card-title">Active Penalties</div><div id="slaPenaltyList"><div style="color:var(--sub);font-size:13px;padding:14px;text-align:center">Loading…</div></div></div>
       <div class="card"><div class="card-title">Penalty Forecast</div><div id="slaPenaltyForecast"><div style="color:var(--sub);font-size:13px;padding:14px;text-align:center">Loading…</div></div></div>
     </div>
-  </div>
-
-  <div class="ops-tab-panel" id="slaTabEsc">
-    <div class="card"><div class="card-title">Escalation Workflows <button class="fbtn" onclick="slaTriggerEsc()" style="font-size:11px;padding:4px 12px;margin-left:12px">+ Trigger</button></div><div id="slaEscList"><div style="color:var(--sub);font-size:13px;padding:14px;text-align:center">Loading…</div></div></div>
   </div>
 
   <div class="ops-tab-panel" id="slaTabScore">
@@ -1566,38 +1552,6 @@ svg.chart { width: 100%; overflow: visible; }
 </div>
 
 
-<!-- ════════════════════════════════
-     ESCALATION (F-069–F-073)
-════════════════════════════════ -->
-<div class="page" id="pg-escalation">
-  <div class="ph">
-    <div>
-      <div class="layer-badge">Layer 3 — Operations Layer</div>
-      <div class="page-title">Incident Escalation</div>
-      <div class="page-sub">Auto-escalation &bull; Severity classifier &bull; Multi-channel alerts &bull; Audit trail</div>
-    </div>
-  </div>
-  <div class="kpi-grid mb-20">
-    <div class="kpi" style="--kpi-color:var(--sev-high)"><div class="kpi-label">Open Incidents<span class="kpi-icon">🔴</span></div><div class="kpi-val" id="escOpen" style="color:var(--sev-high)">—</div><div class="kpi-delta" style="color:var(--sev-high)">Active</div></div>
-    <div class="kpi" style="--kpi-color:var(--warn)"><div class="kpi-label">Escalated<span class="kpi-icon">📢</span></div><div class="kpi-val" id="escEscalated" style="color:var(--warn)">—</div><div class="kpi-delta" style="color:var(--warn)">Higher tier</div></div>
-    <div class="kpi" style="--kpi-color:var(--sev-critical)"><div class="kpi-label">P1 Critical<span class="kpi-icon">🚨</span></div><div class="kpi-val" id="escP1" style="color:var(--sev-critical)">—</div><div class="kpi-delta" style="color:var(--sev-critical)">Immediate</div></div>
-    <div class="kpi" style="--kpi-color:var(--pos)"><div class="kpi-label">Resolved<span class="kpi-icon">✅</span></div><div class="kpi-val" id="escResolved" style="color:var(--pos)">—</div><div class="kpi-delta" style="color:var(--pos)">Closed</div></div>
-  </div>
-  <div class="card mb-20">
-    <div class="card-title">Active Incidents with Escalation Timeline</div>
-    <div id="escIncidentList"></div>
-  </div>
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-title">Audit Trail</div>
-      <div id="escAuditTrail"><div style="color:var(--sub);font-size:12px;padding:16px">Select an incident to view its audit trail</div></div>
-    </div>
-    <div class="card">
-      <div class="card-title">Notification History</div>
-      <div id="escNotifications"><div style="color:var(--sub);font-size:12px;padding:16px">Select an incident to view notifications</div></div>
-    </div>
-  </div>
-</div>
 
 </div><!-- /content -->
 </div><!-- /app-shell -->
@@ -1689,7 +1643,7 @@ function nav(page) {
   if (page === "analytics") renderAnomaly();
 
 
-  if (page === "escalation") renderEscalation();
+
 }
 
 function switchDepot(id) {
@@ -2578,7 +2532,7 @@ function opsShowThresholdForm(){const m=document.createElement('div');m.classNam
 async function opsCreateThreshold(){const body={event_type:document.getElementById('threshEvType').value,metric_name:document.getElementById('threshMetric').value,warning_value:+document.getElementById('threshWarn').value,critical_value:+document.getElementById('threshCrit').value,comparison:'gte'};try{await fetch(API_BASE+'/ops/monitoring/thresholds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});document.querySelector('.ops-modal-overlay').remove();renderOps();}catch(e){alert('Failed');}}
 
 // ════════════════════════════════════════════════════════
-// SLA TRACKING & FLEET YARD (F-059 – F-068)
+// SLA TRACKING (F-059 – F-063)
 // ════════════════════════════════════════════════════════
 function slaTab(el,panelId){el.parentElement.querySelectorAll('.ops-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');el.closest('.page').querySelectorAll('.ops-tab-panel').forEach(p=>p.classList.remove('active'));document.getElementById(panelId).classList.add('active');if(panelId==='slaTabEsc')slaLoadEscalations();if(panelId==='slaTabScore')slaLoadScorecards();if(panelId==='slaTabFleet')slaLoadFleet();if(panelId==='slaTabDwell')slaLoadDwell();if(panelId==='slaTabSched')slaLoadSchedules();if(panelId==='slaTabQueue')slaLoadQueue();}
 
@@ -2588,11 +2542,6 @@ async function renderSLA() {
   try{const fc=await(await fetch(API_BASE+'/ops/escalation/penalties/forecast')).json();document.getElementById('slaPenaltyForecast').innerHTML=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;text-align:center"><div style="padding:14px;background:var(--badge);border-radius:10px;border:1px solid var(--bord)"><div style="font-size:22px;font-weight:800;color:var(--warn)">${fc.total_penalties||0}</div><div style="font-size:11px;color:var(--sub);margin-top:4px">Total Penalties</div></div><div style="padding:14px;background:var(--badge);border-radius:10px;border:1px solid var(--bord)"><div style="font-size:22px;font-weight:800;color:var(--sev-critical)">${fc.total_breaches||0}</div><div style="font-size:11px;color:var(--sub);margin-top:4px">Total Breaches</div></div><div style="padding:14px;background:var(--badge);border-radius:10px;border:1px solid var(--bord)"><div style="font-size:22px;font-weight:800;color:var(--acc)">$${(fc.total_amount||0).toFixed(0)}</div><div style="font-size:11px;color:var(--sub);margin-top:4px">Total Amount</div></div></div>`;}catch(e){}
   const slaTs=document.getElementById('slaLastUpdate');if(slaTs)slaTs.textContent='Last updated: '+new Date().toLocaleTimeString();
 }
-async function slaLoadEscalations(){try{const workflows=await(await fetch(API_BASE+'/ops/escalation/workflows')).json();const el=document.getElementById('slaEscList');if(!workflows.length){el.innerHTML='<div style="color:var(--sub);font-size:13px;padding:14px;text-align:center">No active workflows</div>';return;}el.innerHTML=workflows.map(w=>{const tc=[1,2,3].map(t=>t<w.current_tier?'done':t===w.current_tier?'active':'pending');return`<div style="padding:14px;background:var(--badge);border-radius:10px;margin-bottom:10px;border:1px solid var(--bord)"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><div style="font-size:13px;font-weight:600">${w.trigger_type||'Escalation'} — ${w.severity||'--'}</div><span class="badge" style="background:var(--acc-soft);color:var(--acc);font-size:9px">${(w.status||'').toUpperCase()}</span></div><div class="esc-timeline"><div class="esc-node ${tc[0]}">T1</div><div class="esc-connector ${tc[0]==='done'?'done':''}"></div><div class="esc-node ${tc[1]}">T2</div><div class="esc-connector ${tc[1]==='done'?'done':''}"></div><div class="esc-node ${tc[2]}">T3</div></div><div style="display:flex;gap:6px;margin-top:10px">${w.status!=='resolved'?`<button class="fbtn" onclick="slaEscalateWf('${w.id}')" style="font-size:10px;padding:3px 10px">Escalate</button><button class="fbtn" onclick="slaResolveWf('${w.id}')" style="font-size:10px;padding:3px 10px">Resolve</button>`:'<span style="font-size:11px;color:var(--pos)">Resolved</span>'}</div></div>`;}).join('');}catch(e){}}
-async function slaEscalateWf(id){try{await fetch(API_BASE+'/ops/escalation/workflows/'+id+'/escalate',{method:'POST'});slaLoadEscalations();}catch(e){alert('Failed');}}
-async function slaResolveWf(id){try{await fetch(API_BASE+'/ops/escalation/workflows/'+id+'/resolve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({resolution_notes:'Resolved from dashboard'})});slaLoadEscalations();}catch(e){alert('Failed');}}
-function slaTriggerEsc(){const m=document.createElement('div');m.className='ops-modal-overlay';m.onclick=function(e){if(e.target===m)m.remove();};m.innerHTML=`<div class="ops-modal"><div class="ops-modal-title">Trigger Escalation <button class="close-btn" onclick="this.closest('.ops-modal-overlay').remove()">✕</button></div><div style="display:flex;flex-direction:column;gap:10px"><div><label style="font-size:11px;font-weight:600;color:var(--sub);display:block;margin-bottom:4px">Severity</label><select id="escSev" class="search-box" style="min-width:auto;width:100%"><option>critical</option><option>high</option><option>medium</option></select></div><div><label style="font-size:11px;font-weight:600;color:var(--sub);display:block;margin-bottom:4px">SLA Name</label><input id="escSla" class="search-box" style="min-width:auto;width:100%" placeholder="e.g. Mumbai Port SLA"></div><button class="fbtn" onclick="slaDoTriggerEsc()">Trigger</button></div></div>`;document.body.appendChild(m);}
-async function slaDoTriggerEsc(){const body={severity:document.getElementById('escSev').value,trigger_type:'sla_breach',sla_name:document.getElementById('escSla').value};try{await fetch(API_BASE+'/ops/escalation/workflows/trigger',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});document.querySelector('.ops-modal-overlay').remove();slaLoadEscalations();}catch(e){alert('Failed');}}
 async function slaLoadScorecards(){try{const data=await(await fetch(API_BASE+'/ops/scorecards/summary')).json();const pct=data.overall_compliance_pct??0;const circ=2*Math.PI*34;document.getElementById('scoreRingArc').setAttribute('stroke-dashoffset',circ*(1-pct/100));document.getElementById('scoreRingArc').setAttribute('stroke',pct>90?'var(--pos)':pct>70?'var(--warn)':'var(--sev-critical)');document.getElementById('scoreRingTxt').textContent=pct.toFixed(0)+'%';document.getElementById('scoreRingTxt').setAttribute('fill',pct>90?'var(--pos)':pct>70?'var(--warn)':'var(--sev-critical)');const s=data.summary||{};document.getElementById('scoreSummary').innerHTML=`<div style="text-align:center;padding:10px;background:var(--badge);border-radius:8px;border:1px solid var(--bord)"><div style="font-size:18px;font-weight:800;color:var(--pos)">${s.total_compliant||0}</div><div style="font-size:10px;color:var(--sub)">Compliant</div></div><div style="text-align:center;padding:10px;background:var(--badge);border-radius:8px;border:1px solid var(--bord)"><div style="font-size:18px;font-weight:800;color:var(--warn)">${s.total_at_risk||0}</div><div style="font-size:10px;color:var(--sub)">At Risk</div></div><div style="text-align:center;padding:10px;background:var(--badge);border-radius:8px;border:1px solid var(--bord)"><div style="font-size:18px;font-weight:800;color:var(--sev-critical)">${s.total_breached||0}</div><div style="font-size:10px;color:var(--sub)">Breached</div></div>`;const entries=data.entries||[];document.getElementById('scoreCards').innerHTML=entries.map(e=>{const col=e.compliance_pct>90?'var(--pos)':e.compliance_pct>70?'var(--warn)':'var(--sev-critical)';return`<div style="padding:14px;background:var(--badge);border-radius:10px;border:1px solid var(--bord);border-top:3px solid ${col}"><div style="font-size:13px;font-weight:700;margin-bottom:6px">${e.group_name||'--'}</div><div style="font-size:24px;font-weight:800;color:${col}">${(e.compliance_pct||0).toFixed(1)}%</div><div style="font-size:10px;color:var(--sub);margin-top:4px">${e.compliant||0} ok &bull; ${e.at_risk||0} risk &bull; ${e.breached||0} breach</div></div>`;}).join('');}catch(e){}}
 
 // ════════════════════════════════════════════════════════
