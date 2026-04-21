@@ -247,7 +247,6 @@ async def list_batches(
     zone: Optional[str] = None,
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     query = select(InventoryBatch)
     if sku_code:

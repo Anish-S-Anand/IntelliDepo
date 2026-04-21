@@ -42,8 +42,6 @@ const FALLBACK: ScorecardSummary = {
   by_group: [
     { group_name: "Live Monitoring", total_slas: 12, compliant: 12, at_risk: 0, breached: 0, compliance_pct: 100, penalty_amount: 0 },
     { group_name: "SLA Tracking", total_slas: 18, compliant: 11, at_risk: 4, breached: 3, compliance_pct: 61.1, penalty_amount: 4500 },
-    { group_name: "Fleet & Yard View", total_slas: 15, compliant: 14, at_risk: 1, breached: 0, compliance_pct: 93.3, penalty_amount: 0 },
-    { group_name: "Incident Escalation", total_slas: 10, compliant: 7, at_risk: 1, breached: 2, compliance_pct: 70, penalty_amount: 2200 },
   ],
 };
 

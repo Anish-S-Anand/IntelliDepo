@@ -100,8 +100,6 @@ def gen_seed_data():
     data["scorecards"] = [
         {"period": iso_week, "group_type": "module", "group_name": "Live Monitoring", "total_slas": 12, "compliant": 12, "at_risk": 0, "breached": 0},
         {"period": iso_week, "group_type": "module", "group_name": "SLA Tracking", "total_slas": 18, "compliant": 11, "at_risk": 4, "breached": 3, "penalty_amount": 4500},
-        {"period": iso_week, "group_type": "module", "group_name": "Fleet & Yard View", "total_slas": 15, "compliant": 14, "at_risk": 1, "breached": 0},
-        {"period": iso_week, "group_type": "module", "group_name": "Incident Escalation", "total_slas": 10, "compliant": 7, "at_risk": 1, "breached": 2, "penalty_amount": 2200},
         {"period": iso_week, "group_type": "client", "group_name": "Acme Corp", "total_slas": 8, "compliant": 7, "at_risk": 1, "breached": 0},
         {"period": iso_week, "group_type": "client", "group_name": "ColdChain Inc", "total_slas": 6, "compliant": 3, "at_risk": 1, "breached": 2, "penalty_amount": 3200},
         {"period": iso_week, "group_type": "client", "group_name": "Global Logistics", "total_slas": 5, "compliant": 5, "at_risk": 0, "breached": 0},

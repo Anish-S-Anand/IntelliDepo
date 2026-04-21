@@ -555,48 +555,43 @@ window.renderClusters = async function(search, filter) {
   const zoneGrid = document.getElementById("zoneGrid");
   if (!grid) return;
 
-  let zones = [];
+  let zones = [], batches = [];
   try {
-    const r = await fetch("/backend/depot/vision/cluster/zones", {headers:_WIRE_HEADERS});
-    if (r.ok) zones = await r.json();
+    const [zR, bR] = await Promise.allSettled([
+      fetch("/backend/depot/vision/cluster/zones", {headers:_WIRE_HEADERS}),
+      fetch("/backend/depot/vision/sequencing/batches", {headers:_WIRE_HEADERS}),
+    ]);
+    if (zR.status==="fulfilled"&&zR.value.ok) zones = await zR.value.json();
+    if (bR.status==="fulfilled"&&bR.value.ok) batches = await bR.value.json();
   } catch {}
 
-  // Zone cards
+  // Zone summary cards — real data
   if (zoneGrid && zones.length) {
     zoneGrid.innerHTML = zones.map(function(z){
-      const pct = z.utilization_pct||Math.round((z.current_occupancy||0)/(z.max_capacity_units||1)*100);
-      const col = pct>90?"var(--sev-critical)":pct>75?"var(--warn)":"var(--pos)";
-      return '<div class="zone-card"><div class="zone-hdr"><div class="zone-name">'+z.name+'</div><div style="font-size:18px;font-weight:800;color:'+col+'">'+pct+'%</div></div><div class="prog-track" style="margin:8px 0"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div><div style="font-size:10px;color:var(--sub)">'+(z.current_occupancy||0)+' / '+(z.max_capacity_units||0)+' units &bull; '+z.zone_type+'</div></div>';
+      const pct = Math.round(z.utilization_pct||0);
+      const col = pct>=90?"var(--sev-critical)":pct>=75?"var(--warn)":"var(--pos)";
+      return '<div class="zone-card"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:'+col+';opacity:0.9"></div><div class="zone-nm">Zone '+z.zone_code+'</div><div class="zone-pct" style="color:'+col+'">'+pct+'%</div><div class="prog-track"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div><div class="zone-cnt">'+(z.current_occupancy||0).toLocaleString()+' / '+(z.max_capacity_units||0).toLocaleString()+' bags</div></div>';
     }).join("");
   }
 
-  // Use zones as clusters too — fall back to static CLUSTERS if API returned nothing
-  if (zones.length) {
-    let items = zones;
-    if (search) items = items.filter(function(z){return (z.name||"").toLowerCase().includes(search.toLowerCase());});
-    if (filter==="near_full") items=items.filter(function(z){return (z.utilization_pct||0)>75;});
-    if (filter==="empty") items=items.filter(function(z){return (z.utilization_pct||0)<25;});
-    if (filter==="fifo") items=items.filter(function(z){return z.zone_type==="storage";});
-    grid.innerHTML = items.map(function(z){
-      const pct=z.utilization_pct||0;const col=pct>90?"var(--sev-critical)":pct>75?"var(--warn)":"var(--pos)";
-      return '<div class="cluster-card"><div class="cl-hdr"><span class="cl-id">'+(z.zone_code||z.name)+'</span><span class="cl-product">'+(z.zone_type||"storage")+'</span></div><div class="cl-cap"><div class="prog-track"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div><span class="cl-pct" style="color:'+col+'">'+pct+'%</span></div><div class="cl-meta"><span class="dm-l">Capacity</span><span class="dm-v">'+(z.max_capacity_units||0)+'</span><span class="dm-l">Occupied</span><span class="dm-v">'+(z.current_occupancy||0)+'</span><span class="dm-l">Floor</span><span class="dm-v">'+(z.floor||"G")+'</span></div></div>';
-    }).join("");
-  } else if (typeof CLUSTERS !== "undefined" && CLUSTERS.length) {
-    // Fallback to static mock CLUSTERS from the inline script
-    var _OCC = typeof OCC_COL === "function" ? OCC_COL : function(p){return p>=90?"#DC2626":p>=75?"#F59E0B":"#22C55E";};
-    var items = CLUSTERS.filter(function(c){
-      if (filter==="full" && (c.occ/c.cap)<0.85) return false;
-      if (filter==="empty" && c.occ>0) return false;
-      if (filter==="fifo" && c.fifo) return false;
-      if (search && !c.prod.toLowerCase().includes(search.toLowerCase()) && !c.id.toLowerCase().includes(search.toLowerCase())) return false;
-      return true;
+  // Cluster cards from inventory batches
+  var activeBatches = batches.filter(function(b){return b.status==="active";});
+  if (activeBatches.length) {
+    var items = activeBatches.map(function(b){
+      return {id: (b.zone||"?")+"-"+(b.rack||b.batch_code), prod: b.product_name||b.sku_code, cap: b.original_quantity||b.quantity, occ: b.quantity, batch: b.batch_code, fifo: b.sequencing_rule==="FIFO", act: b.created_at, zone: b.zone||"—"};
     });
+    if (search) items = items.filter(function(c){return c.prod.toLowerCase().includes(search.toLowerCase())||c.id.toLowerCase().includes(search.toLowerCase())||c.batch.toLowerCase().includes(search.toLowerCase());});
+    if (filter==="full") items=items.filter(function(c){return c.cap>0&&(c.occ/c.cap)>=0.85;});
+    if (filter==="empty") items=items.filter(function(c){return c.occ===0;});
+    if (filter==="fifo") items=items.filter(function(c){return !c.fifo;});
+    var _OCC = function(p){return p>=95?"#DC2626":p>=80?"#F59E0B":"#22C55E";};
     grid.innerHTML = items.map(function(c){
-      var pct=Math.round((c.occ/c.cap)*100); var col=_OCC(pct);
-      return '<div class="cluster-card" style="border-color:'+(c.fifo?"var(--bord)":"rgba(202,138,4,0.3)")+'"><div class="cluster-hdr"><div><div class="cluster-name">Cluster '+c.id+'</div><div class="cluster-prod">'+c.prod+'</div></div><div class="badge-tags"><span class="badge" style="background:'+col+'22;color:'+col+';border:1px solid '+col+'44;font-size:10px">'+pct+'%</span><span class="badge" style="background:'+(c.fifo?"rgba(34,197,94,0.1)":"rgba(202,138,4,0.1)")+';color:'+(c.fifo?"#22C55E":"#CA8A04")+';border:1px solid '+(c.fifo?"rgba(34,197,94,0.25)":"rgba(202,138,4,0.25)")+';font-size:9px">'+(c.fifo?"✓ FIFO":"⚠ FIFO")+'</span></div></div><div class="prog-track"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div><div class="cluster-meta"><span class="meta-l">Capacity</span><span class="meta-v">'+c.cap.toLocaleString()+' bags</span><span class="meta-l">Occupied</span><span class="meta-v">'+c.occ.toLocaleString()+' bags</span><span class="meta-l">Batch</span><span class="meta-v" style="font-family:\'JetBrains Mono\',monospace;font-size:10px">'+c.batch+'</span><span class="meta-l">Last Activity</span><span class="meta-v">'+c.act+'</span><span class="meta-l">Expiry</span><span class="meta-v" style="color:'+(c.expiry&&c.expiry.includes("2025-07")?"var(--sev-high)":"var(--text)")+'">'+c.expiry+'</span></div></div>';
+      var pct=c.cap>0?Math.round((c.occ/c.cap)*100):0; var col=_OCC(pct);
+      var age=""; try{var d=Date.now()-new Date(c.act).getTime();var m=Math.floor(d/60000);age=m<1?"just now":m<60?m+"m ago":Math.floor(m/60)+"h ago";}catch(e){age="—";}
+      return '<div class="cluster-card" style="border-color:'+(c.fifo?"var(--bord)":"rgba(202,138,4,0.3)")+'"><div class="cluster-hdr"><div><div class="cluster-name">Cluster '+c.id+'</div><div class="cluster-prod">'+c.prod+'</div></div><div class="badge-tags"><span class="badge" style="background:'+col+'22;color:'+col+';border:1px solid '+col+'44;font-size:10px">'+pct+'%</span><span class="badge" style="background:'+(c.fifo?"rgba(34,197,94,0.1)":"rgba(202,138,4,0.1)")+';color:'+(c.fifo?"#22C55E":"#CA8A04")+';border:1px solid '+(c.fifo?"rgba(34,197,94,0.25)":"rgba(202,138,4,0.25)")+';font-size:9px">'+(c.fifo?"✓ FIFO":"⚠ FEFO")+'</span></div></div><div class="prog-track"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div><div class="cluster-meta"><span class="meta-l">Capacity</span><span class="meta-v">'+c.cap.toLocaleString()+' bags</span><span class="meta-l">Occupied</span><span class="meta-v">'+c.occ.toLocaleString()+' bags</span><span class="meta-l">Batch</span><span class="meta-v" style="font-family:\'JetBrains Mono\',monospace;font-size:10px">'+c.batch+'</span><span class="meta-l">Last Activity</span><span class="meta-v">'+age+'</span></div></div>';
     }).join("");
   } else {
-    grid.innerHTML = '<div style="color:var(--sub);font-size:13px;padding:24px;text-align:center">No cluster data — backend offline</div>';
+    grid.innerHTML = '<div style="color:var(--sub);font-size:13px;padding:24px;text-align:center">No batch data — backend offline or no batches seeded</div>';
   }
 };
 

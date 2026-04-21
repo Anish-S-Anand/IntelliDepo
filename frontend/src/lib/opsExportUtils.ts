@@ -2,7 +2,7 @@
  * IntelliOps™ — Export Utilities for Ops Reports (Day 5)
  *
  * Export functions for SLA scorecards (CSV), incident reports (PDF),
- * fleet/yard reports (CSV), and escalation audit trails (PDF).
+ * and escalation audit trails (PDF).
  * Reuses the shared downloadCsv / downloadPdf from exportUtils.
  */
 
@@ -95,38 +95,6 @@ export function exportOpsIncidentReport(
         },
       },
     ],
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Fleet & Yard CSV Export
-// ---------------------------------------------------------------------------
-
-export function exportFleetCsv(
-  vehicles: {
-    vehicle_id: string;
-    vehicle_type: string;
-    driver_name: string | null;
-    status: string;
-    current_zone: string | null;
-    assigned_dock: string | null;
-    speed_kmh: number;
-    entered_yard_at: string | null;
-  }[],
-) {
-  downloadCsv(
-    `fleet-report-${new Date().toISOString().slice(0, 10)}.csv`,
-    ["Vehicle ID", "Type", "Driver", "Status", "Zone", "Dock", "Speed (km/h)", "Entered Yard"],
-    vehicles.map((v) => [
-      v.vehicle_id,
-      v.vehicle_type,
-      v.driver_name || "—",
-      v.status,
-      v.current_zone || "—",
-      v.assigned_dock || "—",
-      v.speed_kmh,
-      v.entered_yard_at || "—",
-    ]),
   );
 }
 

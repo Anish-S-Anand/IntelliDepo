@@ -116,21 +116,6 @@ class DwellRecord(DBBaseModel):
     metadata_json = Column(JSON, nullable=True)
 
 
-class DockSchedule(DBBaseModel):
-    """Dock booking / scheduling entry."""
-    __tablename__ = "ops_dock_schedules"
-
-    dock_id = Column(String, nullable=False, index=True)
-    vehicle_id = Column(String, nullable=True)
-    client_name = Column(String, nullable=True)
-    scheduled_start = Column(DateTime(timezone=True), nullable=False)
-    scheduled_end = Column(DateTime(timezone=True), nullable=False)
-    actual_arrival = Column(DateTime(timezone=True), nullable=True)
-    actual_departure = Column(DateTime(timezone=True), nullable=True)
-    status = Column(String, default="scheduled", index=True)              # scheduled, active, completed, cancelled
-    delay_risk = Column(Boolean, default=False)
-    notes = Column(Text, nullable=True)
-
 
 # ---------------------------------------------------------------------------
 # Pydantic Schemas
@@ -228,30 +213,6 @@ class DwellHeatmapEntry(BaseModel):
 
 
 # --- Dock Schedule ---
-
-class DockScheduleCreate(BaseModel):
-    dock_id: str
-    vehicle_id: Optional[str] = None
-    client_name: Optional[str] = None
-    scheduled_start: datetime
-    scheduled_end: datetime
-    notes: Optional[str] = None
-
-
-class DockScheduleResponse(BaseModel):
-    id: uuid.UUID
-    dock_id: str
-    vehicle_id: Optional[str]
-    client_name: Optional[str]
-    scheduled_start: datetime
-    scheduled_end: datetime
-    actual_arrival: Optional[datetime]
-    actual_departure: Optional[datetime]
-    status: str
-    delay_risk: bool
-    notes: Optional[str]
-    created_at: datetime
-    model_config = ConfigDict(from_attributes=True)
 
 
 # --- Queue Optimization ---
@@ -745,91 +706,6 @@ async def dwell_heatmap(
 
 
 # ---------------------------------------------------------------------------
-# Dock Scheduling (supports F-067 UI)
-# ---------------------------------------------------------------------------
-
-@router.post("/schedules", response_model=DockScheduleResponse, status_code=201)
-async def create_dock_schedule(
-    body: DockScheduleCreate,
-    db: AsyncSession = Depends(get_db),
-):
-    """Book a dock slot in advance (F-067)."""
-    # Check dock exists
-    dr = await db.execute(select(DockSlot).where(DockSlot.dock_id == body.dock_id))
-    dock = dr.scalar_one_or_none()
-    if not dock:
-        raise HTTPException(404, f"Dock {body.dock_id} not found")
-
-    # Check for overlapping bookings
-    result = await db.execute(
-        select(DockSchedule).where(
-            DockSchedule.dock_id == body.dock_id,
-            DockSchedule.status.in_(["scheduled", "active"]),
-            DockSchedule.scheduled_start < body.scheduled_end,
-            DockSchedule.scheduled_end > body.scheduled_start,
-        )
-    )
-    if result.scalar_one_or_none():
-        raise HTTPException(409, "Time slot conflicts with existing booking")
-
-    schedule = DockSchedule(**body.model_dump())
-    db.add(schedule)
-
-    # Mark dock as reserved
-    dock.status = DockStatus.RESERVED
-    dock.reserved_for = body.vehicle_id
-    dock.reserved_from = body.scheduled_start
-    dock.reserved_until = body.scheduled_end
-
-    await db.commit()
-    await db.refresh(schedule)
-    return DockScheduleResponse.model_validate(schedule)
-
-
-@router.get("/schedules", response_model=list[DockScheduleResponse])
-async def list_dock_schedules(
-    dock_id: Optional[str] = None,
-    week_offset: int = Query(default=0, ge=-4, le=4),
-    db: AsyncSession = Depends(get_db),
-):
-    """List dock schedules for a given week (F-067)."""
-    now = datetime.now(timezone.utc)
-    start_of_week = now - timedelta(days=now.weekday()) + timedelta(weeks=week_offset)
-    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_of_week = start_of_week + timedelta(days=7)
-
-    q = select(DockSchedule).where(
-        DockSchedule.scheduled_start >= start_of_week,
-        DockSchedule.scheduled_start < end_of_week,
-    )
-    if dock_id:
-        q = q.where(DockSchedule.dock_id == dock_id)
-    q = q.order_by(DockSchedule.scheduled_start)
-    result = await db.execute(q)
-    return [DockScheduleResponse.model_validate(s) for s in result.scalars().all()]
-
-
-@router.delete("/schedules/{schedule_id}", status_code=204)
-async def cancel_schedule(
-    schedule_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-):
-    result = await db.execute(select(DockSchedule).where(DockSchedule.id == schedule_id))
-    schedule = result.scalar_one_or_none()
-    if not schedule:
-        raise HTTPException(404, "Schedule not found")
-    schedule.status = "cancelled"
-
-    # Release dock reservation
-    dr = await db.execute(select(DockSlot).where(DockSlot.dock_id == schedule.dock_id))
-    dock = dr.scalar_one_or_none()
-    if dock and dock.reserved_for == schedule.vehicle_id:
-        dock.status = DockStatus.FREE
-        dock.reserved_for = None
-
-    await db.commit()
-
-
 # ---------------------------------------------------------------------------
 # F-068 — Queue Optimization Recommendation Engine
 # ---------------------------------------------------------------------------

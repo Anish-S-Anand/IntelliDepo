@@ -6,7 +6,7 @@ import { Eye, Users, Radio, Plug, BarChart3, Shield, Brain, ArrowUpRight } from 
 const layers = [
   { layer: 1, name: "INTELLIVISION\u2122", subtitle: "Computer Vision & Physical Intelligence", description: "YOLO-class object detection, automated counting, cluster mapping, FIFO/LIFO sequencing, LPR gate control, and perimeter security.", icon: Eye, slug: "intellivision", modules: 6 },
   { layer: 2, name: "INTELLIOPS\u2122", subtitle: "Workforce & Space Management", description: "Smart task assignment, SOP checklists, cluster allocation, space optimization, and exception handling.", icon: Users, slug: "intelliops", modules: 5 },
-  { layer: 3, name: "INTELLICOMMAND\u2122", subtitle: "Real-Time Control & SLA", description: "Live monitoring, SLA breach prediction, fleet & yard visibility, and incident escalation workflows.", icon: Radio, slug: "intellicommand", modules: 4 },
+  { layer: 3, name: "INTELLICOMMAND\u2122", subtitle: "Real-Time Control & SLA", description: "Live monitoring and SLA breach prediction.", icon: Radio, slug: "intellicommand", modules: 2 },
   { layer: 4, name: "INTELLICONNECT\u2122", subtitle: "ERP, IoT & API Integration", description: "Bidirectional ERP sync, MQTT/IoT broker, weather feeds, and API health monitoring.", icon: Plug, slug: "intelliconnect", modules: 3 },
   { layer: 5, name: "ANALYTICS & INSIGHTS", subtitle: "KPIs & Forecasting", description: "Operational KPIs, time-series forecasting, anomaly detection, and executive dashboards.", icon: BarChart3, slug: "analytics", modules: 4 },
   { layer: 6, name: "INDUSTRY / RISK", subtitle: "Compliance & Governance", description: "Regulatory compliance monitoring, batch/expiry tracking, RBAC, and immutable audit logs.", icon: Shield, slug: "risk", modules: 3 },

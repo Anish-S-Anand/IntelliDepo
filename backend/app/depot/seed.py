@@ -36,7 +36,7 @@ CAMERAS = [
     # stream_url uses "tfl:{cam_id}" prefix; backend /tfl-proxy/stream serves MJPEG
     {"name": "Gate Entry North",  "stream_url": "tfl:00001.07450", "zone": "Entry Gate",   "frame_rate": 2, "resolution": "704x576"},  # Piccadilly Circus
     {"name": "Zone A Overhead",   "stream_url": "tfl:00001.06600", "zone": "Zone-A",       "frame_rate": 2, "resolution": "704x576"},  # Cromwell Rd / Earls Court
-    {"name": "Loading Bay 1-4",   "stream_url": "tfl:00001.03675", "zone": "Loading Dock", "frame_rate": 2, "resolution": "704x576"},  # Blackheath Rd / Greenwich
+    {"name": "Loading Bay 1-4",   "stream_url": "tfl:00001.04331", "zone": "Loading Dock", "frame_rate": 2, "resolution": "704x576"},  # A23 Kennington Park Rd
     {"name": "Zone C Perimeter",  "stream_url": "tfl:00001.09747", "zone": "Zone-C",       "frame_rate": 2, "resolution": "704x576"},  # Edgware Way / Broadfields
     {"name": "Gate Exit South",   "stream_url": "tfl:00001.02151", "zone": "Exit Gate",    "frame_rate": 2, "resolution": "704x576"},  # Romford Rd / Tennyson Rd
     {"name": "Yard Overview",     "stream_url": "tfl:00002.00865", "zone": "Yard",         "frame_rate": 2, "resolution": "704x576"},  # A406 Billet Upass E
@@ -246,7 +246,7 @@ async def seed_database(db_url: str | None = None):
                     for batch in BATCHES:
                         await db.execute(text("""
                             INSERT INTO depot_inventory_batches (id, product_name, batch_number, quantity, zone, rack, bin_location, manufacturing_date, expiry_date, rule_type, status, priority_score, created_at, updated_at)
-                            VALUES (:id, :product_name, :batch_number, :quantity, :zone, :rack, :bin_location, :mfg, :exp, :rule_type, 'available', 0.0, :now, :now)
+                            VALUES (:id, :product_name, :batch_number, :quantity, :zone, :rack, :bin_location, :mfg, :exp, :rule_type, 'active', 0.0, :now, :now)
                             ON CONFLICT DO NOTHING
                         """), {
                             "id": uuid.uuid4(), "product_name": batch["product_name"],
@@ -390,24 +390,6 @@ async def seed_database(db_url: str | None = None):
                 })
             logger.info("Seeded 5 dwell records")
 
-            # ── Dock Schedules ──
-            for i in range(4):
-                sched_start = now + timedelta(hours=i * 2 + 1)
-                sched_end = sched_start + timedelta(hours=2)
-                clients = ["Mumbai Port Authority", "Delhi Rail Hub", "Gujarat Logistics", "Hyderabad Freight"]
-                await db.execute(text("""
-                    INSERT INTO ops_dock_schedules (id, dock_id, vehicle_id, client_name, scheduled_start, scheduled_end, status, delay_risk, created_at, updated_at)
-                    VALUES (:id, :dock_id, :vid, :client, :start, :end, 'scheduled', :delay, :now, :now)
-                    ON CONFLICT DO NOTHING
-                """), {
-                    "id": uuid.uuid4(),
-                    "dock_id": dock_ids[i % len(dock_ids)]["dock_id"],
-                    "vid": fleet_vehicles[i]["vehicle_id"] if i < len(fleet_vehicles) else None,
-                    "client": clients[i], "start": sched_start, "end": sched_end,
-                    "delay": i == 1, "now": now,
-                })
-            logger.info("Seeded 4 dock schedules")
-
             # ── Incidents ──
             incidents = [
                 {"title": "Unauthorized entry at Gate 4 perimeter", "description": "Person detected in restricted zone after hours. Camera CAM-042 triggered alert.", "source": "camera", "priority": "P1", "severity_score": 0.95, "status": "open", "zone": "Gate 4 Perimeter", "category": "security"},
@@ -437,25 +419,6 @@ async def seed_database(db_url: str | None = None):
                     "assigned": chain[-1]["tier"], "created": created, "now": now,
                 })
             logger.info(f"Seeded {len(incidents)} incidents")
-
-            # ── Escalation Workflows ──
-            esc_workflows = [
-                {"severity": "critical", "trigger_type": "sla_breach", "trigger_source": "Mumbai Port SLA", "current_tier": "2", "status": "active", "bp": 0.85},
-                {"severity": "high", "trigger_type": "incident", "trigger_source": "Safety Response SLA", "current_tier": "1", "status": "active", "bp": 0.72},
-            ]
-            for ew in esc_workflows:
-                triggered = now - timedelta(minutes=20)
-                await db.execute(text("""
-                    INSERT INTO ops_escalation_workflows (id, severity, trigger_type, trigger_source, breach_probability, current_tier, status, tier_1_notified_at, tier_1_deadline, notifications_sent, created_at, updated_at)
-                    VALUES (:id, :sev, :trigger, :src, :bp, :tier, :status, :notified, :deadline, '[]', :now, :now)
-                    ON CONFLICT DO NOTHING
-                """), {
-                    "id": uuid.uuid4(), "sev": ew["severity"], "trigger": ew["trigger_type"],
-                    "src": ew["trigger_source"], "bp": ew["bp"], "tier": ew["current_tier"],
-                    "status": ew["status"], "notified": triggered,
-                    "deadline": now + timedelta(minutes=10), "now": now,
-                })
-            logger.info(f"Seeded {len(esc_workflows)} escalation workflows")
 
             # ── Monitoring Events + Alerts (so Live Monitoring has data) ──
             event_types = ["sensor", "camera", "gate", "security", "equipment"]
@@ -499,20 +462,6 @@ async def seed_database(db_url: str | None = None):
                 })
             logger.info("Seeded 5 monitoring alerts")
 
-            # ── Auto-Escalation Rules ──
-            esc_rules = [
-                {"name": "P1 Auto-Escalate (5min)", "priority_trigger": "P1", "time_window_minutes": 5, "target_tier": "2", "channels": '["in_app","email","sms"]'},
-                {"name": "P2 Auto-Escalate (15min)", "priority_trigger": "P2", "time_window_minutes": 15, "target_tier": "2", "channels": '["in_app","email"]'},
-                {"name": "P3 Supervisor Notify (60min)", "priority_trigger": "P3", "time_window_minutes": 60, "target_tier": "1", "channels": '["in_app"]'},
-            ]
-            for er in esc_rules:
-                await db.execute(text("""
-                    INSERT INTO ops_auto_escalation_rules (id, name, priority_trigger, time_window_minutes, target_tier, notification_channels, is_active, created_at, updated_at)
-                    VALUES (:id, :name, :pt, :tw, :tt, :ch, true, :now, :now)
-                    ON CONFLICT DO NOTHING
-                """), {"id": uuid.uuid4(), "name": er["name"], "pt": er["priority_trigger"], "tw": er["time_window_minutes"], "tt": er["target_tier"], "ch": er["channels"], "now": now})
-            logger.info(f"Seeded {len(esc_rules)} auto-escalation rules")
-
             # ── Sequencing Batches (fixed columns) ──
             try:
                 async with db.begin_nested():
@@ -529,7 +478,7 @@ async def seed_database(db_url: str | None = None):
                         days_to = sb["days"]
                         await db.execute(text("""
                             INSERT INTO depot_inventory_batches (id, batch_code, sku_code, product_name, zone, rack, bin_location, quantity, original_quantity, manufacture_date, expiry_date, received_at, sequencing_rule, priority_score, status, is_near_expiry, days_to_expiry, created_at, updated_at)
-                            VALUES (:id, :batch_code, :sku, :name, :zone, :rack, :bin, :qty, :qty, :mfg, :exp, :now, :rule, 0.0, 'available', :near, :days, :now, :now)
+                            VALUES (:id, :batch_code, :sku, :name, :zone, :rack, :bin, :qty, :qty, :mfg, :exp, :now, :rule, 0.0, 'active', :near, :days, :now, :now)
                             ON CONFLICT DO NOTHING
                         """), {
                             "id": uuid.uuid4(), "batch_code": f"B2026-{sb['sku_code']}", "sku": sb["sku_code"], "name": sb["product_name"],
@@ -548,8 +497,6 @@ async def seed_database(db_url: str | None = None):
                     scorecards = [
                         {"group_name": "Live Monitoring", "total": 12, "compliant": 12, "at_risk": 0, "breached": 0, "penalty": 0},
                         {"group_name": "SLA Tracking", "total": 18, "compliant": 15, "at_risk": 2, "breached": 1, "penalty": 1500},
-                        {"group_name": "Fleet & Yard View", "total": 15, "compliant": 14, "at_risk": 1, "breached": 0, "penalty": 0},
-                        {"group_name": "Incident Escalation", "total": 10, "compliant": 8, "at_risk": 1, "breached": 1, "penalty": 1100},
                     ]
                     for sc in scorecards:
                         comp_pct = round(sc["compliant"] / sc["total"] * 100, 1) if sc["total"] > 0 else 100
@@ -580,9 +527,7 @@ async def seed_database(db_url: str | None = None):
             print(f"  • {len(BATCHES)} inventory batches")
             print(f"  • {len(dock_slots)} dock slots")
             print(f"  • {len(fleet_vehicles)} fleet vehicles + 5 dwell records")
-            print(f"  • 4 dock schedules")
             print(f"  • {len(incidents)} incidents")
-            print(f"  • {len(esc_workflows)} escalation workflows")
             print(f"  • 12 sensor events + 5 alerts")
             print(f"  • 1 dashboard user")
 

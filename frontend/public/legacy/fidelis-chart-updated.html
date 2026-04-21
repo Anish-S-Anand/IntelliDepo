@@ -1136,10 +1136,7 @@ svg.chart { width: 100%; overflow: visible; }
   </div>
 
   <div class="zone-grid mb-20" id="zoneGrid">
-    <div class="zone-card" style="--zc:#F59E0B"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:#F59E0B;opacity:0.9"></div><div class="zone-nm">Zone A</div><div class="zone-pct" style="color:#F59E0B">81%</div><div class="prog-track"><div class="prog-fill" style="width:81%;background:#F59E0B"></div></div><div class="zone-cnt">810 / 1,000 bags</div></div>
-    <div class="zone-card"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--pos);opacity:0.9"></div><div class="zone-nm">Zone B</div><div class="zone-pct" style="color:var(--pos)">62%</div><div class="prog-track"><div class="prog-fill" style="width:62%;background:var(--pos)"></div></div><div class="zone-cnt">450 / 1,000 bags</div></div>
-    <div class="zone-card"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:#F59E0B;opacity:0.9"></div><div class="zone-nm">Zone C</div><div class="zone-pct" style="color:#F59E0B">74%</div><div class="prog-track"><div class="prog-fill" style="width:74%;background:#F59E0B"></div></div><div class="zone-cnt">595 / 800 bags</div></div>
-    <div class="zone-card"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--sev-critical);opacity:0.9"></div><div class="zone-nm">Zone D</div><div class="zone-pct" style="color:var(--sev-critical)">91%</div><div class="prog-track"><div class="prog-fill" style="width:91%;background:var(--sev-critical)"></div></div><div class="zone-cnt">1,092 / 1,200 bags</div></div>
+    <div style="grid-column:1/-1;color:var(--sub);font-size:12px;text-align:center;padding:20px">Loading zones from backend…</div>
   </div>
 
   <div class="filter-row">
@@ -1251,10 +1248,10 @@ svg.chart { width: 100%; overflow: visible; }
 
   <div class="ops-tab-panel active" id="incTabList">
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-      <button class="fbtn" onclick="incSetFilter('all')" style="font-size:11px;padding:4px 12px">All</button>
-      <button class="fbtn" onclick="incSetFilter('open')" style="font-size:11px;padding:4px 12px">Open</button>
-      <button class="fbtn" onclick="incSetFilter('acknowledged')" style="font-size:11px;padding:4px 12px">Acknowledged</button>
-      <button class="fbtn" onclick="incSetFilter('resolved')" style="font-size:11px;padding:4px 12px">Resolved</button>
+      <button class="fbtn on" onclick="incSetFilter('all',this)" style="font-size:11px;padding:4px 12px">All</button>
+      <button class="fbtn" onclick="incSetFilter('open',this)" style="font-size:11px;padding:4px 12px">Open</button>
+      <button class="fbtn" onclick="incSetFilter('acknowledged',this)" style="font-size:11px;padding:4px 12px">Acknowledged</button>
+      <button class="fbtn" onclick="incSetFilter('resolved',this)" style="font-size:11px;padding:4px 12px">Resolved</button>
     </div>
     <div id="incidentList" style="max-height:500px;overflow-y:auto"><div style="color:var(--sub);font-size:13px;padding:20px;text-align:center">Loading incidents…</div></div>
   </div>
@@ -2436,41 +2433,7 @@ function drawCCTVScene(canvas, cam) {
 // ════════════════════════════════════════════════════════
 // INVENTORY
 // ════════════════════════════════════════════════════════
-function renderClusters(search = "", filter = clFilter) {
-  const grid = document.getElementById("clusterGrid");
-  if (!grid) return;
-  const items = CLUSTERS.filter(c => {
-    if (filter === "full" && (c.occ / c.cap) < 0.85) return false;
-    if (filter === "empty" && c.occ > 0) return false;
-    if (filter === "fifo" && c.fifo) return false;
-    if (search && !c.prod.toLowerCase().includes(search.toLowerCase()) && !c.id.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
-  grid.innerHTML = items.map(c => {
-    const pct = Math.round((c.occ / c.cap) * 100);
-    const col = OCC_COL(pct);
-    return `<div class="cluster-card" style="border-color:${c.fifo ? "var(--bord)" : "rgba(202,138,4,0.3)"}">
-      <div class="cluster-hdr">
-        <div>
-          <div class="cluster-name">Cluster ${c.id}</div>
-          <div class="cluster-prod">${c.prod}</div>
-        </div>
-        <div class="badge-tags">
-          <span class="badge" style="background:${col}22;color:${col};border:1px solid ${col}44;font-size:10px">${pct}%</span>
-          <span class="badge" style="background:${c.fifo ? "rgba(34,197,94,0.1)" : "rgba(202,138,4,0.1)"};color:${c.fifo ? "#22C55E" : "#CA8A04"};border:1px solid ${c.fifo ? "rgba(34,197,94,0.25)" : "rgba(202,138,4,0.25)"};font-size:9px">${c.fifo ? "✓ FIFO" : "⚠ FIFO"}</span>
-        </div>
-      </div>
-      <div class="prog-track"><div class="prog-fill" style="width:${pct}%;background:${col}"></div></div>
-      <div class="cluster-meta">
-        <span class="meta-l">Capacity</span><span class="meta-v">${c.cap.toLocaleString()} bags</span>
-        <span class="meta-l">Occupied</span><span class="meta-v">${c.occ.toLocaleString()} bags</span>
-        <span class="meta-l">Batch</span><span class="meta-v" style="font-family:'JetBrains Mono',monospace;font-size:10px">${c.batch}</span>
-        <span class="meta-l">Last Activity</span><span class="meta-v">${c.act}</span>
-        <span class="meta-l">Expiry</span><span class="meta-v" style="color:${c.expiry && c.expiry.includes("2025-07") ? "var(--sev-high)" : "var(--text)"}">${c.expiry}</span>
-      </div>
-    </div>`;
-  }).join("");
-}
+// Replaced by backend-wired version in intelliops-backend-wire.js (window.renderClusters)
 
 
 // ════════════════════════════════════════════════════════
@@ -2478,7 +2441,7 @@ function renderClusters(search = "", filter = clFilter) {
 // ════════════════════════════════════════════════════════
 let incFilterState = 'all';
 function incTab(el, panelId) { el.parentElement.querySelectorAll('.ops-tab').forEach(t=>t.classList.remove('active')); el.classList.add('active'); el.closest('.page').querySelectorAll('.ops-tab-panel').forEach(p=>p.classList.remove('active')); document.getElementById(panelId).classList.add('active'); if(panelId==='incTabRules')incLoadRules(); if(panelId==='incTabAudit')incLoadAudit(); }
-function incSetFilter(f) { incFilterState=f; renderIncidents(); }
+function incSetFilter(f, el) { incFilterState=f; incFilter=f; if(el){el.closest('div').querySelectorAll('.fbtn').forEach(b=>b.classList.remove('on'));el.classList.add('on');} renderIncidents(f); }
 
 async function renderIncidents() {
   try {
