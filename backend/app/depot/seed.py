@@ -32,14 +32,14 @@ logger = logging.getLogger("intelli.depot.seed")
 # ---------------------------------------------------------------------------
 
 CAMERAS = [
-    # TfL JamCam IDs — real London road cameras, free public API, no auth
-    # stream_url uses "tfl:{cam_id}" prefix; backend /tfl-proxy/stream serves MJPEG
-    {"name": "Gate Entry North",  "stream_url": "tfl:00001.07450", "zone": "Entry Gate",   "frame_rate": 2, "resolution": "704x576"},  # Piccadilly Circus
-    {"name": "Zone A Overhead",   "stream_url": "tfl:00001.06600", "zone": "Zone-A",       "frame_rate": 2, "resolution": "704x576"},  # Cromwell Rd / Earls Court
-    {"name": "Loading Bay 1-4",   "stream_url": "tfl:00001.04331", "zone": "Loading Dock", "frame_rate": 2, "resolution": "704x576"},  # A23 Kennington Park Rd
-    {"name": "Zone C Perimeter",  "stream_url": "tfl:00001.09747", "zone": "Zone-C",       "frame_rate": 2, "resolution": "704x576"},  # Edgware Way / Broadfields
-    {"name": "Gate Exit South",   "stream_url": "tfl:00001.02151", "zone": "Exit Gate",    "frame_rate": 2, "resolution": "704x576"},  # Romford Rd / Tennyson Rd
-    {"name": "Yard Overview",     "stream_url": "tfl:00002.00865", "zone": "Yard",         "frame_rate": 2, "resolution": "704x576"},  # A406 Billet Upass E
+    # Local depot videos — real warehouse CCTV recordings from depot pendrive
+    # stream_url uses "local:{filename}" prefix; video_library.py serves frames
+    {"name": "Gate Entry North",  "stream_url": "local:dtranshipment 1 (2).mp4",                "zone": "Entry Gate",   "frame_rate": 25, "resolution": "854x480"},  # Transhipment area
+    {"name": "Zone A Overhead",   "stream_url": "local:cluster 13 (1).mp4",                     "zone": "Zone-A",       "frame_rate": 25, "resolution": "854x480"},  # Cluster 13 storage
+    {"name": "Loading Bay 1-4",   "stream_url": "local:cluster 4-5 (1).mp4",                    "zone": "Loading Dock", "frame_rate": 25, "resolution": "854x480"},  # Cluster 4-5 bay
+    {"name": "Zone C Perimeter",  "stream_url": "local:Recording 2025-07-30 115417.mp4",        "zone": "Zone-C",       "frame_rate": 25, "resolution": "854x480"},  # Depot perimeter
+    {"name": "Gate Exit South",   "stream_url": "local:Recording 2025-08-11 171805.mp4",        "zone": "Exit Gate",    "frame_rate": 25, "resolution": "854x480"},  # Exit gate ops
+    {"name": "Yard Overview",     "stream_url": "local:Screen Recording 2025-08-11 174929.mp4", "zone": "Yard",         "frame_rate": 25, "resolution": "854x480"},  # Yard overview
 ]
 
 GATES = [

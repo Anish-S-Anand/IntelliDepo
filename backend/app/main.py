@@ -105,12 +105,22 @@ async def lifespan(app: FastAPI):
             await _asyncio.gather(*[_reconnect_one(c) for c in cams])
         except Exception as e:
             logging.getLogger("intelli.depot.vision").warning(f"Camera auto-reconnect skipped: {e}")
-        # Download stock videos in background (non-blocking)
+        # Log available local depot videos
         try:
-            from app.depot.vision.video_library import ensure_videos_downloaded
-            _asyncio.create_task(ensure_videos_downloaded())
+            from app.depot.vision.video_library import list_available_videos
+            available = [v for v in list_available_videos() if v["available"]]
+            logging.getLogger("intelli.depot.video_library").info(
+                f"Local depot videos: {len(available)} available"
+            )
         except Exception as e:
-            logging.getLogger("intelli.depot.video_library").warning(f"Video download skipped: {e}")
+            logging.getLogger("intelli.depot.video_library").warning(f"Video library check skipped: {e}")
+        # Start real-time bag counting pipeline
+        try:
+            from app.depot.vision.realtime_counter import start_realtime_counting
+            _asyncio.create_task(start_realtime_counting())
+            logging.getLogger("intelli.depot.realtime_counter").info("Real-time counting pipeline auto-started")
+        except Exception as e:
+            logging.getLogger("intelli.depot.realtime_counter").warning(f"Real-time counting start skipped: {e}")
     yield
     await engine.dispose()
 
@@ -175,6 +185,11 @@ if settings.ENABLE_DEPOT_MODULES:
     app.include_router(tracking_router)
     app.include_router(inventory_router)
     app.include_router(gate_lpr_router)
+
+    from app.depot.vision.realtime_counter import router as realtime_counter_router
+    from app.depot.vision.training import router as training_router
+    app.include_router(realtime_counter_router)
+    app.include_router(training_router)
 
     # IntelliOps modules
     from app.depot.ops.live_monitoring import router as ops_monitoring_router

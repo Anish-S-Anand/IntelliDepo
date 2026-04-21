@@ -133,6 +133,12 @@ pytest-cache-files-*/
 *.pth
 *.onnx
 
+# Depot CCTV videos (large files, copy from pendrive)
+backend/app/depot/vision/videos/
+
+# YOLO training data (frames, dataset, weights)
+backend/app/depot/vision/training_data/
+
 # Test images
 dark_test.jpg
 light_test.jpg

@@ -195,7 +195,8 @@ def _cv_encode_jpeg(frame: np.ndarray, quality: int = 85) -> bytes:
 
 
 async def stream_connect(camera_id: str, stream_url: str, zone: str = "") -> bool:
-    """Connect to a camera stream. Uses OpenCV for real streams, 5s hard timeout."""
+    """Connect to a camera stream. Uses OpenCV for real streams, 5s hard timeout.
+    Supports local: prefix for local depot video files."""
     loop = asyncio.get_running_loop()
 
     # Assign scene index based on zone name for deterministic unique scenes
@@ -208,6 +209,36 @@ async def stream_connect(camera_id: str, stream_url: str, zone: str = "") -> boo
         _scene_counter_next += 1
 
     scene_idx = _scene_counter.get(camera_id, 0)
+
+    # Handle local: video files from depot pendrive
+    if stream_url.startswith("local:"):
+        filename = stream_url[len("local:"):]
+        from app.depot.vision.video_library import get_local_video_path
+        video_path = get_local_video_path(filename)
+        if video_path is not None and _HAS_CV2:
+            cap = await loop.run_in_executor(
+                _cv_pool, _cv_connect, str(video_path), 0.0
+            )
+            if cap is not None:
+                entry = _StreamEntry(camera_id, stream_url)
+                entry.capture = cap
+                entry.is_real = True
+                _active_streams[camera_id] = entry
+                logger.info(f"Camera {camera_id} connected to local video: {filename}")
+                return True
+            logger.warning(f"Camera {camera_id} failed to open local video: {filename}")
+        else:
+            logger.warning(f"Camera {camera_id} local video not found: {filename}")
+
+        # Fall through to simulated if local file unavailable
+        if ALLOW_SIMULATED_CAMERA:
+            entry = _StreamEntry(camera_id, stream_url)
+            entry.is_real = False
+            _active_streams[camera_id] = entry
+            logger.info(f"Camera {camera_id} local video unavailable, using simulation")
+            return True
+        return False
+
     # Seek each camera to a different offset (0, 10, 20, 30, 40, 50 seconds)
     # so all 6 feeds show different parts of the same stream
     seek_offset = scene_idx * 10.0
@@ -583,17 +614,33 @@ async def get_camera_snapshot(camera_id: uuid.UUID, theme: str = "light", db: As
     if camera.status != CameraStatus.ACTIVE:
         raise HTTPException(status_code=409, detail=f"Camera is not active (status={camera.status})")
 
-    # Auto-reconnect if the stream entry was lost (e.g. after server restart)
-    if str(camera_id) not in _active_streams:
-        await stream_connect(str(camera_id), camera.stream_url)
+    # For local: videos, read a frame from a dedicated capture
+    loop = asyncio.get_running_loop()
+    frame = None
+    if camera.stream_url.startswith("local:") and _HAS_CV2:
+        filename = camera.stream_url[len("local:"):]
+        from app.depot.vision.video_library import get_local_video_path
+        vpath = get_local_video_path(filename)
+        if vpath is not None:
+            def _read_one_frame(path):
+                cap = cv2.VideoCapture(str(path))
+                if not cap.isOpened():
+                    return None
+                ret, f = cap.read()
+                cap.release()
+                return cv2.resize(f, (854, 480)) if ret and f is not None else None
+            frame = await loop.run_in_executor(_cv_pool, _read_one_frame, vpath)
 
-    frame = await stream_read_frame(str(camera_id), theme=theme)
+    if frame is None:
+        # Fallback to shared stream
+        if str(camera_id) not in _active_streams:
+            await stream_connect(str(camera_id), camera.stream_url)
+        frame = await stream_read_frame(str(camera_id), theme=theme)
+
     if frame is None:
         raise HTTPException(status_code=503, detail="Stream not connected")
 
-    jpeg_bytes = await asyncio.get_running_loop().run_in_executor(
-        _cv_pool, _cv_encode_jpeg, frame
-    )
+    jpeg_bytes = await loop.run_in_executor(_cv_pool, _cv_encode_jpeg, frame)
 
     camera.last_seen = datetime.now(timezone.utc)
     await db.commit()
@@ -635,26 +682,57 @@ async def mjpeg_stream(camera_id: uuid.UUID, theme: str = "light", db: AsyncSess
         boundary = b"--frame\r\n"
         fps_delay = 1.0 / cam_fps
         loop = asyncio.get_running_loop()
-        while True:
-            entry = _active_streams.get(cam_id_str)
-            if entry is None:
-                await stream_connect(cam_id_str, cam_stream_url, cam_zone)
-                entry = _active_streams.get(cam_id_str)
-            if entry is None:
-                break
-            # Run blocking frame generation in thread pool to avoid blocking event loop
-            frame = await loop.run_in_executor(_cv_pool, _generate_simulated_frame, entry, theme)
-            if frame is None:
-                break
-            jpeg_bytes = await loop.run_in_executor(_cv_pool, _cv_encode_jpeg, frame, 70)
-            yield (
-                boundary
-                + b"Content-Type: image/jpeg\r\n"
-                + f"Content-Length: {len(jpeg_bytes)}\r\n\r\n".encode()
-                + jpeg_bytes
-                + b"\r\n"
-            )
-            await asyncio.sleep(fps_delay)
+
+        # For local: videos, open a dedicated capture so we don't
+        # compete with the real-time counting pipeline for frames.
+        own_cap = None
+        if cam_stream_url.startswith("local:") and _HAS_CV2:
+            filename = cam_stream_url[len("local:"):]
+            from app.depot.vision.video_library import get_local_video_path
+            vpath = get_local_video_path(filename)
+            if vpath is not None:
+                own_cap = await loop.run_in_executor(
+                    _cv_pool, _cv_connect, str(vpath), 0.0
+                )
+
+        try:
+            while True:
+                if own_cap is not None:
+                    # Read from our own dedicated capture
+                    frame = await loop.run_in_executor(_cv_pool, _cv_read_frame, own_cap)
+                    if frame is None:
+                        # Loop video
+                        own_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        frame = await loop.run_in_executor(_cv_pool, _cv_read_frame, own_cap)
+                    if frame is not None:
+                        frame = cv2.resize(frame, (854, 480))
+                else:
+                    # Fallback to shared stream_read_frame for RTSP/simulated
+                    entry = _active_streams.get(cam_id_str)
+                    if entry is None:
+                        await stream_connect(cam_id_str, cam_stream_url, cam_zone)
+                        entry = _active_streams.get(cam_id_str)
+                    if entry is None:
+                        break
+                    frame = await stream_read_frame(cam_id_str, theme=theme)
+
+                if frame is None:
+                    break
+                jpeg_bytes = await loop.run_in_executor(_cv_pool, _cv_encode_jpeg, frame, 70)
+                yield (
+                    boundary
+                    + b"Content-Type: image/jpeg\r\n"
+                    + f"Content-Length: {len(jpeg_bytes)}\r\n\r\n".encode()
+                    + jpeg_bytes
+                    + b"\r\n"
+                )
+                await asyncio.sleep(fps_delay)
+        finally:
+            if own_cap is not None:
+                try:
+                    own_cap.release()
+                except Exception:
+                    pass
 
     return StreamingResponse(
         generate(),
@@ -874,4 +952,91 @@ async def tfl_jamcam_stream(cam_id: str):
         generate(),
         media_type="multipart/x-mixed-replace; boundary=frame",
         headers={"Cache-Control": "no-cache", "Access-Control-Allow-Origin": "*"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Video Library endpoints — list and stream local depot videos
+# ---------------------------------------------------------------------------
+
+@router.get("/video-library/list")
+async def list_depot_videos():
+    """List all local depot videos available for CCTV feeds and detection training."""
+    from app.depot.vision.video_library import list_available_videos, LOCAL_VIDEO_DIR
+    videos = list_available_videos()
+    return {
+        "video_dir": str(LOCAL_VIDEO_DIR),
+        "total": len(videos),
+        "available": sum(1 for v in videos if v["available"]),
+        "videos": videos,
+    }
+
+
+@router.get("/video-library/{filename}/mjpeg")
+async def stream_local_video(filename: str, theme: str = "light"):
+    """
+    Stream a local depot video as MJPEG. Useful for previewing training videos.
+    filename: e.g. 'cluster 13 (1).mp4'
+    """
+    from app.depot.vision.video_library import get_local_video_path
+
+    video_path = get_local_video_path(filename)
+    if video_path is None:
+        raise HTTPException(status_code=404, detail=f"Video not found: {filename}")
+
+    if not _HAS_CV2:
+        raise HTTPException(status_code=501, detail="OpenCV required for video streaming")
+
+    async def generate():
+        boundary = b"--frame\r\n"
+        loop = asyncio.get_running_loop()
+        cap = await loop.run_in_executor(_cv_pool, _cv_connect, str(video_path), 0.0)
+        if cap is None:
+            return
+        try:
+            while True:
+                frame = await loop.run_in_executor(_cv_pool, _cv_read_frame, cap)
+                if frame is None:
+                    # Loop back to start
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    frame = await loop.run_in_executor(_cv_pool, _cv_read_frame, cap)
+                    if frame is None:
+                        break
+                frame = cv2.resize(frame, (854, 480))
+                jpeg_bytes = await loop.run_in_executor(
+                    _cv_pool, _cv_encode_jpeg, frame, 75
+                )
+                yield (
+                    boundary
+                    + b"Content-Type: image/jpeg\r\n"
+                    + f"Content-Length: {len(jpeg_bytes)}\r\n\r\n".encode()
+                    + jpeg_bytes
+                    + b"\r\n"
+                )
+                await asyncio.sleep(1 / 25)
+        finally:
+            cap.release()
+
+    return StreamingResponse(
+        generate(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@router.get("/video-library/{filename}/snapshot")
+async def video_snapshot(filename: str):
+    """Get a single frame from a local depot video as JPEG."""
+    from app.depot.vision.video_library import get_video_frame_by_filename
+
+    frame = get_video_frame_by_filename(filename)
+    if frame is None:
+        raise HTTPException(status_code=404, detail=f"Cannot read video: {filename}")
+
+    frame = cv2.resize(frame, (854, 480))
+    jpeg_bytes = _cv_encode_jpeg(frame)
+    return StreamingResponse(
+        iter([jpeg_bytes]),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-cache"},
     )

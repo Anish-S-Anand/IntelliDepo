@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Live Stream Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    body { margin: 0; background: #0a0f1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 40px; }
+    h1 { font-size: 20px; margin-bottom: 24px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 900px; width: 100%; }
+    .card { background: #14203a; border: 1px solid #1e2f50; border-radius: 12px; overflow: hidden; }
+    .card video, .card img { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #000; display: block; }
+    .label { padding: 10px 14px; font-size: 13px; font-weight: 600; }
+    .label span { font-size: 10px; color: #8a9bbf; display: block; margin-top: 2px; }
+    .tag { display: inline-block; font-size: 9px; padding: 2px 8px; border-radius: 6px; margin-left: 8px; font-weight: 700; }
+    .hls { background: #3b82f620; color: #3b82f6; }
+    .mjpeg { background: #22c55e20; color: #22c55e; }
+  </style>
+</head>
+<body>
+  <h1>Live Stream Demo &mdash; HLS vs MJPEG</h1>
+  <div class="grid">
+
+    <!-- HLS Stream 1 -->
+    <div class="card">
+      <video id="hls1" muted autoplay playsinline></video>
+      <div class="label">
+        NASA TV <span class="tag hls">HLS</span>
+        <span>Continuous live video via hls.js</span>
+      </div>
+    </div>
+
+    <!-- HLS Stream 2 -->
+    <div class="card">
+      <video id="hls2" muted autoplay playsinline></video>
+      <div class="label">
+        Akamai Test Stream <span class="tag hls">HLS</span>
+        <span>Always-on live test stream</span>
+      </div>
+    </div>
+
+    <!-- MJPEG Stream 1 -->
+    <div class="card">
+      <img src="http://pendelcam.kip.uni-heidelberg.de/mjpg/video.mjpg" alt="Heidelberg Pendulum">
+      <div class="label">
+        Heidelberg University <span class="tag mjpeg">MJPEG</span>
+        <span>Foucault pendulum camera, Germany</span>
+      </div>
+    </div>
+
+    <!-- MJPEG Stream 2 -->
+    <div class="card">
+      <img src="http://camera.buffalotrace.com/mjpg/video.mjpg" alt="Buffalo Trace">
+      <div class="label">
+        Buffalo Trace Distillery <span class="tag mjpeg">MJPEG</span>
+        <span>Warehouse camera, Kentucky</span>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function playHLS(elementId, url) {
+      const video = document.getElementById(elementId);
+      if (Hls.isSupported()) {
+        const hls = new Hls({ lowLatencyMode: true });
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (data.fatal) console.warn(elementId, 'HLS error:', data.type);
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = url;
+        video.play().catch(() => {});
+      }
+    }
+
+    playHLS('hls1', 'https://nasa-i.akamaihd.net/hls/live/253565/NASA-NTV1-Public/master.m3u8');
+    playHLS('hls2', 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8');
+  </script>
+</body>
+</html>

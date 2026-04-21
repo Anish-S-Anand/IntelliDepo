@@ -1,175 +1,183 @@
 """
 Depot Vision — Video Library
-Downloads free warehouse/logistics stock videos and serves them as looping
-CCTV streams. Uses yt-dlp to fetch CC-licensed clips from YouTube.
+Serves local depot CCTV recordings as looping camera feeds.
 
-Videos are cached in /tmp/depot_videos/ inside the container.
-Each camera scene maps to a specific clip so all 6 cameras show different footage.
+Videos are stored in backend/app/depot/vision/videos/ and mapped to
+camera scenes (gate entry, zone overhead, loading bay, etc.).
+Each camera gets a unique video file that loops continuously.
 """
-import asyncio
 import logging
 import os
 import sys
-import hashlib
 from pathlib import Path
 from typing import Optional
 import numpy as np
 
 logger = logging.getLogger("intelli.depot.video_library")
 
-if sys.platform == "win32":
-    VIDEO_DIR = Path(os.environ.get("TEMP", "C:\\Temp")) / "depot_videos"
-else:
-    VIDEO_DIR = Path("/tmp/depot_videos")
+try:
+    import cv2
+    _HAS_CV2 = True
+except ImportError:
+    _HAS_CV2 = False
 
 # ---------------------------------------------------------------------------
-# Live public camera feeds (real-time MJPEG or auto-refresh JPEG)
+# Local video directory — bundled with the project
 # ---------------------------------------------------------------------------
-LIVE_FEEDS = [
-    {
-        "scene": "gate_entry",
-        "label": "GATE ENTRY NORTH",
-        "live_url": "https://weathercam.digitraffic.fi/C0450502.jpg",
-        "type": "jpeg_refresh",
-        "description": "Finland highway cam — gate entry view (JPEG, ~10s refresh)",
-    },
-    {
-        "scene": "zone_overhead",
-        "label": "ZONE-A OVERHEAD",
-        "live_url": "https://weathercam.digitraffic.fi/C0450601.jpg",
-        "type": "jpeg_refresh",
-        "description": "Finland highway cam — overhead zone view (JPEG, ~10s refresh)",
-    },
-    {
-        "scene": "loading_bay",
-        "label": "LOADING BAY 1-4",
-        "live_url": "https://weathercam.digitraffic.fi/C0450501.jpg",
-        "type": "jpeg_refresh",
-        "description": "Finland highway cam — loading/trucks (JPEG, ~10s refresh)",
-    },
-    {
-        "scene": "perimeter",
-        "label": "ZONE-C PERIMETER",
-        "live_url": "https://weathercam.digitraffic.fi/C0450701.jpg",
-        "type": "jpeg_refresh",
-        "description": "Finland highway cam — perimeter view (JPEG, ~10s refresh)",
-    },
-    {
-        "scene": "gate_exit",
-        "label": "GATE EXIT SOUTH",
-        "live_url": "https://weathercam.digitraffic.fi/C0150301.jpg",
-        "type": "jpeg_refresh",
-        "description": "Finland highway cam — exit view (JPEG, ~10s refresh)",
-    },
-    {
-        "scene": "yard",
-        "label": "YARD OVERVIEW",
-        "live_url": "https://weathercam.digitraffic.fi/C0650101.jpg",
-        "type": "jpeg_refresh",
-        "description": "Finland highway cam — wide yard overview (JPEG, ~10s refresh)",
-    },
-]
+_THIS_DIR = Path(__file__).resolve().parent
+LOCAL_VIDEO_DIR = _THIS_DIR / "videos"
 
-# 6 royalty-free warehouse/logistics clips from Mixkit (offline fallback)
-# Direct MP4 links — short clips (8-30s) that loop when live feeds are unavailable
+# ---------------------------------------------------------------------------
+# Depot video files mapped to camera scenes (0-5)
+# These are real warehouse/depot recordings from the depot pendrive.
+# Additional videos beyond the 6 primary scenes are available for
+# detection training and analytics.
+# ---------------------------------------------------------------------------
 SCENE_VIDEOS = [
     {
         "scene": "gate_entry",
         "label": "GATE ENTRY NORTH",
-        "url": "https://assets.mixkit.co/videos/23011/23011-720.mp4",
-        "description": "Truck arriving at warehouse gate — gate entry view",
+        "filename": "dtranshipment 1 (2).mp4",
+        "description": "Transhipment area — gate entry operations",
     },
     {
         "scene": "zone_overhead",
         "label": "ZONE-A OVERHEAD",
-        "url": "https://assets.mixkit.co/videos/23551/23551-720.mp4",
-        "description": "Warehouse interior walkthrough — overhead zone monitoring",
+        "filename": "cluster 13 (1).mp4",
+        "description": "Cluster 13 — overhead zone storage view",
     },
     {
         "scene": "loading_bay",
         "label": "LOADING BAY 1-4",
-        "url": "https://assets.mixkit.co/videos/13067/13067-720.mp4",
-        "description": "Workers loading boxes onto freight truck at loading bay",
+        "filename": "cluster 4-5 (1).mp4",
+        "description": "Cluster 4-5 — loading bay operations",
     },
     {
         "scene": "perimeter",
         "label": "ZONE-C PERIMETER",
-        "url": "https://assets.mixkit.co/videos/39453/39453-720.mp4",
-        "description": "High-angle perimeter overview of warehouse complex",
+        "filename": "Recording 2025-07-30 115417.mp4",
+        "description": "Depot recording — perimeter monitoring",
     },
     {
         "scene": "gate_exit",
         "label": "GATE EXIT SOUTH",
-        "url": "https://assets.mixkit.co/videos/23852/23852-720.mp4",
-        "description": "Worker directing freight truck at exit gate",
+        "filename": "Recording 2025-08-11 171805.mp4",
+        "description": "Depot recording — exit gate operations",
     },
     {
         "scene": "yard",
         "label": "YARD OVERVIEW",
-        "url": "https://assets.mixkit.co/videos/39462/39462-720.mp4",
-        "description": "Aerial yard overview with trucks and cargo operations",
+        "filename": "Screen Recording 2025-08-11 174929.mp4",
+        "description": "Depot screen recording — yard overview",
     },
 ]
 
-# Fallback: direct Mixkit MP4 links (same scene videos, always reachable)
-FALLBACK_VIDEOS = [
-    "https://assets.mixkit.co/videos/23011/23011-720.mp4",   # gate entry — truck arriving
-    "https://assets.mixkit.co/videos/23551/23551-720.mp4",   # zone overhead — warehouse walk
-    "https://assets.mixkit.co/videos/13067/13067-720.mp4",   # loading bay — workers loading truck
-    "https://assets.mixkit.co/videos/39453/39453-720.mp4",   # perimeter — high-angle overview
-    "https://assets.mixkit.co/videos/23852/23852-720.mp4",   # gate exit — truck with worker
-    "https://assets.mixkit.co/videos/39462/39462-720.mp4",   # yard — port/yard overview
+# All available depot videos for training/detection beyond the 6 primary scenes
+ALL_DEPOT_VIDEOS = [
+    "cluster 13 (1).mp4",
+    "cluster 4-5 (1).mp4",
+    "dtranshipment 1 (2).mp4",
+    "Recording 2025-07-30 115417.mp4",
+    "Recording 2025-08-11 171805.mp4",
+    "Screen Recording 2025-04-29 120722.mp4",
+    "Screen Recording 2025-04-29 131812.mp4",
+    "Screen Recording 2025-05-09 125537.mp4",
+    "Screen Recording 2025-05-14 081914.mp4",
+    "Screen Recording 2025-05-22 164244.mp4",
+    "Screen Recording 2025-07-14 142945.mp4",
+    "Screen Recording 2025-07-14 143106.mp4",
+    "Screen Recording 2025-07-30 115414.mp4",
+    "Screen Recording 2025-07-30 120512.mp4",
+    "Screen Recording 2025-08-11 171757.mp4",
+    "Screen Recording 2025-08-11 173926.mp4",
+    "Screen Recording 2025-08-11 174012.mp4",
+    "Screen Recording 2025-08-11 174233.mp4",
+    "Screen Recording 2025-08-11 174929.mp4",
 ]
 
-# In-memory video capture cache: scene -> cv2.VideoCapture
+# In-memory video capture cache: key -> cv2.VideoCapture
 _video_caps: dict[str, object] = {}
-_download_attempted: set[str] = set()
 
 
-def get_video_path(scene_idx: int) -> Optional[Path]:
-    """Return path to downloaded video for this scene, or None."""
-    VIDEO_DIR.mkdir(parents=True, exist_ok=True)
-    path = VIDEO_DIR / f"scene_{scene_idx}.mp4"
+def get_local_video_path(filename: str) -> Optional[Path]:
+    """Return path to a local depot video, or None if not found."""
+    path = LOCAL_VIDEO_DIR / filename
     return path if path.exists() and path.stat().st_size > 10_000 else None
 
 
-async def ensure_videos_downloaded() -> None:
-    """Download all fallback videos if not already present. Non-blocking."""
-    VIDEO_DIR.mkdir(parents=True, exist_ok=True)
-    tasks = []
-    for i, url in enumerate(FALLBACK_VIDEOS):
-        path = VIDEO_DIR / f"scene_{i}.mp4"
-        if not path.exists() or path.stat().st_size < 10_000:
-            tasks.append(_download_video(url, path, i))
-    if tasks:
-        await asyncio.gather(*tasks, return_exceptions=True)
+def get_video_path(scene_idx: int) -> Optional[Path]:
+    """Return path to the video file for this scene index."""
+    if scene_idx < 0 or scene_idx >= len(SCENE_VIDEOS):
+        return None
+    filename = SCENE_VIDEOS[scene_idx]["filename"]
+    return get_local_video_path(filename)
 
 
-async def _download_video(url: str, dest: Path, idx: int) -> None:
-    """Download a video file using httpx or curl."""
-    if str(dest) in _download_attempted:
-        return
-    _download_attempted.add(str(dest))
-    logger.info(f"Downloading scene {idx} video: {url}")
-    try:
-        import httpx
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-            async with client.stream("GET", url) as r:
-                r.raise_for_status()
-                with open(dest, "wb") as f:
-                    async for chunk in r.aiter_bytes(65536):
-                        f.write(chunk)
-        logger.info(f"Scene {idx} downloaded: {dest} ({dest.stat().st_size // 1024}KB)")
-    except Exception as e:
-        logger.warning(f"Scene {idx} download failed ({url}): {e}")
-        dest.unlink(missing_ok=True)
+def list_available_videos() -> list[dict]:
+    """List all depot videos with their availability status."""
+    results = []
+    for filename in ALL_DEPOT_VIDEOS:
+        path = LOCAL_VIDEO_DIR / filename
+        exists = path.exists() and path.stat().st_size > 10_000
+        info = {
+            "filename": filename,
+            "available": exists,
+            "size_mb": round(path.stat().st_size / (1024 * 1024), 1) if exists else 0,
+        }
+        # Check if it's assigned to a scene
+        for i, sv in enumerate(SCENE_VIDEOS):
+            if sv["filename"] == filename:
+                info["scene_idx"] = i
+                info["scene_label"] = sv["label"]
+                break
+        results.append(info)
+    return results
+
+
+def _open_video_capture(video_path: Path, seek_seconds: float = 0.0) -> Optional[object]:
+    """Open a cv2.VideoCapture for a local video file."""
+    if not _HAS_CV2:
+        return None
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        return None
+    if seek_seconds > 0:
+        fps = cap.get(cv2.CAP_PROP_FPS) or 25
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(seek_seconds * fps))
+    return cap
 
 
 def get_video_frame(scene_idx: int, theme: str = "dark") -> Optional[np.ndarray]:
     """
-    Get a frame for this scene using the scene renderer.
-    theme: "dark" = classic CCTV, "light" = bright daylight warehouse
+    Read the next frame from the local depot video for this scene.
+    Loops automatically when the video ends.
+    Falls back to scene_renderer if video is unavailable.
     """
+    video_path = get_video_path(scene_idx)
+
+    if video_path is not None and _HAS_CV2:
+        key = f"local_{scene_idx}"
+
+        # Open capture if not cached
+        if key not in _video_caps or _video_caps[key] is None:
+            _video_caps[key] = _open_video_capture(video_path)
+
+        cap = _video_caps.get(key)
+        if cap is not None:
+            ret, frame = cap.read()
+            if not ret or frame is None:
+                # End of video — loop back to start
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = cap.read()
+            if ret and frame is not None:
+                # Resize to consistent 854x480 for CCTV display
+                frame = cv2.resize(frame, (854, 480))
+                return frame
+
+        # If capture failed, remove from cache so we retry next time
+        _video_caps.pop(key, None)
+
+    # Fallback to synthetic scene renderer
     try:
         from app.depot.vision.scene_renderer import render_scene
         key = f"frame_{scene_idx}"
@@ -179,3 +187,43 @@ def get_video_frame(scene_idx: int, theme: str = "dark") -> Optional[np.ndarray]
     except Exception as e:
         logger.warning(f"Scene renderer failed for scene {scene_idx}: {e}")
         return None
+
+
+def get_video_frame_by_filename(filename: str) -> Optional[np.ndarray]:
+    """
+    Read the next frame from a specific depot video file by name.
+    Useful for running detection/training on any video, not just the 6 scenes.
+    """
+    if not _HAS_CV2:
+        return None
+
+    video_path = get_local_video_path(filename)
+    if video_path is None:
+        return None
+
+    key = f"file_{filename}"
+    if key not in _video_caps or _video_caps[key] is None:
+        _video_caps[key] = _open_video_capture(video_path)
+
+    cap = _video_caps.get(key)
+    if cap is None:
+        return None
+
+    ret, frame = cap.read()
+    if not ret or frame is None:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        ret, frame = cap.read()
+    if ret and frame is not None:
+        return frame
+    return None
+
+
+def release_all():
+    """Release all open video captures."""
+    for key, cap in list(_video_caps.items()):
+        if hasattr(cap, "release"):
+            try:
+                cap.release()
+            except Exception:
+                pass
+    _video_caps.clear()
