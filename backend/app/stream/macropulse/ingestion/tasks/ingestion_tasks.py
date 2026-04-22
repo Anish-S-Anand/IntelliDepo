@@ -6,17 +6,19 @@ import json
 import os
 from datetime import datetime, timezone
 
-import redis as redis_lib
 from celery import Celery
 from celery.schedules import crontab
 from celery.utils.log import get_task_logger
 
 logger = get_task_logger(__name__)
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 DLQ_KEY = "macropulse:dlq"
 
-app = Celery("macropulse", broker=REDIS_URL, backend=REDIS_URL)
+app = Celery(
+    "macropulse",
+    broker=os.getenv("CELERY_BROKER_URL", ""),
+    backend=os.getenv("CELERY_RESULT_BACKEND", ""),
+)
 
 app.conf.update(
     task_serializer="json",
@@ -73,24 +75,19 @@ app.conf.update(
 # ---------------------------------------------------------------------------
 
 def _push_to_dlq(task_name: str, error: str) -> None:
-    """Push failed task info to Redis dead-letter queue."""
-    try:
-        r = redis_lib.from_url(REDIS_URL)
-        record = json.dumps({
-            "task": task_name,
-            "error": error,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
-        r.rpush(DLQ_KEY, record)
-    except Exception as e:
-        logger.error("Failed to push to DLQ: %s", e)
+    """Log failed task info (Redis DLQ removed)."""
+    record = {
+        "task": task_name,
+        "error": error,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    logger.error("DLQ entry: %s", json.dumps(record))
 
 
 def get_dlq_failures() -> list[dict]:
-    """Return all failed task records from the Redis DLQ."""
-    r = redis_lib.from_url(REDIS_URL)
-    raw = r.lrange(DLQ_KEY, 0, -1)
-    return [json.loads(item) for item in raw]
+    """Return empty list — Redis DLQ has been removed."""
+    logger.warning("get_dlq_failures called but Redis DLQ has been removed")
+    return []
 
 
 def _serialize_alert(alert) -> dict:

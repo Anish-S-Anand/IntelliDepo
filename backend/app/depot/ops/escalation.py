@@ -21,9 +21,7 @@ from sqlalchemy import select, func, desc, update
 
 from app.database import BaseModel as DBBaseModel, get_db
 from app.core.auth.dependencies import get_current_user
-from app.core.redis_client import get_redis
 from app.shared.models.user import User
-import redis.asyncio as aioredis
 
 logger = logging.getLogger("intelli.ops.escalation")
 

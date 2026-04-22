@@ -29,10 +29,8 @@ from sqlalchemy import select
 
 from app.database import BaseModel as DBBaseModel, get_db
 from app.core.auth.dependencies import get_current_user
-from app.core.redis_client import get_redis
 from app.core.notifications.service_compat import NotificationService
 from app.shared.models.user import User
-import redis.asyncio as aioredis
 
 logger = logging.getLogger("intelli.depot.colour_analysis")
 ALLOW_SIMULATED_VISION = os.getenv("ALLOW_SIMULATED_VISION", "false").lower() in {"1", "true", "yes"}
@@ -357,7 +355,6 @@ async def run_colour_analysis(
     payload: ColourAnalysisRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
     """
     Run colour analysis on all detected objects from a completed detection run.
@@ -492,7 +489,6 @@ async def run_colour_analysis(
                 priority_map = {"critical": "CRITICAL", "high": "HIGH", "medium": "NORMAL", "low": "LOW"}
                 await NotificationService.send_alert(
                     db=db,
-                    redis=redis,
                     user_id=current_user.id,
                     event_type="depot.colour.mismatch",
                     title=f"Colour Mismatch — {payload.manifest_code or 'Unlinked'}",

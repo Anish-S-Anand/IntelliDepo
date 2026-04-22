@@ -18,8 +18,7 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800
 
-    # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
+    # Redis removed — all features use DB or in-memory alternatives
 
     # Auth — MUST be overridden via .env in production
     SECRET_KEY: str = "change-me-in-production"
@@ -88,8 +87,8 @@ class Settings(BaseSettings):
     # Agent Confidence & Fallback
     CONFIDENCE_DEFAULT_THRESHOLD: float = 0.7
 
-    # Celery (async task dispatch)
-    CELERY_BROKER_URL: str = ""  # defaults to REDIS_URL if not set
+    # Celery (async task dispatch — optional)
+    CELERY_BROKER_URL: str = ""
 
     # Email / SMTP
     SMTP_HOST: str = "localhost"

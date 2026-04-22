@@ -57,17 +57,8 @@ def test_dlq_records_failure():
         get_dlq_failures,
     )
 
-    mock_redis = MagicMock()
-    pushed: list[str] = []
-    mock_redis.rpush = lambda key, val: pushed.append(val)
-    mock_redis.lrange = lambda key, start, end: pushed
-
-    with patch(
-        "app.stream.macropulse.ingestion.tasks.ingestion_tasks.redis_lib.from_url",
-        return_value=mock_redis,
-    ):
-        _push_to_dlq("fetch_fx_task", "API timeout")
-        failures = get_dlq_failures()
+    _push_to_dlq("fetch_fx_task", "API timeout")
+    failures = get_dlq_failures()
 
     assert len(failures) >= 1
     assert failures[0]["task"] == "fetch_fx_task"

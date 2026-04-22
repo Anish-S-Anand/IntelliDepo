@@ -92,7 +92,6 @@ async def mfa_challenge(
     """
     from app.core.auth.authentication import decode_token, create_access_token, create_refresh_token
     from app.core.auth.sessions.service import SessionService
-    from app.core.redis_client import get_redis
 
     # Decode MFA token
     payload = decode_token(body.mfa_token)
@@ -126,10 +125,8 @@ async def mfa_challenge(
         )
 
     # Create new session with full tokens
-    redis = await get_redis()
     access_token, refresh_token = await SessionService.create_session(
         db,
-        redis,
         user,
         device_name=None,
         ip_address=None,

@@ -1,3 +1,7 @@
+"""
+MacroPulse Celery app configuration.
+NOTE: Redis broker has been removed. Set CELERY_BROKER_URL env var to a valid broker before running workers.
+"""
 import os
 
 from celery import Celery
@@ -5,8 +9,8 @@ from celery import Celery
 
 celery_app = Celery(
     "macropulse",
-    broker=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
-    backend=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+    broker=os.getenv("CELERY_BROKER_URL", ""),
+    backend=os.getenv("CELERY_RESULT_BACKEND", ""),
 )
 
 celery_app.conf.update(

@@ -28,10 +28,8 @@ from sqlalchemy import select
 
 from app.database import BaseModel as DBBaseModel, get_db
 from app.core.auth.dependencies import get_current_user, require_permission
-from app.core.redis_client import get_redis
 from app.core.notifications.service_compat import NotificationService
 from app.shared.models.user import User
-import redis.asyncio as aioredis
 
 logger = logging.getLogger("intelli.depot.perimeter")
 
@@ -441,7 +439,6 @@ async def run_security_breach_agent(
     payload: BreachAgentRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
     """
     Security Breach Agent: autonomously scans all active perimeter zones,
@@ -517,7 +514,6 @@ async def run_security_breach_agent(
             priority_map = {"low": "LOW", "medium": "NORMAL", "high": "HIGH", "critical": "CRITICAL"}
             await NotificationService.send_alert(
                 db=db,
-                redis=redis,
                 user_id=current_user.id,
                 event_type="depot.perimeter.breach",
                 title=f"Security Breach — {zone.name}",
@@ -753,7 +749,6 @@ async def resolve_incident(
 async def escalate_overdue_incidents(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
     """
     Auto-escalation check: escalates any open incidents past their deadline.
@@ -781,7 +776,7 @@ async def escalate_overdue_incidents(
 
         try:
             await NotificationService.send_alert(
-                db=db, redis=redis, user_id=current_user.id,
+                db=db, user_id=current_user.id,
                 event_type="depot.perimeter.escalation",
                 title=f"ESCALATED: {incident.title}",
                 message=f"Incident escalated to {incident.escalated_to} (Level {next_level})",

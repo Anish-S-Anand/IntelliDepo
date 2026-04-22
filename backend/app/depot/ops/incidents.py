@@ -25,9 +25,7 @@ from sqlalchemy import select, func, desc
 
 from app.database import BaseModel as DBBaseModel, get_db
 from app.core.auth.dependencies import get_current_user
-from app.core.redis_client import get_redis
 from app.shared.models.user import User
-import redis.asyncio as aioredis
 
 logger = logging.getLogger("intelli.ops.incidents")
 
@@ -385,14 +383,8 @@ async def _send_notification(db: AsyncSession, incident_id: uuid.UUID,
     # Try Novu / platform notifications
     try:
         from app.core.notifications.service_compat import NotificationService
-        redis = None
-        try:
-            from app.core.redis_client import redis_pool
-            redis = redis_pool
-        except Exception:
-            pass
         await NotificationService.send_alert(
-            db=db, redis=redis, user_id=recipient,
+            db=db, user_id=recipient,
             event_type=f"ops.incident.{incident.priority}",
             title=f"[{incident.priority}] {incident.title}",
             message=incident.description or incident.title,

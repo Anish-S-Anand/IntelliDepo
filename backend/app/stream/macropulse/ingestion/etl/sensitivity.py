@@ -1,22 +1,10 @@
 """
 P&L Sensitivity Matrix Calculator.
 Computes impact of 5 macro variables on tenant P&L.
-Results cached in Redis with TTL=300s.
 """
-import json
-import os
 from typing import Any
 
-import redis as redis_lib
-
 from app.stream.macropulse.ingestion.schemas.tenant_profile import TenantProfile
-
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-CACHE_TTL = 300  # 5 minutes
-
-
-def _redis() -> redis_lib.Redis:
-    return redis_lib.from_url(REDIS_URL)
 
 
 def calculate_sensitivity_matrix(
@@ -97,25 +85,9 @@ def calculate_sensitivity_matrix(
         "assumption": f"Modified duration {profile.portfolio.modified_duration}y, 0.5% yield rise",
     }
 
-    # Cache in Redis
-    try:
-        r = _redis()
-        r.setex(
-            f"sensitivity:{profile.tenant_id}",
-            CACHE_TTL,
-            json.dumps(results),
-        )
-    except Exception:
-        pass
-
     return results
 
 
 def get_cached_sensitivity(tenant_id: str) -> dict | None:
-    """Return cached sensitivity matrix or None if expired/missing."""
-    try:
-        r = _redis()
-        raw = r.get(f"sensitivity:{tenant_id}")
-        return json.loads(raw) if raw else None
-    except Exception:
-        return None
+    """Return None — Redis caching removed."""
+    return None

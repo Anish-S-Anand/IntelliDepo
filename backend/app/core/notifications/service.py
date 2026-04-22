@@ -12,7 +12,6 @@ from datetime import datetime, time, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
-import redis.asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.notifications.engine import get_notification_engine
@@ -90,7 +89,6 @@ class NotificationService:
     @staticmethod
     async def send_alert(
         db: AsyncSession,
-        redis: aioredis.Redis,
         user_id: UUID | None,
         event_type: str,
         title: str,
@@ -106,7 +104,6 @@ class NotificationService:
 
         Args:
             db: Database session
-            redis: Redis client
             user_id: Target user ID (None for system broadcast)
             event_type: Type of event (e.g., "agent_failed")
             title: Alert title
@@ -232,7 +229,6 @@ class NotificationService:
         elif channel == "in_app":
             recipient = str(user_id) if user_id else "broadcast"
             success = await InAppChannel.send(
-                redis_client=redis,
                 user_id=str(user_id) if user_id else None,
                 alert_id=str(alert.id),
                 title=title,
@@ -447,7 +443,6 @@ class NotificationService:
     @staticmethod
     async def check_escalations(
         db: AsyncSession,
-        redis: aioredis.Redis,
     ) -> None:
         """
         Find unacknowledged alerts past escalation TTL and create escalated copies.

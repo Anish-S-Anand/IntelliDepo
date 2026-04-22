@@ -33,10 +33,17 @@ COUNTING_LINE_Y = float(os.getenv("COUNTING_LINE_Y", "0.5"))  # normalised Y pos
 DETECTION_INTERVAL = float(os.getenv("RT_DETECTION_INTERVAL", "3.0"))  # seconds between frames
 PUBLISH_INTERVAL = float(os.getenv("RT_PUBLISH_INTERVAL", "2.0"))  # seconds between WS pushes
 CONFIDENCE_THRESHOLD = float(os.getenv("RT_CONFIDENCE", "0.40"))
-TARGET_CLASSES = ["bag", "box", "pallet", "carton"]
+# Classes we count (after mapping)
+COUNTABLE_CLASSES = ["bag", "box", "pallet", "carton", "truck"]
 
-# YOLO class mapping (same as detection.py)
+# YOLO class mapping — maps custom + COCO classes to counting labels
 _YOLO_CLASS_MAP = {
+    # JSW trained model classes
+    "Cement Bags": "bag",
+    "Truck": "truck",
+    "Truck Back": "truck",
+    "Truck space": "truck",
+    # COCO fallback classes
     "backpack": "bag", "handbag": "bag", "suitcase": "bag",
     "box": "box", "carton": "carton", "pallet": "pallet",
 }
@@ -222,7 +229,7 @@ def _detect_frame(frame: np.ndarray) -> list[dict]:
         dets = []
         for _ in range(random.randint(1, 5)):
             dets.append({
-                "class_label": random.choice(TARGET_CLASSES),
+                "class_label": random.choice(COUNTABLE_CLASSES),
                 "confidence": round(random.uniform(0.5, 0.95), 4),
                 "bbox_x": round(random.uniform(0.1, 0.7), 4),
                 "bbox_y": round(random.uniform(0.1, 0.7), 4),
@@ -239,7 +246,7 @@ def _detect_frame(frame: np.ndarray) -> list[dict]:
             cls_id = int(box.cls[0])
             cls_name = r.names.get(cls_id, "unknown")
             mapped = _YOLO_CLASS_MAP.get(cls_name, cls_name)
-            if mapped not in TARGET_CLASSES:
+            if mapped not in COUNTABLE_CLASSES:
                 continue
             conf = float(box.conf[0])
             x1, y1, x2, y2 = box.xyxy[0].tolist()

@@ -13,7 +13,6 @@ from datetime import datetime, time, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
-import redis.asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.notifications.engine import get_notification_engine
@@ -91,7 +90,6 @@ class NotificationService:
     @staticmethod
     async def send_alert(
         db: AsyncSession,
-        redis: aioredis.Redis,
         user_id: UUID | None,
         event_type: str,
         title: str,
@@ -102,7 +100,6 @@ class NotificationService:
         scheduled_at: datetime | None = None,
         request_ip: str | None = None,
     ) -> NotificationAlert:
-        del redis
         payload = payload or {}
 
         if user_id:
@@ -325,9 +322,8 @@ class NotificationService:
     @staticmethod
     async def check_escalations(
         db: AsyncSession,
-        redis: aioredis.Redis,
     ) -> None:
-        del db, redis
+        del db
         logger.info("Escalation compatibility mode active; no persistent escalation queue configured.")
 
     @staticmethod

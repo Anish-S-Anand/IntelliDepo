@@ -153,9 +153,6 @@ async def test_tenant_profile_crud():
     with patch(
         "app.stream.macropulse.ingestion.api.routes.tenant.AsyncSessionLocal",
         return_value=mock_session,
-    ), patch(
-        "app.stream.macropulse.ingestion.etl.sensitivity._redis",
-        return_value=MagicMock(get=MagicMock(return_value=None), setex=MagicMock()),
     ):
         transport = ASGITransport(app=fastapi_app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

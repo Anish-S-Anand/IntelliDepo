@@ -23,9 +23,7 @@ from sqlalchemy import select, func, desc
 
 from app.database import BaseModel as DBBaseModel, get_db
 from app.core.auth.dependencies import get_current_user
-from app.core.redis_client import get_redis
 from app.shared.models.user import User
-import redis.asyncio as aioredis
 
 logger = logging.getLogger("intelli.ops.fleet_yard")
 
@@ -277,7 +275,6 @@ def _detect_status(zone: Optional[str], speed: float) -> str:
 async def ingest_gps(
     body: GPSUpdate,
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
     """Ingest a single GPS position update for a vehicle (F-064)."""
     now = datetime.now(timezone.utc)
@@ -324,26 +321,6 @@ async def ingest_gps(
         db.add(vehicle)
 
     await db.flush()
-
-    # Cache position in Redis for sub-5s dashboard refresh
-    try:
-        import json
-        await redis.setex(
-            f"ops:vehicle:{body.vehicle_id}",
-            30,
-            json.dumps({
-                "vehicle_id": body.vehicle_id,
-                "lat": body.latitude,
-                "lng": body.longitude,
-                "speed": body.speed_kmh,
-                "zone": zone,
-                "status": status,
-                "ts": now.isoformat(),
-            }),
-        )
-    except Exception:
-        pass
-
     await db.commit()
     await db.refresh(vehicle)
     return VehicleResponse.model_validate(vehicle)
@@ -353,7 +330,6 @@ async def ingest_gps(
 async def ingest_gps_batch(
     body: GPSBatch,
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
     """Batch ingest GPS updates (F-064)."""
     now = datetime.now(timezone.utc)
@@ -427,7 +403,6 @@ async def get_vehicle(
 @router.get("/vehicles/yard/summary", response_model=dict)
 async def yard_vehicle_summary(
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
     """KPI summary of vehicles currently in the yard."""
     result = await db.execute(
@@ -451,17 +426,6 @@ async def yard_vehicle_summary(
         v for k, v in by_status.items()
         if k in (VehicleStatus.IN_YARD, VehicleStatus.AT_DOCK, VehicleStatus.AT_GATE)
     )
-
-    # Cache for dashboard
-    try:
-        import json
-        await redis.setex("ops:yard_summary", 30, json.dumps({
-            "total_in_yard": total_in_yard,
-            "by_status": by_status,
-            "by_zone": by_zone,
-        }))
-    except Exception:
-        pass
 
     return {
         "total_in_yard": total_in_yard,

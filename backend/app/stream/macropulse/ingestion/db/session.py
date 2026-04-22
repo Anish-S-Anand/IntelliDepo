@@ -11,7 +11,7 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "../ops/.env"))
 
 POSTGRES_URL = os.getenv(
     "POSTGRES_URL",
-    "postgresql+asyncpg://macropulse:macropulse@localhost:5432/macropulse",
+    os.getenv("DATABASE_URL", "postgresql+asyncpg://intelli:intelli@localhost:5432/intelli"),
 )
 INDIA_DB_URL = os.getenv("INDIA_DB_URL", POSTGRES_URL)
 GCC_DB_URL = os.getenv("GCC_DB_URL", POSTGRES_URL)

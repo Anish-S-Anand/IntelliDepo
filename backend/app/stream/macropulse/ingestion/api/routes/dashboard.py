@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import json
-import os
 from datetime import datetime, timedelta, timezone
 
-import redis as redis_lib
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import desc, select
 
@@ -27,14 +24,7 @@ from app.stream.macropulse.ingestion.schemas.dashboard import (
 )
 from app.stream.macropulse.ingestion.schemas.tenant_profile import TenantProfile
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-DASHBOARD_TTL = 60
-
 router = APIRouter(prefix="/macropulse", tags=["dashboard"])
-
-
-def _redis():
-    return redis_lib.from_url(REDIS_URL)
 
 
 async def _load_profile(tenant_id: str) -> TenantProfile:
@@ -79,13 +69,6 @@ async def _build_sensitivity(profile: TenantProfile) -> dict:
     description="Returns KPI tiles, live alerts, sensitivity matrix, and data freshness for a tenant.",
 )
 async def get_dashboard(tenant_id: str) -> MacroPulseDashboard:
-    try:
-        cached = _redis().get(f"dashboard:{tenant_id}")
-        if cached:
-            return MacroPulseDashboard(**json.loads(cached))
-    except Exception:
-        pass
-
     profile = await _load_profile(tenant_id)
     now = datetime.now(timezone.utc)
 
@@ -211,14 +194,5 @@ async def get_dashboard(tenant_id: str) -> MacroPulseDashboard:
             news=latest_news.ingested_at if latest_news else None,
         ),
     )
-
-    try:
-        _redis().setex(
-            f"dashboard:{tenant_id}",
-            DASHBOARD_TTL,
-            dashboard.model_dump_json(),
-        )
-    except Exception:
-        pass
 
     return dashboard

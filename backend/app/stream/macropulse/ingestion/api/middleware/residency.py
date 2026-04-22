@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any
 
-import redis as redis_lib
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -22,22 +20,8 @@ from app.stream.macropulse.ingestion.db.session import (
 from app.stream.macropulse.ingestion.models.residency_violations import ResidencyViolation
 from app.stream.macropulse.ingestion.models.tenant_profile import TenantProfileModel
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-
-
 class ResidencyViolationError(PermissionError):
     pass
-
-
-def _redis():
-    return redis_lib.from_url(REDIS_URL)
-
-
-def cache_tenant_region(tenant_id: str, region: str) -> None:
-    try:
-        _redis().setex(f"tenant_region:{tenant_id}", 300, region)
-    except Exception:
-        pass
 
 
 async def _query_tenant_region_from_db(tenant_id: str) -> str | None:
@@ -49,7 +33,6 @@ async def _query_tenant_region_from_db(tenant_id: str) -> str | None:
                 if row and not row.is_deleted:
                     primary_region = row.profile_data.get("primary_region")
                     if primary_region:
-                        cache_tenant_region(tenant_id, primary_region)
                         return primary_region
         except Exception:
             continue
@@ -57,12 +40,6 @@ async def _query_tenant_region_from_db(tenant_id: str) -> str | None:
 
 
 async def get_tenant_region(tenant_id: str) -> str | None:
-    try:
-        cached = _redis().get(f"tenant_region:{tenant_id}")
-        if cached:
-            return cached.decode() if isinstance(cached, bytes) else str(cached)
-    except Exception:
-        pass
     return await _query_tenant_region_from_db(tenant_id)
 
 

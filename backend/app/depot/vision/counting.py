@@ -24,10 +24,11 @@ from sqlalchemy import select, func
 
 from app.database import BaseModel as DBBaseModel, get_db
 from app.core.auth.dependencies import get_current_user
-from app.core.redis_client import get_redis
 from app.core.notifications.service_compat import NotificationService
 from app.shared.models.user import User
-import redis.asyncio as aioredis
+
+# In-memory tracking state store (replaces Redis)
+_tracking_state: dict[str, dict] = {}
 
 logger = logging.getLogger("intelli.depot.counting")
 
@@ -269,7 +270,6 @@ async def create_count_session(
     payload: CountSessionCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
     """
     Submit a counting session. If a manifest_id is provided, auto-reconciles
@@ -339,7 +339,6 @@ async def create_count_session(
                 priority_map = {"critical": "CRITICAL", "high": "HIGH", "medium": "NORMAL", "low": "LOW"}
                 await NotificationService.send_alert(
                     db=db,
-                    redis=redis,
                     user_id=current_user.id,
                     event_type="depot.counting.mismatch",
                     title=f"Count Mismatch — {manifest.manifest_code}",
@@ -435,7 +434,6 @@ async def auto_count_from_detection(
     payload: AutoCountRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
     """
     Frame-by-frame Counting Agent: automatically aggregates object counts
@@ -531,7 +529,7 @@ async def auto_count_from_detection(
             try:
                 priority_map = {"critical": "CRITICAL", "high": "HIGH", "medium": "NORMAL", "low": "LOW"}
                 await NotificationService.send_alert(
-                    db=db, redis=redis, user_id=current_user.id,
+                    db=db, user_id=current_user.id,
                     event_type="depot.counting.auto_mismatch",
                     title=f"Auto-Count Mismatch — {manifest.manifest_code}",
                     message=alert.message,
@@ -619,7 +617,6 @@ async def count_from_tracking(
     payload: TrackingCountRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
     """
     Counting Agent v2: aggregates counts from a DeepSORT tracking session.
@@ -716,7 +713,7 @@ async def count_from_tracking(
             try:
                 priority_map = {"critical": "CRITICAL", "high": "HIGH", "medium": "NORMAL", "low": "LOW"}
                 await NotificationService.send_alert(
-                    db=db, redis=redis, user_id=current_user.id,
+                    db=db, user_id=current_user.id,
                     event_type="depot.counting.tracking_mismatch",
                     title=f"Tracking Count Mismatch — {manifest.manifest_code}",
                     message=alert.message,
@@ -936,7 +933,6 @@ async def process_frame(
     payload: FrameInput,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
     """
     Process a frame with DeepSORT tracking. Accepts bounding box detections,
@@ -948,15 +944,10 @@ async def process_frame(
     if ts.status != TrackingSessionStatus.ACTIVE:
         raise HTTPException(status_code=400, detail="Tracking session is not active")
 
-    # Redis key for tracking state
-    redis_key = f"deepsort:session:{session_id}"
-
-    # Get or initialize track counter
-    raw_state = await redis.get(redis_key)
-    if raw_state:
-        import json
-        state = json.loads(raw_state)
-    else:
+    # Get or initialize track counter from in-memory store
+    state_key = str(session_id)
+    state = _tracking_state.get(state_key)
+    if state is None:
         state = {"next_track_id": 1, "tally": {"bag": 0, "box": 0, "pallet": 0, "carton": 0}, "cumulative": 0}
 
     # Simulate DeepSORT: assign persistent track IDs to detections
@@ -979,9 +970,8 @@ async def process_frame(
     frame_total = sum(state["tally"].values())
     state["cumulative"] = frame_total
 
-    # Persist state to Redis (TTL 1 hour)
-    import json
-    await redis.set(redis_key, json.dumps(state), ex=3600)
+    # Persist state in memory
+    _tracking_state[state_key] = state
 
     # Update tracking session in DB
     ts.frame_count = payload.frame_number + 1
@@ -1020,7 +1010,6 @@ async def finalize_tracking_session(
     session_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
     """
     Finalize a DeepSORT tracking session. Computes final tallies,
@@ -1092,9 +1081,8 @@ async def finalize_tracking_session(
                 db.add(alert)
                 count_session.alert_sent = True
 
-    # Clean up Redis state
-    redis_key = f"deepsort:session:{session_id}"
-    await redis.delete(redis_key)
+    # Clean up in-memory state
+    _tracking_state.pop(str(session_id), None)
 
     await db.commit()
     await db.refresh(count_session)

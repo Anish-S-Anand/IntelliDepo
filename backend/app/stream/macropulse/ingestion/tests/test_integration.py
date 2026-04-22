@@ -7,7 +7,6 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import redis as redis_lib
 from httpx import ASGITransport, AsyncClient, Response
 from sqlalchemy import delete, select
 
@@ -165,20 +164,6 @@ async def test_dashboard_returns_kpi_tiles():
     assert body["kpi_tiles"]["repo_rate_pct"] is not None
     assert body["kpi_tiles"]["usd_inr_rate"] > 0
 
-
-@pytest.mark.asyncio
-async def test_dashboard_cached_in_redis():
-    tenant_id = f"cache-{uuid.uuid4().hex[:8]}"
-    redis_client = redis_lib.from_url("redis://localhost:6379/0")
-    redis_client.delete(f"dashboard:{tenant_id}")
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        await client.post("/api/tenant/profile", json=_tenant_payload(tenant_id))
-        await _seed_dashboard_rows()
-        await client.get(f"/api/macropulse/dashboard/{tenant_id}")
-        await client.get(f"/api/macropulse/dashboard/{tenant_id}")
-    assert redis_client.exists(f"dashboard:{tenant_id}") == 1
-    assert redis_client.ttl(f"dashboard:{tenant_id}") <= 60
 
 
 @pytest.mark.asyncio

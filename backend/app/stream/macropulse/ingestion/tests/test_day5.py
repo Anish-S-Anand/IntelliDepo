@@ -281,9 +281,7 @@ def test_event_schema_documentation():
 async def test_event_publisher_publishes_currency_signal():
     from app.stream.macropulse.event_publisher import MacroPulseEventPublisher
 
-    mock_redis = AsyncMock()
-    mock_redis.publish = AsyncMock(return_value=2)
-    publisher = MacroPulseEventPublisher(redis_client=mock_redis)
+    publisher = MacroPulseEventPublisher()
 
     result = await publisher.publish_currency_signal(
         tenant_id="tenant-india-001",
@@ -296,17 +294,13 @@ async def test_event_publisher_publishes_currency_signal():
     assert result["success"] is True
     assert result["channel"] == "macro.currency_signal"
     assert result["consumer"] == "GeoRisk"
-    assert result["subscriber_count"] == 2
-    mock_redis.publish.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_event_publisher_publishes_slowdown_risk():
     from app.stream.macropulse.event_publisher import MacroPulseEventPublisher
 
-    mock_redis = AsyncMock()
-    mock_redis.publish = AsyncMock(return_value=1)
-    publisher = MacroPulseEventPublisher(redis_client=mock_redis)
+    publisher = MacroPulseEventPublisher()
 
     result = await publisher.publish_slowdown_risk(
         tenant_id="tenant-india-001",
@@ -323,9 +317,7 @@ async def test_event_publisher_publishes_slowdown_risk():
 async def test_event_publisher_publishes_commodity_inflation():
     from app.stream.macropulse.event_publisher import MacroPulseEventPublisher
 
-    mock_redis = AsyncMock()
-    mock_redis.publish = AsyncMock(return_value=1)
-    publisher = MacroPulseEventPublisher(redis_client=mock_redis)
+    publisher = MacroPulseEventPublisher()
 
     result = await publisher.publish_commodity_inflation(
         tenant_id="tenant-india-001",
@@ -337,26 +329,6 @@ async def test_event_publisher_publishes_commodity_inflation():
     assert result["success"] is True
     assert result["channel"] == "macro.commodity_inflation"
     assert result["consumer"] == "SLAMonitor"
-
-
-@pytest.mark.asyncio
-async def test_event_publisher_handles_redis_failure():
-    from app.stream.macropulse.event_publisher import MacroPulseEventPublisher, CurrencySignalEvent
-
-    mock_redis = AsyncMock()
-    mock_redis.publish = AsyncMock(side_effect=ConnectionError("Redis down"))
-    publisher = MacroPulseEventPublisher(redis_client=mock_redis)
-
-    result = await publisher.publish_currency_signal(
-        tenant_id="test",
-        currency_pair="USD/INR",
-        signal_type="depreciation",
-        magnitude_pct=1.0,
-        direction="up",
-        confidence=0.8,
-    )
-    assert result["success"] is False
-    assert "error" in result
 
 
 # ---------------------------------------------------------------------------

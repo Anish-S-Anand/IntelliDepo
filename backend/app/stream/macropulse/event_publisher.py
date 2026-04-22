@@ -1,10 +1,10 @@
 """
-MacroPulse Redis Pub/Sub Event Publisher — Day 5 (Pranisree)
+MacroPulse Event Publisher — Redis removed, events are logged only.
 
-Publishes MacroPulse output events to Redis pub/sub channels for downstream consumers:
-  - macro.currency_signal   → GeoRisk module
-  - macro.slowdown_risk     → ChurnGuard module
-  - macro.commodity_inflation → SLAMonitor module
+Publishes MacroPulse output events via logging for downstream consumers:
+  - macro.currency_signal   -> GeoRisk module
+  - macro.slowdown_risk     -> ChurnGuard module
+  - macro.commodity_inflation -> SLAMonitor module
 
 Event schemas documented inline and in /docs.
 """
@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 
-# ── Event Channels ───────────────────────────────────────────
+# -- Event Channels -----------------------------------------------------------
 
 class MacroPulseChannel(str, Enum):
     CURRENCY_SIGNAL = "macro.currency_signal"
@@ -30,7 +30,7 @@ class MacroPulseChannel(str, Enum):
     COMMODITY_INFLATION = "macro.commodity_inflation"
 
 
-# Channel → downstream consumer mapping
+# Channel -> downstream consumer mapping
 CHANNEL_CONSUMERS: dict[str, str] = {
     MacroPulseChannel.CURRENCY_SIGNAL: "GeoRisk",
     MacroPulseChannel.SLOWDOWN_RISK: "ChurnGuard",
@@ -38,7 +38,7 @@ CHANNEL_CONSUMERS: dict[str, str] = {
 }
 
 
-# ── Event Schemas (Pydantic) ────────────────────────────────
+# -- Event Schemas (Pydantic) -------------------------------------------------
 
 class BaseEvent(BaseModel):
     """Base schema for all MacroPulse pub/sub events."""
@@ -116,56 +116,37 @@ class CommodityInflationEvent(BaseEvent):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-# ── Event Publisher ──────────────────────────────────────────
+# -- Event Publisher -----------------------------------------------------------
 
 class MacroPulseEventPublisher:
     """
-    Publishes MacroPulse events to Redis pub/sub channels.
-    Each event is JSON-serialized and published to the appropriate channel.
+    Publishes MacroPulse events by logging them.
+    Redis pub/sub has been removed; events are logged for observability.
     """
 
-    def __init__(self, redis_client=None):
-        self._redis = redis_client
+    def __init__(self):
         self._publish_log: list[dict] = []
 
-    async def _get_redis(self):
-        """Lazy-load Redis client."""
-        if self._redis is None:
-            from app.core.redis_client import get_redis
-            self._redis = await get_redis()
-        return self._redis
-
     async def publish(self, event: BaseEvent) -> dict[str, Any]:
-        """Publish an event to its designated Redis channel."""
-        redis = await self._get_redis()
+        """Log an event to its designated channel."""
         channel = event.channel
         payload = event.model_dump_json()
 
-        try:
-            subscriber_count = await redis.publish(channel, payload)
-            result = {
-                "success": True,
-                "event_id": event.event_id,
-                "channel": channel,
-                "consumer": CHANNEL_CONSUMERS.get(channel, "unknown"),
-                "subscriber_count": subscriber_count,
-                "timestamp": event.timestamp.isoformat(),
-                "payload_bytes": len(payload),
-            }
-            self._publish_log.append(result)
-            logger.info(
-                "Published %s to %s (%d subscribers)",
-                event.event_type, channel, subscriber_count,
-            )
-            return result
-        except Exception as exc:
-            logger.error("Failed to publish %s to %s: %s", event.event_type, channel, exc)
-            return {
-                "success": False,
-                "event_id": event.event_id,
-                "channel": channel,
-                "error": str(exc),
-            }
+        result = {
+            "success": True,
+            "event_id": event.event_id,
+            "channel": channel,
+            "consumer": CHANNEL_CONSUMERS.get(channel, "unknown"),
+            "subscriber_count": 0,
+            "timestamp": event.timestamp.isoformat(),
+            "payload_bytes": len(payload),
+        }
+        self._publish_log.append(result)
+        logger.info(
+            "Published %s to %s (logged only, Redis removed)",
+            event.event_type, channel,
+        )
+        return result
 
     async def publish_currency_signal(
         self,
@@ -249,7 +230,7 @@ class MacroPulseEventPublisher:
         return list(self._publish_log[-100:])
 
 
-# ── Singleton ────────────────────────────────────────────────
+# -- Singleton ----------------------------------------------------------------
 
 _publisher_instance: MacroPulseEventPublisher | None = None
 
@@ -262,7 +243,7 @@ async def get_event_publisher() -> MacroPulseEventPublisher:
     return _publisher_instance
 
 
-# ── Event Schema Documentation Helper ────────────────────────
+# -- Event Schema Documentation Helper ----------------------------------------
 
 def get_event_schemas() -> dict[str, Any]:
     """Return documented event schemas for all pub/sub channels."""

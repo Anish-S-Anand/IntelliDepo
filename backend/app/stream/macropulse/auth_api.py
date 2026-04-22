@@ -11,7 +11,6 @@ from app.core.auth.authentication import authenticate_user, get_user_by_email, r
 from app.core.auth.dependencies import get_current_user
 from app.core.auth.rbac import assign_role_to_user, seed_default_roles
 from app.core.auth.sessions.service import SessionService
-from app.core.redis_client import get_redis
 from app.database import get_db
 from app.shared.models.user import User
 from app.stream.macropulse.auth_schemas import (
@@ -111,9 +110,8 @@ async def login_macropulse_user(
     if hydrated is None:
         raise HTTPException(status_code=401, detail="User not found")
 
-    redis = await get_redis()
     access_token, refresh_token = await SessionService.create_session(
-        db, redis, hydrated, device_name="macropulse-web"
+        db, hydrated, device_name="macropulse-web"
     )
     return MacroPulseAuthTokenResponse(
         access_token=access_token,

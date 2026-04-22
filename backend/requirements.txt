@@ -9,8 +9,7 @@ sqlalchemy[asyncio]>=2.0.36
 asyncpg>=0.30.0
 alembic>=1.14.0
 
-# Redis & Task Queue
-redis>=5.2.0
+# Task Queue
 celery>=5.4.0
 
 # Auth

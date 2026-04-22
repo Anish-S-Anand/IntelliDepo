@@ -11,7 +11,6 @@ from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
 from app.config import settings
-from app.core.redis_client import get_redis
 from app.core.auth.sessions.service import SessionService
 from app.core.auth.authentication import (
     authenticate_user,
@@ -111,9 +110,8 @@ async def login(request: Request, db: AsyncSession = Depends(get_db)):
         }
 
     # Create session with tokens
-    redis = await get_redis()
     access_token, refresh_token = await SessionService.create_session(
-        db, redis, user, device_name=None, ip_address=None
+        db, user, device_name=None, ip_address=None
     )
 
     return TokenResponse(

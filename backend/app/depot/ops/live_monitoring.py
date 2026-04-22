@@ -21,9 +21,7 @@ from sqlalchemy import select, func, desc
 
 from app.database import BaseModel as DBBaseModel, get_db
 from app.core.auth.dependencies import get_current_user
-from app.core.redis_client import get_redis
 from app.shared.models.user import User
-import redis.asyncio as aioredis
 
 logger = logging.getLogger("intelli.ops.live_monitoring")
 
@@ -222,7 +220,6 @@ class LiveStateSnapshot(BaseModel):
 async def ingest_event(
     payload: EventCreate,
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
     """Ingest a single sensor/camera/gate event into TimescaleDB."""
     event = SensorEvent(**payload.model_dump())
@@ -233,8 +230,6 @@ async def ingest_event(
     alert = await _evaluate_thresholds(db, event)
     if alert:
         db.add(alert)
-        # Update Redis alert counter
-        await redis.incr("ops:alert_count")
 
     await db.commit()
     await db.refresh(event)
@@ -245,7 +240,6 @@ async def ingest_event(
 async def ingest_event_batch(
     payload: EventBatch,
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
     """Batch ingest multiple events — optimized for high-throughput sensor feeds."""
     ingested = 0
@@ -263,11 +257,6 @@ async def ingest_event_batch(
             alerts_triggered += 1
 
     await db.commit()
-
-    # Update Redis state
-    await redis.incrby("ops:event_count", ingested)
-    if alerts_triggered > 0:
-        await redis.incrby("ops:alert_count", alerts_triggered)
 
     logger.info(f"Batch ingested: {ingested} events, {alerts_triggered} alerts")
     return EventBatchResult(ingested=ingested, alerts_triggered=alerts_triggered)
@@ -484,9 +473,8 @@ async def resolve_alert(
 @router.get("/dashboard/kpis", response_model=DashboardKPI)
 async def get_dashboard_kpis(
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
-    """Get live KPI counts for the multi-feed dashboard. Uses Redis cache."""
+    """Get live KPI counts for the multi-feed dashboard."""
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Event count today
@@ -497,13 +485,21 @@ async def get_dashboard_kpis(
     total_events = ev_result.scalar() or 0
 
     # Alert counts by severity
+    critical_count = 0
+    high_count = 0
+    medium_count = 0
     for sev in ["critical", "high", "medium"]:
         count_result = await db.execute(
             select(func.count()).select_from(AlertQueue)
             .where(AlertQueue.severity == sev, AlertQueue.status != AlertStatus.RESOLVED)
         )
         count = count_result.scalar() or 0
-        await redis.set(f"ops:kpi:{sev}_alerts", count, ex=30)
+        if sev == "critical":
+            critical_count = count
+        elif sev == "high":
+            high_count = count
+        elif sev == "medium":
+            medium_count = count
 
     active_result = await db.execute(
         select(func.count()).select_from(AlertQueue)
@@ -515,10 +511,6 @@ async def get_dashboard_kpis(
         select(func.count()).select_from(AlertQueue)
         .where(AlertQueue.status == AlertStatus.ACKNOWLEDGED)
     )
-
-    critical_count = int(await redis.get("ops:kpi:critical_alerts") or 0)
-    high_count = int(await redis.get("ops:kpi:high_alerts") or 0)
-    medium_count = int(await redis.get("ops:kpi:medium_alerts") or 0)
 
     hours_elapsed = max((datetime.now(timezone.utc) - today_start).total_seconds() / 3600, 1)
 
@@ -552,10 +544,9 @@ async def get_dashboard_kpis(
 @router.get("/dashboard/state", response_model=LiveStateSnapshot)
 async def get_live_state(
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
 ):
     """Get full live state snapshot for the dashboard — KPIs + recent alerts + feed status."""
-    kpis_resp = await get_dashboard_kpis(db=db, redis=redis)
+    kpis_resp = await get_dashboard_kpis(db=db)
 
     alerts_result = await db.execute(
         select(AlertQueue)

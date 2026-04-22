@@ -1,8 +1,9 @@
 """
-Intelli Platform — Celery Configuration
+Intelli Platform -- Celery Configuration
 Feature: AI-7.2-celery
 
 Celery app setup for asynchronous agent task dispatch.
+NOTE: Redis broker has been removed. Set CELERY_BROKER_URL env var to a valid broker before running workers.
 """
 from celery import Celery
 
@@ -11,8 +12,8 @@ from app.config import settings
 # Create Celery app
 celery_app = Celery(
     "intelli_agents",
-    broker=settings.CELERY_BROKER_URL or settings.REDIS_URL,
-    backend=settings.CELERY_BROKER_URL or settings.REDIS_URL,
+    broker=getattr(settings, "CELERY_BROKER_URL", ""),
+    backend=getattr(settings, "CELERY_RESULT_BACKEND", ""),
 )
 
 # Configure Celery
