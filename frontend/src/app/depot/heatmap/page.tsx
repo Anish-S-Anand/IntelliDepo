@@ -1,5 +1,4 @@
 import dynamic from "next/dynamic";
-import DepotLayout from "@/components/depot/layout/DepotLayout";
 
 const HeatmapPage = dynamic(
   () => import("@/components/depot/operations/HeatmapPage"),
@@ -16,8 +15,6 @@ function LoadingShell() {
 
 export default function HeatmapRoutePage() {
   return (
-    <DepotLayout>
       <HeatmapPage />
-    </DepotLayout>
   );
 }

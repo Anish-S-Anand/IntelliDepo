@@ -1,5 +1,5 @@
 import dynamic from "next/dynamic";
-import DepotLayout from "@/components/depot/layout/DepotLayout";
+
 
 const ZoneConfigPage = dynamic(
   () => import("@/components/depot/operations/ZoneConfigPage"),
@@ -16,8 +16,6 @@ function LoadingShell() {
 
 export default function ZonesRoutePage() {
   return (
-    <DepotLayout>
       <ZoneConfigPage />
-    </DepotLayout>
   );
 }

@@ -467,6 +467,8 @@ export default function LiveFeedViewer() {
   const [cameraBoxes, setCameraBoxes] = useState<Record<string, BoundingBox[]>>({});
   const [detectionModel, setDetectionModel] = useState<DetectionModel | null>(null);
   const detectingRef = useRef(false);
+  const lastRunRef = useRef(0);
+  const MIN_INTERVAL = 8000; // 8 seconds (CRITICAL)
 
   // Load available YOLO detection models on mount
   useEffect(() => {
@@ -508,45 +510,67 @@ export default function LiveFeedViewer() {
   }, [live]);
 
   // Run detection on active cameras via backend API
-  const cameras = (() => {
-    const all = snapshot?.cameras.data ?? [];
-    // Deduplicate by name, preferring cameras with tfl: stream URLs (working feeds)
-    const byName = new Map<string, CameraRecord>();
-    for (const c of all) {
-      const hasTfl = c.stream_url?.startsWith("tfl:");
-      if (!byName.has(c.name) || hasTfl) byName.set(c.name, c);
+  const cameras = useMemo(() => {
+  const all = snapshot?.cameras.data ?? [];
+
+  const byName = new Map<string, CameraRecord>();
+
+  for (const c of all) {
+    const hasTfl = c.stream_url?.startsWith("tfl:");
+    if (!byName.has(c.name) || hasTfl) {
+      byName.set(c.name, c);
     }
-    return Array.from(byName.values()).slice(0, 6);
-  })();
+  }
+
+  return Array.from(byName.values()).slice(0, 5);
+}, [snapshot]);
 
   useEffect(() => {
-    if (!live || !detectionModel || detectingRef.current) return;
-    const activeCams = cameras.filter((c) => c.status === "active");
-    if (activeCams.length === 0) return;
+  if (!live || !detectionModel) return;
 
-    detectingRef.current = true;
+  const now = Date.now();
 
-    Promise.allSettled(
-      activeCams.map(async (cam) => {
-        try {
-          const run = await startDetectionRun(detectionModel.id, 1, cam.id);
-          const objects = await getRunObjects(run.id);
-          return { cameraId: cam.id, boxes: detectedObjectsToBoxes(objects, cam.id) };
-        } catch {
-          return { cameraId: cam.id, boxes: [] as BoundingBox[] };
-        }
-      })
-    ).then((results) => {
+  // ✅ HARD RATE LIMIT (CRITICAL)
+  if (now - lastRunRef.current < MIN_INTERVAL) return;
+
+  if (detectingRef.current) return;
+
+  const activeCams = cameras.filter((c) => c.status === "active");
+  if (activeCams.length === 0) return;
+
+  detectingRef.current = true;
+  lastRunRef.current = now;
+
+  Promise.allSettled(
+    activeCams.map(async (cam) => {
+      try {
+        const run = await startDetectionRun(detectionModel.id, 1, cam.id);
+        const objects = await getRunObjects(run.id);
+        return {
+          cameraId: cam.id,
+          boxes: detectedObjectsToBoxes(objects, cam.id),
+        };
+      } catch {
+        return { cameraId: cam.id, boxes: [] };
+      }
+    })
+  )
+    .then((results) => {
       const newBoxes: Record<string, BoundingBox[]> = {};
+
       for (const result of results) {
         if (result.status === "fulfilled") {
           newBoxes[result.value.cameraId] = result.value.boxes;
         }
       }
+
       setCameraBoxes((prev) => ({ ...prev, ...newBoxes }));
+    })
+    .finally(() => {
+      // ✅ ALWAYS RESET (CRITICAL FIX)
       detectingRef.current = false;
     });
-  }, [tick, live, detectionModel, cameras]);
+}, [tick, live, detectionModel, cameras]);
 
   // Refresh camera list periodically
   useEffect(() => {

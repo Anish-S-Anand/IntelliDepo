@@ -156,19 +156,31 @@ export async function getDetectionModels(): Promise<DetectionModel[]> {
   return res.data;
 }
 
+let lastCall = 0;
+
 export async function startDetectionRun(
   modelId: string,
   frameCount: number,
   cameraId?: string,
 ): Promise<DetectionRunResponse> {
+
+  const now = Date.now();
+
+  // ✅ enforce spacing between API calls
+  if (now - lastCall < 500) {
+    await new Promise((res) => setTimeout(res, 500));
+  }
+
+  lastCall = Date.now();
+
   const res = await api.post<DetectionRunResponse>("/depot/vision/detection/runs", {
     model_id: modelId,
     frame_count: frameCount,
     camera_id: cameraId ?? null,
   });
+
   return res.data;
 }
-
 export async function getDetectionRuns(cameraId?: string): Promise<DetectionRunResponse[]> {
   const params = cameraId ? `?camera_id=${cameraId}` : "";
   const res = await api.get<DetectionRunResponse[]>(`/depot/vision/detection/runs${params}`);

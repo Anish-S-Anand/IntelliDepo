@@ -1,5 +1,4 @@
 import dynamic from "next/dynamic";
-import DepotLayout from "@/components/depot/layout/DepotLayout";
 
 const CountingSummaryPage = dynamic(
   () => import("@/components/depot/operations/CountingSummaryPage"),
@@ -16,8 +15,7 @@ function LoadingShell() {
 
 export default function CountingPage() {
   return (
-    <DepotLayout>
       <CountingSummaryPage />
-    </DepotLayout>
+    
   );
 }

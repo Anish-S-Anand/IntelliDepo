@@ -19,7 +19,7 @@ export default function LoginPage() {
     clearError();
     try {
       await login(email, password);
-      router.push("/stream/macropulse");
+      router.push("/depot");
     } catch {
       // error is set in store
     }

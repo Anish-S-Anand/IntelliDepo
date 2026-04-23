@@ -208,7 +208,7 @@ export function IntelliLanding() {
 
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,181,85,0.02),transparent_18%),linear-gradient(180deg,rgba(1,3,10,0.03),rgba(1,3,10,0.08)_78%,rgba(1,3,10,0.18)_100%)]" />
 
-      <div className="relative z-10 mx-auto flex h-full max-w-[1540px] flex-col px-6 py-5 lg:px-10">
+      <div className="relative z-10 mx-auto flex h-full w-full max-w-[1540px] flex-col px-4 sm:px-6 py-5 lg:px-10">
         <nav className="flex items-center justify-between rounded-full border border-white/10 bg-slate-950/34 px-5 py-3 backdrop-blur-xl">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/92 shadow-[0_0_28px_rgba(128,220,232,0.18)]">
@@ -226,7 +226,7 @@ export function IntelliLanding() {
         <div className="mt-3 flex justify-end pr-1">
           <button
             type="button"
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/login")}
             className="text-[18px] font-black uppercase tracking-[0.3em] text-white/75 transition hover:text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
           >
             Click to know more →
@@ -235,7 +235,7 @@ export function IntelliLanding() {
 
         {/* Tagline — just below the solar system */}
         <div className="absolute left-1/2 z-20 -translate-x-1/2" style={{ top: "82%" }}>
-          <p className="text-center text-[32px] font-black uppercase tracking-[0.28em] text-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.9)]">
+          <p className="text-center text-lg sm:text-2xl lg:text-[32px] font-black uppercase tracking-[0.2em] sm:tracking-[0.28em] text-white px-4 drop-shadow-[0_2px_16px_rgba(0,0,0,0.9)]">
             An AI Application Universe from Fidelis
           </p>
         </div>

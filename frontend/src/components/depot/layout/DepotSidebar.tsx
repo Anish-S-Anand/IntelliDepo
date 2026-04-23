@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -41,19 +41,20 @@ const BOTTOM_ITEMS = [
   { label: "SET", fullLabel: "Settings", href: "/depot/settings", icon: Settings },
 ];
 
-export default function DepotSidebar() {
+export default function DepotSidebar({ open }: { open: boolean }) {
   const pathname = usePathname();
   const [alertCount, setAlertCount] = useState(0);
 
-  // Fetch active alert count for incident badge
   useEffect(() => {
     let cancelled = false;
+
     const fetchAlerts = async () => {
       try {
         const [visionAlerts, perimeterCount] = await Promise.allSettled([
           getAllActiveAlerts(),
           getPerimeterAlertCount(),
         ]);
+
         if (!cancelled) {
           let total = 0;
           if (visionAlerts.status === "fulfilled") total += visionAlerts.value.length;
@@ -64,8 +65,10 @@ export default function DepotSidebar() {
         if (!cancelled) setAlertCount(3);
       }
     };
+
     void fetchAlerts();
     const interval = setInterval(() => void fetchAlerts(), 20000);
+
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -73,12 +76,18 @@ export default function DepotSidebar() {
   }, []);
 
   return (
-    <aside className="fixed left-0 top-[52px] bottom-0 w-16 bg-[#0D1526] border-r border-[#1E2F50] flex flex-col items-center py-3 gap-1 z-40">
+    <aside
+      className={`fixed md:static left-0 top-[52px] bottom-0 w-16 bg-[#0D1526] border-r border-[#1E2F50] flex flex-col items-center py-3 gap-1 z-40 transition-transform duration-300 ${
+        open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      }`}
+    >
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
         const isActive =
           pathname === item.href || pathname?.startsWith(item.href + "/");
+
         const badgeCount = (item as any).hasPulse ? alertCount : 0;
+
         return (
           <Link
             key={item.href}
@@ -91,15 +100,11 @@ export default function DepotSidebar() {
                 : "border-transparent text-[#4E6090] hover:bg-[#E5521A]/5 hover:text-[#8A9BBF] hover:border-[#1E2F50]"
             )}
           >
-            {isActive && (
-              <span className="absolute left-[-12px] top-1/2 -translate-y-1/2 w-[3px] h-6 bg-[#E5521A] rounded-r" />
-            )}
             <Icon className="w-4 h-4" />
-            <span className="text-[7px] font-bold tracking-wide uppercase leading-none">
-              {item.label}
-            </span>
+            <span className="text-[7px] font-bold uppercase">{item.label}</span>
+
             {badgeCount > 0 && (
-              <span className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-[#F04A4A] text-white text-[7px] font-extrabold flex items-center justify-center animate-pulse shadow-[0_0_8px_rgba(240,74,74,0.6)]">
+              <span className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-[#F04A4A] text-white text-[7px] flex items-center justify-center">
                 {badgeCount > 9 ? "9+" : badgeCount}
               </span>
             )}
@@ -107,29 +112,12 @@ export default function DepotSidebar() {
         );
       })}
 
-      <div className="w-[30px] h-px bg-[#1E2F50] my-1" />
-
       <div className="mt-auto">
         {BOTTOM_ITEMS.map((item) => {
           const Icon = item.icon;
-          const isActive =
-            pathname === item.href || pathname?.startsWith(item.href + "/");
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={item.fullLabel}
-              className={cn(
-                "w-11 h-11 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-colors",
-                isActive
-                  ? "bg-[#E5521A]/12 text-[#E5521A] border-[#E5521A]/25"
-                  : "border-transparent text-[#4E6090] hover:bg-[#E5521A]/5 hover:text-[#8A9BBF]"
-              )}
-            >
+            <Link key={item.href} href={item.href} className="w-11 h-11 flex items-center justify-center">
               <Icon className="w-4 h-4" />
-              <span className="text-[7px] font-bold tracking-wide uppercase leading-none">
-                {item.label}
-              </span>
             </Link>
           );
         })}
