@@ -1,36 +1,30 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { VideoFeed } from "./VideoFeed";
 import { ModelProvider, useCocoSsd } from "@/hooks/useCocoSsd";
 import { Camera, ShieldCheck, Truck, AlertTriangle } from "lucide-react";
 
-const CAMERAS = [
-  {
-    name: "Gate Entry North",
-    streamUrl: "https://58a9af047d7e8.streamlock.net/live/NJDOT_1.stream/playlist.m3u8",
-  },
-  {
-    name: "Gate Exit South",
-    streamUrl: "https://videos3.earthcam.com/fecnetwork/9974.flv/chunklist_w1421640637.m3u8",
-  },
-  {
-    name: "Zone A Overhead",
-    streamUrl: "https://www.dot.ca.gov/travel-hq/camera-feed-test/streams/i80_overhead.m3u8",
-  },
-  {
-    name: "Loading Bay 1-4",
-    streamUrl: "https://feeds.thdo.tv/stream/TXDOT_1080p.m3u8",
-  },
-  {
-    name: "Zone C Perimeter",
-    streamUrl: "https://stream.ayrtontv.com.au/streams/traffic_melb.m3u8",
-  },
-  {
-    name: "Yard Overview",
-    streamUrl: "", // Will always fall back to TfL JamCam
-  },
+interface CameraData {
+  id: string;
+  name: string;
+}
+
+const FALLBACK_CAMERAS: CameraData[] = [
+  { id: "gate-entry-north", name: "Gate Entry North" },
+  { id: "zone-a-overhead", name: "Zone A Overhead" },
+  { id: "loading-bay-1-4", name: "Loading Bay 1-4" },
+  { id: "zone-c-perimeter", name: "Zone C Perimeter" },
+  { id: "gate-exit-south", name: "Gate Exit South" },
+  { id: "yard-overview", name: "Yard Overview" },
 ];
+
+function getBackendBase(): string {
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
+  }
+  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+}
 
 interface VehicleCounts {
   [cameraIndex: number]: number;
@@ -61,22 +55,37 @@ function ModelStatus() {
 }
 
 function CameraGridInner() {
+  const [cameras, setCameras] = useState<CameraData[]>(FALLBACK_CAMERAS);
   const [vehicleCounts, setVehicleCounts] = useState<VehicleCounts>({});
   const [plateLog, setPlateLog] = useState<Array<{ time: string; camera: string; plate: string }>>([]);
+
+  useEffect(() => {
+    async function fetchCameras() {
+      try {
+        const res = await fetch(`${getBackendBase()}/depot/vision/cameras/`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setCameras(data.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
+          }
+        }
+      } catch {
+        // Use fallback cameras
+      }
+    }
+    fetchCameras();
+  }, []);
 
   const handleDetectionUpdate = useCallback(
     (cameraIndex: number, cameraName: string) =>
       (vehicles: Array<{ bbox: [number, number, number, number]; class: string; score: number }>) => {
         setVehicleCounts((prev) => ({ ...prev, [cameraIndex]: vehicles.length }));
-
-        // We don't have direct plate data here, but the detection count is tracked.
-        // Plate data flows through the drawBoxes overlay from useDetection.
       },
     [],
   );
 
   const totalVehicles = Object.values(vehicleCounts).reduce((a, b) => a + b, 0);
-  const activeCameras = CAMERAS.length;
+  const activeCameras = cameras.length;
 
   return (
     <div className="flex h-full flex-col gap-3 bg-[#0a0f1a] p-4">
@@ -121,11 +130,11 @@ function CameraGridInner() {
 
       {/* Camera grid — 3x2 */}
       <div className="grid flex-1 grid-cols-3 gap-2">
-        {CAMERAS.map((cam, i) => (
-          <div key={cam.name} className="relative flex flex-col">
+        {cameras.map((cam, i) => (
+          <div key={cam.id} className="relative flex flex-col">
             <VideoFeed
               name={cam.name}
-              streamUrl={cam.streamUrl}
+              cameraId={cam.id}
               cameraIndex={i}
               onDetectionUpdate={handleDetectionUpdate(i, cam.name)}
             />

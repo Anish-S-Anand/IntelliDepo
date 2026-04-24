@@ -1,171 +1,106 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
-import Hls from "hls.js";
+import { useEffect, useRef, useState } from "react";
 import { useDetection } from "@/hooks/useDetection";
-
-interface TflCamera {
-  id: string;
-  commonName: string;
-  jpegUrl: string;
-}
 
 interface VideoFeedProps {
   name: string;
-  streamUrl: string;
+  cameraId: string;
   cameraIndex: number;
   onDetectionUpdate?: (vehicles: Array<{ bbox: [number, number, number, number]; class: string; score: number }>) => void;
 }
 
-// Fetch TfL JamCam list once and cache it
-let tflCamerasCache: TflCamera[] | null = null;
-async function getTflCameras(): Promise<TflCamera[]> {
-  if (tflCamerasCache) return tflCamerasCache;
-  const res = await fetch("https://api.tfl.gov.uk/Place/Type/JamCam");
-  const data = await res.json();
-  const cameras: TflCamera[] = [];
-  for (const place of data) {
-    const availProp = place.additionalProperties?.find(
-      (p: { key: string; value: string }) => p.key === "available",
-    );
-    const jpegProp = place.additionalProperties?.find(
-      (p: { key: string; value: string }) => p.key === "imageUrl",
-    );
-    if (availProp?.value === "true" && jpegProp?.value) {
-      cameras.push({
-        id: place.id,
-        commonName: place.commonName || place.id,
-        jpegUrl: jpegProp.value,
-      });
-    }
-    if (cameras.length >= 6) break;
+function getBackendBase(): string {
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
   }
-  tflCamerasCache = cameras;
-  return cameras;
+  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 }
 
-export function VideoFeed({ name, streamUrl, cameraIndex, onDetectionUpdate }: VideoFeedProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [mode, setMode] = useState<"hls" | "fallback">("hls");
-  const [status, setStatus] = useState<"connecting" | "live" | "fallback">("connecting");
+export function VideoFeed({ name, cameraId, cameraIndex, onDetectionUpdate }: VideoFeedProps) {
+  const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [status, setStatus] = useState<"connecting" | "live" | "error">("connecting");
 
-  // Detection runs on whichever source is active
-  const sourceRef = mode === "hls" ? videoRef : canvasRef;
-  useDetection(sourceRef, canvasRef, cameraIndex, status !== "connecting", onDetectionUpdate);
+  useDetection(sourceCanvasRef, overlayCanvasRef, cameraIndex, status === "live", onDetectionUpdate);
 
-  const startFallback = useCallback(async () => {
-    setMode("fallback");
-    setStatus("fallback");
+  const snapshotUrl = `${getBackendBase()}/depot/vision/cameras/${cameraId}/snapshot`;
 
-    // Hide video, show canvas
-    if (videoRef.current) videoRef.current.style.display = "none";
-    const canvas = canvasRef.current;
+  useEffect(() => {
+    const canvas = sourceCanvasRef.current;
     if (!canvas) return;
-    canvas.style.position = "relative";
-    canvas.style.pointerEvents = "none";
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-    try {
-      const cameras = await getTflCameras();
-      const cam = cameras[cameraIndex % cameras.length];
-      if (!cam) return;
+    let cancelled = false;
+    let consecutiveErrors = 0;
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      pollRef.current = setInterval(() => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.src = cam.jpegUrl + "?t=" + Date.now();
-        img.onload = () => {
-          canvas.width = canvas.offsetWidth;
-          canvas.height = canvas.offsetHeight;
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        };
-      }, 800);
-    } catch {
-      // TfL API unavailable
-    }
-  }, [cameraIndex]);
-
-  // HLS setup
-  useEffect(() => {
-    const videoEl = videoRef.current;
-    if (!videoEl || mode !== "hls") return;
-
-    let hls: Hls | null = null;
-
-    if (Hls.isSupported()) {
-      hls = new Hls({ lowLatencyMode: true, liveSyncDurationCount: 1 });
-      hls.loadSource(streamUrl);
-      hls.attachMedia(videoEl);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        setStatus("live");
-        videoEl.play().catch(() => {});
-      });
-
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) {
-          hls?.destroy();
-          startFallback();
-        }
-      });
-
-      // Timeout: if no manifest in 8 seconds, fall back
-      const timeout = setTimeout(() => {
-        if (status === "connecting") {
-          hls?.destroy();
-          startFallback();
-        }
-      }, 8000);
-
-      return () => {
-        clearTimeout(timeout);
-        hls?.destroy();
-      };
-    } else if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
-      // Native HLS (Safari)
-      videoEl.src = streamUrl;
-      videoEl.addEventListener("loadedmetadata", () => {
-        setStatus("live");
-        videoEl.play().catch(() => {});
-      });
-      videoEl.addEventListener("error", () => startFallback());
-    } else {
-      startFallback();
-    }
-  }, [streamUrl, mode, startFallback]);
-
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+    const initSize = () => {
+      const w = canvas.offsetWidth;
+      const h = canvas.offsetHeight;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
     };
-  }, []);
+    initSize();
+
+    const loadFrame = () => {
+      if (cancelled) return;
+      img.src = snapshotUrl + "?t=" + Date.now();
+    };
+
+    img.onload = () => {
+      if (cancelled) return;
+      consecutiveErrors = 0;
+      initSize();
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      setStatus("live");
+      if (!cancelled) {
+        pollRef.current = setTimeout(loadFrame, 1000);
+      }
+    };
+
+    img.onerror = () => {
+      if (cancelled) return;
+      consecutiveErrors++;
+      setStatus("error");
+      const delay = Math.min(1000 * Math.pow(2, consecutiveErrors), 10000);
+      if (!cancelled) {
+        pollRef.current = setTimeout(loadFrame, delay);
+      }
+    };
+
+    loadFrame();
+
+    return () => {
+      cancelled = true;
+      img.onload = null;
+      img.onerror = null;
+      img.src = "";
+      if (pollRef.current) clearTimeout(pollRef.current);
+    };
+  }, [snapshotUrl]);
 
   const statusColor =
-    status === "live" ? "bg-green-500" : status === "fallback" ? "bg-amber-500" : "bg-gray-500";
+    status === "live" ? "bg-green-500" : status === "error" ? "bg-red-500" : "bg-gray-500";
   const statusText =
-    status === "live" ? "LIVE" : status === "fallback" ? "TfL CAM" : "CONNECTING";
+    status === "live" ? "LIVE" : status === "error" ? "OFFLINE" : "CONNECTING";
 
   return (
     <div className="relative h-[180px] overflow-hidden rounded-md bg-black">
-      <video
-        ref={videoRef}
-        autoPlay
-        muted
-        playsInline
+      <canvas
+        ref={sourceCanvasRef}
         style={{
           width: "100%",
           height: "100%",
-          objectFit: "cover",
-          display: mode === "fallback" ? "none" : "block",
         }}
       />
       <canvas
-        ref={canvasRef}
+        ref={overlayCanvasRef}
         style={{
           position: "absolute",
           top: 0,

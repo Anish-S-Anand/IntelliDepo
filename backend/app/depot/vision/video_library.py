@@ -27,8 +27,8 @@ except ImportError:
 from pathlib import Path
 
 _THIS_FILE = Path(__file__).resolve()
-BACKEND_DIR = _THIS_FILE.parents[3]   # backend/
-LOCAL_VIDEO_DIR = BACKEND_DIR / "videos"
+_THIS_DIR = _THIS_FILE.parent          # backend/app/depot/vision/
+LOCAL_VIDEO_DIR = _THIS_DIR / "videos"
 
 # ---------------------------------------------------------------------------
 # Depot video files mapped to camera scenes (0-5)
