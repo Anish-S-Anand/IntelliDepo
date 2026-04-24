@@ -19,7 +19,7 @@ export default function LoginPage() {
     clearError();
     try {
       await login(email, password);
-      router.push("/depot");
+      router.push("/platform");
     } catch {
       // error is set in store
     }
