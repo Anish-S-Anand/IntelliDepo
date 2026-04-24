@@ -9,7 +9,6 @@ from typing import Any
 
 import httpx
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from novu import NovuConfig  # noqa: F401
 
 from app.stream.macropulse.ingestion.models.alerts import Alert
 
