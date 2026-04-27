@@ -49,6 +49,8 @@ const CLASS_COLOURS: Record<string, string> = {
   box: "#f59e0b",
   pallet: "#22d3a1",
   carton: "#a78bfa",
+  vehicle: "#06b6d4",
+  person: "#ec4899",
   unknown: "#94a3b8",
 };
 
@@ -627,8 +629,12 @@ export default function LiveFeedViewer() {
             </h1>
           </div>
           <p className="text-[11px] text-[#8A9BBF]">
-            Real-time YOLO object detection with bounding box overlays | 85%
-            confidence threshold
+            Real-time cement bag and yard-vehicle detection with bounding box overlays
+            {detectionModel && (
+              <span className="ml-2">
+                | {(detectionModel.confidence_threshold * 100).toFixed(0)}% confidence threshold
+              </span>
+            )}
             {detectionModel && (
               <span className="ml-2 text-emerald-400">
                 Model: {detectionModel.model_name} {detectionModel.model_version}

@@ -8,9 +8,8 @@ import {
   ArrowUp,
   BarChart3,
   Box,
-  Camera,
-  ChevronDown,
   Eye,
+  Image as ImageIcon,
   Fingerprint,
   Minus,
   Play,
@@ -19,6 +18,7 @@ import {
   Target,
 } from "lucide-react";
 import {
+  detectUploadedFrame,
   getDetectionModels,
   getDetectionRuns,
   getRunSummary,
@@ -35,7 +35,6 @@ import {
   getTrackingSession,
   type TrackingSession,
   type TrackingSummary,
-  type TrackedObject,
 } from "@/services/depotTracking";
 import {
   getDepotCommandSnapshot,
@@ -73,6 +72,13 @@ function directionIcon(direction: string) {
   return <Minus className="h-3.5 w-3.5 text-slate-400" />;
 }
 
+function summarizeCounts(objects: DetectedObject[]) {
+  return objects.reduce<Record<string, number>>((acc, obj) => {
+    acc[obj.class_label] = (acc[obj.class_label] || 0) + 1;
+    return acc;
+  }, {});
+}
+
 // ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
@@ -96,6 +102,10 @@ export default function VisionResultsPage() {
   const [frameCount, setFrameCount] = useState(5);
   const [running, setRunning] = useState(false);
   const [trackingRunning, setTrackingRunning] = useState(false);
+  const [testImage, setTestImage] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [uploadedDetections, setUploadedDetections] = useState<DetectedObject[]>([]);
+  const [uploadTesting, setUploadTesting] = useState(false);
 
   // Tab
   const [tab, setTab] = useState<"detections" | "tracking">("detections");
@@ -125,6 +135,18 @@ export default function VisionResultsPage() {
     }
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!testImage) {
+      setImagePreviewUrl(null);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(testImage);
+    setImagePreviewUrl(previewUrl);
+
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [testImage]);
 
   // Load run details when selected
   useEffect(() => {
@@ -185,6 +207,20 @@ export default function VisionResultsPage() {
     }
   }
 
+  async function handleTestImage() {
+    if (!selectedModelId || !testImage) return;
+    setUploadTesting(true);
+    try {
+      const detections = await detectUploadedFrame({
+        file: testImage,
+        modelId: selectedModelId,
+      });
+      setUploadedDetections(detections);
+    } finally {
+      setUploadTesting(false);
+    }
+  }
+
   // Detection class distribution
   const classDistribution = useMemo(() => {
     if (!runSummary) return {};
@@ -193,6 +229,11 @@ export default function VisionResultsPage() {
 
   const activeCameras = cameras.filter((c) => c.status === "active");
   const selectedRun = runs.find((r) => r.id === selectedRunId);
+  const uploadedCounts = useMemo(() => summarizeCounts(uploadedDetections), [uploadedDetections]);
+  const activeModel = useMemo(
+    () => models.find((model) => model.id === selectedModelId) ?? models.find((model) => model.is_active) ?? null,
+    [models, selectedModelId],
+  );
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#081120_0%,#0f172a_28%,#eaf1f5_28.1%,#edf4f7_100%)] px-6 py-6 md:px-8">
@@ -244,6 +285,17 @@ export default function VisionResultsPage() {
                 <h2 className="text-lg font-black tracking-tight text-[#0f172a]">New Detection Run</h2>
               </div>
 
+              {activeModel ? (
+                <div className="mb-4 rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-3 text-xs text-cyan-950">
+                  <p className="font-semibold">
+                    Active backend model: {activeModel.model_name} {activeModel.model_version}
+                  </p>
+                  <p className="mt-1 text-cyan-800">
+                    Confidence {(activeModel.confidence_threshold * 100).toFixed(0)}% | Classes {activeModel.target_classes}
+                  </p>
+                </div>
+              ) : null}
+
               <div className="space-y-3">
                 <div>
                   <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Camera (optional)</label>
@@ -290,6 +342,59 @@ export default function VisionResultsPage() {
                   {running ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4" />}
                   {running ? "Running..." : "Start Detection"}
                 </button>
+              </div>
+            </section>
+
+            <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
+              <div className="flex items-center gap-2 mb-4">
+                <ImageIcon className="h-4 w-4 text-orange-500" />
+                <h2 className="text-lg font-black tracking-tight text-[#0f172a]">Image Detection Test</h2>
+              </div>
+              <p className="mb-4 text-sm text-slate-500">
+                Upload one frame to test the trained backend model directly from the product UI.
+              </p>
+              <div className="space-y-3">
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  onChange={(e) => {
+                    setTestImage(e.target.files?.[0] ?? null);
+                    setUploadedDetections([]);
+                  }}
+                  className="block w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-[#0f172a] file:mr-3 file:rounded-lg file:border-0 file:bg-slate-200 file:px-3 file:py-1.5 file:text-xs file:font-semibold"
+                />
+                <button
+                  type="button"
+                  onClick={handleTestImage}
+                  disabled={uploadTesting || !selectedModelId || !testImage}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50 transition"
+                >
+                  {uploadTesting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4" />}
+                  {uploadTesting ? "Testing image..." : "Run Detection on Image"}
+                </button>
+                {imagePreviewUrl ? (
+                  <img
+                    src={imagePreviewUrl}
+                    alt="Selected image preview"
+                    className="w-full rounded-2xl border border-slate-200 object-cover"
+                  />
+                ) : null}
+                {Object.keys(uploadedCounts).length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(uploadedCounts).map(([cls, count]) => {
+                      const color = CLASS_COLOURS[cls] || CLASS_COLOURS.unknown;
+                      return (
+                        <span
+                          key={cls}
+                          className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold capitalize border"
+                          style={{ color, borderColor: `${color}30`, background: `${color}10` }}
+                        >
+                          {count} {cls}{count !== 1 ? "s" : ""}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
             </section>
 

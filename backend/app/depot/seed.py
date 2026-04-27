@@ -7,7 +7,7 @@ Seeds the database with realistic warehouse demo data:
 - 10 vehicles (mix of approved, pending, blacklisted)
 - 5 visitors
 - 6 perimeter zones (restricted, hazardous, loading, general)
-- Detection model (YOLOv8n)
+- Detection model (trained cement-bag model)
 - 4 cluster zones with occupancy
 - 3 shipment manifests with count sessions
 - 2 sequencing configs (FIFO, FEFO)
@@ -17,6 +17,7 @@ Run: python -m app.depot.seed
 """
 import asyncio
 import logging
+import os
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -92,12 +93,16 @@ MANIFESTS = [
 ]
 
 DETECTION_MODEL = {
-    "model_name": "yolov8n",
-    "model_version": "8.0.1",
-    "confidence_threshold": 0.85,
+    "model_name": "cement-bags-custom",
+    "model_version": "2025-05-29",
+    "weights_path": os.getenv(
+        "YOLO_WEIGHTS",
+        r"C:\Users\karte\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\intelli-platform\best_cement_bags_2025-05-29.pt",
+    ),
+    "confidence_threshold": 0.25,
     "iou_threshold": 0.45,
-    "target_classes": "bag,box,pallet,carton,person,vehicle",
-    "description": "YOLOv8 Nano — warehouse object detection (bags, boxes, pallets, cartons, vehicles, personnel)",
+    "target_classes": "bag,vehicle",
+    "description": "Custom trained cement bag and yard vehicle detector",
 }
 
 BATCHES = [
@@ -115,9 +120,13 @@ BATCHES = [
 
 async def seed_database(db_url: str | None = None):
     """Seed the depot database with demo data."""
-    import os
     if db_url is None:
         db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://intelli:intelli@localhost:5432/intelli")
+    is_sqlite = db_url.startswith("sqlite")
+
+    def new_id():
+        value = uuid.uuid4()
+        return str(value) if is_sqlite else value
 
     engine = create_async_engine(db_url)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -130,7 +139,7 @@ async def seed_database(db_url: str | None = None):
             # ── Cameras ──
             camera_ids = []
             for cam in CAMERAS:
-                cid = uuid.uuid4()
+                cid = new_id()
                 camera_ids.append(cid)
                 await db.execute(text("""
                     INSERT INTO depot_cameras (id, name, stream_url, protocol, zone, status, is_active, frame_rate, resolution, created_at, updated_at)
@@ -142,7 +151,7 @@ async def seed_database(db_url: str | None = None):
             # ── Gates ──
             gate_ids = []
             for i, gate in enumerate(GATES):
-                gid = uuid.uuid4()
+                gid = new_id()
                 gate_ids.append(gid)
                 await db.execute(text("""
                     INSERT INTO depot_gates (id, gate_code, name, gate_type, status, is_active, total_entries_today, created_at, updated_at)
@@ -159,7 +168,7 @@ async def seed_database(db_url: str | None = None):
                             INSERT INTO depot_vehicle_registry (id, plate_number, vehicle_type, owner_name, company, status, is_active, created_at, updated_at)
                             VALUES (:id, :plate_number, :vehicle_type, :owner_name, :company, :status, true, :now, :now)
                             ON CONFLICT DO NOTHING
-                        """), {**v, "id": uuid.uuid4(), "now": now})
+                        """), {**v, "id": new_id(), "now": now})
                 logger.info(f"Seeded {len(VEHICLES)} vehicles")
             except Exception as e:
                 logger.warning(f"Skipped vehicles: {e}")
@@ -170,13 +179,13 @@ async def seed_database(db_url: str | None = None):
                     INSERT INTO depot_visitors (id, name, company, purpose, contact_number, host_name, status, checked_in_at, pass_valid_until, registered_by, created_at, updated_at)
                     VALUES (:id, :name, :company, :purpose, :contact_number, :host_name, 'checked_in', :now, :expiry, :user, :now, :now)
                     ON CONFLICT DO NOTHING
-                """), {**vis, "id": uuid.uuid4(), "now": now, "expiry": now + timedelta(hours=8), "user": seed_user})
+                """), {**vis, "id": new_id(), "now": now, "expiry": now + timedelta(hours=8), "user": seed_user})
             logger.info(f"Seeded {len(VISITORS)} visitors")
 
             # ── Perimeter Zones ──
             pz_ids = []
             for j, pz in enumerate(PERIMETER_ZONES):
-                pzid = uuid.uuid4()
+                pzid = new_id()
                 pz_ids.append(pzid)
                 cam_id = camera_ids[j % len(camera_ids)]
                 await db.execute(text("""
@@ -188,7 +197,7 @@ async def seed_database(db_url: str | None = None):
 
             # ── Sample Breaches ──
             for k in range(3):
-                bid = uuid.uuid4()
+                bid = new_id()
                 await db.execute(text("""
                     INSERT INTO depot_perimeter_breaches (id, zone_id, camera_id, breach_type, severity, confidence, snapshot_ref, alert_sent, notes, detected_at, created_at, updated_at)
                     VALUES (:id, :zone_id, :cam_id, :breach_type, :severity, :confidence, :snapshot, true, :notes, :detected_at, :now, :now)
@@ -214,7 +223,7 @@ async def seed_database(db_url: str | None = None):
                     VALUES (:id, :zone_code, :name, :zone_type, :floor, :area_sqm, :max, :occ, :util, :status, true, :now, :now)
                     ON CONFLICT DO NOTHING
                 """), {
-                    **cz, "id": uuid.uuid4(),
+                    **cz, "id": new_id(),
                     "max": cz["max_capacity_units"],
                     "occ": cz["current_occupancy"],
                     "util": round(cz["current_occupancy"] / cz["max_capacity_units"] * 100, 1),
@@ -225,11 +234,55 @@ async def seed_database(db_url: str | None = None):
 
             # ── Detection Model ──
             await db.execute(text("""
-                INSERT INTO depot_detection_models (id, model_name, model_version, confidence_threshold, iou_threshold, target_classes, description, is_active, created_at, updated_at)
-                VALUES (:id, :model_name, :model_version, :confidence_threshold, :iou_threshold, :target_classes, :description, true, :now, :now)
-                ON CONFLICT DO NOTHING
-            """), {**DETECTION_MODEL, "id": uuid.uuid4(), "now": now})
-            logger.info("Seeded detection model: yolov8n")
+                UPDATE depot_detection_models
+                SET is_active = false, updated_at = :now
+                WHERE model_name != :model_name OR model_version != :model_version
+            """), {
+                "model_name": DETECTION_MODEL["model_name"],
+                "model_version": DETECTION_MODEL["model_version"],
+                "now": now,
+            })
+
+            existing_model = await db.execute(text("""
+                SELECT id FROM depot_detection_models
+                WHERE model_name = :model_name AND model_version = :model_version
+                LIMIT 1
+            """), {
+                "model_name": DETECTION_MODEL["model_name"],
+                "model_version": DETECTION_MODEL["model_version"],
+            })
+            existing_model_id = existing_model.scalar_one_or_none()
+
+            if existing_model_id:
+                await db.execute(text("""
+                    UPDATE depot_detection_models
+                    SET weights_path = :weights_path,
+                        confidence_threshold = :confidence_threshold,
+                        iou_threshold = :iou_threshold,
+                        target_classes = :target_classes,
+                        description = :description,
+                        is_active = true,
+                        updated_at = :now
+                    WHERE id = :id
+                """), {
+                    **DETECTION_MODEL,
+                    "id": existing_model_id,
+                    "now": now,
+                })
+            else:
+                from app.depot.vision.detection import DetectionModel as DetectionModelORM
+
+                db.add(DetectionModelORM(
+                    model_name=DETECTION_MODEL["model_name"],
+                    model_version=DETECTION_MODEL["model_version"],
+                    weights_path=DETECTION_MODEL["weights_path"],
+                    confidence_threshold=DETECTION_MODEL["confidence_threshold"],
+                    iou_threshold=DETECTION_MODEL["iou_threshold"],
+                    target_classes=DETECTION_MODEL["target_classes"],
+                    description=DETECTION_MODEL["description"],
+                    is_active=True,
+                ))
+            logger.info("Seeded detection model: cement-bags-custom")
 
             # ── Shipment Manifests ──
             for mf in MANIFESTS:
@@ -237,7 +290,7 @@ async def seed_database(db_url: str | None = None):
                     INSERT INTO depot_shipment_manifests (id, manifest_code, vehicle_number, expected_bags, expected_boxes, status, created_at, updated_at)
                     VALUES (:id, :manifest_code, :vehicle_number, :expected_bags, :expected_boxes, 'active', :now, :now)
                     ON CONFLICT DO NOTHING
-                """), {**mf, "id": uuid.uuid4(), "now": now})
+                """), {**mf, "id": new_id(), "now": now})
             logger.info(f"Seeded {len(MANIFESTS)} shipment manifests")
 
             # ── Inventory Batches ──
@@ -249,7 +302,7 @@ async def seed_database(db_url: str | None = None):
                             VALUES (:id, :product_name, :batch_number, :quantity, :zone, :rack, :bin_location, :mfg, :exp, :rule_type, 'active', 0.0, :now, :now)
                             ON CONFLICT DO NOTHING
                         """), {
-                            "id": uuid.uuid4(), "product_name": batch["product_name"],
+                            "id": new_id(), "product_name": batch["product_name"],
                             "batch_number": batch["batch_number"], "quantity": batch["quantity"],
                             "zone": batch["zone"], "rack": batch["rack"], "bin_location": batch["bin_location"],
                             "mfg": batch["manufacturing_date"], "exp": batch["expiry_date"],
@@ -272,7 +325,7 @@ async def seed_database(db_url: str | None = None):
                     INSERT INTO ops_tasks (id, title, worker_name, worker_id, area, zone, priority, status, created_at, updated_at)
                     VALUES (:id, :title, :worker_name, :worker_id, :area, :zone, :priority, :status, :now, :now)
                     ON CONFLICT DO NOTHING
-                """), {**t, "id": uuid.uuid4(), "now": now})
+                """), {**t, "id": new_id(), "now": now})
             logger.info(f"Seeded {len(ops_tasks)} IntelliOps tasks")
 
             # ── IntelliOps SOP Checklists ──
@@ -287,7 +340,7 @@ async def seed_database(db_url: str | None = None):
                     INSERT INTO ops_sop_checklists (id, name, shift, zone, progress_pct, status, item_count, items_done, created_at, updated_at)
                     VALUES (:id, :name, :shift, :zone, :progress_pct, :status, :item_count, :items_done, :now, :now)
                     ON CONFLICT DO NOTHING
-                """), {**cl, "id": uuid.uuid4(), "now": now})
+                """), {**cl, "id": new_id(), "now": now})
             logger.info(f"Seeded {len(checklists)} SOP checklists")
 
             # ── IntelliOps Exceptions ──
@@ -302,7 +355,7 @@ async def seed_database(db_url: str | None = None):
                     INSERT INTO ops_exceptions (id, exception_type, location, zone, root_cause, description, status, severity, sla_minutes, detected_at, created_at, updated_at)
                     VALUES (:id, :exception_type, :location, :zone, :root_cause, :description, :status, :severity, :sla_minutes, :now, :now, :now)
                     ON CONFLICT DO NOTHING
-                """), {**ex, "id": uuid.uuid4(), "now": now})
+                """), {**ex, "id": new_id(), "now": now})
             logger.info(f"Seeded {len(exceptions)} IntelliOps exceptions")
 
             # ── Dashboard User (for legacy HTML auth) ──
@@ -316,7 +369,7 @@ async def seed_database(db_url: str | None = None):
                     INSERT INTO users (id, email, hashed_password, full_name, is_active, is_superuser, account_type, failed_login_attempts, mfa_enabled, email_verified, created_at, updated_at)
                     VALUES (:id, :email, :pw, 'Dashboard Operator', true, false, 'platform_user', 0, false, true, :now, :now)
                     ON CONFLICT DO NOTHING
-                """), {"id": uuid.uuid4(), "email": dash_email, "pw": dash_pass, "now": now})
+                """), {"id": new_id(), "email": dash_email, "pw": dash_pass, "now": now})
                 logger.info("Seeded dashboard user: dashboard@intelli.ai")
             else:
                 logger.info("Dashboard user already exists")
@@ -332,7 +385,7 @@ async def seed_database(db_url: str | None = None):
             ]
             dock_ids = []
             for ds in dock_slots:
-                did = uuid.uuid4()
+                did = new_id()
                 dock_ids.append({"id": did, "dock_id": ds["dock_id"]})
                 await db.execute(text("""
                     INSERT INTO ops_dock_slots (id, dock_id, dock_name, zone, dock_type, capacity_tonnes, status, x_position, y_position, created_at, updated_at)
@@ -359,7 +412,7 @@ async def seed_database(db_url: str | None = None):
                     VALUES (:id, :vid, :vtype, :status, :zone, :dock, :yard_at, :now, :lat, :lng, :now, :now)
                     ON CONFLICT DO NOTHING
                 """), {
-                    "id": uuid.uuid4(), "vid": fv["vehicle_id"],
+                    "id": new_id(), "vid": fv["vehicle_id"],
                     "vtype": fv["vehicle_type"], "status": fv["status"], "zone": fv["current_zone"],
                     "dock": fv["assigned_dock"], "yard_at": yard_time, "now": now,
                     "lat": 12.97 + (idx_fv * 0.005),
@@ -384,7 +437,7 @@ async def seed_database(db_url: str | None = None):
                     VALUES (:id, :vid, :zone, :checkin, :dwell, :alert, :now, :now)
                     ON CONFLICT DO NOTHING
                 """), {
-                    "id": uuid.uuid4(), "vid": fv["vehicle_id"], "zone": fv["current_zone"],
+                    "id": new_id(), "vid": fv["vehicle_id"], "zone": fv["current_zone"],
                     "checkin": now - timedelta(minutes=dwell_mins), "dwell": dwell_mins,
                     "alert": alert_lvl, "now": now,
                 })
@@ -400,7 +453,7 @@ async def seed_database(db_url: str | None = None):
                 {"title": "Forklift collision near Zone A", "description": "Minor collision between forklift and pallet stack. No injuries.", "source": "camera", "priority": "P1", "severity_score": 0.90, "status": "escalated", "zone": "Zone A", "category": "safety"},
             ]
             for j, inc in enumerate(incidents):
-                inc_id = uuid.uuid4()
+                inc_id = new_id()
                 created = now - timedelta(minutes=[8, 25, 62, 15, 45, 3][j])
                 chain = [{"tier": "Shift Supervisor", "assigned_at": created.isoformat()}]
                 if inc["status"] == "escalated":
@@ -425,7 +478,7 @@ async def seed_database(db_url: str | None = None):
             severities = ["critical", "high", "medium", "low", "info"]
             zones = ["Zone-A", "Zone-B", "Zone-C", "Entry Gate", "Loading Dock", "Perimeter"]
             for i in range(12):
-                eid = uuid.uuid4()
+                eid = new_id()
                 ev_sev = severities[i % 5]
                 ev_zone = zones[i % 6]
                 ev_time = now - timedelta(minutes=i * 8)
@@ -450,7 +503,7 @@ async def seed_database(db_url: str | None = None):
                     VALUES (:id, :atype, :sev, :score, :src_id, :src_name, :zone, :title, :msg, :status, :ts, :now, :now)
                     ON CONFLICT DO NOTHING
                 """), {
-                    "id": uuid.uuid4(), "atype": event_types[i],
+                    "id": new_id(), "atype": event_types[i],
                     "src_id": f"SRC-{i:03d}", "src_name": f"Sensor-{i+1}",
                     "zone": zones[i], "sev": severities[i],
                     "title": ["Critical temperature in Zone-A", "Unauthorized motion Zone-B", "Gate sensor anomaly", "Perimeter vibration alert", "Equipment pressure warning"][i],
@@ -481,7 +534,7 @@ async def seed_database(db_url: str | None = None):
                             VALUES (:id, :batch_code, :sku, :name, :zone, :rack, :bin, :qty, :qty, :mfg, :exp, :now, :rule, 0.0, 'active', :near, :days, :now, :now)
                             ON CONFLICT DO NOTHING
                         """), {
-                            "id": uuid.uuid4(), "batch_code": f"B2026-{sb['sku_code']}", "sku": sb["sku_code"], "name": sb["product_name"],
+                            "id": new_id(), "batch_code": f"B2026-{sb['sku_code']}", "sku": sb["sku_code"], "name": sb["product_name"],
                             "zone": sb["zone"], "rack": sb["rack"], "bin": sb["bin_location"],
                             "qty": sb["quantity"], "mfg": mfg, "exp": exp,
                             "rule": sb["rule"], "near": days_to < 60, "days": days_to, "now": now,
@@ -505,7 +558,7 @@ async def seed_database(db_url: str | None = None):
                             VALUES (:id, :period, 'module', :gn, :total, :comp, :ar, :br, :pct, :pen, 'USD', :now, :now)
                             ON CONFLICT DO NOTHING
                         """), {
-                            "id": uuid.uuid4(), "period": iso_week, "gn": sc["group_name"],
+                            "id": new_id(), "period": iso_week, "gn": sc["group_name"],
                             "total": sc["total"], "comp": sc["compliant"], "ar": sc["at_risk"],
                             "br": sc["breached"], "pct": comp_pct, "pen": sc["penalty"], "now": now,
                         })
@@ -515,26 +568,26 @@ async def seed_database(db_url: str | None = None):
 
             await db.commit()
             logger.info("=== Depot seed complete ===")
-            print("\n✓ Depot database seeded successfully with demo data.")
-            print(f"  • {len(CAMERAS)} cameras")
-            print(f"  • {len(GATES)} gates")
-            print(f"  • {len(VEHICLES)} vehicles")
-            print(f"  • {len(VISITORS)} visitors")
-            print(f"  • {len(PERIMETER_ZONES)} perimeter zones + 3 breaches")
-            print(f"  • {len(CLUSTER_ZONES)} cluster zones")
-            print(f"  • 1 detection model (YOLOv8n)")
-            print(f"  • {len(MANIFESTS)} shipment manifests")
-            print(f"  • {len(BATCHES)} inventory batches")
-            print(f"  • {len(dock_slots)} dock slots")
-            print(f"  • {len(fleet_vehicles)} fleet vehicles + 5 dwell records")
-            print(f"  • {len(incidents)} incidents")
-            print(f"  • 12 sensor events + 5 alerts")
-            print(f"  • 1 dashboard user")
+            print("\n[OK] Depot database seeded successfully with demo data.")
+            print(f"  - {len(CAMERAS)} cameras")
+            print(f"  - {len(GATES)} gates")
+            print(f"  - {len(VEHICLES)} vehicles")
+            print(f"  - {len(VISITORS)} visitors")
+            print(f"  - {len(PERIMETER_ZONES)} perimeter zones + 3 breaches")
+            print(f"  - {len(CLUSTER_ZONES)} cluster zones")
+            print(f"  - 1 detection model (cement-bags-custom)")
+            print(f"  - {len(MANIFESTS)} shipment manifests")
+            print(f"  - {len(BATCHES)} inventory batches")
+            print(f"  - {len(dock_slots)} dock slots")
+            print(f"  - {len(fleet_vehicles)} fleet vehicles + 5 dwell records")
+            print(f"  - {len(incidents)} incidents")
+            print(f"  - 12 sensor events + 5 alerts")
+            print(f"  - 1 dashboard user")
 
         except Exception as e:
             await db.rollback()
             logger.error(f"Seed failed: {e}")
-            print(f"\n✗ Seed failed: {e}")
+            print(f"\n[ERROR] Seed failed: {e}")
             raise
 
 

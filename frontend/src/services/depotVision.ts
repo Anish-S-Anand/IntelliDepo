@@ -57,6 +57,11 @@ export interface RunSummary {
   average_confidence: number;
 }
 
+export interface DetectFrameParams {
+  file: File;
+  modelId: string;
+}
+
 // ---------------------------------------------------------------------------
 // Colour Analysis Types
 // ---------------------------------------------------------------------------
@@ -195,6 +200,20 @@ export async function getRunSummary(runId: string): Promise<RunSummary> {
 export async function getRunObjects(runId: string, classLabel?: string): Promise<DetectedObject[]> {
   const params = classLabel ? `?class_label=${classLabel}` : "";
   const res = await api.get<DetectedObject[]>(`/depot/vision/detection/runs/${runId}/objects${params}`);
+  return res.data;
+}
+
+export async function detectUploadedFrame({
+  file,
+  modelId,
+}: DetectFrameParams): Promise<DetectedObject[]> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("model_id", modelId);
+
+  const res = await api.post<DetectedObject[]>("/depot/vision/detection/detect-frame", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
   return res.data;
 }
 

@@ -35,6 +35,10 @@ from app.shared.models.user import User
 
 logger = logging.getLogger("intelli.depot.detection")
 ALLOW_SIMULATED_VISION = os.getenv("ALLOW_SIMULATED_VISION", "false").lower() in {"1", "true", "yes"}
+DEFAULT_YOLO_WEIGHTS = os.getenv(
+    "YOLO_WEIGHTS",
+    r"C:\Users\karte\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\intelli-platform\best_cement_bags_2025-05-29.pt",
+)
 
 # ---------------------------------------------------------------------------
 # YOLO model loader — real ultralytics with graceful fallback
@@ -55,11 +59,12 @@ def _load_yolo_model(weights_path: str | None) -> object | None:
     """Load (or return cached) YOLO model from weights path."""
     if not _HAS_ULTRALYTICS:
         return None
-    key = weights_path or "yolov8n.pt"
+    resolved_path = weights_path or DEFAULT_YOLO_WEIGHTS
+    key = resolved_path or "yolov8n.pt"
     if key not in _yolo_models:
         resolved = key
-        if weights_path and Path(weights_path).exists():
-            resolved = weights_path
+        if resolved_path and Path(resolved_path).exists():
+            resolved = resolved_path
         else:
             resolved = "yolov8n.pt"  # auto-downloads from ultralytics hub
         try:
@@ -84,6 +89,8 @@ class ObjectClass(str, Enum):
     BOX = "box"
     PALLET = "pallet"
     CARTON = "carton"
+    PERSON = "person"
+    VEHICLE = "vehicle"
     UNKNOWN = "unknown"
 
 
@@ -236,9 +243,13 @@ class RunSummary(BaseModel):
 
 # Map YOLO class names to our ObjectClass enum values
 _YOLO_CLASS_MAP: dict[str, str] = {
+    "Cement Bags": "bag",
+    "Truck": "vehicle",
+    "Truck Back": "vehicle",
+    "Truck space": "vehicle",
     "backpack": "bag", "handbag": "bag", "suitcase": "bag",
     "bag": "bag", "box": "box", "carton": "carton",
-    "pallet": "pallet",
+    "pallet": "pallet", "person": "person", "truck": "vehicle", "car": "vehicle",
 }
 
 

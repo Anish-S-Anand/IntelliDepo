@@ -191,6 +191,10 @@ _trackers: dict[str, _SimpleTracker] = {}
 # YOLO model loader
 # ---------------------------------------------------------------------------
 _yolo_model = None
+DEFAULT_YOLO_WEIGHTS = os.getenv(
+    "YOLO_WEIGHTS",
+    r"C:\Users\karte\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\intelli-platform\best_cement_bags_2025-05-29.pt",
+)
 
 
 def _load_model():
@@ -203,7 +207,7 @@ def _load_model():
 
         # Priority: 1) custom trained weights, 2) env var, 3) project-local, 4) auto-download
         custom_weights = Path(__file__).resolve().parent / "training_data" / "weights" / "depot_best.pt"
-        env_weights = os.getenv("YOLO_WEIGHTS", "")
+        env_weights = DEFAULT_YOLO_WEIGHTS
 
         if custom_weights.exists():
             _yolo_model = YOLO(str(custom_weights))
