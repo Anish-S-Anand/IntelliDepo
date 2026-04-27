@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/authStore";
 import {
   LayoutDashboard,
   Package,
   Eye,
+  Camera,
   AlertTriangle,
   BarChart3,
   Radio,
@@ -43,7 +45,43 @@ const BOTTOM_ITEMS = [
 
 export default function DepotSidebar({ open }: { open: boolean }) {
   const pathname = usePathname();
+  const user = useAuthStore((state) => state.user);
   const [alertCount, setAlertCount] = useState(0);
+  const normalizedRole = (user?.role ?? "").toLowerCase().replace(/\s+/g, "_");
+  const isWarehouseManager =
+    normalizedRole === "warehouse_manager" || normalizedRole.includes("warehouse");
+  const isRegionalManager =
+    normalizedRole === "regional_manager" || normalizedRole.includes("regional");
+
+  const warehouseManagerNavItems = [
+    { label: "DASH", fullLabel: "Dashboard", href: "/depot/operations", icon: LayoutDashboard },
+    { label: "CAM", fullLabel: "Cameras", href: "/depot/cameras", icon: Camera },
+    { label: "ANL", fullLabel: "Analytics", href: "/depot/analytics", icon: BarChart3 },
+    { label: "GTE", fullLabel: "Gate & LPR", href: "/depot/gate", icon: Shield },
+    { label: "SEC", fullLabel: "Perimeter", href: "/depot/perimeter", icon: Radar, hasPulse: true },
+    { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle },
+    { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package },
+    { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
+  ];
+
+  const regionalManagerNavItems = [
+    { label: "DASH", fullLabel: "Dashboard", href: "/depot/operations", icon: LayoutDashboard },
+    { label: "CAM", fullLabel: "Cameras", href: "/depot/cameras", icon: Camera },
+    { label: "CMD", fullLabel: "Command", href: "/depot/command", icon: Radio },
+    { label: "ANL", fullLabel: "Analytics", href: "/depot/analytics", icon: BarChart3 },
+    { label: "GTE", fullLabel: "Gate & LPR", href: "/depot/gate", icon: Shield },
+    { label: "SEC", fullLabel: "Perimeter", href: "/depot/perimeter", icon: Radar, hasPulse: true },
+    { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle },
+    { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package },
+    { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
+  ];
+
+  const visibleNavItems = isWarehouseManager
+    ? warehouseManagerNavItems
+    : isRegionalManager
+      ? regionalManagerNavItems
+      : NAV_ITEMS;
+  const visibleBottomItems = BOTTOM_ITEMS;
 
   useEffect(() => {
     let cancelled = false;
@@ -81,7 +119,7 @@ export default function DepotSidebar({ open }: { open: boolean }) {
         open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       }`}
     >
-      {NAV_ITEMS.map((item) => {
+      {visibleNavItems.map((item) => {
         const Icon = item.icon;
         const isActive =
           pathname === item.href || pathname?.startsWith(item.href + "/");
@@ -113,7 +151,7 @@ export default function DepotSidebar({ open }: { open: boolean }) {
       })}
 
       <div className="mt-auto">
-        {BOTTOM_ITEMS.map((item) => {
+        {visibleBottomItems.map((item) => {
           const Icon = item.icon;
           return (
             <Link key={item.href} href={item.href} className="w-11 h-11 flex items-center justify-center">

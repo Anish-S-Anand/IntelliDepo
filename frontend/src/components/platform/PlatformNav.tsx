@@ -3,15 +3,39 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { LogOut, Menu, X, User } from "lucide-react";
+import { Loader2, LogOut, Menu, X, User } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 
 export default function PlatformNav() {
   const router = useRouter();
   const { logout, user } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const normalizedRole = (user?.role ?? "").toLowerCase().replace(/\s+/g, "_");
+  const location = user?.location?.trim();
+
+  const userScopeLabel = (() => {
+    if (normalizedRole.includes("warehouse") && location) {
+      return `Warehouse: ${location}`;
+    }
+
+    if (normalizedRole.includes("regional") && location) {
+      return `Region: ${location}`;
+    }
+
+    if (location) {
+      return location;
+    }
+
+    return null;
+  })();
 
   const handleLogout = () => {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
     logout();
     router.push("/login");
   };
@@ -39,18 +63,25 @@ export default function PlatformNav() {
 
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center gap-4">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-100">
+            <div className="flex items-start gap-2 px-4 py-2 rounded-lg bg-slate-100">
               <User className="w-4 h-4 text-slate-600" />
-              <span className="text-sm font-medium text-slate-700">
-                {user?.email || "User"}
-              </span>
+              <div className="flex flex-col leading-tight">
+                <span className="text-sm font-medium text-slate-700">
+                  {user?.email || "User"}
+                </span>
+                {userScopeLabel ? (
+                  <span className="text-xs text-slate-500 mt-1">{userScopeLabel}</span>
+                ) : null}
+              </div>
             </div>
             <button
               onClick={handleLogout}
+              disabled={isLoggingOut}
+              aria-busy={isLoggingOut}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition font-medium text-sm"
             >
-              <LogOut className="w-4 h-4" />
-              Logout
+              {isLoggingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+              {isLoggingOut ? "Signing out..." : "Logout"}
             </button>
           </div>
 
@@ -70,18 +101,25 @@ export default function PlatformNav() {
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden mt-4 pt-4 border-t border-slate-200 space-y-3">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100">
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-slate-100">
               <User className="w-4 h-4 text-slate-600" />
-              <span className="text-sm font-medium text-slate-700">
-                {user?.email || "User"}
-              </span>
+              <div className="flex flex-col leading-tight">
+                <span className="text-sm font-medium text-slate-700">
+                  {user?.email || "User"}
+                </span>
+                {userScopeLabel ? (
+                  <span className="text-xs text-slate-500 mt-1">{userScopeLabel}</span>
+                ) : null}
+              </div>
             </div>
             <button
               onClick={handleLogout}
+              disabled={isLoggingOut}
+              aria-busy={isLoggingOut}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition font-medium text-sm"
             >
-              <LogOut className="w-4 h-4" />
-              Logout
+              {isLoggingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+              {isLoggingOut ? "Signing out..." : "Logout"}
             </button>
           </div>
         )}

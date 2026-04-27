@@ -1,5 +1,9 @@
+"use client";
+
 import Link from "next/link";
-import { LucideIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { Loader2, LucideIcon } from "lucide-react";
 
 interface AppCardProps {
   title: string;
@@ -32,8 +36,33 @@ export default function AppCard({
   color,
   badge,
 }: AppCardProps) {
+  const pathname = usePathname();
+  const [isPending, setIsPending] = useState(false);
+
+  useEffect(() => {
+    setIsPending(false);
+  }, [pathname]);
+
   return (
-    <Link href={href}>
+    <Link
+      href={href}
+      aria-busy={isPending}
+      onClick={(event) => {
+        if (
+          event.defaultPrevented ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey ||
+          event.button !== 0
+        ) {
+          return;
+        }
+
+        setIsPending(true);
+      }}
+      className={isPending ? "pointer-events-none" : ""}
+    >
       <div
         className={`group rounded-2xl border-2 p-6 sm:p-8 transition-all hover:shadow-lg cursor-pointer ${colorClasses[color]}`}
       >
@@ -43,11 +72,16 @@ export default function AppCard({
           >
             <Icon className="w-6 h-6 sm:w-7 sm:h-7" />
           </div>
-          {badge && (
+          {isPending ? (
+            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-white/70 text-slate-600 inline-flex items-center gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Opening...
+            </span>
+          ) : badge ? (
             <span className="text-xs font-bold uppercase tracking-widest px-2 py-1 rounded-full bg-white/60 text-slate-600">
               {badge}
             </span>
-          )}
+          ) : null}
         </div>
         <h3 className="text-xl sm:text-2xl font-bold mb-2">{title}</h3>
         <p className="text-sm sm:text-base opacity-80">{description}</p>

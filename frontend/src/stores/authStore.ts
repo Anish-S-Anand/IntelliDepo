@@ -1,13 +1,16 @@
 /**
- * Auth Store — user session, login/logout, token management
+ * Auth Store - user session, login/logout, token management
  */
 import { create } from "zustand";
 import api from "@/services/api";
+import { getDemoCredential } from "@/lib/demoCredentials";
 
 interface User {
   id: string;
   email: string;
   full_name: string;
+  role?: string;
+  location?: string;
   is_active: boolean;
   is_superuser: boolean;
   last_login: string | null;
@@ -35,55 +38,57 @@ export const useAuthStore = create<AuthState>((set) => ({
   error: null,
 
   login: async (email, password) => {
-  set({ isLoading: true, error: null });
+    set({ isLoading: true, error: null });
 
-  try {
-    const { data } = await api.post("/api/v1/auth/login", { email, password });
+    try {
+      const { data } = await api.post("/api/v1/auth/login", { email, password });
 
-    localStorage.setItem("token", data.access_token);
-    if (data.refresh_token) {
-      localStorage.setItem("refresh_token", data.refresh_token);
-    }
-
-    set({
-      token: data.access_token,
-      isAuthenticated: true,
-      isLoading: false,
-    });
-
-    const { data: user } = await api.get("/api/v1/auth/me");
-    set({ user });
-
-  } catch (err: any) {
-    console.warn("Backend login failed → using dummy login");
-
-    // ✅ FALLBACK DUMMY LOGIN (IMPORTANT)
-    if (email && password) {
-      localStorage.setItem("token", "demo-token");
+      localStorage.setItem("token", data.access_token);
+      if (data.refresh_token) {
+        localStorage.setItem("refresh_token", data.refresh_token);
+      }
 
       set({
-        token: "demo-token",
+        token: data.access_token,
         isAuthenticated: true,
         isLoading: false,
-        user: {
-          id: "demo",
-          email,
-          full_name: "Demo User",
-          is_active: true,
-          is_superuser: false,
-          last_login: new Date().toISOString(),
-        },
-        error: null,
       });
 
-      return;
-    }
+      const { data: user } = await api.get("/api/v1/auth/me");
+      set({ user });
+    } catch (err: any) {
+      console.warn("Backend login failed, trying local demo credentials");
 
-    const message = err.response?.data?.detail || "Login failed";
-    set({ error: message, isLoading: false });
-    throw err;
-  }
-},
+      const demoCredential = getDemoCredential(email, password);
+      if (demoCredential) {
+        const demoToken = `demo-token-${demoCredential.id}`;
+        localStorage.setItem("token", demoToken);
+
+        set({
+          token: demoToken,
+          isAuthenticated: true,
+          isLoading: false,
+          user: {
+            id: demoCredential.id,
+            email: demoCredential.email,
+            full_name: demoCredential.fullName,
+            role: demoCredential.role,
+            location: demoCredential.location,
+            is_active: true,
+            is_superuser: demoCredential.role === "admin",
+            last_login: new Date().toISOString(),
+          },
+          error: null,
+        });
+
+        return;
+      }
+
+      const message = err.response?.data?.detail || "Invalid credentials. Use one of the demo role accounts.";
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
 
   register: async (email, password, fullName) => {
     set({ isLoading: true, error: null });

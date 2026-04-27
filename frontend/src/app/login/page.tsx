@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, HeartPulse, Loader2, Lock, Mail } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
+import { DEMO_CREDENTIALS } from "@/lib/demoCredentials";
+
+function roleLabel(role: string) {
+  if (role === "warehouse_manager") return "Warehouse Manager";
+  if (role === "regional_manager") return "Regional Manager";
+  if (role === "admin") return "Admin";
+  return role;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -25,16 +33,15 @@ export default function LoginPage() {
     }
   };
 
-  const fillDemo = () => {
-    setEmail("demo@fidelis-demo.com");
-    setPassword("MacroPulse2025!");
+  const fillDemo = (demoEmail: string, demoPassword: string) => {
+    setEmail(demoEmail);
+    setPassword(demoPassword);
     clearError();
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(circle_at_top_left,_rgba(157,227,229,0.72),_transparent_36%),linear-gradient(135deg,_#b7e4e6_0%,_#dff1ef_52%,_#edf6f3_100%)]">
-      <div className="w-full max-w-md px-4">
-        {/* Brand */}
+    <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(circle_at_top_left,_rgba(157,227,229,0.72),_transparent_36%),linear-gradient(135deg,_#b7e4e6_0%,_#dff1ef_52%,_#edf6f3_100%)] py-8 px-4">
+      <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
           <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-[#1a2332] shadow-[0_16px_32px_rgba(26,35,50,0.35)] mb-4">
             <HeartPulse className="h-8 w-8 text-cyan-300" />
@@ -44,7 +51,6 @@ export default function LoginPage() {
           <p className="mt-1 text-sm text-slate-500">Sign in to your workspace</p>
         </div>
 
-        {/* Card */}
         <div className="rounded-3xl border border-white/70 bg-white/80 backdrop-blur-sm shadow-[0_8px_32px_rgba(15,35,86,0.10)] p-8">
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
             <div>
@@ -75,7 +81,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  placeholder="••••••••"
+                  placeholder="********"
                   className="w-full rounded-xl border border-gray-200 pl-10 pr-10 py-3 text-sm text-gray-800 bg-gray-50/70 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                 />
                 <button
@@ -104,21 +110,39 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Demo credentials */}
+          {/* Demo login credentials:
+              Warehouse Manager (Bengaluru): wm.blr@fidelis-demo.com / MacroPulse2025!
+              Warehouse Manager (Hyderabad): wm.hyd@fidelis-demo.com / MacroPulse2025!
+              Warehouse Manager (Mumbai): wm.mum@fidelis-demo.com / MacroPulse2025!
+              Regional Manager: regional@fidelis-demo.com / MacroPulse2025!
+              Admin: admin@fidelis-demo.com / MacroPulse2025!
+          */}
           <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
-            <p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-2">Demo Credentials</p>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <p className="text-xs text-slate-600 font-mono">demo@fidelis-demo.com</p>
-                <p className="text-xs text-slate-600 font-mono">MacroPulse2025!</p>
-              </div>
-              <button
-                onClick={fillDemo}
-                className="text-xs font-semibold text-blue-600 bg-white border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition"
-              >
-                Use Demo
-              </button>
+            <p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-3">Role Demo Credentials</p>
+            <div className="space-y-2.5">
+              {DEMO_CREDENTIALS.map((credential) => (
+                <div
+                  key={credential.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-blue-100 bg-white/80 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-slate-700 truncate">
+                      {roleLabel(credential.role)}
+                      {credential.location ? ` - ${credential.location}` : ""}
+                    </p>
+                    <p className="text-[11px] text-slate-500 font-mono truncate">{credential.email}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fillDemo(credential.email, credential.password)}
+                    className="shrink-0 text-xs font-semibold text-blue-600 bg-white border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition"
+                  >
+                    Use
+                  </button>
+                </div>
+              ))}
             </div>
+            <p className="mt-3 text-[11px] text-slate-500 font-mono">Password for all demo users: MacroPulse2025!</p>
           </div>
 
           <div className="mt-6 text-center text-sm text-slate-500">
@@ -129,9 +153,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-xs text-slate-400">
-          Fidelis Platform · MacroPulse Intelligence Suite
-        </p>
+        <p className="mt-6 text-center text-xs text-slate-400">Fidelis Platform - MacroPulse Intelligence Suite</p>
       </div>
     </div>
   );
