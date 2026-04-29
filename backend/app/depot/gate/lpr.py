@@ -14,7 +14,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text
+from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -210,6 +210,45 @@ class GateActionRequest(BaseModel):
     action: str = Field(..., description="open or close")
 
 
+async def _get_active_gate(db: AsyncSession, gate_id: uuid.UUID) -> Optional[Gate]:
+    """
+    Resolve a gate by UUID across SQLite/Postgres differences.
+
+    Some seeded SQLite rows are readable in list queries but may not be found by
+    `db.get(...)` when the UUID is stored with a different adapter shape.
+    """
+    gate = await db.get(Gate, gate_id)
+    if gate and gate.is_active:
+        return gate
+
+    gate_id_str = str(gate_id)
+
+    # SQLite seed data stores UUIDs as plain text, so first resolve the raw row
+    # by text id, then load the ORM object using that exact primary key shape.
+    raw_gate = await db.execute(
+        text(
+            """
+            SELECT gate_code
+            FROM depot_gates
+            WHERE id = :gate_id
+              AND is_active = 1
+            LIMIT 1
+            """
+        ),
+        {"gate_id": gate_id_str},
+    )
+    gate_code = raw_gate.scalar_one_or_none()
+    if gate_code:
+        result = await db.execute(
+            select(Gate).where(Gate.gate_code == str(gate_code), Gate.is_active == True)
+        )
+        gate = result.scalar_one_or_none()
+        if gate:
+            return gate
+
+    return None
+
+
 def _extract_plate_from_frame(frame: np.ndarray) -> tuple[str, float]:
     """
     Extract license plate text from a camera frame using OpenCV + Tesseract.
@@ -298,8 +337,8 @@ async def gate_action(
     current_user: User = Depends(get_current_user),
 ):
     """Open or close a gate."""
-    gate = await db.get(Gate, gate_id)
-    if not gate or not gate.is_active:
+    gate = await _get_active_gate(db, gate_id)
+    if not gate:
         raise HTTPException(status_code=404, detail="Gate not found")
 
     if payload.action == "open":
@@ -385,8 +424,8 @@ async def process_lpr_scan(
     Checks the vehicle registry, applies blacklist matching, and triggers
     gate open/close based on the access decision.
     """
-    gate = await db.get(Gate, payload.gate_id)
-    if not gate or not gate.is_active:
+    gate = await _get_active_gate(db, payload.gate_id)
+    if not gate:
         raise HTTPException(status_code=404, detail="Gate not found")
 
     # Lookup vehicle in registry
@@ -500,8 +539,8 @@ async def process_lpr_image_scan(
         raise HTTPException(status_code=422, detail="Could not extract plate number from image")
 
     # Now process the same as text-based scan
-    gate = await db.get(Gate, gate_id)
-    if not gate or not gate.is_active:
+    gate = await _get_active_gate(db, gate_id)
+    if not gate:
         raise HTTPException(status_code=404, detail="Gate not found")
 
     # Lookup vehicle in registry

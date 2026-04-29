@@ -113,6 +113,14 @@ BATCHES = [
     {"sku_id": "SKU-STL-02", "product_name": "Steel Coils Grade 2", "batch_number": "B2025-1023", "quantity": 580, "zone": "D", "rack": "D-01", "bin_location": "D-01-L1", "manufacturing_date": "2026-03-01", "expiry_date": "2028-03-01", "rule_type": "FIFO"},
 ]
 
+DEMO_USERS = [
+    {"email": "wm.blr@fidelis-demo.com", "full_name": "Warehouse Manager - Bengaluru", "password": "MacroPulse2025!", "is_superuser": False},
+    {"email": "wm.hyd@fidelis-demo.com", "full_name": "Warehouse Manager - Hyderabad", "password": "MacroPulse2025!", "is_superuser": False},
+    {"email": "wm.mum@fidelis-demo.com", "full_name": "Warehouse Manager - Mumbai", "password": "MacroPulse2025!", "is_superuser": False},
+    {"email": "regional@fidelis-demo.com", "full_name": "Regional Manager - India", "password": "MacroPulse2025!", "is_superuser": False},
+    {"email": "admin@fidelis-demo.com", "full_name": "Platform Admin", "password": "MacroPulse2025!", "is_superuser": True},
+]
+
 
 # ---------------------------------------------------------------------------
 # Seed runner
@@ -360,7 +368,22 @@ async def seed_database(db_url: str | None = None):
 
             # ── Dashboard User (for legacy HTML auth) ──
             from passlib.context import CryptContext
+            from app.core.auth.authentication import register_user
             pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+            for demo_user in DEMO_USERS:
+                existing = await db.execute(text("SELECT id FROM users WHERE email = :e"), {"e": demo_user["email"]})
+                if existing.scalar_one_or_none():
+                    continue
+                user = await register_user(
+                    db,
+                    demo_user["email"],
+                    demo_user["password"],
+                    demo_user["full_name"],
+                )
+                user.is_superuser = demo_user["is_superuser"]
+                user.email_verified = True
+                await db.commit()
+            logger.info("Seeded frontend demo users")
             dash_email = "dashboard@intelli.ai"
             dash_pass = pwd_ctx.hash("DashboardOps2026!")
             existing = await db.execute(text("SELECT id FROM users WHERE email = :e"), {"e": dash_email})
@@ -526,8 +549,8 @@ async def seed_database(db_url: str | None = None):
                         {"sku_code": "RICE-BAS", "product_name": "Basmati Rice 25kg", "zone": "D", "rack": "D-02", "bin_location": "D-02-L1", "quantity": 800, "rule": "FEFO", "days": 365},
                     ]
                     for sb in seq_batches:
-                        mfg = now - timedelta(days=30)
-                        exp = now + timedelta(days=sb["days"])
+                        mfg = (now - timedelta(days=30)).date()
+                        exp = (now + timedelta(days=sb["days"])).date()
                         days_to = sb["days"]
                         await db.execute(text("""
                             INSERT INTO depot_inventory_batches (id, batch_code, sku_code, product_name, zone, rack, bin_location, quantity, original_quantity, manufacture_date, expiry_date, received_at, sequencing_rule, priority_score, status, is_near_expiry, days_to_expiry, created_at, updated_at)
