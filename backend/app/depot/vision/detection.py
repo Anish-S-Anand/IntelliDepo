@@ -35,10 +35,24 @@ from app.shared.models.user import User
 
 logger = logging.getLogger("intelli.depot.detection")
 ALLOW_SIMULATED_VISION = os.getenv("ALLOW_SIMULATED_VISION", "false").lower() in {"1", "true", "yes"}
-DEFAULT_YOLO_WEIGHTS = os.getenv(
-    "YOLO_WEIGHTS",
-    r"C:\Users\karte\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\intelli-platform\best_cement_bags_2025-05-29.pt",
-)
+
+
+def _default_yolo_weights() -> str:
+    env_weights = os.getenv("YOLO_WEIGHTS")
+    if env_weights:
+        return env_weights
+
+    candidates = [
+        r"C:\Users\DELL\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\INTELLI\DEPOT\JSW Design\videos\best_cement_bags_2025-05-29.pt",
+        r"C:\Users\karte\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\intelli-platform\best_cement_bags_2025-05-29.pt",
+    ]
+    for candidate in candidates:
+        if Path(candidate).exists():
+            return candidate
+    return "yolov8n.pt"
+
+
+DEFAULT_YOLO_WEIGHTS = _default_yolo_weights()
 
 # ---------------------------------------------------------------------------
 # YOLO model loader — real ultralytics with graceful fallback

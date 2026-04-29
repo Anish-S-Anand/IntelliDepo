@@ -20,6 +20,7 @@ import time
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -34,15 +35,15 @@ DETECTION_INTERVAL = float(os.getenv("RT_DETECTION_INTERVAL", "3.0"))  # seconds
 PUBLISH_INTERVAL = float(os.getenv("RT_PUBLISH_INTERVAL", "2.0"))  # seconds between WS pushes
 CONFIDENCE_THRESHOLD = float(os.getenv("RT_CONFIDENCE", "0.40"))
 # Classes we count (after mapping)
-COUNTABLE_CLASSES = ["bag", "box", "pallet", "carton", "truck"]
+COUNTABLE_CLASSES = ["bag", "box", "pallet", "carton", "truck", "vehicle"]
 
 # YOLO class mapping — maps custom + COCO classes to counting labels
 _YOLO_CLASS_MAP = {
     # JSW trained model classes
     "Cement Bags": "bag",
-    "Truck": "truck",
-    "Truck Back": "truck",
-    "Truck space": "truck",
+    "Truck": "vehicle",
+    "Truck Back": "vehicle",
+    "Truck space": "vehicle",
     # COCO fallback classes
     "backpack": "bag", "handbag": "bag", "suitcase": "bag",
     "box": "box", "carton": "carton", "pallet": "pallet",
@@ -191,10 +192,22 @@ _trackers: dict[str, _SimpleTracker] = {}
 # YOLO model loader
 # ---------------------------------------------------------------------------
 _yolo_model = None
-DEFAULT_YOLO_WEIGHTS = os.getenv(
-    "YOLO_WEIGHTS",
-    r"C:\Users\karte\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\intelli-platform\best_cement_bags_2025-05-29.pt",
-)
+def _default_yolo_weights() -> str:
+    env_weights = os.getenv("YOLO_WEIGHTS")
+    if env_weights:
+        return env_weights
+
+    candidates = [
+        r"C:\Users\DELL\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\INTELLI\DEPOT\JSW Design\videos\best_cement_bags_2025-05-29.pt",
+        r"C:\Users\karte\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\intelli-platform\best_cement_bags_2025-05-29.pt",
+    ]
+    for candidate in candidates:
+        if Path(candidate).exists():
+            return candidate
+    return "yolov8n.pt"
+
+
+DEFAULT_YOLO_WEIGHTS = _default_yolo_weights()
 
 
 def _load_model():
@@ -205,16 +218,16 @@ def _load_model():
         from ultralytics import YOLO
         from pathlib import Path
 
-        # Priority: 1) custom trained weights, 2) env var, 3) project-local, 4) auto-download
+        # Priority: 1) explicit/default machine weights, 2) project-local, 3) auto-download
         custom_weights = Path(__file__).resolve().parent / "training_data" / "weights" / "depot_best.pt"
         env_weights = DEFAULT_YOLO_WEIGHTS
 
-        if custom_weights.exists():
-            _yolo_model = YOLO(str(custom_weights))
-            logger.info(f"YOLO model loaded: custom depot weights ({custom_weights.name})")
-        elif env_weights and Path(env_weights).exists():
+        if env_weights and Path(env_weights).exists():
             _yolo_model = YOLO(env_weights)
             logger.info(f"YOLO model loaded: {env_weights}")
+        elif custom_weights.exists():
+            _yolo_model = YOLO(str(custom_weights))
+            logger.info(f"YOLO model loaded: custom depot weights ({custom_weights.name})")
         else:
             _yolo_model = YOLO("yolov8n.pt")
             logger.info("YOLO model loaded: default yolov8n.pt")
