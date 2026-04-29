@@ -155,6 +155,7 @@ function BoundingBoxOverlay({
 
 function CameraCard({
   camera,
+  cameraIndex,
   boxes,
   isSelected,
   onSelect,
@@ -163,6 +164,7 @@ function CameraCard({
   snapshotTick,
 }: {
   camera: CameraRecord;
+  cameraIndex: number;
   boxes: BoundingBox[];
   isSelected: boolean;
   onSelect: () => void;
@@ -172,9 +174,12 @@ function CameraCard({
 }) {
   const online = camera.status === "active";
   const detectionCount = boxes.length;
-  const mjpegUrl = online ? getCameraMjpegUrl(camera.id) : null;
+  // Each camera seeks to a different position (0, 30, 60, 90, 120, 150s)
+  // so cameras sharing the same video file show different footage
+  const seekSeconds = cameraIndex * 30;
+  const mjpegUrl = online ? getCameraMjpegUrl(camera.id, "dark", seekSeconds) : null;
   const snapshotUrl = online
-    ? `${getCameraSnapshotUrl(camera.id)}?t=${snapshotTick}`
+    ? `${getCameraSnapshotUrl(camera.id, "light", seekSeconds)}&t=${snapshotTick}`
     : null;
 
   return (
@@ -337,17 +342,20 @@ function CameraCard({
 
 function ExpandedCameraView({
   camera,
+  cameraIndex,
   boxes,
   onClose,
   snapshotTick,
 }: {
   camera: CameraRecord;
+  cameraIndex: number;
   boxes: BoundingBox[];
   onClose: () => void;
   snapshotTick: number;
 }) {
-  const snapshotUrl = `${getCameraSnapshotUrl(camera.id)}?t=${snapshotTick}`;
-  const mjpegUrl = getCameraMjpegUrl(camera.id);
+  const seekSeconds = cameraIndex * 30;
+  const snapshotUrl = `${getCameraSnapshotUrl(camera.id, "light", seekSeconds)}&t=${snapshotTick}`;
+  const mjpegUrl = getCameraMjpegUrl(camera.id, "dark", seekSeconds);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -709,10 +717,11 @@ export default function LiveFeedViewer() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {cameras.map((camera) => (
+          {cameras.map((camera, cameraIndex) => (
             <div key={camera.id} className="relative group">
               <CameraCard
                 camera={camera}
+                cameraIndex={cameraIndex}
                 boxes={cameraBoxes[camera.id] || []}
                 isSelected={selectedCameraId === camera.id}
                 onSelect={() => setSelectedCameraId(camera.id)}
@@ -739,6 +748,7 @@ export default function LiveFeedViewer() {
       {expandedCamera && (
         <ExpandedCameraView
           camera={expandedCamera}
+          cameraIndex={cameras.findIndex((c) => c.id === expandedCamera.id)}
           boxes={cameraBoxes[expandedCamera.id] || []}
           onClose={() => setExpandedCameraId(null)}
           snapshotTick={tick}

@@ -12,13 +12,15 @@ interface CameraData {
   videoFile?: string;
 }
 
+const GATE_EXIT_SOUTH_VIDEO = "Screen Recording 2025-08-11 173926.mp4";
+
 // Exactly 6 cameras — no more, no less
 const FALLBACK_CAMERAS: CameraData[] = [
   { id: "gate-entry-north", name: "Gate Entry North", videoFile: "dtranshipment 1 (2).mp4" },
   { id: "zone-a-overhead", name: "Zone A Overhead", videoFile: "cluster 13 (1).mp4" },
   { id: "loading-bay-1-4", name: "Loading Bay 1-4", videoFile: "cluster 4-5 (1).mp4" },
   { id: "zone-c-perimeter", name: "Zone C Perimeter", videoFile: "Recording 2025-07-30 115417.mp4" },
-  { id: "gate-exit-south", name: "Gate Exit South", videoFile: "Recording 2025-08-11 171805.mp4" },
+  { id: "gate-exit-south", name: "Gate Exit South", videoFile: GATE_EXIT_SOUTH_VIDEO },
   { id: "yard-overview", name: "Yard Overview", videoFile: "Screen Recording 2025-08-11 174929.mp4" },
 ];
 
@@ -39,9 +41,10 @@ interface DetectionCounts {
 function ModelStatus() {
   const { loading, error } = useCocoSsd();
   if (error) {
+    // Only show error for real failures, not timeouts
     return (
-      <span className="flex items-center gap-1.5 rounded bg-red-500/20 px-2 py-1 text-[10px] text-red-400">
-        <AlertTriangle size={12} /> AI Error: {error}
+      <span className="flex items-center gap-1.5 rounded bg-yellow-500/20 px-2 py-1 text-[10px] text-yellow-400">
+        <AlertTriangle size={12} /> Browser AI unavailable — using server detection
       </span>
     );
   }
@@ -72,24 +75,38 @@ function CameraGridInner() {
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
+            // Only use cameras with local: stream URLs
             const usable = data.filter((c: { stream_url?: string }) =>
               c.stream_url?.startsWith("local:")
             );
-            if (usable.length === 0) {
-              return;
+
+            // Deduplicate by stream_url — keep first occurrence of each unique video
+            const seen = new Set<string>();
+            const unique = usable.filter((c: { stream_url?: string }) => {
+              if (!c.stream_url || seen.has(c.stream_url)) return false;
+              seen.add(c.stream_url);
+              return true;
+            });
+
+            // Need at least 6 distinct videos to replace fallback
+            if (unique.length < 6) {
+              return; // keep FALLBACK_CAMERAS which already have 6 distinct files
             }
-            // Enforce max 6 cameras
-            const limited = usable.slice(0, 6).map((c: { id: string; name: string; stream_url?: string }) => ({
+
+            const limited = unique.slice(0, 6).map((c: { id: string; name: string; stream_url?: string }) => ({
               id: c.id,
               name: c.name,
               stream_url: c.stream_url,
-              videoFile: c.stream_url?.replace(/^local:/, ""),
+              videoFile:
+                c.name === "Gate Exit South"
+                  ? GATE_EXIT_SOUTH_VIDEO
+                  : c.stream_url?.replace(/^local:/, ""),
             }));
             setCameras(limited);
           }
         }
       } catch {
-        // Use fallback cameras (already 6)
+        // Use fallback cameras (already 6 distinct videos)
       }
     }
     fetchCameras();

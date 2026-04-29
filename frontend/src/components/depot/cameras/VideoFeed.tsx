@@ -43,11 +43,15 @@ export function VideoFeed({ name, cameraId, videoFile, cameraIndex, onDetectionU
 
   useDetection(sourceCanvasRef, overlayCanvasRef, cameraIndex, status === "live", onDetectionUpdate);
 
+  // Each camera seeks to a different position in its video so feeds look distinct.
+  // Index 0 = start, 1 = 30s in, 2 = 60s in, etc.
+  const seekSeconds = cameraIndex * 30;
+
   const snapshotUrl = videoFile
-    ? `/backend/depot/vision/cameras/video-library/${encodeURIComponent(videoFile)}/snapshot`
-    : `${getBackendBase()}/depot/vision/cameras/${cameraId}/snapshot`;
+    ? `/backend/depot/vision/cameras/video-library/${encodeURIComponent(videoFile)}/snapshot?seek=${seekSeconds}`
+    : `${getBackendBase()}/depot/vision/cameras/${cameraId}/snapshot?seek=${seekSeconds}`;
   const streamUrl = videoFile
-    ? `/backend/depot/vision/cameras/video-library/${encodeURIComponent(videoFile)}/mjpeg?theme=dark`
+    ? `/backend/depot/vision/cameras/video-library/${encodeURIComponent(videoFile)}/mjpeg?theme=dark&seek=${seekSeconds}`
     : null;
 
   // LPR simulation: periodically "detect" a plate when camera is live

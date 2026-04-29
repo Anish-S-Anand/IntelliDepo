@@ -201,24 +201,26 @@ export async function getCameraFrame(cameraId: string): Promise<IntegrationPanel
 /**
  * Get the MJPEG stream URL for a camera (for use in <img> src).
  * Points directly to the backend port to bypass Next.js proxy buffering.
+ * seek: offset in seconds so cameras sharing the same video show different parts.
  */
-export function getCameraMjpegUrl(cameraId: string, theme: "dark" | "light" = "dark"): string {
-  // MJPEG streams must bypass the Next.js proxy (which buffers responses).
-  // Use the direct backend URL in the browser.
+export function getCameraMjpegUrl(cameraId: string, theme: "dark" | "light" = "dark", seek = 0): string {
   const base = typeof window !== "undefined"
     ? `${window.location.protocol}//${window.location.hostname}:8000`
     : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
-  return `${base}/depot/vision/cameras/${cameraId}/mjpeg?theme=${theme}`;
+  const seekParam = seek > 0 ? `&seek=${seek}` : "";
+  return `${base}/depot/vision/cameras/${cameraId}/mjpeg?theme=${theme}${seekParam}`;
 }
 
 /**
  * Get the snapshot URL for a camera (for use in <img> src).
+ * seek: offset in seconds so cameras sharing the same video show different parts.
  */
-export function getCameraSnapshotUrl(cameraId: string, theme: "dark" | "light" = "light"): string {
+export function getCameraSnapshotUrl(cameraId: string, theme: "dark" | "light" = "light", seek = 0): string {
   const base = typeof window !== "undefined"
     ? `${window.location.protocol}//${window.location.hostname}:8000`
     : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
-  return `${base}/depot/vision/cameras/${cameraId}/snapshot?theme=${theme}`;
+  const seekParam = seek > 0 ? `&seek=${seek}` : "";
+  return `${base}/depot/vision/cameras/${cameraId}/snapshot?theme=${theme}${seekParam}`;
 }
 
 /**

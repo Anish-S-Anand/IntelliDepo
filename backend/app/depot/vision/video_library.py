@@ -64,7 +64,7 @@ SCENE_VIDEOS = [
     {
         "scene": "gate_exit",
         "label": "GATE EXIT SOUTH",
-        "filename": "Recording 2025-08-11 171805.mp4",
+        "filename": "Screen Recording 2025-08-11 173926.mp4",
         "description": "Depot recording — exit gate operations",
     },
     {
@@ -192,10 +192,12 @@ def get_video_frame(scene_idx: int, theme: str = "dark") -> Optional[np.ndarray]
         return None
 
 
-def get_video_frame_by_filename(filename: str) -> Optional[np.ndarray]:
+def get_video_frame_by_filename(filename: str, seek_seconds: float = 0.0) -> Optional[np.ndarray]:
     """
-    Read the next frame from a specific depot video file by name.
-    Useful for running detection/training on any video, not just the 6 scenes.
+    Read a frame from a specific depot video file by name.
+    seek_seconds: position in the video to read from (0 = start).
+    Each call with the same filename+seek returns the frame at that position.
+    Useful for showing different parts of the same video across multiple cameras.
     """
     if not _HAS_CV2:
         return None
@@ -204,9 +206,10 @@ def get_video_frame_by_filename(filename: str) -> Optional[np.ndarray]:
     if video_path is None:
         return None
 
-    key = f"file_{filename}"
+    # Use a seek-specific cache key so different seek positions don't share state
+    key = f"file_{filename}_{int(seek_seconds)}"
     if key not in _video_caps or _video_caps[key] is None:
-        _video_caps[key] = _open_video_capture(video_path)
+        _video_caps[key] = _open_video_capture(video_path, seek_seconds=seek_seconds)
 
     cap = _video_caps.get(key)
     if cap is None:
@@ -214,7 +217,9 @@ def get_video_frame_by_filename(filename: str) -> Optional[np.ndarray]:
 
     ret, frame = cap.read()
     if not ret or frame is None:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        # Loop: seek back to the original position
+        fps = cap.get(cv2.CAP_PROP_FPS) or 25
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(seek_seconds * fps))
         ret, frame = cap.read()
     if ret and frame is not None:
         return frame

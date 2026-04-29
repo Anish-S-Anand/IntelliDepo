@@ -605,10 +605,11 @@ async def get_latest_frame(camera_id: uuid.UUID, db: AsyncSession = Depends(get_
 
 @router.get("/{camera_id}/snapshot")
 @router.get("/{camera_id}/snapshot")
-async def get_camera_snapshot(camera_id: str, theme: str = "light", db: AsyncSession = Depends(get_db)):
+async def get_camera_snapshot(camera_id: str, theme: str = "light", seek: float = 0.0, db: AsyncSession = Depends(get_db)):
     """
     Capture a single frame and return it as a JPEG image.
     Accepts both UUID and slug-style camera IDs (e.g. 'gate-entry-north').
+    seek: optional offset in seconds into the video (for showing different parts of the same file).
     """
     # Try UUID lookup first
     camera = None
@@ -645,14 +646,19 @@ async def get_camera_snapshot(camera_id: str, theme: str = "light", db: AsyncSes
         from app.depot.vision.video_library import get_local_video_path
         vpath = get_local_video_path(filename)
         if vpath is not None:
-            def _read_one_frame(path):
+            def _read_one_frame(path, seek_s: float = 0.0):
                 cap = cv2.VideoCapture(str(path))
                 if not cap.isOpened():
                     return None
+                if seek_s > 0:
+                    fps = cap.get(cv2.CAP_PROP_FPS) or 25
+                    total = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+                    target = int(seek_s * fps) % max(1, int(total))
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, target)
                 ret, f = cap.read()
                 cap.release()
                 return cv2.resize(f, (854, 480)) if ret and f is not None else None
-            frame = await loop.run_in_executor(_cv_pool, _read_one_frame, vpath)
+            frame = await loop.run_in_executor(_cv_pool, _read_one_frame, vpath, seek)
 
     if frame is None:
         frame = await stream_read_frame(cam_key, theme=theme)
@@ -993,10 +999,11 @@ async def list_depot_videos():
 
 
 @router.get("/video-library/{filename}/mjpeg")
-async def stream_local_video(filename: str, theme: str = "light"):
+async def stream_local_video(filename: str, theme: str = "light", seek: float = 0.0):
     """
     Stream a local depot video as MJPEG. Useful for previewing training videos.
     filename: e.g. 'cluster 13 (1).mp4'
+    seek: start offset in seconds (default 0).
     """
     from app.depot.vision.video_library import get_local_video_path
 
@@ -1010,15 +1017,17 @@ async def stream_local_video(filename: str, theme: str = "light"):
     async def generate():
         boundary = b"--frame\r\n"
         loop = asyncio.get_running_loop()
-        cap = await loop.run_in_executor(_cv_pool, _cv_connect, str(video_path), 0.0)
+        cap = await loop.run_in_executor(_cv_pool, _cv_connect, str(video_path), seek)
         if cap is None:
             return
+        # Remember the seek position so we loop back to it (not to frame 0)
+        seek_frame = int(seek * (cap.get(cv2.CAP_PROP_FPS) or 25))
         try:
             while True:
                 frame = await loop.run_in_executor(_cv_pool, _cv_read_frame, cap)
                 if frame is None:
-                    # Loop back to start
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    # Loop back to seek position
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, seek_frame)
                     frame = await loop.run_in_executor(_cv_pool, _cv_read_frame, cap)
                     if frame is None:
                         break
@@ -1045,11 +1054,13 @@ async def stream_local_video(filename: str, theme: str = "light"):
 
 
 @router.get("/video-library/{filename}/snapshot")
-async def video_snapshot(filename: str):
-    """Get a single frame from a local depot video as JPEG."""
+async def video_snapshot(filename: str, seek: float = 0.0):
+    """Get a single frame from a local depot video as JPEG.
+    seek: offset in seconds into the video (default 0).
+    """
     from app.depot.vision.video_library import get_video_frame_by_filename
 
-    frame = get_video_frame_by_filename(filename)
+    frame = get_video_frame_by_filename(filename, seek_seconds=seek)
     if frame is None:
         raise HTTPException(status_code=404, detail=f"Cannot read video: {filename}")
 
