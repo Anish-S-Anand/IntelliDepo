@@ -15,11 +15,38 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (mounted && !isAuthenticated) {
-      router.replace("/login"); // safer than push
+      router.replace("/login");
     }
   }, [isAuthenticated, mounted, router]);
 
-  if (!mounted || !isAuthenticated) return null;
+  // Show loading spinner while checking auth — never blank
+  if (!mounted) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: "var(--bg-page, #080e1c)" }}
+      >
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#E5521A] border-t-transparent" />
+          <span className="text-[12px] text-[#8A9BBF]">Loading IntelliDepot...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: "var(--bg-page, #080e1c)" }}
+      >
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#E5521A] border-t-transparent" />
+          <span className="text-[12px] text-[#8A9BBF]">Redirecting to login...</span>
+        </div>
+      </div>
+    );
+  }
 
   return <>{children}</>;
 }

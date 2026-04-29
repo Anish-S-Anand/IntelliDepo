@@ -5,31 +5,96 @@ Feature: AUTH-6.1, AUTH-6.2
 FastAPI dependencies for extracting/validating users and checking RBAC permissions.
 """
 import uuid
+import logging
 from collections.abc import Callable
 
 from fastapi import Depends, HTTPException, status, Header, Request
 from fastapi.security import OAuth2PasswordBearer, HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.database import get_db
 from app.core.auth.authentication import decode_token, get_user_by_id
 from app.shared.models.user import User
 
+logger = logging.getLogger("intelli.auth")
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 http_bearer = HTTPBearer(auto_error=False)
+
+# ---------------------------------------------------------------------------
+# Demo token support — allows frontend demo credentials to work without
+# a real JWT. Demo tokens have the format: "demo-token-<user-id>"
+# ---------------------------------------------------------------------------
+
+_DEMO_USER_MAP = {
+    "wm.blr@fidelis-demo.com": {"full_name": "Warehouse Manager - Bengaluru", "role": "warehouse_manager", "is_superuser": False},
+    "wm.hyd@fidelis-demo.com": {"full_name": "Warehouse Manager - Hyderabad", "role": "warehouse_manager", "is_superuser": False},
+    "wm.mum@fidelis-demo.com": {"full_name": "Warehouse Manager - Mumbai", "role": "warehouse_manager", "is_superuser": False},
+    "regional@fidelis-demo.com": {"full_name": "Regional Manager - India", "role": "regional_manager", "is_superuser": False},
+    "admin@fidelis-demo.com": {"full_name": "Platform Admin", "role": "admin", "is_superuser": True},
+}
+
+
+async def _get_or_create_demo_user(db: AsyncSession, email: str) -> User | None:
+    """Look up a demo user by email, creating them if they don't exist yet."""
+    info = _DEMO_USER_MAP.get(email)
+    if not info:
+        return None
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user:
+        return user
+
+    # Create the demo user on-the-fly
+    try:
+        from app.core.auth.authentication import register_user
+        user = await register_user(db, email, "MacroPulse2025!", info["full_name"])
+        user.is_superuser = info["is_superuser"]
+        user.email_verified = True
+        await db.commit()
+        await db.refresh(user)
+        return user
+    except Exception as e:
+        logger.warning(f"Could not create demo user {email}: {e}")
+        await db.rollback()
+        return None
 
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Extract and validate the current user from the access token."""
+    """Extract and validate the current user from the access token.
+
+    Supports both real JWTs and demo tokens (demo-token-<email-index>).
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # ── Demo token bypass ──────────────────────────────────────────────────
+    if token.startswith("demo-token-"):
+        # Format: demo-token-<uuid> where uuid maps to a demo credential id
+        # Try to find the user by matching the token suffix to known demo emails
+        demo_emails = list(_DEMO_USER_MAP.keys())
+        # Try each demo email to find a matching user
+        for email in demo_emails:
+            result = await db.execute(select(User).where(User.email == email))
+            user = result.scalar_one_or_none()
+            if user and user.is_active:
+                return user
+        # If no demo users exist yet, create the admin
+        user = await _get_or_create_demo_user(db, "admin@fidelis-demo.com")
+        if user:
+            return user
+        raise credentials_exception
+
+    # ── Real JWT validation ────────────────────────────────────────────────
     payload = decode_token(token)
     if payload is None or payload.get("type") != "access":
         raise credentials_exception

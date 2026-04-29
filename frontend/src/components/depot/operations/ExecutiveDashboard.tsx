@@ -51,6 +51,7 @@ export default function ExecutiveDashboard() {
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
+    // Use Promise.allSettled so one 401 doesn't block the rest
     const results = await Promise.allSettled([
       getAllActiveAlerts(),
       getActiveBreaches(),
@@ -68,7 +69,8 @@ export default function ExecutiveDashboard() {
 
   useEffect(() => {
     void fetchAll();
-    const interval = setInterval(() => void fetchAll(), 30000);
+    // Reduced polling interval for better performance
+    const interval = setInterval(() => void fetchAll(), 60000);
     return () => clearInterval(interval);
   }, [fetchAll]);
 
@@ -109,8 +111,8 @@ export default function ExecutiveDashboard() {
           <div className="text-[11px] text-[#E5521A] font-bold tracking-[0.1em] uppercase mb-1">
             Executive Overview
           </div>
-          <h1 className="text-[22px] font-extrabold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
-            IntelliVision Command Center
+          <h1 className="text-[22px] font-extrabold text-[#E8EDF8]">
+            Operations Hub
           </h1>
           <p className="text-[11px] text-[#8A9BBF] mt-0.5">
             {depot.name} · {depot.loc} · All 6 modules active
@@ -159,7 +161,7 @@ export default function ExecutiveDashboard() {
 
       {/* Module Status Grid */}
       <div className="mb-5">
-        <h2 className="text-[14px] font-bold text-[#E8EDF8] mb-3" style={{ fontFamily: "'Syne', sans-serif" }}>
+        <h2 className="text-[14px] font-bold text-[#E8EDF8] mb-3" >
           Module Health
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -214,7 +216,7 @@ export default function ExecutiveDashboard() {
         {/* Throughput Chart */}
         <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px]">
           <div className="flex justify-between items-center mb-3.5">
-            <span className="text-[13px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+            <span className="text-[13px] font-bold text-[#E8EDF8]" >
               Daily Throughput (Bags)
             </span>
             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#E5521A]/10 text-[#E5521A] border border-[#E5521A]/20">
@@ -248,7 +250,7 @@ export default function ExecutiveDashboard() {
         {/* Counting Accuracy Summary */}
         <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px]">
           <div className="flex justify-between items-center mb-3.5">
-            <span className="text-[13px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+            <span className="text-[13px] font-bold text-[#E8EDF8]" >
               Counting Sessions
             </span>
             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#5B9BF5]/12 text-[#5B9BF5] border border-[#5B9BF5]/25">
@@ -286,7 +288,7 @@ export default function ExecutiveDashboard() {
       {capacityStatus.length > 0 && (
         <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px] mb-5">
           <div className="flex justify-between items-center mb-3.5">
-            <span className="text-[13px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+            <span className="text-[13px] font-bold text-[#E8EDF8]" >
               Zone Capacity Status
             </span>
             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#F5A623]/12 text-[#F5A623] border border-[#F5A623]/25">
@@ -318,7 +320,7 @@ export default function ExecutiveDashboard() {
         {/* Active Vision Alerts */}
         <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px]">
           <div className="flex justify-between items-center mb-3.5">
-            <span className="text-[13px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+            <span className="text-[13px] font-bold text-[#E8EDF8]" >
               Vision Alerts
             </span>
             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#F5A623]/12 text-[#F5A623] border border-[#F5A623]/25">
@@ -351,7 +353,7 @@ export default function ExecutiveDashboard() {
         {/* Perimeter & Incident Feed */}
         <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px]">
           <div className="flex justify-between items-center mb-3.5">
-            <span className="text-[13px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+            <span className="text-[13px] font-bold text-[#E8EDF8]" >
               Security Incidents
             </span>
             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#F04A4A]/12 text-[#F04A4A] border border-[#F04A4A]/25">
@@ -393,3 +395,4 @@ export default function ExecutiveDashboard() {
     </div>
   );
 }
+

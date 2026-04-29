@@ -1,58 +1,103 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, RefreshCw } from "lucide-react";
+import Image from "next/image";
+import { Bell, RefreshCw, Settings, User, Clock, LogOut, ChevronDown, Shield } from "lucide-react";
 import { DEPOTS } from "@/lib/depot-data";
+import { useAuthStore } from "@/stores/authStore";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
-export default function DepotTopBar({
-  toggleSidebar,
-}: {
-  toggleSidebar: () => void;
-}) {
+export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => void }) {
   const router = useRouter();
+  const { user, logout } = useAuthStore();
   const [depot, setDepot] = useState("MUM-001");
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const initials = user?.full_name
+    ? user.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "OP";
+
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-[52px] bg-[#0D1526] border-b border-[#1E2F50] flex items-center px-3 sm:px-4 gap-2 sm:gap-3 z-50">
-      
-      {/* 🔥 Mobile Hamburger */}
+    <header
+      className="depot-topbar fixed top-0 left-0 right-0 h-[52px] flex items-center px-3 sm:px-4 gap-2 sm:gap-3 z-50 theme-transition"
+      style={{
+        backgroundColor: "var(--bg-nav)",
+        borderBottom: "1px solid var(--bg-nav-border)",
+      }}
+    >
+      {/* Mobile Hamburger */}
       <button
         onClick={toggleSidebar}
-        className="md:hidden w-8 h-8 flex items-center justify-center text-white text-lg"
+        className="md:hidden w-8 h-8 flex items-center justify-center text-lg theme-transition"
+        style={{ color: "var(--text-primary)" }}
+        aria-label="Toggle sidebar"
       >
         ☰
       </button>
 
       {/* Logo */}
       <button
-        onClick={() => router.push("/depot")}
-        className="flex items-center gap-2 flex-shrink-0"
+        onClick={() => router.push("/depot/operations")}
+        className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0"
+        aria-label="Go to depot home"
       >
-        <div className="w-[30px] h-[30px] rounded-lg bg-gradient-to-br from-[#C43A08] to-[#E5521A] flex items-center justify-center shadow-[0_0_8px_rgba(229,82,26,0.5)]">
-          <span className="text-white text-xs font-extrabold">F</span>
+        <div className="w-[28px] h-[28px] sm:w-[32px] sm:h-[32px] rounded-lg bg-white flex items-center justify-center shadow-[0_0_8px_rgba(229,82,26,0.3)] overflow-hidden flex-shrink-0">
+          <Image
+            src="/fidelis-logo.png"
+            alt="Fidelis"
+            width={28}
+            height={28}
+            className="w-5 h-5 sm:w-6 sm:h-6 object-contain"
+            priority
+          />
         </div>
-        <div className="flex flex-col leading-none">
-          <span
-            className="text-[#E5521A] font-extrabold text-[14px] sm:text-[16px] tracking-tight"
-            style={{ fontFamily: "'Syne', sans-serif" }}
-          >
-            Fidelis
+        <div className="hidden xs:flex flex-col leading-none">
+          <span className="text-[#E5521A] font-extrabold text-[13px] sm:text-[15px] tracking-tight">
+            Intelli
           </span>
-          <span className="text-[7px] sm:text-[8px] text-[#8A9BBF] font-semibold tracking-[0.12em] uppercase">
+          <span
+            className="text-[7px] sm:text-[8px] font-semibold tracking-[0.12em] uppercase"
+            style={{ color: "var(--text-muted)" }}
+          >
             IntelliDepot™
           </span>
         </div>
       </button>
 
       {/* Divider */}
-      <div className="hidden sm:block w-px h-7 bg-[#1E2F50] flex-shrink-0" />
+      <div
+        className="hidden sm:block w-px h-7 flex-shrink-0"
+        style={{ backgroundColor: "var(--border-default)" }}
+      />
 
       {/* Depot selector */}
       <select
         value={depot}
         onChange={(e) => setDepot(e.target.value)}
-        className="px-2 py-1.5 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[10px] sm:text-[11px] font-semibold cursor-pointer outline-none focus:border-[#E5521A]"
+        className="depot-select px-2 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-semibold cursor-pointer outline-none theme-transition"
+        style={{
+          backgroundColor: "var(--bg-input)",
+          border: "1px solid var(--border-input)",
+          color: "var(--text-input)",
+        }}
+        aria-label="Select depot"
       >
         {DEPOTS.map((d) => (
           <option key={d.id} value={d.id}>
@@ -61,24 +106,56 @@ export default function DepotTopBar({
         ))}
       </select>
 
-      {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Live pill (hidden on very small screens) */}
-      <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#22D3A1]/8 border border-[#22D3A1]/20 text-[10px] font-bold text-[#22D3A1]">
+      {/* Live pill */}
+      <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold text-[#22D3A1]"
+        style={{ backgroundColor: "rgba(34,211,161,0.08)", border: "1px solid rgba(34,211,161,0.2)" }}
+      >
         <span className="w-1.5 h-1.5 rounded-full bg-[#22D3A1] animate-pulse" />
         LIVE
       </div>
 
+      {/* Theme Toggle */}
+      <ThemeToggle />
+
       {/* Refresh */}
-      <button className="w-8 h-8 rounded-lg border border-[#1E2F50] text-[#8A9BBF] hover:border-[#E5521A] hover:text-[#E5521A] flex items-center justify-center transition">
+      <button
+        className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors theme-transition"
+        style={{
+          border: "1px solid var(--border-default)",
+          color: "var(--text-muted)",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.color = "#E5521A";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(229,82,26,0.5)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-default)";
+        }}
+        aria-label="Refresh"
+      >
         <RefreshCw className="w-3.5 h-3.5" />
       </button>
 
       {/* Alerts */}
       <button
         onClick={() => router.push("/depot/incidents")}
-        className="relative w-8 h-8 rounded-lg border border-[#1E2F50] text-[#8A9BBF] hover:border-[#E5521A] hover:text-[#E5521A] flex items-center justify-center transition"
+        className="relative w-8 h-8 rounded-lg flex items-center justify-center transition-colors theme-transition"
+        style={{
+          border: "1px solid var(--border-default)",
+          color: "var(--text-muted)",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.color = "#E5521A";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(229,82,26,0.5)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-default)";
+        }}
+        aria-label="View alerts"
       >
         <Bell className="w-3.5 h-3.5" />
         <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#F04A4A] text-white text-[8px] font-extrabold flex items-center justify-center">
@@ -86,9 +163,106 @@ export default function DepotTopBar({
         </span>
       </button>
 
-      {/* User */}
-      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#C43A08] to-[#E5521A] flex items-center justify-center text-[12px] sm:text-[13px] font-extrabold text-white cursor-pointer flex-shrink-0">
-        OP
+      {/* Profile dropdown */}
+      <div className="relative flex-shrink-0" ref={profileRef}>
+        <button
+          onClick={() => setProfileOpen((prev) => !prev)}
+          className="flex items-center gap-1.5 rounded-lg px-1.5 py-1 transition-colors theme-transition"
+          style={{ color: "var(--text-muted)" }}
+          aria-label="Profile menu"
+          aria-expanded={profileOpen}
+        >
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#C43A08] to-[#E5521A] flex items-center justify-center text-[11px] font-extrabold text-white">
+            {initials}
+          </div>
+          <ChevronDown
+            className={`w-3 h-3 transition-transform ${profileOpen ? "rotate-180" : ""}`}
+            style={{ color: "var(--text-muted)" }}
+          />
+        </button>
+
+        {profileOpen && (
+          <div
+            className="absolute right-0 top-[calc(100%+6px)] w-64 rounded-xl shadow-2xl z-[100] overflow-hidden theme-transition"
+            style={{
+              backgroundColor: "var(--bg-surface-2)",
+              border: "1px solid var(--border-default)",
+            }}
+          >
+            {/* User info */}
+            <div
+              className="px-4 py-3 theme-transition"
+              style={{
+                borderBottom: "1px solid var(--border-default)",
+                backgroundColor: "var(--bg-surface-3)",
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#C43A08] to-[#E5521A] flex items-center justify-center text-[14px] font-extrabold text-white">
+                  {initials}
+                </div>
+                <div>
+                  <div className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>
+                    {user?.full_name || "Operator"}
+                  </div>
+                  <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                    {user?.email || "operator@intelli.com"}
+                  </div>
+                  <div className="text-[9px] text-[#E5521A] font-semibold uppercase mt-0.5">
+                    {user?.role || "Admin"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Menu items */}
+            <div className="py-1.5">
+              {[
+                { icon: Settings, color: "#E5521A", label: "Settings", sub: "Account, alerts, integrations", href: "/depot/settings" },
+                { icon: User, color: "#5B9BF5", label: "Account Profile", sub: "Edit your profile details", href: "/depot/settings?tab=account" },
+                { icon: Clock, color: "#22D3A1", label: "Activity & Time Spent", sub: "Session history and usage", href: "/depot/settings?tab=activity" },
+                { icon: Shield, color: "#F5A623", label: "Security & Privacy", sub: "Password, 2FA, permissions", href: "/depot/settings?tab=security" },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.label}
+                    onClick={() => { setProfileOpen(false); router.push(item.href); }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[12px] transition-colors text-left theme-transition"
+                    style={{ color: "var(--text-muted)" }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--bg-surface-3)";
+                      (e.currentTarget as HTMLButtonElement).style.color = "var(--text-primary)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
+                      (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
+                    }}
+                  >
+                    <Icon className="w-4 h-4 flex-shrink-0" style={{ color: item.color }} />
+                    <div>
+                      <div className="font-semibold">{item.label}</div>
+                      <div className="text-[10px]" style={{ color: "var(--text-faint)" }}>{item.sub}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Logout */}
+            <div style={{ borderTop: "1px solid var(--border-default)" }} className="py-1.5">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-[12px] text-[#F04A4A] transition-colors text-left"
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "rgba(240,74,74,0.08)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent"; }}
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="font-semibold">Sign Out</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );

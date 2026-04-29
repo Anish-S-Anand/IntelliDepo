@@ -1,33 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AuthGuard from "@/components/auth/AuthGuard";
 import DepotTopBar from "@/components/depot/layout/DepotTopBar";
 import DepotSidebar from "@/components/depot/layout/DepotSidebar";
 
-export default function DepotLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DepotLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   return (
     <AuthGuard>
-      {/* Top Navigation */}
-      <DepotTopBar
-        toggleSidebar={() => setSidebarOpen((prev) => !prev)}
-      />
+      <div
+        className="min-h-screen theme-transition"
+        style={{ backgroundColor: "var(--bg-page)", color: "var(--text-primary)" }}
+      >
+        {/* Top Navigation — fixed, full width */}
+        <DepotTopBar toggleSidebar={() => setSidebarOpen((prev) => !prev)} />
 
-      {/* Sidebar */}
-      <DepotSidebar open={sidebarOpen} />
+        {/* Sidebar overlay for mobile */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-30 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
 
-      {/* Main Content */}
-      <main className="pt-[52px] md:ml-16 transition-all duration-300">
-        <div className="px-4 sm:px-6 lg:px-8 py-4">
-          {children}
-        </div>
-      </main>
+        {/* Sidebar */}
+        <DepotSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+        {/* Main Content */}
+        <main
+          className="pt-[52px] md:ml-16 min-h-screen theme-transition"
+          style={{ backgroundColor: "var(--bg-page)" }}
+        >
+          {/* Responsive padding: tight on mobile, comfortable on desktop */}
+          <div className="px-3 sm:px-4 md:px-5 lg:px-6 xl:px-8 py-3 sm:py-4">
+            {children}
+          </div>
+        </main>
+      </div>
     </AuthGuard>
   );
 }

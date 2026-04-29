@@ -82,3 +82,8 @@ email-validator>=2.1.0
 # Code Quality
 ruff>=0.8.0
 mypy>=1.13.0
+
+# Intelli Depot computer-vision
+ultralytics>=8.3.0
+opencv-python-headless>=4.10.0
+streamlit>=1.44.0

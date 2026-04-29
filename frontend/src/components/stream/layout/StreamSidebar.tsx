@@ -43,7 +43,7 @@ export default function StreamSidebar() {
     <aside className="fixed left-0 top-0 bottom-0 w-56 bg-[#1a2332] text-white flex flex-col z-40">
       {/* Brand */}
       <div className="px-5 pt-6 pb-4 border-b border-white/10">
-        <h1 className="text-lg font-bold tracking-tight">Intelli Stream</h1>
+        <h1 className="text-lg font-bold tracking-tight">IntelliStream</h1>
         <p className="text-[11px] font-semibold tracking-widest text-blue-400 uppercase mt-0.5">
           Financial Intelligence
         </p>

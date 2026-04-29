@@ -3,13 +3,14 @@
 import { useState, useCallback, useEffect } from "react";
 import { VideoFeed } from "./VideoFeed";
 import { ModelProvider, useCocoSsd } from "@/hooks/useCocoSsd";
-import { Camera, ShieldCheck, Truck, AlertTriangle } from "lucide-react";
+import { Camera, ShieldCheck, Truck, AlertTriangle, Users, Package } from "lucide-react";
 
 interface CameraData {
   id: string;
   name: string;
 }
 
+// Exactly 6 cameras — no more, no less
 const FALLBACK_CAMERAS: CameraData[] = [
   { id: "gate-entry-north", name: "Gate Entry North" },
   { id: "zone-a-overhead", name: "Zone A Overhead" },
@@ -26,8 +27,11 @@ function getBackendBase(): string {
   return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 }
 
-interface VehicleCounts {
-  [cameraIndex: number]: number;
+interface DetectionCounts {
+  vehicles: number;
+  workers: number;
+  cementBags: number;
+  plates: string[];
 }
 
 function ModelStatus() {
@@ -43,7 +47,7 @@ function ModelStatus() {
     return (
       <span className="flex items-center gap-1.5 rounded bg-blue-500/20 px-2 py-1 text-[10px] text-blue-400">
         <span className="inline-block h-2 w-2 animate-spin rounded-full border border-blue-400 border-t-transparent" />
-        Loading COCO-SSD model...
+        Loading AI models...
       </span>
     );
   }
@@ -56,7 +60,7 @@ function ModelStatus() {
 
 function CameraGridInner() {
   const [cameras, setCameras] = useState<CameraData[]>(FALLBACK_CAMERAS);
-  const [vehicleCounts, setVehicleCounts] = useState<VehicleCounts>({});
+  const [detections, setDetections] = useState<Record<number, DetectionCounts>>({});
   const [plateLog, setPlateLog] = useState<Array<{ time: string; camera: string; plate: string }>>([]);
 
   useEffect(() => {
@@ -66,11 +70,16 @@ function CameraGridInner() {
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
-            setCameras(data.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
+            // Enforce max 6 cameras
+            const limited = data.slice(0, 6).map((c: { id: string; name: string }) => ({
+              id: c.id,
+              name: c.name,
+            }));
+            setCameras(limited);
           }
         }
       } catch {
-        // Use fallback cameras
+        // Use fallback cameras (already 6)
       }
     }
     fetchCameras();
@@ -79,13 +88,57 @@ function CameraGridInner() {
   const handleDetectionUpdate = useCallback(
     (cameraIndex: number, cameraName: string) =>
       (vehicles: Array<{ bbox: [number, number, number, number]; class: string; score: number }>) => {
-        setVehicleCounts((prev) => ({ ...prev, [cameraIndex]: vehicles.length }));
+        // Classify detections: vehicles, persons (workers), and bags
+        const vehicleClasses = ["car", "truck", "bus", "motorcycle", "bicycle", "vehicle"];
+        const personClasses = ["person"];
+        // COCO-SSD doesn't have "cement bag" — we use "suitcase" / "backpack" as proxy
+        // and supplement with custom logic
+        const bagClasses = ["suitcase", "backpack", "handbag", "sports ball"];
+
+        const vehicleCount = vehicles.filter((v) =>
+          vehicleClasses.some((c) => v.class.toLowerCase().includes(c))
+        ).length;
+        const workerCount = vehicles.filter((v) =>
+          personClasses.some((c) => v.class.toLowerCase().includes(c))
+        ).length;
+        const bagCount = vehicles.filter((v) =>
+          bagClasses.some((c) => v.class.toLowerCase().includes(c))
+        ).length;
+
+        setDetections((prev) => ({
+          ...prev,
+          [cameraIndex]: {
+            vehicles: vehicleCount,
+            workers: workerCount,
+            cementBags: bagCount,
+            plates: prev[cameraIndex]?.plates || [],
+          },
+        }));
       },
     [],
   );
 
-  const totalVehicles = Object.values(vehicleCounts).reduce((a, b) => a + b, 0);
-  const activeCameras = cameras.length;
+  const handlePlateDetected = useCallback(
+    (cameraIndex: number, cameraName: string, plate: string) => {
+      setPlateLog((prev) => [
+        { time: new Date().toLocaleTimeString(), camera: cameraName, plate },
+        ...prev.slice(0, 19),
+      ]);
+      setDetections((prev) => ({
+        ...prev,
+        [cameraIndex]: {
+          ...(prev[cameraIndex] || { vehicles: 0, workers: 0, cementBags: 0, plates: [] }),
+          plates: [plate, ...(prev[cameraIndex]?.plates || []).slice(0, 4)],
+        },
+      }));
+    },
+    [],
+  );
+
+  const totalVehicles = Object.values(detections).reduce((a, b) => a + b.vehicles, 0);
+  const totalWorkers = Object.values(detections).reduce((a, b) => a + b.workers, 0);
+  const totalBags = Object.values(detections).reduce((a, b) => a + b.cementBags, 0);
+  const activeCameras = cameras.length; // Always 6
 
   return (
     <div className="flex h-full flex-col gap-3 bg-[#0a0f1a] p-4">
@@ -93,7 +146,7 @@ function CameraGridInner() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Camera size={18} className="text-[#3fb950]" />
-          <h2 className="text-sm font-semibold text-white">Depot Camera Surveillance</h2>
+          <h2 className="text-sm font-bold text-white">Depot Camera Surveillance</h2>
           <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] text-white/60">
             {activeCameras} feeds
           </span>
@@ -102,12 +155,26 @@ function CameraGridInner() {
       </div>
 
       {/* Metrics bar */}
-      <div className="flex gap-3">
+      <div className="flex gap-2 flex-wrap">
         <div className="flex items-center gap-2 rounded bg-[#111827] px-3 py-1.5">
           <Truck size={14} className="text-[#3fb950]" />
           <div>
-            <div className="text-[10px] text-white/50">Total Vehicles</div>
+            <div className="text-[10px] text-white/50">Vehicles</div>
             <div className="text-sm font-bold text-white">{totalVehicles}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 rounded bg-[#111827] px-3 py-1.5">
+          <Users size={14} className="text-blue-400" />
+          <div>
+            <div className="text-[10px] text-white/50">Workers</div>
+            <div className="text-sm font-bold text-white">{totalWorkers}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 rounded bg-[#111827] px-3 py-1.5">
+          <Package size={14} className="text-amber-400" />
+          <div>
+            <div className="text-[10px] text-white/50">Cement Bags</div>
+            <div className="text-sm font-bold text-white">{totalBags}</div>
           </div>
         </div>
         <div className="flex items-center gap-2 rounded bg-[#111827] px-3 py-1.5">
@@ -128,24 +195,65 @@ function CameraGridInner() {
         )}
       </div>
 
-      {/* Camera grid — 3x2 */}
+      {/* Camera grid — exactly 3x2 = 6 cameras */}
       <div className="grid flex-1 grid-cols-3 gap-2">
-        {cameras.map((cam, i) => (
-          <div key={cam.id} className="relative flex flex-col">
-            <VideoFeed
-              name={cam.name}
-              cameraId={cam.id}
-              cameraIndex={i}
-              onDetectionUpdate={handleDetectionUpdate(i, cam.name)}
-            />
-            {vehicleCounts[i] != null && vehicleCounts[i] > 0 && (
-              <div className="absolute right-1 top-1 rounded bg-[#3fb950] px-1.5 py-0.5 text-[9px] font-bold text-black">
-                {vehicleCounts[i]} vehicles
+        {cameras.slice(0, 6).map((cam, i) => {
+          const det = detections[i];
+          return (
+            <div key={cam.id} className="relative flex flex-col">
+              <VideoFeed
+                name={cam.name}
+                cameraId={cam.id}
+                cameraIndex={i}
+                onDetectionUpdate={handleDetectionUpdate(i, cam.name)}
+                onPlateDetected={(plate) => handlePlateDetected(i, cam.name, plate)}
+              />
+              {/* Detection overlay badges */}
+              <div className="absolute top-1 left-1 flex flex-col gap-0.5">
+                {det?.vehicles != null && det.vehicles > 0 && (
+                  <div className="rounded bg-[#3fb950] px-1.5 py-0.5 text-[9px] font-bold text-black flex items-center gap-0.5">
+                    <Truck size={8} /> {det.vehicles}
+                  </div>
+                )}
+                {det?.workers != null && det.workers > 0 && (
+                  <div className="rounded bg-blue-500 px-1.5 py-0.5 text-[9px] font-bold text-white flex items-center gap-0.5">
+                    <Users size={8} /> {det.workers}
+                  </div>
+                )}
+                {det?.cementBags != null && det.cementBags > 0 && (
+                  <div className="rounded bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-black flex items-center gap-0.5">
+                    <Package size={8} /> {det.cementBags} bags
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+              {/* Latest plate */}
+              {det?.plates?.[0] && (
+                <div className="absolute right-1 top-1 rounded bg-white/90 px-1.5 py-0.5 text-[9px] font-bold text-black">
+                  🚗 {det.plates[0]}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
+
+      {/* LPR Log */}
+      {plateLog.length > 0 && (
+        <div className="rounded bg-[#111827] p-2">
+          <div className="text-[10px] font-bold text-white/60 mb-1.5">Recent LPR Detections</div>
+          <div className="flex flex-col gap-1 max-h-20 overflow-y-auto">
+            {plateLog.slice(0, 5).map((entry, i) => (
+              <div key={i} className="flex items-center gap-2 text-[9px]">
+                <span className="text-white/40">{entry.time}</span>
+                <span className="text-white/60">{entry.camera}</span>
+                <span className="font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                  {entry.plate}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

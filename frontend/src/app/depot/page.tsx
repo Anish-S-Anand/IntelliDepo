@@ -1,22 +1,25 @@
 "use client";
-import dynamic from "next/dynamic";
 
-const LegacyDepotHtmlMount = dynamic(
-  () => import("@/components/depot/professional/LegacyDepotHtmlMount").then((m) => m.LegacyDepotHtmlMount),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-screen items-center justify-center bg-[#080d18]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#e5521a] border-t-transparent" />
-          <span className="text-xs text-[#4E6090]">Loading IntelliDepot...</span>
-        </div>
-      </div>
-    ),
-  },
-);
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
+/**
+ * /depot root redirects directly to the Operations Hub.
+ * This avoids the legacy HTML mount and goes straight to the main dashboard.
+ */
 export default function DepotPage() {
-  // key={Date.now()} would remount every render — use a stable build-time key instead
-  return <LegacyDepotHtmlMount key="legacy-depot" />;
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/depot/operations");
+  }, [router]);
+
+  return (
+    <div className="flex h-screen items-center justify-center bg-[#080d18]">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#e5521a] border-t-transparent" />
+        <span className="text-xs text-[#4E6090]">Loading IntelliDepot...</span>
+      </div>
+    </div>
+  );
 }

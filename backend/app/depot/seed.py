@@ -306,15 +306,17 @@ async def seed_database(db_url: str | None = None):
                 async with db.begin_nested():
                     for batch in BATCHES:
                         await db.execute(text("""
-                            INSERT INTO depot_inventory_batches (id, product_name, batch_number, quantity, zone, rack, bin_location, manufacturing_date, expiry_date, rule_type, status, priority_score, created_at, updated_at)
-                            VALUES (:id, :product_name, :batch_number, :quantity, :zone, :rack, :bin_location, :mfg, :exp, :rule_type, 'active', 0.0, :now, :now)
+                            INSERT INTO depot_inventory_batches (id, batch_code, sku_code, product_name, zone, rack, bin_location, quantity, original_quantity, manufacture_date, expiry_date, received_at, sequencing_rule, status, priority_score, is_near_expiry, created_at, updated_at)
+                            VALUES (:id, :batch_code, :sku_code, :product_name, :zone, :rack, :bin_location, :quantity, :quantity, :mfg, :exp, :now, :sequencing_rule, 'active', 0.0, false, :now, :now)
                             ON CONFLICT DO NOTHING
                         """), {
                             "id": new_id(), "product_name": batch["product_name"],
-                            "batch_number": batch["batch_number"], "quantity": batch["quantity"],
+                            "batch_code": batch["batch_number"],
+                            "sku_code": batch.get("sku_id", batch["batch_number"]),
+                            "quantity": batch["quantity"],
                             "zone": batch["zone"], "rack": batch["rack"], "bin_location": batch["bin_location"],
                             "mfg": batch["manufacturing_date"], "exp": batch["expiry_date"],
-                            "rule_type": batch["rule_type"], "now": now,
+                            "sequencing_rule": batch["rule_type"], "now": now,
                         })
                 logger.info(f"Seeded {len(BATCHES)} inventory batches")
             except Exception as e:
@@ -367,35 +369,42 @@ async def seed_database(db_url: str | None = None):
             logger.info(f"Seeded {len(exceptions)} IntelliOps exceptions")
 
             # ── Dashboard User (for legacy HTML auth) ──
-            from passlib.context import CryptContext
             from app.core.auth.authentication import register_user
-            pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
             for demo_user in DEMO_USERS:
-                existing = await db.execute(text("SELECT id FROM users WHERE email = :e"), {"e": demo_user["email"]})
-                if existing.scalar_one_or_none():
-                    continue
-                user = await register_user(
-                    db,
-                    demo_user["email"],
-                    demo_user["password"],
-                    demo_user["full_name"],
-                )
-                user.is_superuser = demo_user["is_superuser"]
-                user.email_verified = True
-                await db.commit()
+                try:
+                    existing = await db.execute(text("SELECT id FROM users WHERE email = :e"), {"e": demo_user["email"]})
+                    if existing.scalar_one_or_none():
+                        continue
+                    user = await register_user(
+                        db,
+                        demo_user["email"],
+                        demo_user["password"],
+                        demo_user["full_name"],
+                    )
+                    user.is_superuser = demo_user["is_superuser"]
+                    user.email_verified = True
+                    await db.commit()
+                except Exception as e:
+                    logger.warning(f"Skipped demo user {demo_user['email']}: {e}")
+                    await db.rollback()
             logger.info("Seeded frontend demo users")
-            dash_email = "dashboard@intelli.ai"
-            dash_pass = pwd_ctx.hash("DashboardOps2026!")
-            existing = await db.execute(text("SELECT id FROM users WHERE email = :e"), {"e": dash_email})
-            if not existing.scalar_one_or_none():
-                await db.execute(text("""
-                    INSERT INTO users (id, email, hashed_password, full_name, is_active, is_superuser, account_type, failed_login_attempts, mfa_enabled, email_verified, created_at, updated_at)
-                    VALUES (:id, :email, :pw, 'Dashboard Operator', true, false, 'platform_user', 0, false, true, :now, :now)
-                    ON CONFLICT DO NOTHING
-                """), {"id": new_id(), "email": dash_email, "pw": dash_pass, "now": now})
-                logger.info("Seeded dashboard user: dashboard@intelli.ai")
-            else:
-                logger.info("Dashboard user already exists")
+
+            # Dashboard operator user
+            try:
+                from passlib.context import CryptContext
+                pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+                dash_email = "dashboard@intelli.ai"
+                existing = await db.execute(text("SELECT id FROM users WHERE email = :e"), {"e": dash_email})
+                if not existing.scalar_one_or_none():
+                    dash_user = await register_user(db, dash_email, "DashboardOps2026!", "Dashboard Operator")
+                    dash_user.email_verified = True
+                    await db.commit()
+                    logger.info("Seeded dashboard user: dashboard@intelli.ai")
+                else:
+                    logger.info("Dashboard user already exists")
+            except Exception as e:
+                logger.warning(f"Skipped dashboard user: {e}")
+                await db.rollback()
 
             # ── Fleet Dock Slots ──
             dock_slots = [
