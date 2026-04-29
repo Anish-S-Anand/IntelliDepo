@@ -115,14 +115,14 @@ export function IntelliLanding() {
     };
 
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      const idleId = window.requestIdleCallback(() => startScene(), { timeout: 800 });
+      const idleId = window.requestIdleCallback(() => startScene(), { timeout: 2500 });
       return () => {
         cancelled = true;
         window.cancelIdleCallback(idleId);
       };
     }
 
-    timeoutId = setTimeout(startScene, 180);
+    timeoutId = setTimeout(startScene, 2200);
     return () => {
       cancelled = true;
       if (timeoutId) clearTimeout(timeoutId);

@@ -63,11 +63,11 @@ function configureTexture(texture: THREE.Texture, color = false) {
 function getAuthoredTextureUrls(id: string) {
   const base = `/textures/solar/${id}/${id}`;
   return {
-    albedo: [`${base}_albedo.webp`, `${base}_albedo.jpg`],
-    normal: [`${base}_normal.webp`, `${base}_normal.jpg`],
-    roughness: [`${base}_roughness.webp`, `${base}_roughness.jpg`],
-    displacement: [`${base}_displacement.webp`, `${base}_displacement.jpg`],
-    emissive: [`${base}_emissive.webp`, `${base}_emissive.jpg`],
+    albedo: [`${base}_albedo.jpg`],
+    normal: [],
+    roughness: [],
+    displacement: [],
+    emissive: [],
   };
 }
 
@@ -88,12 +88,12 @@ function loadFirstAvailableTexture(
 
 function getSunTextureUrls() {
   const base = "/textures/solar/sun/sun";
-  return [`${base}_albedo.webp`, `${base}_albedo.jpg`];
+  return [`${base}_albedo.jpg`];
 }
 
 function getRingTextureUrls(id: string) {
   const base = `/textures/solar/${id}/${id}`;
-  return [`${base}_ring.webp`, `${base}_ring.png`, `${base}_ring.jpg`, `${base}_ring.jpeg`, `${base}_ring.tif`, `${base}_ring.tiff`];
+  return [`${base}_ring.png`];
 }
 
 function makeRingTexture(_innerColor: string, _outerColor: string) {

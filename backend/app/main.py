@@ -124,7 +124,6 @@ async def lifespan(app: FastAPI):
     yield
     await engine.dispose()
 
-
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
@@ -219,3 +218,5 @@ app.include_router(scenario_router)
 from app.stream.competelens.earnings_api import router as earnings_router
 
 app.include_router(earnings_router)
+
+
