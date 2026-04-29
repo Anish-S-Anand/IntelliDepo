@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useDetection } from "@/hooks/useDetection";
 
 interface VideoFeedProps {
@@ -8,6 +8,7 @@ interface VideoFeedProps {
   cameraId: string;
   cameraIndex: number;
   onDetectionUpdate?: (vehicles: Array<{ bbox: [number, number, number, number]; class: string; score: number }>) => void;
+  onPlateDetected?: (plate: string) => void;
 }
 
 function getBackendBase(): string {
@@ -17,15 +18,48 @@ function getBackendBase(): string {
   return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 }
 
-export function VideoFeed({ name, cameraId, cameraIndex, onDetectionUpdate }: VideoFeedProps) {
+/**
+ * Simulates LPR detection by generating a plausible license plate string.
+ * In production this would call a real LPR API or Tesseract.js OCR on the vehicle ROI.
+ */
+function simulateLPR(): string {
+  const states = ["MH", "DL", "KA", "TN", "GJ", "RJ", "UP", "WB"];
+  const state = states[Math.floor(Math.random() * states.length)];
+  const num1 = String(Math.floor(Math.random() * 99) + 1).padStart(2, "0");
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const letter1 = letters[Math.floor(Math.random() * letters.length)];
+  const letter2 = letters[Math.floor(Math.random() * letters.length)];
+  const num2 = String(Math.floor(Math.random() * 9999) + 1).padStart(4, "0");
+  return `${state} ${num1} ${letter1}${letter2} ${num2}`;
+}
+
+export function VideoFeed({ name, cameraId, cameraIndex, onDetectionUpdate, onPlateDetected }: VideoFeedProps) {
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lprTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [status, setStatus] = useState<"connecting" | "live" | "error">("connecting");
 
   useDetection(sourceCanvasRef, overlayCanvasRef, cameraIndex, status === "live", onDetectionUpdate);
 
   const snapshotUrl = `${getBackendBase()}/depot/vision/cameras/${cameraId}/snapshot`;
+
+  // LPR simulation: periodically "detect" a plate when camera is live
+  const triggerLPR = useCallback(() => {
+    if (onPlateDetected && status === "live") {
+      // Only trigger occasionally (simulate real detection rate)
+      if (Math.random() < 0.15) {
+        onPlateDetected(simulateLPR());
+      }
+    }
+  }, [onPlateDetected, status]);
+
+  useEffect(() => {
+    lprTimerRef.current = setInterval(triggerLPR, 5000);
+    return () => {
+      if (lprTimerRef.current) clearInterval(lprTimerRef.current);
+    };
+  }, [triggerLPR]);
 
   useEffect(() => {
     const canvas = sourceCanvasRef.current;
@@ -94,10 +128,7 @@ export function VideoFeed({ name, cameraId, cameraIndex, onDetectionUpdate }: Vi
     <div className="relative h-[180px] overflow-hidden rounded-md bg-black">
       <canvas
         ref={sourceCanvasRef}
-        style={{
-          width: "100%",
-          height: "100%",
-        }}
+        style={{ width: "100%", height: "100%" }}
       />
       <canvas
         ref={overlayCanvasRef}
@@ -112,7 +143,7 @@ export function VideoFeed({ name, cameraId, cameraIndex, onDetectionUpdate }: Vi
       />
       {/* Camera label */}
       <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-2 pb-1.5 pt-4">
-        <span className="text-[10px] font-semibold text-white/90 drop-shadow">{name}</span>
+        <span className="text-[10px] font-bold text-white/90 drop-shadow">{name}</span>
         <span className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold text-white ${statusColor}`}>
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
           {statusText}

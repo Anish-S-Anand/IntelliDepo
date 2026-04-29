@@ -20,7 +20,7 @@ import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import Column, String, Boolean, DateTime, Integer
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, select
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -604,15 +604,35 @@ async def get_latest_frame(camera_id: uuid.UUID, db: AsyncSession = Depends(get_
 
 
 @router.get("/{camera_id}/snapshot")
-async def get_camera_snapshot(camera_id: uuid.UUID, theme: str = "light", db: AsyncSession = Depends(get_db)):
+@router.get("/{camera_id}/snapshot")
+async def get_camera_snapshot(camera_id: str, theme: str = "light", db: AsyncSession = Depends(get_db)):
     """
     Capture a single frame and return it as a JPEG image.
+    Accepts both UUID and slug-style camera IDs (e.g. 'gate-entry-north').
     """
-    camera = await db.get(Camera, camera_id)
+    # Try UUID lookup first
+    camera = None
+    try:
+        cam_uuid = uuid.UUID(camera_id)
+        camera = await db.get(Camera, cam_uuid)
+    except (ValueError, AttributeError):
+        pass
+
+    # Fallback: slug-to-name lookup (e.g. 'gate-entry-north' → 'Gate Entry North')
+    if camera is None:
+        slug_name = camera_id.replace("-", " ").title()
+        result = await db.execute(
+            select(Camera).where(Camera.name.ilike(f"%{slug_name}%"), Camera.is_active == True)
+        )
+        camera = result.scalar_one_or_none()
+
     if not camera:
         raise HTTPException(status_code=404, detail="Camera not found")
-    if camera.status != CameraStatus.ACTIVE:
-        raise HTTPException(status_code=409, detail=f"Camera is not active (status={camera.status})")
+
+    # Auto-connect if not active
+    cam_key = str(camera.id)
+    if cam_key not in _active_streams:
+        await stream_connect(cam_key, camera.stream_url, camera.zone or "")
 
     # For local: videos, read a frame from a dedicated capture
     loop = asyncio.get_running_loop()
@@ -632,10 +652,7 @@ async def get_camera_snapshot(camera_id: uuid.UUID, theme: str = "light", db: As
             frame = await loop.run_in_executor(_cv_pool, _read_one_frame, vpath)
 
     if frame is None:
-        # Fallback to shared stream
-        if str(camera_id) not in _active_streams:
-            await stream_connect(str(camera_id), camera.stream_url)
-        frame = await stream_read_frame(str(camera_id), theme=theme)
+        frame = await stream_read_frame(cam_key, theme=theme)
 
     if frame is None:
         raise HTTPException(status_code=503, detail="Stream not connected")

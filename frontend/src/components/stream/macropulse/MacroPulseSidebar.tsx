@@ -90,7 +90,7 @@ export default function MacroPulseSidebar() {
             <HeartPulse className="h-6 w-6 text-cyan-100" />
           </div>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-cyan-300/80">Intelli Stream</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-cyan-300/80">IntelliStream</p>
             <h1 className="text-lg font-bold tracking-tight text-white">Macro Pulse</h1>
           </div>
         </div>
