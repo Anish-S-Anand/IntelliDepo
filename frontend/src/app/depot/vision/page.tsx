@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import LiveFeedViewer from "@/components/depot/operations/LiveFeedViewer";
+import CameraGrid from "@/components/depot/cameras/CameraGrid";
 import AlertPanel from "@/components/depot/operations/AlertPanel";
 import { AlertTriangle, BarChart3 } from "lucide-react";
 
@@ -12,7 +12,7 @@ export default function VisionRoute() {
 
   return (
     <>
-      <LiveFeedViewer />
+      <CameraGrid />
 
       {/* Floating buttons */}
       <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-2">

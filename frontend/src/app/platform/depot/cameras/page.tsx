@@ -1,1 +1,5 @@
-export { default } from "@/app/depot/cameras/page";
+import { redirect } from "next/navigation";
+
+export default function PlatformDepotCamerasPage() {
+  redirect("/platform/depot/vision");
+}

@@ -150,9 +150,23 @@ async def seed_database(db_url: str | None = None):
                 cid = new_id()
                 camera_ids.append(cid)
                 await db.execute(text("""
+                    UPDATE depot_cameras
+                    SET stream_url = :stream_url,
+                        protocol = 'rtsp',
+                        zone = :zone,
+                        status = 'active',
+                        is_active = true,
+                        frame_rate = :frame_rate,
+                        resolution = :resolution,
+                        updated_at = :now
+                    WHERE name = :name
+                """), {**cam, "now": now})
+                await db.execute(text("""
                     INSERT INTO depot_cameras (id, name, stream_url, protocol, zone, status, is_active, frame_rate, resolution, created_at, updated_at)
-                    VALUES (:id, :name, :stream_url, 'rtsp', :zone, 'active', true, :frame_rate, :resolution, :now, :now)
-                    ON CONFLICT DO NOTHING
+                    SELECT :id, CAST(:name AS VARCHAR), :stream_url, 'rtsp', :zone, 'active', true, :frame_rate, :resolution, :now, :now
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM depot_cameras WHERE name = CAST(:name AS VARCHAR)
+                    )
                 """), {**cam, "id": cid, "now": now})
             logger.info(f"Seeded {len(CAMERAS)} cameras")
 

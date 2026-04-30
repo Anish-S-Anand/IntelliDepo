@@ -8,16 +8,18 @@ import { Camera, ShieldCheck, Truck, AlertTriangle, Users, Package } from "lucid
 interface CameraData {
   id: string;
   name: string;
+  stream_url?: string;
+  videoFile?: string;
 }
 
 // Exactly 6 cameras — no more, no less
 const FALLBACK_CAMERAS: CameraData[] = [
-  { id: "gate-entry-north", name: "Gate Entry North" },
-  { id: "zone-a-overhead", name: "Zone A Overhead" },
-  { id: "loading-bay-1-4", name: "Loading Bay 1-4" },
-  { id: "zone-c-perimeter", name: "Zone C Perimeter" },
-  { id: "gate-exit-south", name: "Gate Exit South" },
-  { id: "yard-overview", name: "Yard Overview" },
+  { id: "gate-entry-north", name: "Gate Entry North", videoFile: "dtranshipment 1 (2).mp4" },
+  { id: "zone-a-overhead", name: "Zone A Overhead", videoFile: "cluster 13 (1).mp4" },
+  { id: "loading-bay-1-4", name: "Loading Bay 1-4", videoFile: "cluster 4-5 (1).mp4" },
+  { id: "zone-c-perimeter", name: "Zone C Perimeter", videoFile: "Recording 2025-07-30 115417.mp4" },
+  { id: "gate-exit-south", name: "Gate Exit South", videoFile: "Recording 2025-08-11 171805.mp4" },
+  { id: "yard-overview", name: "Yard Overview", videoFile: "Screen Recording 2025-08-11 174929.mp4" },
 ];
 
 function getBackendBase(): string {
@@ -70,10 +72,18 @@ function CameraGridInner() {
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
+            const usable = data.filter((c: { stream_url?: string }) =>
+              c.stream_url?.startsWith("local:")
+            );
+            if (usable.length === 0) {
+              return;
+            }
             // Enforce max 6 cameras
-            const limited = data.slice(0, 6).map((c: { id: string; name: string }) => ({
+            const limited = usable.slice(0, 6).map((c: { id: string; name: string; stream_url?: string }) => ({
               id: c.id,
               name: c.name,
+              stream_url: c.stream_url,
+              videoFile: c.stream_url?.replace(/^local:/, ""),
             }));
             setCameras(limited);
           }
@@ -204,6 +214,7 @@ function CameraGridInner() {
               <VideoFeed
                 name={cam.name}
                 cameraId={cam.id}
+                videoFile={cam.videoFile}
                 cameraIndex={i}
                 onDetectionUpdate={handleDetectionUpdate(i, cam.name)}
                 onPlateDetected={(plate) => handlePlateDetected(i, cam.name, plate)}

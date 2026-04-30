@@ -168,7 +168,7 @@ export default function CommandPage() {
                     <div className="w-1 h-[34px] rounded flex-shrink-0" style={{ background: col }} />
                     <div>
                       <div className="text-[11px] font-semibold text-[#E8EDF8]">{i.title}</div>
-                      <div className="text-[10px] text-[#8A9BBF]">{i.zone || i.assigned_to || "—"}</div>
+                      <div className="text-[10px] text-[#8A9BBF]">{i.zone_id || i.escalated_to || "—"}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

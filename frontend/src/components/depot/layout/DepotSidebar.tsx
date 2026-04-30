@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   Package,
   Eye,
-  Camera,
   AlertTriangle,
   Radio,
   Hash,
@@ -31,7 +30,6 @@ const NAV_ITEMS = [
   { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
   { label: "SEQ", fullLabel: "Sequencing", href: "/depot/sequencing", icon: Layers },
   { label: "GTE", fullLabel: "Gate & LPR", href: "/depot/gate", icon: Shield },
-  { label: "CAM", fullLabel: "Cameras", href: "/depot/cameras", icon: Camera },
   { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle },
 ];
 
@@ -45,7 +43,7 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
 
   const warehouseManagerNavItems = [
     { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard },
-    { label: "CAM", fullLabel: "Cameras", href: "/depot/cameras", icon: Camera },
+    { label: "VIS", fullLabel: "Vision AI", href: "/depot/vision", icon: Eye },
     { label: "GTE", fullLabel: "Gate & LPR", href: "/depot/gate", icon: Shield },
     { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle },
     { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package },
@@ -54,7 +52,7 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
 
   const regionalManagerNavItems = [
     { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard },
-    { label: "CAM", fullLabel: "Cameras", href: "/depot/cameras", icon: Camera },
+    { label: "VIS", fullLabel: "Vision AI", href: "/depot/vision", icon: Eye },
     { label: "CMD", fullLabel: "Command", href: "/depot/command", icon: Radio },
     { label: "GTE", fullLabel: "Gate & LPR", href: "/depot/gate", icon: Shield },
     { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle },
@@ -96,7 +94,7 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
 
   return (
     <aside
-      className={`depot-sidebar fixed md:static left-0 top-[52px] bottom-0 w-16 flex flex-col items-center py-3 gap-1 z-40 transition-all duration-300 ${
+      className={`depot-sidebar fixed left-0 top-[52px] bottom-0 w-16 flex flex-col items-center py-3 gap-1 z-40 transition-all duration-300 ${
         open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       }`}
       style={{

@@ -6,6 +6,7 @@ import { useDetection } from "@/hooks/useDetection";
 interface VideoFeedProps {
   name: string;
   cameraId: string;
+  videoFile?: string;
   cameraIndex: number;
   onDetectionUpdate?: (vehicles: Array<{ bbox: [number, number, number, number]; class: string; score: number }>) => void;
   onPlateDetected?: (plate: string) => void;
@@ -33,7 +34,7 @@ function simulateLPR(): string {
   return `${state} ${num1} ${letter1}${letter2} ${num2}`;
 }
 
-export function VideoFeed({ name, cameraId, cameraIndex, onDetectionUpdate, onPlateDetected }: VideoFeedProps) {
+export function VideoFeed({ name, cameraId, videoFile, cameraIndex, onDetectionUpdate, onPlateDetected }: VideoFeedProps) {
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,7 +43,12 @@ export function VideoFeed({ name, cameraId, cameraIndex, onDetectionUpdate, onPl
 
   useDetection(sourceCanvasRef, overlayCanvasRef, cameraIndex, status === "live", onDetectionUpdate);
 
-  const snapshotUrl = `${getBackendBase()}/depot/vision/cameras/${cameraId}/snapshot`;
+  const snapshotUrl = videoFile
+    ? `/backend/depot/vision/cameras/video-library/${encodeURIComponent(videoFile)}/snapshot`
+    : `${getBackendBase()}/depot/vision/cameras/${cameraId}/snapshot`;
+  const streamUrl = videoFile
+    ? `/backend/depot/vision/cameras/video-library/${encodeURIComponent(videoFile)}/mjpeg?theme=dark`
+    : null;
 
   // LPR simulation: periodically "detect" a plate when camera is live
   const triggerLPR = useCallback(() => {
@@ -126,9 +132,18 @@ export function VideoFeed({ name, cameraId, cameraIndex, onDetectionUpdate, onPl
 
   return (
     <div className="relative h-[180px] overflow-hidden rounded-md bg-black">
+      {streamUrl && (
+        <img
+          src={streamUrl}
+          alt={`${name} live feed`}
+          className="absolute inset-0 h-full w-full object-cover"
+          onLoad={() => setStatus("live")}
+          onError={() => setStatus("error")}
+        />
+      )}
       <canvas
         ref={sourceCanvasRef}
-        style={{ width: "100%", height: "100%" }}
+        style={{ width: "100%", height: "100%", opacity: streamUrl ? 0 : 1 }}
       />
       <canvas
         ref={overlayCanvasRef}

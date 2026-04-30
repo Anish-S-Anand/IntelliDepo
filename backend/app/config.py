@@ -83,6 +83,7 @@ class Settings(BaseSettings):
 
     # Product modules
     ENABLE_DEPOT_MODULES: bool = True
+    ENABLE_STREAM_MODULES: bool = False
 
     # Agent Confidence & Fallback
     CONFIDENCE_DEFAULT_THRESHOLD: float = 0.7

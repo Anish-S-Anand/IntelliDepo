@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import {
-  Camera,
   BarChart3,
   Zap,
   RefreshCw,
@@ -32,7 +31,7 @@ interface DepotModule {
 
 const WAREHOUSE_MANAGER_MODULE_TITLES = new Set([
   "Dashboard",
-  "Cameras",
+  "Vision",
   "Analytics",
   "Gate",
   "Perimeter",
@@ -44,7 +43,7 @@ const WAREHOUSE_MANAGER_MODULE_TITLES = new Set([
 
 const REGIONAL_MANAGER_MODULE_TITLES = new Set([
   "Dashboard",
-  "Cameras",
+  "Vision",
   "Command",
   "Analytics",
   "Gate",
@@ -61,12 +60,6 @@ const modules: DepotModule[] = [
     description: "Live operational overview and key metrics",
     icon: BarChart3,
     href: "/platform/depot/dashboard",
-  },
-  {
-    title: "Cameras",
-    description: "Real-time video feeds and monitoring",
-    icon: Camera,
-    href: "/platform/depot/cameras",
   },
   {
     title: "Analytics",

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import {
-  LayoutDashboard, Camera, Radio, Hash, Map, Eye, Shield, AlertTriangle,
+  LayoutDashboard, Radio, Hash, Map, Eye, Shield, AlertTriangle,
   Package, Sliders, Layers, ArrowUpRight, Building2,
 } from "lucide-react";
 
@@ -14,13 +14,6 @@ const MODULES = [
     href: "/depot/operations",
     color: "#E5521A",
     badge: "LIVE",
-  },
-  {
-    name: "Cameras",
-    description: "Real-time video feeds with AI detection — vehicles, workers, cement bags, and license plate recognition.",
-    icon: Camera,
-    href: "/depot/cameras",
-    color: "#3B82F6",
   },
   {
     name: "Command",
@@ -161,7 +154,7 @@ export default function DepotApplicationsPage() {
         <div className="flex flex-wrap gap-2">
           {[
             { label: "Operations Hub", href: "/depot/operations" },
-            { label: "Live Cameras", href: "/depot/cameras" },
+            { label: "Live Vision", href: "/depot/vision" },
             { label: "Incidents", href: "/depot/incidents" },
             { label: "Inventory", href: "/depot/inventory" },
             { label: "Gate & LPR", href: "/depot/gate" },

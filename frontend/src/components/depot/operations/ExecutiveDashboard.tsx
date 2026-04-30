@@ -24,6 +24,7 @@ import { getAllActiveAlerts, type UnifiedAlert } from "@/services/depotVision";
 import { getActiveBreaches, getIncidents, getPerimeterZones, type IncidentResponse } from "@/services/depotPerimeter";
 import { getCapacityStatus, type CapacityStatusEntry } from "@/services/depotCluster";
 import { getCountSessions, getManifests, type CountSessionResponse, type ManifestResponse } from "@/services/depotCounting";
+import { getAccessLogs, type AccessLogResponse } from "@/services/depotGate";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -50,6 +51,7 @@ export default function ExecutiveDashboard() {
   const [perimeterZones, setPerimeterZones] = useState(0);
   const [countSessions, setCountSessions] = useState<CountSessionResponse[]>([]);
   const [manifests, setManifests] = useState<ManifestResponse[]>([]);
+  const [accessLogs, setAccessLogs] = useState<AccessLogResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
@@ -62,6 +64,7 @@ export default function ExecutiveDashboard() {
       getPerimeterZones(),
       getCountSessions(),
       getManifests(),
+      getAccessLogs({ limit: 100 }),
     ]);
     if (results[0].status === "fulfilled") setVisionAlerts(results[0].value);
     if (results[1].status === "fulfilled") setActiveBreaches(results[1].value.length);
@@ -70,6 +73,7 @@ export default function ExecutiveDashboard() {
     if (results[4].status === "fulfilled") setPerimeterZones(results[4].value.length);
     if (results[5].status === "fulfilled") setCountSessions(results[5].value);
     if (results[6].status === "fulfilled") setManifests(results[6].value);
+    if (results[7].status === "fulfilled") setAccessLogs(results[7].value);
     setLoading(false);
   }, []);
 
@@ -95,6 +99,8 @@ export default function ExecutiveDashboard() {
   const totalExpected = manifests.reduce((s, m) => s + (m.total_expected ?? 0), 0);
   const countAccuracy = totalExpected > 0 ? ((totalCounted / totalExpected) * 100).toFixed(1) : "—";
   const mismatches = countSessions.filter((c) => c.reconciliation_status === "mismatch").length;
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const gateEventsToday = accessLogs.filter((log) => log.processed_at.startsWith(todayKey)).length || accessLogs.length;
 
   // Module status
   const modules: ModuleStatus[] = [
@@ -102,7 +108,7 @@ export default function ExecutiveDashboard() {
     { name: "Automated Counting", icon: Hash, status: "operational", metric: `${countAccuracy}% acc`, detail: `${countSessions.length} sessions today`, color: "#22D3A1" },
     { name: "Cluster Mapping", icon: Map, status: zonesExceedingWarning > 0 ? "degraded" : "operational", metric: `${avgCapacity}% avg`, detail: `${zonesExceedingWarning} zones over threshold`, color: zonesExceedingWarning > 0 ? "#F5A623" : "#22D3A1" },
     { name: "Inventory Sequencing", icon: Layers, status: "operational", metric: "96.4% FIFO", detail: "Rules enforced", color: "#22D3A1" },
-    { name: "Gate & LPR", icon: Shield, status: "operational", metric: `${depot.trucks} trucks`, detail: "OCR active", color: "#22D3A1" },
+    { name: "Gate & LPR", icon: Shield, status: "operational", metric: `${gateEventsToday} events`, detail: "OCR active", color: "#22D3A1" },
     { name: "Perimeter Security", icon: ShieldAlert, status: activeBreaches > 0 ? "degraded" : "operational", metric: `${perimeterZones} zones`, detail: `${activeBreaches} active breaches`, color: activeBreaches > 0 ? "#F04A4A" : "#22D3A1" },
   ];
 
@@ -139,7 +145,7 @@ export default function ExecutiveDashboard() {
           { label: "Active Alerts", value: String(totalAlerts), trend: `${visionAlerts.length} vision · ${activeBreaches} perimeter`, icon: AlertTriangle, color: totalAlerts > 0 ? "#F5A623" : "#22D3A1" },
           { label: "Open Incidents", value: String(openIncidents), trend: `${criticalIncidents} critical`, icon: ShieldAlert, color: openIncidents > 0 ? "#F04A4A" : "#22D3A1" },
           { label: "Depot Occupancy", value: `${avgCapacity}%`, trend: `${zonesExceedingWarning} zones at risk`, icon: Package, color: avgCapacity > 90 ? "#F04A4A" : avgCapacity > 80 ? "#F5A623" : "#22D3A1" },
-          { label: "Gate Events", value: `${depot.trucks}`, trend: "Active trucks today", icon: Truck, color: "#5B9BF5" },
+          { label: "Gate Events", value: String(gateEventsToday), trend: "LPR scans today", icon: Truck, color: "#5B9BF5" },
           { label: "Resolved Today", value: String(resolvedIncidents), trend: `${resolvedIncidents} incidents closed`, icon: CheckCircle2, color: "#22D3A1" },
         ].map((kpi) => {
           const Icon = kpi.icon;

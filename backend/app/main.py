@@ -66,16 +66,18 @@ async def lifespan(app: FastAPI):
 
     async with async_session() as db:
         await seed_default_roles(db)
-    # Seed stream sample data (STR-API-1)
-    from app.stream.data.service import StreamDataService
-    async with async_session() as db:
-        await StreamDataService(db).seed_if_empty()
+    if settings.ENABLE_STREAM_MODULES:
+        # Seed stream sample data (STR-API-1)
+        from app.stream.data.service import StreamDataService
+        async with async_session() as db:
+            await StreamDataService(db).seed_if_empty()
     # Initialize vector store (DATA-5.2)
     from app.core.data_infra.vector_db import init_vector_store
     await init_vector_store()
     # Seed MacroPulse market docs index (Day 1 — Pranisree)
-    from app.stream.macropulse.vector_setup import validate_and_seed_index
-    await validate_and_seed_index()
+    if settings.ENABLE_STREAM_MODULES:
+        from app.stream.macropulse.vector_setup import validate_and_seed_index
+        await validate_and_seed_index()
     # Seed Depot demo data (cameras, gates, vehicles, zones, etc.) if tables are empty
     if settings.ENABLE_DEPOT_MODULES:
         try:
@@ -209,17 +211,18 @@ from app.core.data_infra.storage_router import router as storage_router
 
 app.include_router(vector_router)
 app.include_router(storage_router)
-app.include_router(stream_data_router)
-app.include_router(macropulse_router)
-app.include_router(tenant_router, prefix="/api")
-app.include_router(alerts_router, prefix="/api")
-app.include_router(hitl_router, prefix="/api")
-app.include_router(guardrails_router, prefix="/api")
-app.include_router(dashboard_router, prefix="/api")
-app.include_router(scenario_router)
+if settings.ENABLE_STREAM_MODULES:
+    app.include_router(stream_data_router)
+    app.include_router(macropulse_router)
+    app.include_router(tenant_router, prefix="/api")
+    app.include_router(alerts_router, prefix="/api")
+    app.include_router(hitl_router, prefix="/api")
+    app.include_router(guardrails_router, prefix="/api")
+    app.include_router(dashboard_router, prefix="/api")
+    app.include_router(scenario_router)
 
-from app.stream.competelens.earnings_api import router as earnings_router
+    from app.stream.competelens.earnings_api import router as earnings_router
 
-app.include_router(earnings_router)
+    app.include_router(earnings_router)
 
 

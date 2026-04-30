@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import BaseModel as DBBaseModel, get_db
 
 logger = logging.getLogger("intelli.depot.vision")
-ALLOW_SIMULATED_CAMERA = os.getenv("ALLOW_SIMULATED_CAMERA", "false").lower() in {"1", "true", "yes"}
+ALLOW_SIMULATED_CAMERA = os.getenv("ALLOW_SIMULATED_CAMERA", "true").lower() in {"1", "true", "yes"}
 
 router = APIRouter(prefix="/depot/vision/cameras", tags=["Depot - Camera Feed"])
 
@@ -624,7 +624,10 @@ async def get_camera_snapshot(camera_id: str, theme: str = "light", db: AsyncSes
         result = await db.execute(
             select(Camera).where(Camera.name.ilike(f"%{slug_name}%"), Camera.is_active == True)
         )
-        camera = result.scalar_one_or_none()
+        candidates = result.scalars().all()
+        camera = next((cam for cam in candidates if cam.stream_url.startswith("local:")), None)
+        if camera is None:
+            camera = next(iter(candidates), None)
 
     if not camera:
         raise HTTPException(status_code=404, detail="Camera not found")
