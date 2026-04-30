@@ -74,54 +74,26 @@ export async function getMacroPulseDashboard(tenantId: string): Promise<MacroPul
 }
 
 export async function getTenantProfile(tenantId: string): Promise<TenantProfile> {
-  const response = await fetch(`${BASE_API}/tenant/profile/${tenantId}`, {
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    const detail = await response.json().catch(() => null);
-    throw Object.assign(new Error(detail?.detail ?? "Unable to load tenant profile."), {
-      response: { status: response.status },
-    });
-  }
-
-  return (await response.json()) as TenantProfile;
+  const { data } = await api.get<TenantProfile>(`${BASE_API}/tenant/profile/${tenantId}`);
+  return data;
 }
 
 export async function upsertTenantProfile(profile: TenantProfile): Promise<TenantProfile> {
-  const response = await fetch(`${BASE_API}/tenant/profile`, {
-    method: "POST",
+  const { data } = await api.post<TenantProfile>(`${BASE_API}/tenant/profile`, profile, {
     headers: {
-      "Content-Type": "application/json",
       "X-Write-Region": profile.primary_region === "IN" ? "IN" : "UAE",
     },
-    body: JSON.stringify(profile),
   });
-
-  if (!response.ok) {
-    const detail = await response.json().catch(() => null);
-    throw new Error(detail?.detail ?? "Unable to save tenant profile.");
-  }
-
-  return (await response.json()) as TenantProfile;
+  return data;
 }
 
 export async function updateTenantProfile(profile: TenantProfile): Promise<TenantProfile> {
-  const response = await fetch(`${BASE_API}/tenant/profile/${profile.tenant_id}`, {
-    method: "PUT",
+  const { data } = await api.put<TenantProfile>(`${BASE_API}/tenant/profile/${profile.tenant_id}`, profile, {
     headers: {
-      "Content-Type": "application/json",
       "X-Write-Region": profile.primary_region === "IN" ? "IN" : "UAE",
     },
-    body: JSON.stringify(profile),
   });
-
-  if (!response.ok) {
-    const detail = await response.json().catch(() => null);
-    throw new Error(detail?.detail ?? "Unable to update tenant profile.");
-  }
-
-  return (await response.json()) as TenantProfile;
+  return data;
 }
 
 export async function ensureTenantProfile(tenantId: string): Promise<TenantProfile> {
@@ -137,16 +109,8 @@ export async function ensureTenantProfile(tenantId: string): Promise<TenantProfi
 }
 
 export async function getSensitivity(tenantId: string): Promise<SensitivityResponse> {
-  const response = await fetch(`${BASE_API}/tenant/profile/${tenantId}/sensitivity`, {
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    const detail = await response.json().catch(() => null);
-    throw new Error(detail?.detail ?? "Unable to load sensitivity matrix.");
-  }
-
-  return (await response.json()) as SensitivityResponse;
+  const { data } = await api.get<SensitivityResponse>(`${BASE_API}/tenant/profile/${tenantId}/sensitivity`);
+  return data;
 }
 
 export async function getHitlPending(tenantId?: string): Promise<HITLPendingAlert[]> {

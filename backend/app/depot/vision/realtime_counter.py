@@ -197,13 +197,16 @@ def _default_yolo_weights() -> str:
     if env_weights:
         return env_weights
 
-    candidates = [
-        r"C:\Users\DELL\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\INTELLI\DEPOT\JSW Design\videos\best_cement_bags_2025-05-29.pt",
-        r"C:\Users\karte\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\intelli-platform\best_cement_bags_2025-05-29.pt",
-    ]
-    for candidate in candidates:
-        if Path(candidate).exists():
-            return candidate
+    # Check for custom depot weights trained via the training pipeline
+    custom_weights = Path(__file__).resolve().parent / "training_data" / "weights" / "depot_best.pt"
+    if custom_weights.exists():
+        return str(custom_weights)
+
+    # Fall back to bundled yolov8n.pt at repo root
+    bundled = Path(__file__).resolve().parents[3] / "yolov8n.pt"
+    if bundled.exists():
+        return str(bundled)
+
     return "yolov8n.pt"
 
 

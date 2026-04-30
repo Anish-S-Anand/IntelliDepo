@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Radar, Shield, AlertTriangle, MapPin } from "lucide-react";
-import { INCIDENTS as MOCK_INCIDENTS, SEV_COL, STA_COL } from "@/lib/depot-data";
+import { SEV_COL, STA_COL } from "@/lib/depot-data";
 import type { Incident } from "@/lib/depot-data";
 import {
   getIncidents,
@@ -44,25 +44,20 @@ function mapBackendIncident(inc: IncidentResponse): Incident {
 }
 
 export default function IncidentsPage() {
-  const [incidents, setIncidents] = useState<Incident[]>(MOCK_INCIDENTS);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [breaches, setBreaches] = useState<BreachResponse[]>([]);
   const [filter, setFilter] = useState<FilterType>("all");
   const [viewTab, setViewTab] = useState<ViewTab>("incidents");
   const [resolveModalId, setResolveModalId] = useState<string | null>(null);
   const [resolveNotes, setResolveNotes] = useState("");
 
-  // Fetch real incidents from backend and merge with mock data
+  // Fetch real incidents from backend
   const fetchIncidents = useCallback(async () => {
     try {
       const backendIncidents = await getIncidents();
-      const mapped = backendIncidents.map(mapBackendIncident);
-      // Merge: backend incidents first, then mock data for non-overlapping IDs
-      const backendIds = new Set(mapped.map((i) => i.id));
-      const merged = [...mapped, ...MOCK_INCIDENTS.filter((m) => !backendIds.has(m.id))];
-      setIncidents(merged);
+      setIncidents(backendIncidents.map(mapBackendIncident));
     } catch {
-      // Fallback to mock data
-      setIncidents(MOCK_INCIDENTS);
+      // Keep empty — don't pad with stale mock data
     }
   }, []);
 

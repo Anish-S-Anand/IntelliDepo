@@ -107,17 +107,17 @@ export interface ScorecardSummary {
 }
 
 export async function getSLAs(): Promise<SLADefinition[]> {
-  const { data } = await api.get("/sla");
+  const { data } = await api.get("/macropulse/sla");
   return data;
 }
 
 export async function getBreachPrediction(slaId: string): Promise<BreachPrediction> {
-  const { data } = await api.get(`/sla/${slaId}/breach-prediction`);
+  const { data } = await api.get(`/macropulse/sla/${slaId}/breach-prediction`);
   return data;
 }
 
 export async function getAtRiskSLAs(): Promise<BreachPrediction[]> {
-  const { data } = await api.get("/sla/breach-predictions/at-risk");
+  const { data } = await api.get("/macropulse/sla/breach-predictions/at-risk");
   return data;
 }
 

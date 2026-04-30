@@ -4,16 +4,36 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Bell, RefreshCw, Settings, User, Clock, LogOut, ChevronDown, Shield } from "lucide-react";
-import { DEPOTS } from "@/lib/depot-data";
 import { useAuthStore } from "@/stores/authStore";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { getAllActiveAlerts } from "@/services/depotVision";
+import { getPerimeterAlertCount } from "@/services/depotPerimeter";
 
 export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => void }) {
   const router = useRouter();
   const { user, logout } = useAuthStore();
-  const [depot, setDepot] = useState("MUM-001");
   const [profileOpen, setProfileOpen] = useState(false);
+  const [alertCount, setAlertCount] = useState(0);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  // Fetch live alert count for the bell badge
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const [vision, perimeter] = await Promise.allSettled([
+          getAllActiveAlerts(),
+          getPerimeterAlertCount(),
+        ]);
+        let total = 0;
+        if (vision.status === "fulfilled") total += vision.value.length;
+        if (perimeter.status === "fulfilled") total += perimeter.value;
+        setAlertCount(total);
+      } catch { /* silent */ }
+    };
+    void fetchAlerts();
+    const interval = setInterval(() => void fetchAlerts(), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -87,24 +107,17 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
         style={{ backgroundColor: "var(--border-default)" }}
       />
 
-      {/* Depot selector */}
-      <select
-        value={depot}
-        onChange={(e) => setDepot(e.target.value)}
-        className="depot-select px-2 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-semibold cursor-pointer outline-none theme-transition"
+      {/* Depot label — shows "IntelliDepot" since we're single-depot */}
+      <div
+        className="hidden sm:flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-semibold theme-transition"
         style={{
           backgroundColor: "var(--bg-input)",
           border: "1px solid var(--border-input)",
           color: "var(--text-input)",
         }}
-        aria-label="Select depot"
       >
-        {DEPOTS.map((d) => (
-          <option key={d.id} value={d.id}>
-            📍 {d.name}
-          </option>
-        ))}
-      </select>
+        📍 IntelliDepot
+      </div>
 
       <div className="flex-1" />
 
@@ -158,9 +171,11 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
         aria-label="View alerts"
       >
         <Bell className="w-3.5 h-3.5" />
-        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#F04A4A] text-white text-[8px] font-extrabold flex items-center justify-center">
-          3
-        </span>
+        {alertCount > 0 && (
+          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#F04A4A] text-white text-[8px] font-extrabold flex items-center justify-center">
+            {alertCount > 9 ? "9+" : alertCount}
+          </span>
+        )}
       </button>
 
       {/* Profile dropdown */}

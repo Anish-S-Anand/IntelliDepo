@@ -102,7 +102,10 @@ async def lifespan(app: FastAPI):
                 except Exception as ce:
                     _cam_log.warning(f"  ✗ {cam.name}: {ce}")
 
-            await _asyncio.gather(*[_reconnect_one(c) for c in cams])
+            # Run camera reconnects in the background — don't block startup
+            async def _reconnect_all():
+                await _asyncio.gather(*[_reconnect_one(c) for c in cams])
+            _asyncio.create_task(_reconnect_all())
         except Exception as e:
             logging.getLogger("intelli.depot.vision").warning(f"Camera auto-reconnect skipped: {e}")
         # Log available local depot videos

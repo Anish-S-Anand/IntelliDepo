@@ -19,10 +19,11 @@ import {
   Zap,
   Clock,
 } from "lucide-react";
-import { DEPOTS, THROUGHPUT, DAYS, COUNTING_SESSIONS } from "@/lib/depot-data";
+import { THROUGHPUT, DAYS } from "@/lib/depot-data";
 import { getAllActiveAlerts, type UnifiedAlert } from "@/services/depotVision";
 import { getActiveBreaches, getIncidents, getPerimeterZones, type IncidentResponse } from "@/services/depotPerimeter";
 import { getCapacityStatus, type CapacityStatusEntry } from "@/services/depotCluster";
+import { getCountSessions, getManifests, type CountSessionResponse, type ManifestResponse } from "@/services/depotCounting";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,12 +43,13 @@ interface ModuleStatus {
 // ---------------------------------------------------------------------------
 
 export default function ExecutiveDashboard() {
-  const depot = DEPOTS[0];
   const [visionAlerts, setVisionAlerts] = useState<UnifiedAlert[]>([]);
   const [activeBreaches, setActiveBreaches] = useState(0);
   const [incidents, setIncidents] = useState<IncidentResponse[]>([]);
   const [capacityStatus, setCapacityStatus] = useState<CapacityStatusEntry[]>([]);
   const [perimeterZones, setPerimeterZones] = useState(0);
+  const [countSessions, setCountSessions] = useState<CountSessionResponse[]>([]);
+  const [manifests, setManifests] = useState<ManifestResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
@@ -58,12 +60,16 @@ export default function ExecutiveDashboard() {
       getIncidents(),
       getCapacityStatus(),
       getPerimeterZones(),
+      getCountSessions(),
+      getManifests(),
     ]);
     if (results[0].status === "fulfilled") setVisionAlerts(results[0].value);
     if (results[1].status === "fulfilled") setActiveBreaches(results[1].value.length);
     if (results[2].status === "fulfilled") setIncidents(results[2].value);
     if (results[3].status === "fulfilled") setCapacityStatus(results[3].value);
     if (results[4].status === "fulfilled") setPerimeterZones(results[4].value.length);
+    if (results[5].status === "fulfilled") setCountSessions(results[5].value);
+    if (results[6].status === "fulfilled") setManifests(results[6].value);
     setLoading(false);
   }, []);
 
@@ -84,16 +90,16 @@ export default function ExecutiveDashboard() {
     : 84;
   const zonesExceedingWarning = capacityStatus.filter((c) => c.exceeds_warning).length;
 
-  // Counting KPIs from mock data
-  const totalCounted = COUNTING_SESSIONS.reduce((s, c) => s + c.totalCounted, 0);
-  const totalExpected = COUNTING_SESSIONS.reduce((s, c) => s + c.totalExpected, 0);
+  // Counting KPIs from real API data
+  const totalCounted = countSessions.reduce((s, c) => s + c.total_counted, 0);
+  const totalExpected = manifests.reduce((s, m) => s + (m.total_expected ?? 0), 0);
   const countAccuracy = totalExpected > 0 ? ((totalCounted / totalExpected) * 100).toFixed(1) : "—";
-  const mismatches = COUNTING_SESSIONS.filter((c) => c.status === "mismatch").length;
+  const mismatches = countSessions.filter((c) => c.reconciliation_status === "mismatch").length;
 
   // Module status
   const modules: ModuleStatus[] = [
-    { name: "Object Detection", icon: Eye, status: "operational", metric: `${depot.cams}/14 cams`, detail: "YOLO v8 active", color: "#22D3A1" },
-    { name: "Automated Counting", icon: Hash, status: "operational", metric: `${countAccuracy}% acc`, detail: `${COUNTING_SESSIONS.length} sessions today`, color: "#22D3A1" },
+    { name: "Object Detection", icon: Eye, status: "operational", metric: `${perimeterZones} zones`, detail: "YOLO v8 active", color: "#22D3A1" },
+    { name: "Automated Counting", icon: Hash, status: "operational", metric: `${countAccuracy}% acc`, detail: `${countSessions.length} sessions today`, color: "#22D3A1" },
     { name: "Cluster Mapping", icon: Map, status: zonesExceedingWarning > 0 ? "degraded" : "operational", metric: `${avgCapacity}% avg`, detail: `${zonesExceedingWarning} zones over threshold`, color: zonesExceedingWarning > 0 ? "#F5A623" : "#22D3A1" },
     { name: "Inventory Sequencing", icon: Layers, status: "operational", metric: "96.4% FIFO", detail: "Rules enforced", color: "#22D3A1" },
     { name: "Gate & LPR", icon: Shield, status: "operational", metric: `${depot.trucks} trucks`, detail: "OCR active", color: "#22D3A1" },
@@ -115,7 +121,7 @@ export default function ExecutiveDashboard() {
             Operations Hub
           </h1>
           <p className="text-[11px] text-[#8A9BBF] mt-0.5">
-            {depot.name} · {depot.loc} · All 6 modules active
+            IntelliDepot · All 6 modules active
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -254,32 +260,37 @@ export default function ExecutiveDashboard() {
               Counting Sessions
             </span>
             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#5B9BF5]/12 text-[#5B9BF5] border border-[#5B9BF5]/25">
-              {COUNTING_SESSIONS.length} TODAY
+              {countSessions.length} TODAY
             </span>
           </div>
           <div className="space-y-2">
-            {COUNTING_SESSIONS.slice(0, 5).map((cs) => {
-              const matchColor = cs.status === "matched" ? "#22D3A1" : cs.status === "mismatch" ? "#F04A4A" : "#F5A623";
-              return (
-                <div key={cs.id} className="p-2.5 rounded-[10px] bg-[#0F1A30]">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-bold text-[#E8EDF8]">{cs.manifestCode}</span>
-                    <span
-                      className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
-                      style={{ background: `${matchColor}15`, color: matchColor }}
-                    >
-                      {cs.status.toUpperCase()}
-                    </span>
+            {countSessions.length === 0 ? (
+              <div className="text-center py-6 text-[#4E6090] text-[11px]">No counting sessions today</div>
+            ) : (
+              countSessions.slice(0, 5).map((cs) => {
+                const matchColor = cs.reconciliation_status === "matched" ? "#22D3A1" : cs.reconciliation_status === "mismatch" ? "#F04A4A" : "#F5A623";
+                const manifest = manifests.find((m) => m.id === cs.manifest_id);
+                return (
+                  <div key={cs.id} className="p-2.5 rounded-[10px] bg-[#0F1A30]">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[11px] font-bold text-[#E8EDF8]">{manifest?.manifest_code ?? "—"}</span>
+                      <span
+                        className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
+                        style={{ background: `${matchColor}15`, color: matchColor }}
+                      >
+                        {cs.reconciliation_status.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center mt-1 text-[10px] text-[#8A9BBF]">
+                      <span>{cs.total_counted}/{manifest?.total_expected ?? "?"} items</span>
+                      <span style={{ color: cs.discrepancy_total !== 0 ? "#F04A4A" : "#22D3A1" }}>
+                        {cs.discrepancy_total >= 0 ? "+" : ""}{cs.discrepancy_total}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center mt-1 text-[10px] text-[#8A9BBF]">
-                    <span>{cs.totalCounted}/{cs.totalExpected} items</span>
-                    <span style={{ color: cs.discrepancy !== 0 ? "#F04A4A" : "#22D3A1" }}>
-                      {cs.discrepancy >= 0 ? "+" : ""}{cs.discrepancy}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       </div>

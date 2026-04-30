@@ -562,6 +562,8 @@ async def auto_count_from_detection(
 
 # ---------------------------------------------------------------------------
 # Mismatch Alert Endpoints
+# NOTE: /alerts/active MUST be defined before /alerts/{alert_id}/acknowledge
+# so FastAPI matches the literal "active" path before the UUID parameter.
 # ---------------------------------------------------------------------------
 
 @router.get("/alerts", response_model=list[MismatchAlertResponse])
@@ -578,6 +580,20 @@ async def list_mismatch_alerts(
     if severity:
         query = query.where(MismatchAlert.severity == severity)
     result = await db.execute(query.order_by(MismatchAlert.created_at.desc()))
+    return result.scalars().all()
+
+
+@router.get("/alerts/active", response_model=list[MismatchAlertResponse])
+async def get_active_alerts(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all unacknowledged mismatch alerts."""
+    result = await db.execute(
+        select(MismatchAlert)
+        .where(MismatchAlert.acknowledged == False)
+        .order_by(MismatchAlert.created_at.desc())
+    )
     return result.scalars().all()
 
 
@@ -746,20 +762,6 @@ async def count_from_tracking(
         alert=MismatchAlertResponse.model_validate(alert) if alert else None,
         status=session.reconciliation_status,
     )
-
-
-@router.get("/alerts/active", response_model=list[MismatchAlertResponse])
-async def get_active_alerts(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Get all unacknowledged mismatch alerts."""
-    result = await db.execute(
-        select(MismatchAlert)
-        .where(MismatchAlert.acknowledged == False)
-        .order_by(MismatchAlert.created_at.desc())
-    )
-    return result.scalars().all()
 
 
 # ---------------------------------------------------------------------------
