@@ -86,6 +86,13 @@ _COUNTING_PROFILE = [
 ]
 
 
+# Accumulated counts for the demo camera — persist across interpolation cycles
+_demo_in_total: int = 0
+_demo_out_total: int = 0
+_demo_last_count: int = 0  # last interpolated count value
+_demo_last_elapsed: float = -1.0  # last elapsed time we processed
+
+
 def _interpolate_count(elapsed: float) -> tuple[int, str, int]:
     cycle = _COUNTING_PROFILE[-1][0]
     t = elapsed % cycle
@@ -101,11 +108,23 @@ def _interpolate_count(elapsed: float) -> tuple[int, str, int]:
 
 
 def _reference_counting_camera() -> dict:
+    global _demo_in_total, _demo_out_total, _demo_last_count, _demo_last_elapsed
+
     elapsed = time.monotonic() - _demo_started_at
     current_count, scene, detections_count = _interpolate_count(elapsed)
-    previous_count, _, _ = _interpolate_count(max(0, elapsed - DETECTION_INTERVAL))
-    inbound = max(current_count, previous_count)
-    outbound = max(0, inbound - current_count)
+
+    # Accumulate counts based on delta from last call
+    if _demo_last_elapsed >= 0:
+        prev_count, _, _ = _interpolate_count(_demo_last_elapsed)
+        delta = current_count - prev_count
+        if delta > 0:
+            _demo_in_total += delta
+        elif delta < 0:
+            _demo_out_total += abs(delta)
+
+    _demo_last_count = current_count
+    _demo_last_elapsed = elapsed
+
     confidence = 0.91 + ((int(elapsed) % 7) * 0.006)
     detections = []
     for i in range(detections_count):
@@ -126,12 +145,20 @@ def _reference_counting_camera() -> dict:
         "video_file": COUNTING_DEMO_VIDEO,
         "reference_video": COUNTING_REFERENCE_VIDEO,
         "scene": scene,
-        "in_count": inbound,
-        "out_count": outbound,
-        "total": current_count,
+        "in_count": _demo_in_total,
+        "out_count": _demo_out_total,
+        "total": _demo_in_total - _demo_out_total,
         "by_class": {
-            "bag": {"in": inbound, "out": outbound, "net": current_count},
-            "box": {"in": max(0, inbound // 8), "out": max(0, outbound // 8), "net": max(0, current_count // 8)},
+            "bag": {
+                "in": _demo_in_total,
+                "out": _demo_out_total,
+                "net": _demo_in_total - _demo_out_total,
+            },
+            "box": {
+                "in": max(0, _demo_in_total // 8),
+                "out": max(0, _demo_out_total // 8),
+                "net": max(0, (_demo_in_total - _demo_out_total) // 8),
+            },
         },
         "detections": detections,
         "last_update": datetime.now(timezone.utc).isoformat(),
@@ -592,9 +619,14 @@ async def stop_realtime_counting():
 def reset_counts():
     """Reset all counts (e.g. at start of new day)."""
     global _today_counts, _camera_counts, _counted_tracks
+    global _demo_in_total, _demo_out_total, _demo_last_count, _demo_last_elapsed
     _today_counts.clear()
     _camera_counts.clear()
     _counted_tracks.clear()
+    _demo_in_total = 0
+    _demo_out_total = 0
+    _demo_last_count = 0
+    _demo_last_elapsed = -1.0
     logger.info("All counts reset")
 
 

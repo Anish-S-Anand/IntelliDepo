@@ -1020,20 +1020,33 @@ async def stream_local_video(filename: str, theme: str = "light", seek: float = 
         cap = await loop.run_in_executor(_cv_pool, _cv_connect, str(video_path), seek)
         if cap is None:
             return
-        # Remember the seek position so we loop back to it (not to frame 0)
-        seek_frame = int(seek * (cap.get(cv2.CAP_PROP_FPS) or 25))
+        # Set capture resolution before reading — reduces per-frame memory by ~4x
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 854)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        # Stream at 15fps (skip every other frame) to halve CPU/memory load
+        TARGET_FPS = 15
+        src_fps = cap.get(cv2.CAP_PROP_FPS) or 25
+        frame_skip = max(1, round(src_fps / TARGET_FPS))
+        seek_frame = int(seek * src_fps)
+        frame_num = 0
         try:
             while True:
                 frame = await loop.run_in_executor(_cv_pool, _cv_read_frame, cap)
                 if frame is None:
                     # Loop back to seek position
                     cap.set(cv2.CAP_PROP_POS_FRAMES, seek_frame)
+                    frame_num = 0
                     frame = await loop.run_in_executor(_cv_pool, _cv_read_frame, cap)
                     if frame is None:
                         break
+                frame_num += 1
+                # Skip frames to hit target fps
+                if frame_num % frame_skip != 0:
+                    await asyncio.sleep(0)
+                    continue
                 frame = cv2.resize(frame, (854, 480))
                 jpeg_bytes = await loop.run_in_executor(
-                    _cv_pool, _cv_encode_jpeg, frame, 75
+                    _cv_pool, _cv_encode_jpeg, frame, 70
                 )
                 yield (
                     boundary
@@ -1042,7 +1055,7 @@ async def stream_local_video(filename: str, theme: str = "light", seek: float = 
                     + jpeg_bytes
                     + b"\r\n"
                 )
-                await asyncio.sleep(1 / 25)
+                await asyncio.sleep(1 / TARGET_FPS)
         finally:
             cap.release()
 
@@ -1060,12 +1073,19 @@ async def video_snapshot(filename: str, seek: float = 0.0):
     """
     from app.depot.vision.video_library import get_video_frame_by_filename
 
-    frame = get_video_frame_by_filename(filename, seek_seconds=seek)
-    if frame is None:
+    loop = asyncio.get_running_loop()
+
+    def _read_and_encode():
+        f = get_video_frame_by_filename(filename, seek_seconds=seek)
+        if f is None:
+            return None
+        f = cv2.resize(f, (854, 480))
+        return _cv_encode_jpeg(f)
+
+    jpeg_bytes = await loop.run_in_executor(_cv_pool, _read_and_encode)
+    if jpeg_bytes is None:
         raise HTTPException(status_code=404, detail=f"Cannot read video: {filename}")
 
-    frame = cv2.resize(frame, (854, 480))
-    jpeg_bytes = _cv_encode_jpeg(frame)
     return StreamingResponse(
         iter([jpeg_bytes]),
         media_type="image/jpeg",

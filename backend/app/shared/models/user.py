@@ -9,7 +9,7 @@ from datetime import datetime
 import uuid
 
 from sqlalchemy import String, Boolean, DateTime, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import BaseModel
@@ -42,7 +42,7 @@ class User(BaseModel):
     # MFA (enterprise auth)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     mfa_secret: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
-    mfa_backup_codes: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    mfa_backup_codes: Mapped[list | None] = mapped_column(JSON, nullable=True, default=None)
     # Email verification
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     email_verify_token: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)

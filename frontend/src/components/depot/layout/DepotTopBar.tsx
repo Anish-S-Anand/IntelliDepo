@@ -16,23 +16,32 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
   const [alertCount, setAlertCount] = useState(0);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  // Fetch live alert count for the bell badge
+  // Fetch live alert count for the bell badge — deferred so it doesn't compete
+  // with the page's own data fetching on navigation
   useEffect(() => {
+    let cancelled = false;
     const fetchAlerts = async () => {
       try {
         const [vision, perimeter] = await Promise.allSettled([
           getAllActiveAlerts(),
           getPerimeterAlertCount(),
         ]);
-        let total = 0;
-        if (vision.status === "fulfilled") total += vision.value.length;
-        if (perimeter.status === "fulfilled") total += perimeter.value;
-        setAlertCount(total);
+        if (!cancelled) {
+          let total = 0;
+          if (vision.status === "fulfilled") total += vision.value.length;
+          if (perimeter.status === "fulfilled") total += perimeter.value;
+          setAlertCount(total);
+        }
       } catch { /* silent */ }
     };
-    void fetchAlerts();
+    // Defer by 3s so page content loads first
+    const initialTimer = window.setTimeout(() => void fetchAlerts(), 3000);
     const interval = setInterval(() => void fetchAlerts(), 60000);
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {

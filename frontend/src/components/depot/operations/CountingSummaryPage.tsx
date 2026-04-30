@@ -81,7 +81,14 @@ interface TimeSeriesPoint {
 }
 
 const COUNTING_VIDEO_FILE = "Screen Recording 2025-07-30 120512.mp4";
-const COUNTING_FEED_URL = `/backend/depot/vision/cameras/video-library/${encodeURIComponent(COUNTING_VIDEO_FILE)}/mjpeg?theme=dark&seek=18`;
+
+// Point directly to the backend port — bypasses Next.js proxy buffering which
+// causes MJPEG streams to play in slow-motion.
+function getCountingFeedUrl(): string {
+  if (typeof window === "undefined") return "";
+  const base = `${window.location.protocol}//${window.location.hostname}:8000`;
+  return `${base}/depot/vision/cameras/video-library/${encodeURIComponent(COUNTING_VIDEO_FILE)}/mjpeg?theme=dark&seek=18`;
+}
 
 function classCount(camera: { by_class: RealtimeCountsResponse["cameras"][string]["by_class"] }, label: string): number {
   const value = camera.by_class[label];
@@ -190,6 +197,7 @@ export default function CountingSummaryPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null);
+  const [countingFeedUrl, setCountingFeedUrl] = useState("");
 
   // API data
   const [sessions, setSessions] = useState<SessionRow[]>([]);
@@ -291,6 +299,10 @@ export default function CountingSummaryPage() {
       setTimeSeries([]);
     }
     setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    setCountingFeedUrl(getCountingFeedUrl());
   }, []);
 
   useEffect(() => {
@@ -429,7 +441,7 @@ export default function CountingSummaryPage() {
           </div>
           <div className="relative aspect-video bg-black">
             <img
-              src={COUNTING_FEED_URL}
+              src={countingFeedUrl}
               alt="JSW counting line footage"
               className="h-full w-full object-cover"
             />

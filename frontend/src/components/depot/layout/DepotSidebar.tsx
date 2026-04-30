@@ -84,10 +84,12 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
         if (!cancelled) setAlertCount(3);
       }
     };
-    void fetchAlerts();
+    // Defer initial fetch by 2s so it doesn't compete with the page's own data fetching on load
+    const initialTimer = window.setTimeout(() => void fetchAlerts(), 2000);
     const interval = setInterval(() => void fetchAlerts(), 60000);
     return () => {
       cancelled = true;
+      window.clearTimeout(initialTimer);
       clearInterval(interval);
     };
   }, []);
@@ -112,6 +114,8 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
             key={item.href}
             href={item.href}
             title={item.fullLabel}
+            prefetch={true}
+            scroll={false}
             onClick={() => onClose?.()}
             className={cn(
               "depot-sidebar-item relative w-11 h-11 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all text-[16px]",
