@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Shield,
   Car,
@@ -70,20 +70,15 @@ const VEHICLE_STATUS: Record<string, { color: string; bg: string; border: string
 
 // ---------------------------------------------------------------------------
 // Pass expiry countdown
+// Uses a shared "tick" prop so the parent drives a single interval instead
+// of mounting one setInterval per visitor row.
 // ---------------------------------------------------------------------------
 
-function ExpiryCountdown({ expiresAt }: { expiresAt: string }) {
-  const [remaining, setRemaining] = useState(0);
-
-  useEffect(() => {
-    const update = () => {
-      const diff = new Date(expiresAt).getTime() - Date.now();
-      setRemaining(Math.max(0, Math.floor(diff / 1000)));
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [expiresAt]);
+function ExpiryCountdown({ expiresAt, tick }: { expiresAt: string; tick: number }) {
+  const remaining = useMemo(() => {
+    const diff = new Date(expiresAt).getTime() - tick;
+    return Math.max(0, Math.floor(diff / 1000));
+  }, [expiresAt, tick]);
 
   if (remaining <= 0) {
     return <span className="text-[10px] text-[#F04A4A] font-semibold">EXPIRED</span>;
@@ -373,6 +368,13 @@ export default function GateConsolePage() {
   const [togglingGate, setTogglingGate] = useState<string | null>(null);
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
 
+  // Shared countdown ticker for ExpiryCountdown — one interval instead of N per visitor row
+  const [tick, setTick] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   // --- Data loading ---
   const loadGates = useCallback(async () => {
     try {
@@ -493,11 +495,11 @@ export default function GateConsolePage() {
   };
 
   // --- Filtered logs ---
-  const filteredLogs = accessLogs.filter((log) => {
+  const filteredLogs = useMemo(() => accessLogs.filter((log) => {
     if (logFilter !== "all" && log.decision.toLowerCase() !== logFilter) return false;
     if (logSearch && !log.plate_number.toLowerCase().includes(logSearch.toLowerCase())) return false;
     return true;
-  });
+  }), [accessLogs, logFilter, logSearch]);
 
   // --- Render ---
   if (loading) {
@@ -1023,7 +1025,7 @@ export default function GateConsolePage() {
                   {visitor.pass_valid_until && (
                     <div className="flex items-center gap-1">
                       <span className="text-[#4E6090]">Expires: </span>
-                      <ExpiryCountdown expiresAt={visitor.pass_valid_until} />
+                      <ExpiryCountdown expiresAt={visitor.pass_valid_until} tick={tick} />
                     </div>
                   )}
                   {visitor.host_name && (

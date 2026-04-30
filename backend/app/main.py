@@ -224,11 +224,3 @@ if settings.ENABLE_STREAM_MODULES:
     from app.stream.competelens.earnings_api import router as earnings_router
 
     app.include_router(earnings_router)
-
-
-<<<<<<< HEAD
-=======
-app.include_router(earnings_router)
-
-
->>>>>>> fa12d98 (Lpr Updated recognition system)

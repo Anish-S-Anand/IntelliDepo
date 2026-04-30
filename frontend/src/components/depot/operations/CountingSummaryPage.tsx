@@ -4,9 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import {
   getCountSessions,
   getManifests,
+  getRealtimeCounts,
   getReconciliationReport,
   type CountSessionResponse,
   type ManifestResponse,
+  type RealtimeCountsResponse,
   type ReconciliationReport,
 } from "@/services/depotCounting";
 import { exportCountingReport } from "@/lib/exportUtils";
@@ -17,13 +19,13 @@ import {
   TrendingUp,
   Download,
   Search,
-  Filter,
   ChevronDown,
   FileText,
-  Eye,
   BarChart3,
   Clock,
   Target,
+  Activity,
+  ScanLine,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -76,6 +78,15 @@ interface TimeSeriesPoint {
   bags: number;
   boxes: number;
   cumulative: number;
+}
+
+const COUNTING_VIDEO_FILE = "Screen Recording 2025-07-30 120512.mp4";
+const COUNTING_FEED_URL = `/backend/depot/vision/cameras/video-library/${encodeURIComponent(COUNTING_VIDEO_FILE)}/mjpeg?theme=dark&seek=18`;
+
+function classCount(camera: { by_class: RealtimeCountsResponse["cameras"][string]["by_class"] }, label: string): number {
+  const value = camera.by_class[label];
+  if (typeof value === "number") return value;
+  return value?.net ?? ((value?.in ?? 0) - (value?.out ?? 0));
 }
 
 // ---------------------------------------------------------------------------
@@ -185,42 +196,127 @@ export default function CountingSummaryPage() {
   const [batchTallies, setBatchTallies] = useState<BatchTally[]>([]);
   const [timeSeries, setTimeSeries] = useState<TimeSeriesPoint[]>([]);
   const [report, setReport] = useState<ReconciliationReport | null>(null);
+  const [realtime, setRealtime] = useState<RealtimeCountsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
-    try {
-      const [sessionsRaw, manifests, reportData] = await Promise.all([
-        getCountSessions(),
-        getManifests(),
-        getReconciliationReport(),
-      ]);
-      setSessions(buildSessionRows(sessionsRaw, manifests));
-      setBatchTallies(buildBatchTallies(sessionsRaw, manifests));
-      setTimeSeries(buildTimeSeries(sessionsRaw));
-      setReport(reportData);
-    } catch (err) {
-      console.error("CountingSummaryPage: failed to fetch data", err);
-    } finally {
-      setLoading(false);
+    const [sessionsResult, manifestsResult, reportResult, realtimeResult] = await Promise.allSettled([
+      getCountSessions(),
+      getManifests(),
+      getReconciliationReport(),
+      getRealtimeCounts(),
+    ]);
+
+    const sessionsRaw = sessionsResult.status === "fulfilled" ? sessionsResult.value : [];
+    const manifests = manifestsResult.status === "fulfilled" ? manifestsResult.value : [];
+    const reportData = reportResult.status === "fulfilled" ? reportResult.value : null;
+    const realtimeData = realtimeResult.status === "fulfilled" ? realtimeResult.value : null;
+
+    if (sessionsResult.status === "rejected") console.error("CountingSummaryPage: sessions fetch failed", sessionsResult.reason);
+    if (manifestsResult.status === "rejected") console.error("CountingSummaryPage: manifests fetch failed", manifestsResult.reason);
+    if (reportResult.status === "rejected") console.error("CountingSummaryPage: report fetch failed", reportResult.reason);
+    if (realtimeResult.status === "rejected") console.error("CountingSummaryPage: realtime fetch failed", realtimeResult.reason);
+
+    setRealtime(realtimeData);
+    setReport(reportData);
+
+    const sessionRows = buildSessionRows(sessionsRaw, manifests);
+    const liveCameras = realtimeData ? Object.values(realtimeData.cameras) : [];
+    const liveTimestamp = realtimeData?.timestamp ?? new Date().toISOString();
+    const liveRows: SessionRow[] = liveCameras.map((camera, index) => {
+      const detections = camera.detections ?? [];
+      const avgConfidence = detections.length > 0
+        ? detections.reduce((sum, det) => sum + det.confidence, 0) / detections.length * 100
+        : 0;
+      const counted = camera.total || detections.length;
+      return {
+        id: camera.camera_id,
+        manifestCode: "LIVE",
+        vehicleNumber: detections.length > 0 ? `${detections.length} active detection${detections.length === 1 ? "" : "s"}` : "No active detections",
+        expectedBags: 0,
+        expectedBoxes: 0,
+        countedBags: classCount(camera, "bag"),
+        countedBoxes: classCount(camera, "box"),
+        totalExpected: 0,
+        totalCounted: counted,
+        discrepancy: counted,
+        confidenceAvg: Number(avgConfidence.toFixed(1)),
+        status: "pending",
+        zone: camera.zone ?? `Camera ${index + 1}`,
+        camera: camera.camera_id.slice(0, 8),
+        timestamp: camera.last_update
+          ? new Date(camera.last_update).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true }).toUpperCase()
+          : new Date(liveTimestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true }).toUpperCase(),
+      };
+    });
+    const rows = liveRows.length > 0 ? [...liveRows, ...sessionRows] : sessionRows;
+
+    const sessionTallies = buildBatchTallies(sessionsRaw, manifests);
+    const liveTallies: BatchTally[] = liveCameras.slice(0, 8).map((camera, index) => {
+      const detections = camera.detections ?? [];
+      const counted = camera.total || detections.length;
+      return {
+        id: camera.camera_id,
+        batchCode: camera.camera_id.slice(0, 8),
+        product: `Live Camera ${index + 1}`,
+        expected: 0,
+        counted,
+        variance: counted,
+        variancePct: 0,
+        status: counted > 0 ? "pending" : "matched",
+      };
+    });
+
+    const series = buildTimeSeries(sessionsRaw);
+    const liveTotal = liveCameras.reduce((sum, camera) => sum + (camera.total || camera.detections?.length || 0), 0);
+    const liveSeries = realtimeData
+      ? [{
+          time: new Date(realtimeData.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
+          bags: liveCameras.reduce((sum, camera) => sum + classCount(camera, "bag"), 0),
+          boxes: liveCameras.reduce((sum, camera) => sum + classCount(camera, "box"), 0),
+          cumulative: liveTotal,
+        }]
+      : series;
+
+    setSessions(rows);
+    setBatchTallies(liveTallies.length > 0 ? [...liveTallies, ...sessionTallies] : sessionTallies);
+    if (liveSeries.length > 0) {
+      setTimeSeries((prev) => {
+        const next = [...prev, liveSeries[0]];
+        return next.slice(-18);
+      });
+    } else if (series.length > 0) {
+      setTimeSeries(series);
+    } else {
+      setTimeSeries([]);
     }
+    setLoading(false);
   }, []);
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30_000);
+    const interval = setInterval(fetchData, 2_500);
     return () => clearInterval(interval);
   }, [fetchData]);
 
   // Derived KPI values (from report when available, fallback to local)
-  const totalExpected = report?.total_expected ?? sessions.reduce((a, s) => a + s.totalExpected, 0);
-  const totalCounted = report?.total_counted ?? sessions.reduce((a, s) => a + s.totalCounted, 0);
-  const totalDisc = report?.total_discrepancy ?? (totalCounted - totalExpected);
-  const matchedCount = report?.matched_sessions ?? sessions.filter((s) => s.status === "matched").length;
-  const totalSessions = report?.total_sessions ?? sessions.length;
-  const mismatchCount = report?.mismatch_sessions ?? sessions.filter((s) => s.status === "mismatch").length;
-  const avgConf = sessions.length > 0
+  const hasReportSessions = Boolean(report && report.total_sessions > 0);
+  const liveCameras = realtime ? Object.values(realtime.cameras) : [];
+  const primaryLiveCamera = liveCameras.find((camera) => camera.camera_id === "jsw-counting-line") ?? liveCameras[0];
+  const liveDetected = liveCameras.reduce((sum, camera) => sum + (camera.total || camera.detections?.length || 0), 0);
+  const totalExpected = hasReportSessions ? report!.total_expected : sessions.reduce((a, s) => a + s.totalExpected, 0);
+  const totalCounted = liveDetected || (hasReportSessions ? report!.total_counted : sessions.reduce((a, s) => a + s.totalCounted, 0));
+  const totalDisc = totalCounted - totalExpected;
+  const matchedCount = liveDetected > 0 ? 0 : hasReportSessions ? report!.matched_sessions : sessions.filter((s) => s.status === "matched").length;
+  const totalSessions = liveDetected > 0 ? liveCameras.length : hasReportSessions ? report!.total_sessions : sessions.length;
+  const mismatchCount = liveDetected > 0 ? liveCameras.filter((camera) => camera.out_count > 0).length : hasReportSessions ? report!.mismatch_sessions : sessions.filter((s) => s.status === "mismatch").length;
+  const avgConf = sessions.some((s) => s.confidenceAvg > 0)
     ? (sessions.reduce((a, s) => a + s.confidenceAvg, 0) / sessions.length).toFixed(1)
     : "0.0";
+  const primaryDetections = primaryLiveCamera?.detections ?? [];
+  const primaryConfidence = primaryDetections.length > 0
+    ? (primaryDetections.reduce((sum, det) => sum + det.confidence, 0) / primaryDetections.length * 100).toFixed(1)
+    : avgConf;
 
   const filtered = sessions.filter((s) => {
     const matchSearch =
@@ -315,6 +411,106 @@ export default function CountingSummaryPage() {
 
       {/* Glow divider */}
       <div className="h-px bg-gradient-to-r from-transparent via-[#E5521A]/40 to-transparent mb-5" />
+
+      {/* Live Counting Feed */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1.45fr_1fr] gap-4 mb-5">
+        <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] overflow-hidden">
+          <div className="flex items-center justify-between px-[18px] py-3 border-b border-[#1E2F50]">
+            <div className="flex items-center gap-2">
+              <ScanLine className="w-4 h-4 text-[#E5521A]" />
+              <span className="text-[13px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+                Live Counting Feed
+              </span>
+            </div>
+            <span className="flex items-center gap-1.5 rounded-full border border-[#22D3A1]/30 bg-[#22D3A1]/10 px-2 py-0.5 text-[9px] font-bold text-[#22D3A1]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#22D3A1] animate-pulse" />
+              {realtime?.running ? "COUNTER RUNNING" : "COUNTER SYNCING"}
+            </span>
+          </div>
+          <div className="relative aspect-video bg-black">
+            <img
+              src={COUNTING_FEED_URL}
+              alt="JSW counting line footage"
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute left-0 right-0 top-1/2 border-t-2 border-dashed border-[#22D3A1]/80 shadow-[0_0_18px_rgba(34,211,161,0.45)]" />
+            <div className="absolute left-4 top-[calc(50%-18px)] rounded-full bg-[#22D3A1] px-2 py-1 text-[9px] font-black text-[#07111F]">
+              COUNT LINE
+            </div>
+            {primaryDetections.slice(0, 5).map((det) => (
+              <div
+                key={det.track_id}
+                className="absolute border-2 border-[#22D3A1] bg-[#22D3A1]/10"
+                style={{
+                  left: `${det.bbox_x * 100}%`,
+                  top: `${det.bbox_y * 100}%`,
+                  width: `${det.bbox_w * 100}%`,
+                  height: `${det.bbox_h * 100}%`,
+                }}
+              >
+                <span className="absolute -top-5 left-0 rounded bg-[#22D3A1] px-1.5 py-0.5 text-[8px] font-black text-[#07111F]">
+                  {det.class.toUpperCase()} {(det.confidence * 100).toFixed(0)}%
+                </span>
+              </div>
+            ))}
+            <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between bg-gradient-to-t from-black/85 to-transparent px-4 pb-3 pt-14">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8A9BBF]">
+                  {primaryLiveCamera?.zone ?? "Loading Bay 1-4"}
+                </div>
+                <div className="text-[18px] font-black text-white" style={{ fontFamily: "'Syne', sans-serif" }}>
+                  {primaryLiveCamera?.scene ?? "Live bag movement"}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-right">
+                <div>
+                  <div className="text-[9px] font-bold text-[#8A9BBF] uppercase">In</div>
+                  <div className="text-[20px] font-black text-[#22D3A1]">{primaryLiveCamera?.in_count ?? 0}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] font-bold text-[#8A9BBF] uppercase">Out</div>
+                  <div className="text-[20px] font-black text-[#F5A623]">{primaryLiveCamera?.out_count ?? 0}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] font-bold text-[#8A9BBF] uppercase">Net</div>
+                  <div className="text-[20px] font-black text-[#5B9BF5]">{primaryLiveCamera?.total ?? 0}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px]">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="w-4 h-4 text-[#22D3A1]" />
+            <span className="text-[13px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+              Real-Time Counter
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: "Live Bags", value: classCount(primaryLiveCamera ?? { by_class: {} }, "bag"), color: "#22D3A1" },
+              { label: "Live Boxes", value: classCount(primaryLiveCamera ?? { by_class: {} }, "box"), color: "#E5521A" },
+              { label: "Active Detections", value: primaryDetections.length, color: "#5B9BF5" },
+              { label: "Confidence", value: `${primaryConfidence}%`, color: "#F5A623" },
+            ].map((item) => (
+              <div key={item.label} className="rounded-[12px] bg-[#0F1A30] border border-[#1E2F50] p-3">
+                <div className="text-[9px] font-bold uppercase tracking-wide text-[#4E6090] mb-1">{item.label}</div>
+                <div className="text-[24px] font-black" style={{ color: item.color, fontFamily: "'Syne', sans-serif" }}>
+                  {item.value}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 rounded-[12px] bg-[#0F1A30] border border-[#1E2F50] p-3">
+            <div className="text-[9px] font-bold uppercase tracking-wide text-[#4E6090] mb-2">Reference Profile</div>
+            <div className="text-[12px] font-bold text-[#E8EDF8]">{primaryLiveCamera?.reference_video ?? "Recording 2025-08-04 164626.mp4"}</div>
+            <div className="mt-1 text-[10px] leading-relaxed text-[#8A9BBF]">
+              The count stream follows the reference scene flow: inward unloading raises the bag stock, hold/reject scenes reduce it, and the next batch resumes from the live footage.
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Count Time-Series Chart + Batch Tallies */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4 mb-5">

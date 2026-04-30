@@ -61,57 +61,7 @@ const STATS = [
 
 export function IntelliLanding() {
   const router = useRouter();
-<<<<<<< HEAD
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-=======
-  const [activeId, setActiveId] = useState<string>("stream");
-  const [tooltip, setTooltip] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [labelPositions, setLabelPositions] = useState<{ id: string; x: number; y: number; visible: boolean; depth?: number }[]>([]);
-  const [showScene, setShowScene] = useState(false);
-  const positionsRef = useRef<{ id: string; x: number; y: number; visible: boolean }[]>([]);
-  const frameRef = useRef(0);
-
-  const handlePositionsUpdate = useCallback((positions: { id: string; x: number; y: number; visible: boolean }[]) => {
-    positionsRef.current = positions;
-    frameRef.current += 1;
-    if (frameRef.current % 3 === 0) setLabelPositions([...positions]);
-  }, []);
-
-  const handleVariantHover = useCallback((id: string) => {
-    if (id) {
-      setActiveId(id);
-      const pos = positionsRef.current.find((p) => p.id === id);
-      setTooltip({ id, x: pos?.x ?? window.innerWidth / 2, y: pos?.y ?? window.innerHeight / 2 });
-    } else {
-      setTooltip(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
-    const startScene = () => {
-      if (!cancelled) {
-        setShowScene(true);
-      }
-    };
-
-    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      const idleId = window.requestIdleCallback(() => startScene(), { timeout: 2500 });
-      return () => {
-        cancelled = true;
-        window.cancelIdleCallback(idleId);
-      };
-    }
-
-    timeoutId = setTimeout(startScene, 2200);
-    return () => {
-      cancelled = true;
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, []);
->>>>>>> fa12d98 (Lpr Updated recognition system)
 
   return (
     <div className="min-h-screen bg-[#020B18] text-white overflow-x-hidden">

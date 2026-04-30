@@ -53,6 +53,10 @@ export function VideoFeed({ name, cameraId, videoFile, cameraIndex, onDetectionU
   const streamUrl = videoFile
     ? `/backend/depot/vision/cameras/video-library/${encodeURIComponent(videoFile)}/mjpeg?theme=dark&seek=${seekSeconds}`
     : null;
+  const withCacheBuster = useCallback((url: string) => {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}t=${Date.now()}`;
+  }, []);
 
   // LPR simulation: periodically "detect" a plate when camera is live
   const triggerLPR = useCallback(() => {
@@ -94,7 +98,7 @@ export function VideoFeed({ name, cameraId, videoFile, cameraIndex, onDetectionU
 
     const loadFrame = () => {
       if (cancelled) return;
-      img.src = snapshotUrl + "?t=" + Date.now();
+      img.src = withCacheBuster(snapshotUrl);
     };
 
     img.onload = () => {
@@ -127,7 +131,7 @@ export function VideoFeed({ name, cameraId, videoFile, cameraIndex, onDetectionU
       img.src = "";
       if (pollRef.current) clearTimeout(pollRef.current);
     };
-  }, [snapshotUrl]);
+  }, [snapshotUrl, withCacheBuster]);
 
   const statusColor =
     status === "live" ? "bg-green-500" : status === "error" ? "bg-red-500" : "bg-gray-500";

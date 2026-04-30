@@ -12,7 +12,7 @@ interface CameraData {
   videoFile?: string;
 }
 
-const GATE_EXIT_SOUTH_VIDEO = "Screen Recording 2025-08-11 173926.mp4";
+const GATE_EXIT_SOUTH_VIDEO = "Recording 2025-08-11 171805.mp4";
 
 // Exactly 6 cameras — no more, no less
 const FALLBACK_CAMERAS: CameraData[] = [

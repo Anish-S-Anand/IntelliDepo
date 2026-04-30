@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Radar, Shield, AlertTriangle, MapPin } from "lucide-react";
 import { SEV_COL, STA_COL } from "@/lib/depot-data";
 import type { Incident } from "@/lib/depot-data";
@@ -50,6 +50,8 @@ export default function IncidentsPage() {
   const [viewTab, setViewTab] = useState<ViewTab>("incidents");
   const [resolveModalId, setResolveModalId] = useState<string | null>(null);
   const [resolveNotes, setResolveNotes] = useState("");
+  const [acknowledging, setAcknowledging] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
 
   // Fetch real incidents from backend
   const fetchIncidents = useCallback(async () => {
@@ -80,52 +82,64 @@ export default function IncidentsPage() {
     return () => clearInterval(interval);
   }, [fetchIncidents, fetchBreaches]);
 
-  const filtered = incidents.filter((i) => {
+  const filtered = useMemo(() => incidents.filter((i) => {
     if (filter === "all") return true;
     if (filter === i.status) return true;
     if (filter === i.sev) return true;
     return false;
-  });
+  }), [incidents, filter]);
 
-  const cntOpen = incidents.filter((i) => i.status === "open").length;
-  const cntAck = incidents.filter((i) => i.status === "acknowledged").length;
-  const cntRes = incidents.filter((i) => i.status === "resolved").length;
-  const cntCrit = incidents.filter((i) => i.sev === "CRITICAL").length;
+  const cntOpen = useMemo(() => incidents.filter((i) => i.status === "open").length, [incidents]);
+  const cntAck = useMemo(() => incidents.filter((i) => i.status === "acknowledged").length, [incidents]);
+  const cntRes = useMemo(() => incidents.filter((i) => i.status === "resolved").length, [incidents]);
+  const cntCrit = useMemo(() => incidents.filter((i) => i.sev === "CRITICAL").length, [incidents]);
 
   const acknowledge = async (id: string) => {
-    // Try backend first for UUID-like IDs
-    if (id.includes("-") && id.length > 10) {
-      try {
-        await acknowledgeIncident(id, "Acknowledged from incident console");
-        void fetchIncidents();
-        return;
-      } catch { /* fall through to local state */ }
+    // Prevent double-clicks
+    if (acknowledging !== null) return;
+    setAcknowledging(id);
+    try {
+      // Try backend first for UUID-like IDs
+      if (id.includes("-") && id.length > 10) {
+        try {
+          await acknowledgeIncident(id, "Acknowledged from incident console");
+          void fetchIncidents();
+          return;
+        } catch { /* fall through to local state */ }
+      }
+      setIncidents((prev) =>
+        prev.map((i) =>
+          i.id === id ? { ...i, status: "acknowledged" as const, assignee: "Command Center" } : i
+        )
+      );
+    } finally {
+      setAcknowledging(null);
     }
-    setIncidents((prev) =>
-      prev.map((i) =>
-        i.id === id ? { ...i, status: "acknowledged" as const, assignee: "Command Center" } : i
-      )
-    );
   };
 
   const handleResolve = async () => {
-    if (!resolveModalId || resolveNotes.length < 5) return;
-    if (resolveModalId.includes("-") && resolveModalId.length > 10) {
-      try {
-        await resolveIncident(resolveModalId, resolveNotes);
-        void fetchIncidents();
-        setResolveModalId(null);
-        setResolveNotes("");
-        return;
-      } catch { /* fall through */ }
+    if (!resolveModalId || resolveNotes.length < 5 || resolving) return;
+    setResolving(true);
+    try {
+      if (resolveModalId.includes("-") && resolveModalId.length > 10) {
+        try {
+          await resolveIncident(resolveModalId, resolveNotes);
+          void fetchIncidents();
+          setResolveModalId(null);
+          setResolveNotes("");
+          return;
+        } catch { /* fall through */ }
+      }
+      setIncidents((prev) =>
+        prev.map((i) =>
+          i.id === resolveModalId ? { ...i, status: "resolved" as const } : i
+        )
+      );
+      setResolveModalId(null);
+      setResolveNotes("");
+    } finally {
+      setResolving(false);
     }
-    setIncidents((prev) =>
-      prev.map((i) =>
-        i.id === resolveModalId ? { ...i, status: "resolved" as const } : i
-      )
-    );
-    setResolveModalId(null);
-    setResolveNotes("");
   };
 
   const filters: { label: string; value: FilterType; style?: string }[] = [
@@ -270,15 +284,17 @@ export default function IncidentsPage() {
                   {i.status === "open" && (
                     <button
                       onClick={() => acknowledge(i.id)}
-                      className="px-3 py-1.5 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition"
+                      disabled={acknowledging === i.id}
+                      className="px-3 py-1.5 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition disabled:opacity-50"
                     >
-                      Take Action
+                      {acknowledging === i.id ? "..." : "Take Action"}
                     </button>
                   )}
                   {i.status !== "resolved" && (
                     <button
                       onClick={() => { setResolveModalId(i.id); setResolveNotes(""); }}
-                      className="px-3 py-1.5 rounded-lg border border-[#22D3A1]/30 text-[#22D3A1] text-[11px] font-bold hover:bg-[#22D3A1]/10 transition"
+                      disabled={acknowledging === i.id}
+                      className="px-3 py-1.5 rounded-lg border border-[#22D3A1]/30 text-[#22D3A1] text-[11px] font-bold hover:bg-[#22D3A1]/10 transition disabled:opacity-50"
                     >
                       Resolve
                     </button>
@@ -384,10 +400,10 @@ export default function IncidentsPage() {
               </button>
               <button
                 onClick={handleResolve}
-                disabled={resolveNotes.length < 5}
+                disabled={resolveNotes.length < 5 || resolving}
                 className="px-4 py-1.5 rounded-lg bg-[#22D3A1] text-[#0D1526] text-[11px] font-bold disabled:opacity-40"
               >
-                Resolve
+                {resolving ? "Resolving..." : "Resolve"}
               </button>
             </div>
           </div>

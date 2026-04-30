@@ -39,7 +39,7 @@ CAMERAS = [
     {"name": "Zone A Overhead",   "stream_url": "local:cluster 13 (1).mp4",                     "zone": "Zone-A",       "frame_rate": 25, "resolution": "854x480"},  # Cluster 13 storage
     {"name": "Loading Bay 1-4",   "stream_url": "local:cluster 4-5 (1).mp4",                    "zone": "Loading Dock", "frame_rate": 25, "resolution": "854x480"},  # Cluster 4-5 bay
     {"name": "Zone C Perimeter",  "stream_url": "local:Recording 2025-07-30 115417.mp4",        "zone": "Zone-C",       "frame_rate": 25, "resolution": "854x480"},  # Depot perimeter
-    {"name": "Gate Exit South",   "stream_url": "local:Screen Recording 2025-08-11 173926.mp4", "zone": "Exit Gate",    "frame_rate": 25, "resolution": "854x480"},  # Exit gate ops
+    {"name": "Gate Exit South",   "stream_url": "local:Recording 2025-08-11 171805.mp4",        "zone": "Exit Gate",    "frame_rate": 25, "resolution": "854x480"},  # Exit gate ops
     {"name": "Yard Overview",     "stream_url": "local:Screen Recording 2025-08-11 174929.mp4", "zone": "Yard",         "frame_rate": 25, "resolution": "854x480"},  # Yard overview
 ]
 

@@ -74,6 +74,45 @@ export interface ReconciliationReport {
   active_alerts: number;
 }
 
+export interface RealtimeDetection {
+  track_id: number;
+  class: string;
+  confidence: number;
+  bbox_x: number;
+  bbox_y: number;
+  bbox_w: number;
+  bbox_h: number;
+}
+
+export interface RealtimeCameraCount {
+  camera_id: string;
+  name?: string;
+  zone?: string;
+  video_file?: string;
+  reference_video?: string;
+  scene?: string;
+  in_count: number;
+  out_count: number;
+  total: number;
+  by_class: Record<string, number | { in?: number; out?: number; net?: number }>;
+  detections?: RealtimeDetection[];
+  last_update?: string;
+}
+
+export interface RealtimeCountsResponse {
+  today: {
+    in?: number;
+    out?: number;
+    net?: number;
+    total?: number;
+    [key: string]: number | undefined;
+  };
+  cameras: Record<string, RealtimeCameraCount>;
+  counting_line_y: number;
+  running: boolean;
+  timestamp: string;
+}
+
 // API functions
 
 export async function getManifests(): Promise<ManifestResponse[]> {
@@ -89,6 +128,11 @@ export async function getCountSessions(manifestId?: string): Promise<CountSessio
 
 export async function getReconciliationReport(): Promise<ReconciliationReport> {
   const res = await api.get<ReconciliationReport>("/depot/vision/counting/reconciliation/report");
+  return res.data;
+}
+
+export async function getRealtimeCounts(): Promise<RealtimeCountsResponse> {
+  const res = await api.get<RealtimeCountsResponse>("/depot/vision/realtime/counts");
   return res.data;
 }
 

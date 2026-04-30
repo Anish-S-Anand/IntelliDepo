@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   AlertTriangle,
   Bell,
@@ -54,22 +54,16 @@ const SEVERITY_CONFIG: Record<
 
 // ---------------------------------------------------------------------------
 // Escalation countdown (15-min window)
+// Uses a shared "tick" prop so the parent drives a single interval instead
+// of mounting one setInterval per alert card.
 // ---------------------------------------------------------------------------
 
-function EscalationCountdown({ createdAt }: { createdAt: string }) {
-  const [remaining, setRemaining] = useState<number>(0);
-
-  useEffect(() => {
-    const update = () => {
-      const created = new Date(createdAt).getTime();
-      const deadline = created + 15 * 60 * 1000; // 15 minutes
-      const now = Date.now();
-      setRemaining(Math.max(0, Math.floor((deadline - now) / 1000)));
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [createdAt]);
+function EscalationCountdown({ createdAt, tick }: { createdAt: string; tick: number }) {
+  const remaining = useMemo(() => {
+    const created = new Date(createdAt).getTime();
+    const deadline = created + 15 * 60 * 1000; // 15 minutes
+    return Math.max(0, Math.floor((deadline - tick) / 1000));
+  }, [createdAt, tick]);
 
   if (remaining <= 0) {
     return (
@@ -104,10 +98,12 @@ function AlertItem({
   alert,
   onAcknowledge,
   isAcknowledging,
+  tick,
 }: {
   alert: UnifiedAlert;
   onAcknowledge: (alert: UnifiedAlert) => void;
   isAcknowledging: boolean;
+  tick: number;
 }) {
   const severity = SEVERITY_CONFIG[alert.severity] || SEVERITY_CONFIG.medium;
   const isCountAlert = alert.type === "count_mismatch";
@@ -143,7 +139,7 @@ function AlertItem({
             </span>
           </div>
         </div>
-        <EscalationCountdown createdAt={alert.created_at} />
+        <EscalationCountdown createdAt={alert.created_at} tick={tick} />
       </div>
 
       {/* Alert message */}
@@ -203,8 +199,22 @@ export default function AlertPanel({
   const [acknowledging, setAcknowledging] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "count_mismatch" | "colour_mismatch">("all");
   const [wsConnected, setWsConnected] = useState(false);
+  // Single shared tick for all EscalationCountdown instances — one interval instead of N
+  const [tick, setTick] = useState(() => Date.now());
+
+  // Shared countdown ticker — replaces per-card setInterval
+  useEffect(() => {
+    const id = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Ref to cancel in-flight loadAlerts requests when a newer one starts
+  const loadAbortRef = useRef<AbortController | null>(null);
 
   const loadAlerts = useCallback(async () => {
+    // Cancel any previous in-flight request
+    loadAbortRef.current?.abort();
+    loadAbortRef.current = new AbortController();
     try {
       const data = await getAllActiveAlerts();
       setAlerts(data);
@@ -289,6 +299,8 @@ export default function AlertPanel({
   }, [isOpen, loadAlerts, wsUrl]);
 
   const handleAcknowledge = async (alert: UnifiedAlert) => {
+    // Prevent double-clicks / concurrent acknowledges
+    if (acknowledging !== null) return;
     setAcknowledging(alert.id);
     try {
       if (alert.type === "count_mismatch") {
@@ -296,22 +308,36 @@ export default function AlertPanel({
       } else {
         await acknowledgeColourAlert(alert.id);
       }
-      setAlerts((prev) => prev.filter((a) => a.id !== alert.id));
-      onAlertCountChange?.(alerts.length - 1);
+      setAlerts((prev) => {
+        const next = prev.filter((a) => a.id !== alert.id);
+        onAlertCountChange?.(next.length);
+        return next;
+      });
     } catch {
-      // API call failed — remove from UI optimistically
-      setAlerts((prev) => prev.filter((a) => a.id !== alert.id));
-      onAlertCountChange?.(alerts.length - 1);
+      // Optimistic removal even on failure
+      setAlerts((prev) => {
+        const next = prev.filter((a) => a.id !== alert.id);
+        onAlertCountChange?.(next.length);
+        return next;
+      });
     } finally {
       setAcknowledging(null);
     }
   };
 
-  const filteredAlerts =
-    filter === "all" ? alerts : alerts.filter((a) => a.type === filter);
+  const filteredAlerts = useMemo(
+    () => (filter === "all" ? alerts : alerts.filter((a) => a.type === filter)),
+    [alerts, filter],
+  );
 
-  const countAlerts = alerts.filter((a) => a.type === "count_mismatch").length;
-  const colourAlerts = alerts.filter((a) => a.type === "colour_mismatch").length;
+  const countAlerts = useMemo(
+    () => alerts.filter((a) => a.type === "count_mismatch").length,
+    [alerts],
+  );
+  const colourAlerts = useMemo(
+    () => alerts.filter((a) => a.type === "colour_mismatch").length,
+    [alerts],
+  );
 
   if (!isOpen) return null;
 
@@ -380,6 +406,7 @@ export default function AlertPanel({
               alert={alert}
               onAcknowledge={handleAcknowledge}
               isAcknowledging={acknowledging === alert.id}
+              tick={tick}
             />
           ))
         )}

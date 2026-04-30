@@ -11,6 +11,8 @@ function resolveApiBaseUrl() {
 const api = axios.create({
   baseURL: resolveApiBaseUrl(),
   headers: { "Content-Type": "application/json" },
+  // Prevent slow backend responses from blocking the UI indefinitely
+  timeout: 15000,
 });
 
 api.interceptors.request.use((config) => {

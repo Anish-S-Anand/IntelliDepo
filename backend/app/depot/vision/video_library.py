@@ -64,7 +64,7 @@ SCENE_VIDEOS = [
     {
         "scene": "gate_exit",
         "label": "GATE EXIT SOUTH",
-        "filename": "Screen Recording 2025-08-11 173926.mp4",
+        "filename": "Recording 2025-08-11 171805.mp4",
         "description": "Depot recording — exit gate operations",
     },
     {

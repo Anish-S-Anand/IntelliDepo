@@ -407,7 +407,6 @@ async def list_count_sessions(
     manifest_id: Optional[uuid.UUID] = None,
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List counting sessions with optional filters."""
     query = select(CountSession)
@@ -571,7 +570,6 @@ async def list_mismatch_alerts(
     acknowledged: Optional[bool] = None,
     severity: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List mismatch alerts."""
     query = select(MismatchAlert)
@@ -586,7 +584,6 @@ async def list_mismatch_alerts(
 @router.get("/alerts/active", response_model=list[MismatchAlertResponse])
 async def get_active_alerts(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Get all unacknowledged mismatch alerts."""
     result = await db.execute(
@@ -1110,7 +1107,6 @@ async def finalize_tracking_session(
 async def get_count_timeseries(
     session_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Return count time-series snapshots for a tracking/counting session."""
     result = await db.execute(
@@ -1130,7 +1126,6 @@ async def get_count_timeseries(
 @router.get("/reconciliation/report", response_model=ReconciliationReport)
 async def get_reconciliation_report(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Generate a reconciliation summary report across all counting sessions."""
     result = await db.execute(select(CountSession).order_by(CountSession.created_at.desc()))

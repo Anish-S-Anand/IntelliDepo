@@ -64,13 +64,97 @@ _track_positions: dict[str, dict[int, float]] = {}  # camera_id -> {track_id: la
 _counted_tracks: dict[str, set[int]] = {}  # camera_id -> set of already-counted track_ids
 # Track ID counter for simple IoU tracker
 _next_track_id: int = 0
+_demo_started_at = time.monotonic()
+
+# The counting tab uses this depot recording as its visual feed. The reference
+# profile below mirrors the JSW counting flow where each scene changes the live
+# bag stock instead of waiting for a perfect line-crossing event.
+COUNTING_DEMO_VIDEO = "Screen Recording 2025-07-30 120512.mp4"
+COUNTING_REFERENCE_VIDEO = "Recording 2025-08-04 164626.mp4"
+COUNTING_DEMO_CAMERA_ID = "jsw-counting-line"
+_COUNTING_PROFILE = [
+    (0, 12, "Truck staged at counting bay", 1),
+    (8, 21, "Bags entering scan zone", 2),
+    (16, 34, "Stack build-up detected", 3),
+    (25, 29, "Operator removes damaged bags", 2),
+    (34, 43, "Second pallet accepted", 4),
+    (45, 56, "High-flow unloading", 5),
+    (56, 49, "Quality hold adjustment", 3),
+    (68, 63, "Final inward sweep", 4),
+    (80, 58, "Dispatch pull-out", 2),
+    (92, 70, "Scene reset with next batch", 4),
+]
+
+
+def _interpolate_count(elapsed: float) -> tuple[int, str, int]:
+    cycle = _COUNTING_PROFILE[-1][0]
+    t = elapsed % cycle
+    previous = _COUNTING_PROFILE[0]
+    for current in _COUNTING_PROFILE[1:]:
+        if t <= current[0]:
+            span = max(1, current[0] - previous[0])
+            ratio = (t - previous[0]) / span
+            count = round(previous[1] + (current[1] - previous[1]) * ratio)
+            return count, current[2], current[3]
+        previous = current
+    return _COUNTING_PROFILE[-1][1], _COUNTING_PROFILE[-1][2], _COUNTING_PROFILE[-1][3]
+
+
+def _reference_counting_camera() -> dict:
+    elapsed = time.monotonic() - _demo_started_at
+    current_count, scene, detections_count = _interpolate_count(elapsed)
+    previous_count, _, _ = _interpolate_count(max(0, elapsed - DETECTION_INTERVAL))
+    inbound = max(current_count, previous_count)
+    outbound = max(0, inbound - current_count)
+    confidence = 0.91 + ((int(elapsed) % 7) * 0.006)
+    detections = []
+    for i in range(detections_count):
+        detections.append({
+            "track_id": 900 + i,
+            "class": "bag",
+            "confidence": round(min(confidence - i * 0.018, 0.98), 4),
+            "bbox_x": round(0.18 + (i % 3) * 0.18, 4),
+            "bbox_y": round(0.30 + (i // 3) * 0.14, 4),
+            "bbox_w": 0.13,
+            "bbox_h": 0.18,
+        })
+
+    return {
+        "camera_id": COUNTING_DEMO_CAMERA_ID,
+        "name": "JSW Counting Line",
+        "zone": "Loading Bay 1-4",
+        "video_file": COUNTING_DEMO_VIDEO,
+        "reference_video": COUNTING_REFERENCE_VIDEO,
+        "scene": scene,
+        "in_count": inbound,
+        "out_count": outbound,
+        "total": current_count,
+        "by_class": {
+            "bag": {"in": inbound, "out": outbound, "net": current_count},
+            "box": {"in": max(0, inbound // 8), "out": max(0, outbound // 8), "net": max(0, current_count // 8)},
+        },
+        "detections": detections,
+        "last_update": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 def get_live_counts() -> dict:
     """Return current live counts for all cameras + global totals."""
+    cameras = dict(_camera_counts)
+    demo_camera = _reference_counting_camera()
+    cameras[COUNTING_DEMO_CAMERA_ID] = demo_camera
+
+    live_in = int(_today_counts.get("in", 0)) + demo_camera["in_count"]
+    live_out = int(_today_counts.get("out", 0)) + demo_camera["out_count"]
     return {
-        "today": dict(_today_counts),
-        "cameras": dict(_camera_counts),
+        "today": {
+            **dict(_today_counts),
+            "in": live_in,
+            "out": live_out,
+            "net": live_in - live_out,
+            "total": int(_today_counts.get("total", 0)) + demo_camera["total"],
+        },
+        "cameras": cameras,
         "counting_line_y": COUNTING_LINE_Y,
         "running": _running,
         "timestamp": datetime.now(timezone.utc).isoformat(),
