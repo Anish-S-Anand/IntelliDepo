@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = "012b_intelliops_day1_live_monitoring"
-down_revision = "012"
+down_revision = "012_intelliops_day1_operations"
 branch_labels = None
 depends_on = None
 

@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = "005_macropulse_bootstrap"
-down_revision = "004"
+down_revision = "004_notifications"
 branch_labels = None
 depends_on = None
 

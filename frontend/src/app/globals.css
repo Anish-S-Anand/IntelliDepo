@@ -4,50 +4,50 @@
 
 /* ============================================================
    INTELLI PLATFORM — DESIGN TOKENS
-   Light theme = white bg, black text
-   Dark theme  = dark navy bg, white text
+   Light theme = warm white / cream, strong contrast, NOTHING blue-navy
+   Dark theme  = deep navy/slate, vibrant accents
    ============================================================ */
 
 @layer base {
   /* ── Light Theme (default) ─────────────────────────────── */
   :root {
-    /* Page */
-    --bg-page:          #f4f6fa;
-    --bg-page-2:        #eef1f7;
+    /* Page — warm off-white, clearly NOT dark */
+    --bg-page:          #F0F4FA;
+    --bg-page-2:        #E8EDF7;
 
-    /* Surfaces */
-    --bg-surface:       #ffffff;
-    --bg-surface-2:     #f0f2f8;
-    --bg-surface-3:     #e8ecf4;
+    /* Surfaces — pure white cards */
+    --bg-surface:       #FFFFFF;
+    --bg-surface-2:     #F5F7FC;
+    --bg-surface-3:     #EEF1F8;
 
-    /* Sidebar / TopBar */
-    --bg-nav:           #ffffff;
-    --bg-nav-border:    #e2e6f0;
-    --bg-nav-item:      #f0f2f8;
-    --bg-nav-active:    rgba(229,82,26,0.10);
+    /* Sidebar / TopBar — clean white */
+    --bg-nav:           #FFFFFF;
+    --bg-nav-border:    #E5E7EB;
+    --bg-nav-item:      #F3F4F6;
+    --bg-nav-active:    rgba(229,82,26,0.08);
 
-    /* Text */
-    --text-primary:     #0a0f1e;
-    --text-secondary:   #374151;
-    --text-muted:       #6b7280;
-    --text-faint:       #9ca3af;
+    /* Text — deep charcoal for maximum legibility */
+    --text-primary:     #0D1117;
+    --text-secondary:   #1F2937;
+    --text-muted:       #4B5563;
+    --text-faint:       #9CA3AF;
     --text-nav:         #374151;
     --text-nav-active:  #E5521A;
 
-    /* Borders */
-    --border-default:   #d1d5e0;
-    --border-strong:    #b0b8cc;
+    /* Borders — subtle gray */
+    --border-default:   #E5E7EB;
+    --border-strong:    #D1D5DB;
 
-    /* Inputs */
-    --bg-input:         #ffffff;
-    --border-input:     #d1d5e0;
-    --text-input:       #0a0f1e;
-    --placeholder:      #9ca3af;
+    /* Inputs — white with gray border */
+    --bg-input:         #FFFFFF;
+    --border-input:     #D1D5DB;
+    --text-input:       #0D1117;
+    --placeholder:      #9CA3AF;
 
-    /* Cards */
-    --bg-card:          #ffffff;
-    --bg-card-hover:    #f8f9fc;
-    --border-card:      #e2e6f0;
+    /* Cards — white, shadowed */
+    --bg-card:          #FFFFFF;
+    --bg-card-hover:    #F9FAFB;
+    --border-card:      #E5E7EB;
 
     /* Accent / Brand */
     --accent:           #E5521A;
@@ -55,7 +55,7 @@
     --accent-subtle:    rgba(229,82,26,0.08);
     --accent-border:    rgba(229,82,26,0.25);
 
-    /* Status */
+    /* Status — vivid for light bg */
     --color-success:    #16a34a;
     --color-warning:    #d97706;
     --color-danger:     #dc2626;
@@ -63,18 +63,18 @@
 
     /* Tailwind CSS vars */
     --background:       214 38% 97%;
-    --foreground:       222 47% 11%;
+    --foreground:       222 47% 7%;
     --card:             0 0% 100%;
-    --card-foreground:  222 47% 11%;
+    --card-foreground:  222 47% 7%;
     --primary:          220 90% 52%;
     --primary-foreground: 210 40% 98%;
-    --secondary:        210 40% 96%;
+    --secondary:        210 16% 94%;
     --secondary-foreground: 222 47% 11%;
-    --muted:            220 22% 94%;
+    --muted:            220 14% 93%;
     --muted-foreground: 215 16% 42%;
-    --border:           214 31% 88%;
-    --input:            214 31% 88%;
-    --ring:             220 90% 52%;
+    --border:           214 22% 90%;
+    --input:            214 22% 90%;
+    --ring:             16 76% 50%;
     --radius:           0.75rem;
     --destructive:      0 84% 60%;
     --destructive-foreground: 210 40% 98%;
@@ -98,11 +98,11 @@
     --bg-nav-active:    rgba(229,82,26,0.12);
 
     /* Text */
-    --text-primary:     #E8EDF8;
-    --text-secondary:   #b8c4d8;
-    --text-muted:       #8A9BBF;
-    --text-faint:       #4E6090;
-    --text-nav:         #8A9BBF;
+    --text-primary:     #ffffff;
+    --text-secondary:   #e2e8f8;
+    --text-muted:       #a0b0d0;
+    --text-faint:       #6a7fa8;
+    --text-nav:         #a0b0d0;
     --text-nav-active:  #E5521A;
 
     /* Borders */
@@ -120,7 +120,7 @@
     --bg-card-hover:    #1a2a48;
     --border-card:      #1E2F50;
 
-    /* Accent / Brand */
+    /* Accent */
     --accent:           #E5521A;
     --accent-hover:     #FF7A42;
     --accent-subtle:    rgba(229,82,26,0.10);
@@ -166,31 +166,25 @@
     scroll-behavior: smooth;
   }
 
-  /* ── Light body ── */
   body {
     background-color: var(--bg-page);
     color: var(--text-primary);
     font-family: "Arial", "Helvetica Neue", "Helvetica", sans-serif;
-    font-weight: 400;
+    font-weight: 700;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition: background-color 0.25s ease, color 0.25s ease;
   }
 
-  /* ── Universal font ── */
   h1, h2, h3, h4, h5, h6 {
     font-family: "Arial", "Helvetica Neue", "Helvetica", sans-serif;
-    font-weight: 700;
+    font-weight: 800;
     color: var(--text-primary);
   }
 
-  p, span, label, input, textarea, select, button, a, li, td, th {
+  p, span, label, input, textarea, select, button, a, li, td, th, div {
     font-family: "Arial", "Helvetica Neue", "Helvetica", sans-serif;
-  }
-
-  /* Override any inline font-family declarations */
-  [style*="Syne"], [style*="Calibri"], [style*="Segoe"] {
-    font-family: "Arial", "Helvetica Neue", "Helvetica", sans-serif !important;
+    font-weight: 700;
   }
 
   ::selection {
@@ -201,11 +195,8 @@
 
 /* ============================================================
    THEME-AWARE UTILITY CLASSES
-   Use these instead of hardcoded hex colors
    ============================================================ */
 @layer utilities {
-
-  /* ── Page backgrounds ── */
   .theme-bg-page      { background-color: var(--bg-page); }
   .theme-bg-surface   { background-color: var(--bg-surface); }
   .theme-bg-surface-2 { background-color: var(--bg-surface-2); }
@@ -214,57 +205,46 @@
   .theme-bg-input     { background-color: var(--bg-input); }
   .theme-bg-nav       { background-color: var(--bg-nav); }
 
-  /* ── Text ── */
   .theme-text-primary   { color: var(--text-primary); }
   .theme-text-secondary { color: var(--text-secondary); }
   .theme-text-muted     { color: var(--text-muted); }
   .theme-text-faint     { color: var(--text-faint); }
 
-  /* ── Borders ── */
   .theme-border         { border-color: var(--border-default); }
   .theme-border-strong  { border-color: var(--border-strong); }
   .theme-border-card    { border-color: var(--border-card); }
   .theme-border-input   { border-color: var(--border-input); }
 
-  /* ── Nav ── */
   .theme-bg-nav-item    { background-color: var(--bg-nav-item); }
   .theme-bg-nav-active  { background-color: var(--bg-nav-active); }
   .theme-text-nav       { color: var(--text-nav); }
   .theme-text-nav-active { color: var(--text-nav-active); }
 
-  /* ── Accent ── */
   .theme-accent         { color: var(--accent); }
   .theme-bg-accent      { background-color: var(--accent); }
   .theme-bg-accent-subtle { background-color: var(--accent-subtle); }
 
-  /* ── Status ── */
   .theme-success { color: var(--color-success); }
   .theme-warning { color: var(--color-warning); }
   .theme-danger  { color: var(--color-danger); }
   .theme-info    { color: var(--color-info); }
 
-  /* ── Card hover ── */
   .theme-card-hover:hover { background-color: var(--bg-card-hover); }
 
-  /* ── Transitions ── */
   .theme-transition {
-    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
   }
 }
 
 /* ============================================================
-   DEPOT COMPONENT OVERRIDES
-   These override the hardcoded dark colors in depot components
-   so they respond to the theme toggle.
+   DEPOT COMPONENT OVERRIDES — theme-aware
    ============================================================ */
 
-/* ── Top Bar ── */
 .depot-topbar {
   background-color: var(--bg-nav) !important;
   border-bottom-color: var(--bg-nav-border) !important;
 }
 
-/* ── Sidebar ── */
 .depot-sidebar {
   background-color: var(--bg-nav) !important;
   border-right-color: var(--bg-nav-border) !important;
@@ -284,7 +264,6 @@
   color: var(--accent) !important;
 }
 
-/* ── Cards ── */
 .depot-card {
   background-color: var(--bg-card) !important;
   border-color: var(--border-card) !important;
@@ -295,7 +274,6 @@
   background-color: var(--bg-card-hover) !important;
 }
 
-/* ── Inputs ── */
 .depot-input {
   background-color: var(--bg-input) !important;
   border-color: var(--border-input) !important;
@@ -306,13 +284,11 @@
   color: var(--placeholder) !important;
 }
 
-/* ── Main content area ── */
 .depot-main {
   background-color: var(--bg-page) !important;
   color: var(--text-primary) !important;
 }
 
-/* ── Dropdown menus ── */
 .depot-dropdown {
   background-color: var(--bg-surface-2) !important;
   border-color: var(--border-default) !important;
@@ -327,24 +303,20 @@
   color: var(--text-primary) !important;
 }
 
-/* ── Select elements ── */
 .depot-select {
   background-color: var(--bg-input) !important;
   border-color: var(--border-input) !important;
   color: var(--text-input) !important;
 }
 
-/* ── Text overrides for theme ── */
 .depot-text-primary   { color: var(--text-primary) !important; }
 .depot-text-secondary { color: var(--text-secondary) !important; }
 .depot-text-muted     { color: var(--text-muted) !important; }
 .depot-text-faint     { color: var(--text-faint) !important; }
 
-/* ── Border overrides ── */
 .depot-border         { border-color: var(--border-default) !important; }
 .depot-border-strong  { border-color: var(--border-strong) !important; }
 
-/* ── Table ── */
 .depot-table-row {
   border-bottom-color: var(--border-default) !important;
 }
@@ -353,51 +325,28 @@
   background-color: var(--bg-card-hover) !important;
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--bg-surface-2);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-faint);
-}
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-surface-2); }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
 
 /* ============================================================
    ANIMATIONS
    ============================================================ */
 @layer utilities {
   @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  @keyframes float-slow {
-    0%, 100% { transform: translate3d(0, 0, 0); }
-    50%       { transform: translate3d(0, -18px, 0); }
-  }
-
-  @keyframes float-medium {
-    0%, 100% { transform: translate3d(0, 0, 0); }
-    50%       { transform: translate3d(-12px, 16px, 0); }
-  }
-
   @keyframes fade-up {
-    0%   { opacity: 0; transform: translate3d(0, 24px, 0); }
+    0%   { opacity: 0; transform: translate3d(0, 20px, 0); }
     100% { opacity: 1; transform: translate3d(0, 0, 0); }
   }
 
   @keyframes scale-in {
-    0%   { opacity: 0; transform: scale(0.9); }
+    0%   { opacity: 0; transform: scale(0.92); }
     100% { opacity: 1; transform: scale(1); }
   }
 
@@ -406,276 +355,185 @@
     50%       { transform: scale(1.35); opacity: 1; }
   }
 
-  @keyframes scan-line {
-    0%   { transform: translate3d(-120%, 0, 0); opacity: 0; }
-    15%  { opacity: 1; }
-    85%  { opacity: 1; }
-    100% { transform: translate3d(520%, 0, 0); opacity: 0; }
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
   }
 
-  @keyframes orbit-ring {
-    0%   { transform: rotate(0deg) scale(1); opacity: 0.5; }
-    50%  { transform: rotate(180deg) scale(1.08); opacity: 0.9; }
-    100% { transform: rotate(360deg) scale(1); opacity: 0.5; }
-  }
-
-  @keyframes star-twinkle {
-    0%, 100% { opacity: 0.3; transform: scale(0.9); }
-    50%       { opacity: 1; transform: scale(1.12); }
-  }
-
-  @keyframes twinkle-pan {
-    0%   { transform: translate3d(0, 0, 0); }
-    50%  { transform: translate3d(-1.5%, 1.2%, 0); }
-    100% { transform: translate3d(0, 0, 0); }
-  }
-
-  @keyframes solar-pulse {
-    0%, 100% { transform: scale(1); opacity: 0.28; }
-    50%       { transform: scale(1.08); opacity: 0.5; }
-  }
-
-  @keyframes nebula-sway {
-    0%, 100% { transform: rotate(-14deg) translate3d(0, 0, 0) scale(1); }
-    50%       { transform: rotate(-12deg) translate3d(18px, 10px, 0) scale(1.04); }
-  }
-
-  @keyframes light-streak {
-    0%   { transform: translate3d(-18%, 0, 0) rotate(14deg); opacity: 0; }
-    12%  { opacity: 0.9; }
-    100% { transform: translate3d(42%, 0, 0) rotate(14deg); opacity: 0; }
-  }
-
-  .motion-float-slow    { animation: float-slow 8s ease-in-out infinite; }
-  .motion-float-medium  { animation: float-medium 10s ease-in-out infinite; }
-  .motion-fade-up       { animation: fade-up 0.8s ease-out both; }
-  .motion-fade-up-delayed { animation: fade-up 1s ease-out both; animation-delay: 0.14s; }
-  .motion-scale-in      { animation: scale-in 0.85s cubic-bezier(0.22, 1, 0.36, 1) both; }
-  .motion-scan-line     { animation: scan-line 7.5s linear infinite; }
+  .motion-fade-up       { animation: fade-up 0.6s ease-out both; }
+  .motion-fade-up-delayed { animation: fade-up 0.8s ease-out both; animation-delay: 0.1s; }
+  .motion-scale-in      { animation: scale-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
   .motion-pulse-node    { animation: pulse-node 2.8s ease-in-out infinite; }
-  .motion-orbit         { animation: orbit-ring 9s linear infinite; }
-  .motion-orbit-delayed { animation: orbit-ring 11s linear infinite reverse; }
-  .motion-star          { animation: star-twinkle 3.6s ease-in-out infinite; }
 
-  .twinkle-layer {
-    background-repeat: repeat;
-    animation: twinkle-pan 24s ease-in-out infinite;
-  }
-
-  .twinkle-layer-primary {
-    background-image:
-      radial-gradient(circle at 12% 18%, rgba(255,248,232,0.95) 0 1px, transparent 1.7px),
-      radial-gradient(circle at 42% 62%, rgba(255,232,174,0.95) 0 1.2px, transparent 1.9px),
-      radial-gradient(circle at 76% 28%, rgba(222,235,255,0.92) 0 1.1px, transparent 1.8px),
-      radial-gradient(circle at 84% 74%, rgba(255,255,255,0.9) 0 1px, transparent 1.7px),
-      radial-gradient(circle at 24% 82%, rgba(255,214,146,0.88) 0 1.1px, transparent 1.8px);
-    background-size: 380px 380px, 520px 520px, 460px 460px, 600px 600px, 700px 700px;
-  }
-
-  .motion-solar-pulse { animation: solar-pulse 4s ease-in-out infinite; }
-  .motion-nebula      { animation: nebula-sway 22s ease-in-out infinite; }
-  .motion-light-streak { animation: light-streak 12s linear infinite; }
-
-  /* MacroPulse */
-  .macropulse-shell {
-    background:
-      radial-gradient(circle at 14% 12%, rgba(134,220,230,0.38), transparent 26%),
-      radial-gradient(circle at 82% 16%, rgba(195,234,240,0.42), transparent 24%),
-      linear-gradient(135deg, rgba(190,235,236,0.92) 0%, rgba(223,243,240,0.94) 48%, rgba(239,248,244,0.98) 100%);
-    font-family: "Arial", "Helvetica Neue", "Helvetica", sans-serif;
-  }
-
-  .macropulse-shell, .macropulse-shell * {
-    font-family: "Arial", "Helvetica Neue", "Helvetica", sans-serif;
-  }
-
-  .macropulse-panel {
-    background: linear-gradient(180deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.2) 100%);
-    box-shadow: 0 24px 72px rgba(36,72,102,0.12), inset 0 1px 0 rgba(255,255,255,0.48);
-    backdrop-filter: blur(14px);
-  }
-
-  .macropulse-card {
-    background: linear-gradient(180deg, rgba(255,255,255,0.78) 0%, rgba(255,255,255,0.64) 100%);
-    box-shadow: 0 14px 34px rgba(56,95,126,0.08), inset 0 1px 0 rgba(255,255,255,0.55);
-  }
-
-  .macropulse-sidebar {
-    background:
-      radial-gradient(circle at top left, rgba(49,74,133,0.38), transparent 28%),
-      linear-gradient(180deg, #162033 0%, #172239 52%, #131c2d 100%);
-    box-shadow: inset -1px 0 0 rgba(255,255,255,0.06), 18px 0 50px rgba(8,14,26,0.26);
+  /* Skeleton loading shimmer */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--bg-surface-2) 25%,
+      var(--bg-surface-3) 50%,
+      var(--bg-surface-2) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px;
   }
 }
 
 /* ============================================================
-   LIGHT THEME — TARGETED OVERRIDES
-   Goal: Only fix headings + backgrounds + borders in light mode.
-   Body text, labels, descriptions inherit from CSS variables.
-   Accent/status colors (orange, green, red, blue) are preserved.
+   LIGHT THEME — Targeted dark-color overrides
+   Replace ALL hardcoded dark blues/navies with light equivalents
    ============================================================ */
 
-/* ── 1. HEADINGS — Black in light mode ── */
+/* ── Page backgrounds ── */
+html:not(.dark) body {
+  background-color: #F0F4FA !important;
+  color: #0D1117 !important;
+}
+
+/* Very dark backgrounds → light page bg */
+html:not(.dark) [class*="bg-[#0D1526]"],
+html:not(.dark) [class*="bg-[#0d1526]"],
+html:not(.dark) [class*="bg-[#080d18]"],
+html:not(.dark) [class*="bg-[#0a0f1a]"],
+html:not(.dark) [class*="bg-[#0A0E1A]"],
+html:not(.dark) [class*="bg-[#0a0e1a]"],
+html:not(.dark) [class*="bg-[#0A1628]"],
+html:not(.dark) [class*="bg-[#0a1628]"],
+html:not(.dark) [class*="bg-[#080e1c]"],
+html:not(.dark) [class*="bg-[#020B18]"],
+html:not(.dark) [class*="bg-[#010810]"] {
+  background-color: #F0F4FA !important;
+}
+
+/* Dark card backgrounds → white */
+html:not(.dark) [class*="bg-[#14203A]"],
+html:not(.dark) [class*="bg-[#14203a]"],
+html:not(.dark) [class*="bg-[#1a2332]"],
+html:not(.dark) [class*="bg-[#1A2A4A]"],
+html:not(.dark) [class*="bg-[#1a2a4a]"] {
+  background-color: #FFFFFF !important;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04) !important;
+}
+
+/* Medium dark → very light gray */
+html:not(.dark) [class*="bg-[#0F1A30]"],
+html:not(.dark) [class*="bg-[#0f1a30]"],
+html:not(.dark) [class*="bg-[#111827]"] {
+  background-color: #F5F7FC !important;
+}
+
+/* ── Borders ── */
+html:not(.dark) [class*="border-[#1E2F50]"],
+html:not(.dark) [class*="border-[#1e2f50]"] {
+  border-color: #E5E7EB !important;
+}
+
+html:not(.dark) [class*="border-[#2A3F68]"],
+html:not(.dark) [class*="border-[#2a3f68]"] {
+  border-color: #D1D5DB !important;
+}
+
+/* ── Text — convert dark-mode white/pale text to dark charcoal ── */
+html:not(.dark) [class*="text-[#E8EDF8]"],
+html:not(.dark) [class*="text-[#e8edf8]"] {
+  color: #0D1117 !important;
+}
+
+html:not(.dark) [class*="text-white"] {
+  color: #0D1117 !important;
+}
+
+/* Muted blue-gray → readable dark gray */
+html:not(.dark) [class*="text-[#8A9BBF]"],
+html:not(.dark) [class*="text-[#8a9bbf]"],
+html:not(.dark) [class*="text-[#a0b0d0]"] {
+  color: #4B5563 !important;
+}
+
+/* Faint text */
+html:not(.dark) [class*="text-[#4E6090]"],
+html:not(.dark) [class*="text-[#4e6090]"],
+html:not(.dark) [class*="text-[#6a7fa8]"] {
+  color: #9CA3AF !important;
+}
+
+/* ── Headings — always dark in light mode ── */
 html:not(.dark) h1,
 html:not(.dark) h2,
 html:not(.dark) h3,
 html:not(.dark) h4,
 html:not(.dark) h5,
 html:not(.dark) h6 {
-  color: #0a0f1e !important;
+  color: #0D1117 !important;
 }
 
-/* Headings set via hardcoded text classes */
-html:not(.dark) h1[class*="text-\\[#E8EDF8\\]"],
-html:not(.dark) h2[class*="text-\\[#E8EDF8\\]"],
-html:not(.dark) h3[class*="text-\\[#E8EDF8\\]"],
-html:not(.dark) h1[class*="text-\\[#e8edf8\\]"],
-html:not(.dark) h2[class*="text-\\[#e8edf8\\]"],
-html:not(.dark) h3[class*="text-\\[#e8edf8\\]"] {
-  color: #0a0f1e !important;
-}
-
-/* ── 2. PAGE BACKGROUNDS ── */
-html:not(.dark) body {
-  background-color: #f4f6fa !important;
-  color: #0a0f1e !important;
-}
-
-/* Very dark page backgrounds → light */
-html:not(.dark) [class*="bg-\\[\\#0D1526\\]"],
-html:not(.dark) [class*="bg-\\[\\#0d1526\\]"],
-html:not(.dark) [class*="bg-\\[\\#080d18\\]"],
-html:not(.dark) [class*="bg-\\[\\#0a0f1a\\]"],
-html:not(.dark) [class*="bg-\\[\\#0A0E1A\\]"],
-html:not(.dark) [class*="bg-\\[\\#0a0e1a\\]"],
-html:not(.dark) [class*="bg-\\[\\#0A1628\\]"],
-html:not(.dark) [class*="bg-\\[\\#0a1628\\]"],
-html:not(.dark) [class*="bg-\\[\\#080e1c\\]"] {
-  background-color: #f4f6fa !important;
-}
-
-/* Card backgrounds → white */
-html:not(.dark) [class*="bg-\\[\\#14203A\\]"],
-html:not(.dark) [class*="bg-\\[\\#14203a\\]"],
-html:not(.dark) [class*="bg-\\[\\#1a2332\\]"],
-html:not(.dark) [class*="bg-\\[\\#1A2A4A\\]"],
-html:not(.dark) [class*="bg-\\[\\#1a2a4a\\]"] {
-  background-color: #ffffff !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-}
-
-/* Medium dark → light gray */
-html:not(.dark) [class*="bg-\\[\\#0F1A30\\]"],
-html:not(.dark) [class*="bg-\\[\\#0f1a30\\]"],
-html:not(.dark) [class*="bg-\\[\\#111827\\]"] {
-  background-color: #f0f2f8 !important;
-}
-
-/* ── 3. BORDERS ── */
-html:not(.dark) [class*="border-\\[\\#1E2F50\\]"],
-html:not(.dark) [class*="border-\\[\\#1e2f50\\]"] {
-  border-color: #e2e6f0 !important;
-}
-
-html:not(.dark) [class*="border-\\[\\#2A3F68\\]"],
-html:not(.dark) [class*="border-\\[\\#2a3f68\\]"] {
-  border-color: #d1d5e0 !important;
-}
-
-/* ── 4. TEXT — Only the hardcoded near-white colors ── */
-
-/* Near-white text → black */
-html:not(.dark) [class*="text-\\[\\#E8EDF8\\]"],
-html:not(.dark) [class*="text-\\[\\#e8edf8\\]"] {
-  color: #0a0f1e !important;
-}
-
-/* Muted blue-gray → readable dark gray */
-html:not(.dark) [class*="text-\\[\\#8A9BBF\\]"],
-html:not(.dark) [class*="text-\\[\\#8a9bbf\\]"] {
-  color: #374151 !important;
-}
-
-/* Faint text → medium gray (still readable) */
-html:not(.dark) [class*="text-\\[\\#4E6090\\]"],
-html:not(.dark) [class*="text-\\[\\#4e6090\\]"] {
-  color: #6b7280 !important;
-}
-
-/* ── 5. INPUTS & FORMS ── */
-html:not(.dark) input:not([class*="bg-white"]):not([class*="bg-\\[#020"]):not([class*="bg-\\[#0a0"]),
+/* ── Inputs ── */
+html:not(.dark) input:not([class*="bg-white"]):not([class*="bg-transparent"]),
 html:not(.dark) textarea:not([class*="bg-white"]),
 html:not(.dark) select:not([class*="bg-white"]) {
-  background-color: #ffffff !important;
-  color: #0a0f1e !important;
-  border-color: #d1d5e0 !important;
+  background-color: #FFFFFF !important;
+  color: #0D1117 !important;
+  border-color: #D1D5DB !important;
 }
 
 html:not(.dark) input::placeholder,
 html:not(.dark) textarea::placeholder {
-  color: #9ca3af !important;
+  color: #9CA3AF !important;
 }
 
 html:not(.dark) select option {
-  background-color: #ffffff;
-  color: #0a0f1e;
+  background-color: #FFFFFF;
+  color: #0D1117;
 }
 
-/* ── 6. PROGRESS BAR TRACKS ── */
-html:not(.dark) .w-full.h-1[class*="bg-\\[\\#1E2F50\\]"],
-html:not(.dark) .w-full.h-2[class*="bg-\\[\\#1E2F50\\]"],
-html:not(.dark) .flex-1.h-1[class*="bg-\\[\\#1E2F50\\]"] {
-  background-color: #e2e6f0 !important;
+/* ── Progress bar tracks ── */
+html:not(.dark) [class*="bg-[#1E2F50]"] {
+  background-color: #E5E7EB !important;
 }
 
-/* ── 7. HOVER STATES ── */
-html:not(.dark) [class*="hover\\:bg-\\[\\#1E2F50\\]"]:hover,
-html:not(.dark) [class*="hover\\:bg-\\[\\#1e2f50\\]"]:hover {
-  background-color: #f0f2f8 !important;
+/* ── Hover states ── */
+html:not(.dark) [class*="hover:bg-[#1E2F50]"]:hover,
+html:not(.dark) [class*="hover:bg-[#1e2f50]"]:hover {
+  background-color: #F3F4F6 !important;
 }
 
-html:not(.dark) [class*="hover\\:bg-\\[\\#2A3F68\\]"]:hover,
-html:not(.dark) [class*="hover\\:bg-\\[\\#2a3f68\\]"]:hover {
-  background-color: #e8ecf4 !important;
+html:not(.dark) [class*="hover:bg-[#2A3F68]"]:hover,
+html:not(.dark) [class*="hover:bg-[#2a3f68]"]:hover {
+  background-color: #E9EBF0 !important;
 }
 
-html:not(.dark) [class*="hover\\:border-\\[\\#2A3F68\\]"]:hover {
-  border-color: #b0b8cc !important;
+html:not(.dark) [class*="hover:border-[#2A3F68]"]:hover {
+  border-color: #B0B8CC !important;
 }
 
-/* ── 8. KEEP ACCENT BUTTONS WHITE TEXT ── */
-html:not(.dark) [class*="bg-\\[\\#E5521A\\]"],
-html:not(.dark) [class*="bg-\\[\\#e5521a\\]"] {
+/* ── Keep accent buttons white text ── */
+html:not(.dark) [class*="bg-[#E5521A]"],
+html:not(.dark) [class*="bg-[#e5521a]"] {
   color: #ffffff !important;
 }
 
-/* ── 9. SVG CHART ELEMENTS ── */
+/* ── SVG charts ── */
 html:not(.dark) svg text[fill="#4E6090"],
 html:not(.dark) svg text[fill="#8A9BBF"] {
-  fill: #6b7280 !important;
+  fill: #6B7280 !important;
 }
 
 html:not(.dark) svg line[stroke="#1E2F50"],
 html:not(.dark) svg line[stroke="#1e2f50"] {
-  stroke: #e2e6f0 !important;
+  stroke: #E5E7EB !important;
 }
 
-html:not(.dark) svg circle[stroke="#14203A"],
-html:not(.dark) svg circle[stroke="#14203a"] {
-  stroke: #ffffff !important;
-}
-
-/* ── 10. DEPOT STRUCTURAL COMPONENTS ── */
+/* ── Structural components ── */
 html:not(.dark) .depot-sidebar {
-  background-color: #ffffff !important;
-  border-right-color: #e2e6f0 !important;
-  box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+  background-color: #FFFFFF !important;
+  border-right-color: #E5E7EB !important;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.06);
 }
 
 html:not(.dark) .depot-topbar {
-  background-color: #ffffff !important;
-  border-bottom-color: #e2e6f0 !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  background-color: #FFFFFF !important;
+  border-bottom-color: #E5E7EB !important;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.06);
 }
 
 html:not(.dark) .depot-sidebar-item {
@@ -683,7 +541,7 @@ html:not(.dark) .depot-sidebar-item {
 }
 
 html:not(.dark) .depot-sidebar-item:hover {
-  background-color: #f0f2f8 !important;
+  background-color: #F3F4F6 !important;
   color: #111827 !important;
 }
 
@@ -694,61 +552,406 @@ html:not(.dark) .depot-sidebar-item.active {
 }
 
 html:not(.dark) .depot-main,
-html:not(.dark) main[class*="pt-\\[52px\\]"] {
-  background-color: #f4f6fa !important;
+html:not(.dark) main {
+  background-color: #F0F4FA !important;
 }
 
-/* ── 11. SCROLLBAR ── */
-html:not(.dark) ::-webkit-scrollbar-track {
-  background: #f0f2f8;
-}
+/* ── Scrollbar ── */
+html:not(.dark) ::-webkit-scrollbar-track { background: #F5F7FC; }
+html:not(.dark) ::-webkit-scrollbar-thumb { background: #D1D5DB; }
+html:not(.dark) ::-webkit-scrollbar-thumb:hover { background: #B0B8CC; }
 
-html:not(.dark) ::-webkit-scrollbar-thumb {
-  background: #d1d5e0;
-}
-
-html:not(.dark) ::-webkit-scrollbar-thumb:hover {
-  background: #b0b8cc;
-}
-
-/* ── 12. SMOOTH TRANSITIONS ── */
+/* ── Smooth transitions ── */
 body,
 .depot-topbar,
 .depot-sidebar,
 .depot-main,
 main {
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }
 
-/* Exclude media elements from transitions */
 canvas, video, img {
   transition: none !important;
 }
 
-/* ── 13. UNIVERSAL FONT ── */
-* {
+/* ── Universal Arial Bold ── */
+*, *::before, *::after {
   font-family: "Arial", "Helvetica Neue", "Helvetica", sans-serif !important;
+  font-weight: 700 !important;
 }
 
-/* ── 14. MOBILE RESPONSIVE BASE ── */
+canvas, video, img, svg {
+  font-family: inherit;
+}
+
+/* ============================================================
+   MOBILE RESPONSIVE
+   ============================================================ */
 @media (max-width: 640px) {
-  /* Ensure depot sidebar doesn't overlap content on mobile */
   .depot-sidebar {
     position: fixed !important;
     z-index: 40;
+    width: 280px !important;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease !important;
   }
 
-  /* Reduce padding on mobile */
-  .px-4.sm\\:px-6.lg\\:px-8 {
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
+  .depot-sidebar.open,
+  .depot-sidebar[data-open="true"] {
+    transform: translateX(0) !important;
+  }
+
+  /* Reduce card padding on mobile */
+  .p-5 { padding: 0.875rem !important; }
+  .p-\[18px\] { padding: 14px !important; }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  main[class*="md:ml-16"] {
+    margin-left: 4rem;
   }
 }
 
-/* ── 15. TABLET RESPONSIVE ── */
-@media (min-width: 641px) and (max-width: 1024px) {
-  /* Tablet: sidebar visible, content adjusted */
-  main[class*="md\\:ml-16"] {
-    margin-left: 4rem;
-  }
+/* ============================================================
+   ROUTE LOADING — skeleton pulse
+   ============================================================ */
+@keyframes route-skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.8; }
+}
+
+.route-skeleton-bar {
+  border-radius: 8px;
+  animation: route-skeleton-pulse 1.4s ease-in-out infinite;
+  background: var(--bg-surface-3);
+}
+
+/* ============================================================
+   LIGHT THEME — Progress bar tracks in dashboard cards
+   Need high specificity to beat Tailwind's arbitrary classes
+   ============================================================ */
+html:not(.dark) div[class*="h-1"][class*="bg-[#1E2F50]"],
+html:not(.dark) div[class*="h-2"][class*="bg-[#1E2F50]"],
+html:not(.dark) div[class*="h-1.5"][class*="bg-[#1E2F50]"] {
+  background-color: #E5E7EB !important;
+}
+
+
+/* ============================================================
+   BUTTON VISIBILITY FIXES — CRITICAL FOR PRODUCTION
+   Ensure ALL buttons are highly visible in both themes
+   ============================================================ */
+
+/* ── Light Theme Button Fixes ── */
+html:not(.dark) button {
+  /* Force strong borders and dark text for all buttons */
+  border-width: 2px !important;
+  border-style: solid !important;
+  font-weight: 700 !important;
+}
+
+/* Default buttons (not colored) - strong visibility */
+html:not(.dark) button:not([class*="bg-[#E5521A]"]):not([class*="bg-[#e5521a]"]):not([class*="bg-blue"]):not([class*="bg-emerald"]):not([class*="bg-red"]):not([class*="bg-amber"]):not([class*="bg-green"]):not([class*="bg-cyan"]):not([class*="bg-sky"]):not([class*="bg-indigo"]):not([class*="bg-purple"]):not([class*="bg-pink"]):not([class*="bg-rose"]):not([class*="bg-orange"]):not([class*="bg-yellow"]):not([class*="bg-lime"]):not([class*="bg-teal"]):not([class*="bg-violet"]):not([class*="bg-fuchsia"]) {
+  border-color: #9CA3AF !important;
+  color: #0D1117 !important;
+  background-color: #FFFFFF !important;
+}
+
+/* Default button hover states */
+html:not(.dark) button:not([class*="bg-[#E5521A]"]):not([class*="bg-[#e5521a]"]):not([class*="bg-blue"]):not([class*="bg-emerald"]):not([class*="bg-red"]):not([class*="bg-amber"]):not([class*="bg-green"]):not([class*="bg-cyan"]):not([class*="bg-sky"]):not([class*="bg-indigo"]):not([class*="bg-purple"]):not([class*="bg-pink"]):not([class*="bg-rose"]):not([class*="bg-orange"]):not([class*="bg-yellow"]):not([class*="bg-lime"]):not([class*="bg-teal"]):not([class*="bg-violet"]):not([class*="bg-fuchsia"]):hover {
+  border-color: #6B7280 !important;
+  background-color: #F9FAFB !important;
+  color: #000000 !important;
+}
+
+/* Buttons with gray borders - make them darker */
+html:not(.dark) button[class*="border-gray"] {
+  border-color: #9CA3AF !important;
+  color: #0D1117 !important;
+}
+
+html:not(.dark) button[class*="border-gray"]:hover {
+  border-color: #6B7280 !important;
+  background-color: #F3F4F6 !important;
+}
+
+/* Buttons with text-gray - make text darker */
+html:not(.dark) button[class*="text-gray"] {
+  color: #0D1117 !important;
+}
+
+/* Light colored buttons - add strong borders */
+html:not(.dark) button[class*="bg-gray-50"],
+html:not(.dark) button[class*="bg-gray-100"],
+html:not(.dark) button[class*="bg-white"] {
+  border-color: #9CA3AF !important;
+  color: #0D1117 !important;
+}
+
+/* Accent/colored buttons - keep white text */
+html:not(.dark) button[class*="bg-[#E5521A]"],
+html:not(.dark) button[class*="bg-[#e5521a]"],
+html:not(.dark) button[class*="bg-blue-"],
+html:not(.dark) button[class*="bg-emerald-"],
+html:not(.dark) button[class*="bg-red-"],
+html:not(.dark) button[class*="bg-amber-"],
+html:not(.dark) button[class*="bg-green-"],
+html:not(.dark) button[class*="bg-cyan-"],
+html:not(.dark) button[class*="bg-sky-"],
+html:not(.dark) button[class*="bg-indigo-"],
+html:not(.dark) button[class*="bg-purple-"],
+html:not(.dark) button[class*="bg-pink-"],
+html:not(.dark) button[class*="bg-rose-"],
+html:not(.dark) button[class*="bg-orange-"] {
+  color: #FFFFFF !important;
+  border-color: transparent !important;
+}
+
+/* ── Dark Theme Button Enhancements ── */
+html.dark button {
+  border-width: 1.5px !important;
+  border-style: solid !important;
+  font-weight: 700 !important;
+}
+
+/* Default buttons in dark theme */
+html.dark button:not([class*="bg-[#E5521A]"]):not([class*="bg-[#e5521a]"]):not([class*="bg-blue"]):not([class*="bg-emerald"]):not([class*="bg-red"]):not([class*="bg-amber"]):not([class*="bg-green"]):not([class*="bg-cyan"]):not([class*="bg-sky"]):not([class*="bg-indigo"]):not([class*="bg-purple"]):not([class*="bg-pink"]):not([class*="bg-rose"]):not([class*="bg-orange"]):not([class*="bg-yellow"]):not([class*="bg-lime"]):not([class*="bg-teal"]):not([class*="bg-violet"]):not([class*="bg-fuchsia"]) {
+  border-color: #2A3F68 !important;
+  color: #E8EDF8 !important;
+}
+
+html.dark button:not([class*="bg-[#E5521A]"]):not([class*="bg-[#e5521a]"]):not([class*="bg-blue"]):not([class*="bg-emerald"]):not([class*="bg-red"]):not([class*="bg-amber"]):not([class*="bg-green"]):not([class*="bg-cyan"]):not([class*="bg-sky"]):not([class*="bg-indigo"]):not([class*="bg-purple"]):not([class*="bg-pink"]):not([class*="bg-rose"]):not([class*="bg-orange"]):not([class*="bg-yellow"]):not([class*="bg-lime"]):not([class*="bg-teal"]):not([class*="bg-violet"]):not([class*="bg-fuchsia"]):hover {
+  border-color: #3A5088 !important;
+  background-color: #1a2a48 !important;
+}
+
+/* ============================================================
+   ADDITIONAL LIGHT THEME TEXT VISIBILITY FIXES
+   Fix all text colors that are too light in light theme
+   ============================================================ */
+
+/* Gray text colors - make darker for better contrast */
+html:not(.dark) [class*="text-gray-400"],
+html:not(.dark) [class*="text-gray-500"] {
+  color: #4B5563 !important;
+}
+
+html:not(.dark) [class*="text-gray-600"] {
+  color: #374151 !important;
+}
+
+html:not(.dark) [class*="text-gray-700"],
+html:not(.dark) [class*="text-gray-800"] {
+  color: #1F2937 !important;
+}
+
+/* Slate text colors */
+html:not(.dark) [class*="text-slate-400"],
+html:not(.dark) [class*="text-slate-500"] {
+  color: #475569 !important;
+}
+
+html:not(.dark) [class*="text-slate-600"],
+html:not(.dark) [class*="text-slate-700"] {
+  color: #334155 !important;
+}
+
+/* Blue-gray text colors */
+html:not(.dark) [class*="text-blue-gray"],
+html:not(.dark) [class*="text-sky-700"],
+html:not(.dark) [class*="text-sky-800"] {
+  color: #1E3A8A !important;
+}
+
+/* Ensure all labels are dark */
+html:not(.dark) label {
+  color: #0D1117 !important;
+}
+
+/* Ensure all table text is dark */
+html:not(.dark) td,
+html:not(.dark) th {
+  color: #0D1117 !important;
+}
+
+/* Ensure all list items are dark */
+html:not(.dark) li {
+  color: #0D1117 !important;
+}
+
+/* Ensure all spans are dark unless specifically colored */
+html:not(.dark) span:not([class*="text-"]):not([class*="bg-"]) {
+  color: #0D1117 !important;
+}
+
+/* Ensure all divs with text are dark */
+html:not(.dark) div:not([class*="text-"]):not([class*="bg-"]) {
+  color: #0D1117 !important;
+}
+
+/* ============================================================
+   ADDITIONAL LIGHT THEME BACKGROUND FIXES
+   Fix all backgrounds that are too dark in light theme
+   ============================================================ */
+
+/* Gray backgrounds - make lighter */
+html:not(.dark) [class*="bg-gray-800"],
+html:not(.dark) [class*="bg-gray-900"] {
+  background-color: #FFFFFF !important;
+  color: #0D1117 !important;
+}
+
+html:not(.dark) [class*="bg-gray-700"] {
+  background-color: #F9FAFB !important;
+  color: #0D1117 !important;
+}
+
+html:not(.dark) [class*="bg-gray-600"] {
+  background-color: #F3F4F6 !important;
+  color: #0D1117 !important;
+}
+
+/* Slate backgrounds */
+html:not(.dark) [class*="bg-slate-800"],
+html:not(.dark) [class*="bg-slate-900"] {
+  background-color: #FFFFFF !important;
+  color: #0D1117 !important;
+}
+
+html:not(.dark) [class*="bg-slate-700"] {
+  background-color: #F9FAFB !important;
+  color: #0D1117 !important;
+}
+
+/* Zinc backgrounds */
+html:not(.dark) [class*="bg-zinc-800"],
+html:not(.dark) [class*="bg-zinc-900"] {
+  background-color: #FFFFFF !important;
+  color: #0D1117 !important;
+}
+
+/* Neutral backgrounds */
+html:not(.dark) [class*="bg-neutral-800"],
+html:not(.dark) [class*="bg-neutral-900"] {
+  background-color: #FFFFFF !important;
+  color: #0D1117 !important;
+}
+
+/* ============================================================
+   ADDITIONAL LIGHT THEME BORDER FIXES
+   Fix all borders that are too light in light theme
+   ============================================================ */
+
+/* Gray borders - make darker for visibility */
+html:not(.dark) [class*="border-gray-100"],
+html:not(.dark) [class*="border-gray-200"] {
+  border-color: #D1D5DB !important;
+}
+
+html:not(.dark) [class*="border-gray-300"] {
+  border-color: #9CA3AF !important;
+}
+
+/* Slate borders */
+html:not(.dark) [class*="border-slate-100"],
+html:not(.dark) [class*="border-slate-200"] {
+  border-color: #CBD5E1 !important;
+}
+
+/* Ensure all cards have visible borders */
+html:not(.dark) [class*="rounded"][class*="border"]:not([class*="border-0"]):not([class*="border-none"]) {
+  border-color: #E5E7EB !important;
+}
+
+/* ============================================================
+   SPECIFIC COMPONENT FIXES FOR SCREENSHOTS
+   ============================================================ */
+
+/* Threshold preview bars */
+html:not(.dark) [class*="THRESHOLD"] {
+  color: #0D1117 !important;
+}
+
+/* Zone labels and indicators */
+html:not(.dark) [class*="ZONE"] {
+  color: #0D1117 !important;
+}
+
+/* Export buttons and action buttons */
+html:not(.dark) button[class*="Export"],
+html:not(.dark) button[class*="export"] {
+  border-width: 2px !important;
+  border-color: #6B7280 !important;
+  color: #0D1117 !important;
+  background-color: #FFFFFF !important;
+}
+
+html:not(.dark) button[class*="Export"]:hover,
+html:not(.dark) button[class*="export"]:hover {
+  border-color: #374151 !important;
+  background-color: #F3F4F6 !important;
+}
+
+/* Filter buttons (All, Near Full, Empty, FIFO Warn) */
+html:not(.dark) button[class*="rounded-full"],
+html:not(.dark) button[class*="rounded-xl"],
+html:not(.dark) button[class*="rounded-lg"] {
+  border-width: 2px !important;
+}
+
+/* Active filter buttons */
+html:not(.dark) button[class*="rounded-full"][class*="border-orange"],
+html:not(.dark) button[class*="rounded-full"][class*="border-red"],
+html:not(.dark) button[class*="rounded-full"][class*="border-blue"] {
+  border-width: 2px !important;
+  font-weight: 800 !important;
+}
+
+/* Inactive filter buttons */
+html:not(.dark) button[class*="rounded-full"]:not([class*="border-orange"]):not([class*="border-red"]):not([class*="border-blue"]) {
+  border-color: #9CA3AF !important;
+  color: #374151 !important;
+  background-color: #FFFFFF !important;
+}
+
+/* Check Out buttons */
+html:not(.dark) button[class*="Check"],
+html:not(.dark) button[class*="check"] {
+  border-width: 2px !important;
+  border-color: #F59E0B !important;
+  color: #92400E !important;
+  background-color: #FEF3C7 !important;
+}
+
+/* Status badges */
+html:not(.dark) [class*="PENDING"],
+html:not(.dark) [class*="APPROVED"],
+html:not(.dark) [class*="BLACKLISTED"] {
+  font-weight: 800 !important;
+}
+
+/* Table headers */
+html:not(.dark) th {
+  color: #374151 !important;
+  font-weight: 800 !important;
+}
+
+/* Table cells */
+html:not(.dark) td {
+  color: #0D1117 !important;
+  font-weight: 700 !important;
+}
+
+/* Purpose and Expires labels in visitor cards */
+html:not(.dark) [class*="Purpose"],
+html:not(.dark) [class*="Expires"],
+html:not(.dark) [class*="Host"] {
+  color: #0D1117 !important;
+}
+
+/* Time indicators */
+html:not(.dark) [class*="7h"],
+html:not(.dark) [class*="May"],
+html:not(.dark) [class*="pm"] {
+  color: #4B5563 !important;
 }

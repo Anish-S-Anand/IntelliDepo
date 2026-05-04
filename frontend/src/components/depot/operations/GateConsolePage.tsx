@@ -338,10 +338,196 @@ function RegisterVehicleModal({
 // ---------------------------------------------------------------------------
 
 export default function GateConsolePage() {
+  // --- Dummy Data ---
+  const DUMMY_ACCESS_LOGS: AccessLogResponse[] = [
+    {
+      id: "log-1",
+      gate_id: "gate-1",
+      gate_code: "G-01",
+      plate_number: "KA-01-AB-1234",
+      direction: "entry",
+      decision: "granted",
+      plate_confidence: 0.98,
+      processed_at: new Date(Date.now() - 5 * 60000).toISOString(),
+      created_at: new Date(Date.now() - 5 * 60000).toISOString(),
+      denied_reason: null,
+    },
+    {
+      id: "log-2",
+      gate_id: "gate-2",
+      gate_code: "G-02",
+      plate_number: "MH-12-CD-5678",
+      direction: "entry",
+      decision: "denied",
+      plate_confidence: 0.95,
+      processed_at: new Date(Date.now() - 10 * 60000).toISOString(),
+      created_at: new Date(Date.now() - 10 * 60000).toISOString(),
+      denied_reason: "Vehicle not registered",
+    },
+    {
+      id: "log-3",
+      gate_id: "gate-1",
+      gate_code: "G-01",
+      plate_number: "DL-03-EF-9012",
+      direction: "exit",
+      decision: "granted",
+      plate_confidence: 0.97,
+      processed_at: new Date(Date.now() - 15 * 60000).toISOString(),
+      created_at: new Date(Date.now() - 15 * 60000).toISOString(),
+      denied_reason: null,
+    },
+    {
+      id: "log-4",
+      gate_id: "gate-3",
+      gate_code: "G-03",
+      plate_number: "TN-22-GH-3456",
+      direction: "entry",
+      decision: "blacklisted",
+      plate_confidence: 0.99,
+      processed_at: new Date(Date.now() - 20 * 60000).toISOString(),
+      created_at: new Date(Date.now() - 20 * 60000).toISOString(),
+      denied_reason: "Vehicle blacklisted - Security concern",
+    },
+    {
+      id: "log-5",
+      gate_id: "gate-2",
+      gate_code: "G-02",
+      plate_number: "KA-05-IJ-7890",
+      direction: "entry",
+      decision: "granted",
+      plate_confidence: 0.96,
+      processed_at: new Date(Date.now() - 25 * 60000).toISOString(),
+      created_at: new Date(Date.now() - 25 * 60000).toISOString(),
+      denied_reason: null,
+    },
+    {
+      id: "log-6",
+      gate_id: "gate-1",
+      gate_code: "G-01",
+      plate_number: "AP-09-KL-2345",
+      direction: "exit",
+      decision: "granted",
+      plate_confidence: 0.94,
+      processed_at: new Date(Date.now() - 30 * 60000).toISOString(),
+      created_at: new Date(Date.now() - 30 * 60000).toISOString(),
+      denied_reason: null,
+    },
+    {
+      id: "log-7",
+      gate_id: "gate-3",
+      gate_code: "G-03",
+      plate_number: "GJ-18-MN-6789",
+      direction: "entry",
+      decision: "denied",
+      plate_confidence: 0.92,
+      processed_at: new Date(Date.now() - 35 * 60000).toISOString(),
+      created_at: new Date(Date.now() - 35 * 60000).toISOString(),
+      denied_reason: "Expired registration",
+    },
+    {
+      id: "log-8",
+      gate_id: "gate-2",
+      gate_code: "G-02",
+      plate_number: "RJ-14-OP-0123",
+      direction: "entry",
+      decision: "granted",
+      plate_confidence: 0.98,
+      processed_at: new Date(Date.now() - 40 * 60000).toISOString(),
+      created_at: new Date(Date.now() - 40 * 60000).toISOString(),
+      denied_reason: null,
+    },
+  ];
+
+  const DUMMY_VEHICLES: VehicleResponse[] = [
+    {
+      id: "veh-1",
+      plate_number: "KA-01-AB-1234",
+      vehicle_type: "truck",
+      owner_name: "Rajesh Kumar",
+      company: "ABC Logistics",
+      status: "registered",
+      created_at: new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
+      updated_at: new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
+    },
+    {
+      id: "veh-2",
+      plate_number: "MH-12-CD-5678",
+      vehicle_type: "van",
+      owner_name: "Priya Sharma",
+      company: "XYZ Transport",
+      status: "temporary",
+      valid_until: new Date(Date.now() + 7 * 24 * 60 * 60000).toISOString(),
+      created_at: new Date(Date.now() - 5 * 24 * 60 * 60000).toISOString(),
+      updated_at: new Date(Date.now() - 5 * 24 * 60 * 60000).toISOString(),
+    },
+    {
+      id: "veh-3",
+      plate_number: "DL-03-EF-9012",
+      vehicle_type: "car",
+      owner_name: "Amit Patel",
+      company: "Tech Solutions Inc",
+      status: "registered",
+      created_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
+      updated_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
+    },
+    {
+      id: "veh-4",
+      plate_number: "TN-22-GH-3456",
+      vehicle_type: "truck",
+      owner_name: "Suresh Reddy",
+      company: "Southern Freight",
+      status: "blacklisted",
+      blacklist_reason: "Security concern - unauthorized access attempt",
+      created_at: new Date(Date.now() - 90 * 24 * 60 * 60000).toISOString(),
+      updated_at: new Date(Date.now() - 2 * 24 * 60 * 60000).toISOString(),
+    },
+    {
+      id: "veh-5",
+      plate_number: "KA-05-IJ-7890",
+      vehicle_type: "van",
+      owner_name: "Lakshmi Iyer",
+      company: "Express Delivery Co",
+      status: "registered",
+      created_at: new Date(Date.now() - 45 * 24 * 60 * 60000).toISOString(),
+      updated_at: new Date(Date.now() - 45 * 24 * 60 * 60000).toISOString(),
+    },
+    {
+      id: "veh-6",
+      plate_number: "AP-09-KL-2345",
+      vehicle_type: "car",
+      owner_name: "Venkat Rao",
+      company: "Coastal Enterprises",
+      status: "registered",
+      created_at: new Date(Date.now() - 20 * 24 * 60 * 60000).toISOString(),
+      updated_at: new Date(Date.now() - 20 * 24 * 60 * 60000).toISOString(),
+    },
+    {
+      id: "veh-7",
+      plate_number: "GJ-18-MN-6789",
+      vehicle_type: "truck",
+      owner_name: "Mehul Shah",
+      company: "Gujarat Movers",
+      status: "expired",
+      valid_until: new Date(Date.now() - 10 * 24 * 60 * 60000).toISOString(),
+      created_at: new Date(Date.now() - 120 * 24 * 60 * 60000).toISOString(),
+      updated_at: new Date(Date.now() - 10 * 24 * 60 * 60000).toISOString(),
+    },
+    {
+      id: "veh-8",
+      plate_number: "RJ-14-OP-0123",
+      vehicle_type: "bike",
+      owner_name: "Anil Verma",
+      company: "Quick Courier",
+      status: "registered",
+      created_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
+      updated_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
+    },
+  ];
+
   // --- State ---
   const [gates, setGates] = useState<GateResponse[]>([]);
-  const [accessLogs, setAccessLogs] = useState<AccessLogResponse[]>([]);
-  const [vehicles, setVehicles] = useState<VehicleResponse[]>([]);
+  const [accessLogs, setAccessLogs] = useState<AccessLogResponse[]>(DUMMY_ACCESS_LOGS);
+  const [vehicles, setVehicles] = useState<VehicleResponse[]>(DUMMY_VEHICLES);
   const [visitors, setVisitors] = useState<VisitorResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -387,15 +573,23 @@ export default function GateConsolePage() {
   const loadLogs = useCallback(async () => {
     try {
       const data = await getAccessLogs({ limit: 20 });
-      setAccessLogs(data);
-    } catch { /* offline */ }
+      // Merge API data with dummy data, or use dummy data if API fails
+      setAccessLogs(data.length > 0 ? data : DUMMY_ACCESS_LOGS);
+    } catch { 
+      // Keep dummy data on error
+      setAccessLogs(DUMMY_ACCESS_LOGS);
+    }
   }, []);
 
   const loadVehicles = useCallback(async () => {
     try {
       const data = await getVehicles();
-      setVehicles(data);
-    } catch { /* offline */ }
+      // Merge API data with dummy data, or use dummy data if API fails
+      setVehicles(data.length > 0 ? data : DUMMY_VEHICLES);
+    } catch { 
+      // Keep dummy data on error
+      setVehicles(DUMMY_VEHICLES);
+    }
   }, []);
 
   const loadVisitors = useCallback(async () => {
@@ -789,7 +983,7 @@ export default function GateConsolePage() {
                 <th className="pb-2 pr-3">Plate</th>
                 <th className="pb-2 pr-3">Direction</th>
                 <th className="pb-2 pr-3">Decision</th>
-                <th className="pb-2 pr-3">Confidence</th>
+                <th className="pb-2 pr-3">Analysis</th>
                 <th className="pb-2">Reason</th>
               </tr>
             </thead>
@@ -825,7 +1019,7 @@ export default function GateConsolePage() {
                     </span>
                   </td>
                   <td className="py-2 pr-3 text-[10px] font-mono text-[#8A9BBF]">
-                    {(log.plate_confidence * 100).toFixed(1)}%
+                    Analysis
                   </td>
                   <td className="py-2 text-[10px] text-[#F04A4A]">
                     {log.denied_reason || "—"}

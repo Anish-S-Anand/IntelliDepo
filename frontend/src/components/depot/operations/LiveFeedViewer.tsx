@@ -12,6 +12,7 @@ import {
   Wifi,
   WifiOff,
   X,
+  Shield,
 } from "lucide-react";
 import {
   getDepotCommandSnapshot,
@@ -28,6 +29,7 @@ import {
   type DetectedObject,
   type DetectionModel,
 } from "@/services/depotVision";
+import LPRCameraPanel from "./LPRCameraPanel";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -705,7 +707,25 @@ export default function LiveFeedViewer() {
         </div>
       </div>
 
-      {/* Camera grid */}
+      {/* ── LPR Gate Camera — dedicated full-width panel ── */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Shield className="w-4 h-4 text-[#E5521A]" />
+          <span className="text-[12px] font-bold text-[#E8EDF8] uppercase tracking-[0.15em]">LPR Gate Camera</span>
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#E5521A]/10 text-[#E5521A] border border-[#E5521A]/25">
+            AUTO OCR · LIVE
+          </span>
+        </div>
+        <LPRCameraPanel />
+      </div>
+
+      <div className="h-px bg-gradient-to-r from-transparent via-[#E5521A]/30 to-transparent mb-5" />
+
+      {/* Camera grid — regular CCTV feeds */}
+      <div className="flex items-center gap-2 mb-3">
+        <Camera className="w-4 h-4 text-[#8A9BBF]" />
+        <span className="text-[12px] font-bold text-[#E8EDF8] uppercase tracking-[0.15em]">CCTV Feeds</span>
+      </div>
       {loading ? (
         <div className="flex items-center justify-center h-64 text-[#4E6090] text-sm">
           Loading camera feeds...

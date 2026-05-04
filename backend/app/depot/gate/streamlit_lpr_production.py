@@ -24,7 +24,7 @@ except ImportError:
 
 
 # Production video path
-DEFAULT_VIDEO_PATH = r"C:\Users\karte\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\intelli-platform\LPR_RECOGNITION.mp4"
+DEFAULT_VIDEO_PATH = r"C:\Users\Anish\Desktop\IntelliDepo\backend\tmp\LPR_RECOGNITION.mp4"
 
 # Indian license plate patterns
 PLATE_PATTERNS = [

@@ -3,6 +3,7 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: intelli-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: intelli
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-intelli}
@@ -12,73 +13,93 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U intelli"]
+      test: ["CMD-SHELL", "pg_isready -U intelli -d intelli"]
       interval: 5s
       timeout: 5s
-      retries: 5
-    restart: unless-stopped
+      retries: 10
+      start_period: 10s
+    networks:
+      - intelli-net
 
   # ---- MinIO (S3 storage) ----
   minio:
     image: minio/minio:latest
     container_name: intelli-minio
+    restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
       - minio_data:/data
-    restart: unless-stopped
+    networks:
+      - intelli-net
 
   # ---- Zookeeper (required for Kafka) ----
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
     container_name: intelli-zookeeper
-    ports:
-      - "2181:2181"
+    restart: unless-stopped
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    restart: unless-stopped
+    ports:
+      - "2181:2181"
+    networks:
+      - intelli-net
 
-  # ---- Kafka (stable Confluent version) ----
+  # ---- Kafka ----
   kafka:
     image: confluentinc/cp-kafka:7.6.0
     container_name: intelli-kafka
+    hostname: kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
     ports:
       - "9092:9092"
+      - "29092:29092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
 
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      # Internal container-to-container access + host access
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-    depends_on:
-      - zookeeper
-    restart: unless-stopped
+
+      # Single-broker local dev settings
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    networks:
+      - intelli-net
 
   # ---- Kafka UI ----
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: intelli-kafka-ui
-    ports:
-      - "8080:8080"
+    restart: unless-stopped
+    depends_on:
+      - kafka
     environment:
       KAFKA_CLUSTERS_0_NAME: intelli-cluster
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-    depends_on:
-      - kafka
-    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - intelli-net
 
   # ---- Grafana ----
   grafana:
     image: grafana/grafana:latest
     container_name: intelli-grafana
+    restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
@@ -87,26 +108,14 @@ services:
       - "3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-
-  # ---- Frontend Only ----
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: intelli-frontend
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-      NEXT_PUBLIC_S3_ENDPOINT: http://localhost:9000
-      NEXT_PUBLIC_KAFKA_UI: http://localhost:8080
-    ports:
-      - "3000:3000"
-    restart: unless-stopped
+    networks:
+      - intelli-net
 
 volumes:
   postgres_data:
-  grafana_data:
   minio_data:
+  grafana_data:
+
+networks:
+  intelli-net:
+    driver: bridge

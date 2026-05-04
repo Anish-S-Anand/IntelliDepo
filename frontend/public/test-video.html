@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video Test</title>
+    <style>
+        body { background: #000; color: #fff; font-family: Arial; padding: 20px; }
+        .video-container { margin: 20px 0; }
+        img { max-width: 800px; border: 2px solid #0f0; }
+        .status { padding: 10px; background: #333; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Video Backend Test</h1>
+    
+    <div class="status">
+        <h2>Test 1: Video List</h2>
+        <button onclick="testList()">Test Video List API</button>
+        <pre id="list-result"></pre>
+    </div>
+
+    <div class="status">
+        <h2>Test 2: Snapshot (Direct Backend)</h2>
+        <button onclick="testSnapshotDirect()">Load Snapshot (Direct)</button>
+        <div class="video-container">
+            <img id="snapshot-direct" alt="Direct snapshot" />
+        </div>
+    </div>
+
+    <div class="status">
+        <h2>Test 3: Snapshot (Through Proxy)</h2>
+        <button onclick="testSnapshotProxy()">Load Snapshot (Proxy)</button>
+        <div class="video-container">
+            <img id="snapshot-proxy" alt="Proxy snapshot" />
+        </div>
+    </div>
+
+    <div class="status">
+        <h2>Test 4: MJPEG Stream (Through Proxy)</h2>
+        <button onclick="testStream()">Load MJPEG Stream</button>
+        <div class="video-container">
+            <img id="stream" alt="MJPEG stream" />
+        </div>
+    </div>
+
+    <script>
+        async function testList() {
+            const result = document.getElementById('list-result');
+            try {
+                const response = await fetch('/backend/depot/vision/cameras/video-library/list');
+                const data = await response.json();
+                result.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                result.textContent = 'ERROR: ' + error.message;
+            }
+        }
+
+        function testSnapshotDirect() {
+            const img = document.getElementById('snapshot-direct');
+            img.src = 'http://localhost:8000/depot/vision/cameras/video-library/LPR_RECOGNITION.mp4/snapshot?seek=0&t=' + Date.now();
+        }
+
+        function testSnapshotProxy() {
+            const img = document.getElementById('snapshot-proxy');
+            img.src = '/backend/depot/vision/cameras/video-library/LPR_RECOGNITION.mp4/snapshot?seek=0&t=' + Date.now();
+        }
+
+        function testStream() {
+            const img = document.getElementById('stream');
+            img.src = '/backend/depot/vision/cameras/video-library/LPR_RECOGNITION.mp4/mjpeg?theme=dark&seek=0&t=' + Date.now();
+        }
+    </script>
+</body>
+</html>

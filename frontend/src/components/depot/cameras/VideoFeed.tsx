@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useDetection } from "@/hooks/useDetection";
+import api from "@/services/api";
 
 interface VideoFeedProps {
   name: string;
@@ -37,27 +38,22 @@ function simulateLPR(): string {
 export function VideoFeed({ name, cameraId, videoFile, cameraIndex, onDetectionUpdate, onPlateDetected }: VideoFeedProps) {
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
-  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lprTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [status, setStatus] = useState<"connecting" | "live" | "error">("connecting");
 
   useDetection(sourceCanvasRef, overlayCanvasRef, cameraIndex, status === "live", onDetectionUpdate);
 
-  // Each camera seeks to a different position in its video so feeds look distinct.
-  // Index 0 = start, 1 = 30s in, 2 = 60s in, etc.
-  const seekSeconds = cameraIndex * 30;
+  // All cameras start from the beginning of their respective videos
+  // This ensures consistent playback and avoids seek issues
+  const seekSeconds = 0;
 
   const snapshotUrl = videoFile
-    ? `/backend/depot/vision/cameras/video-library/${encodeURIComponent(videoFile)}/snapshot?seek=${seekSeconds}`
-    : `${getBackendBase()}/depot/vision/cameras/${cameraId}/snapshot?seek=${seekSeconds}`;
-  const streamUrl = videoFile
-    ? `/backend/depot/vision/cameras/video-library/${encodeURIComponent(videoFile)}/mjpeg?theme=dark&seek=${seekSeconds}`
-    : null;
-  const withCacheBuster = useCallback((url: string) => {
-    const separator = url.includes("?") ? "&" : "?";
-    return `${url}${separator}t=${Date.now()}`;
-  }, []);
-
+    ? `/depot/vision/cameras/video-library/${encodeURIComponent(videoFile)}/snapshot?seek=${seekSeconds}`
+    : `/depot/vision/cameras/${cameraId}/snapshot?seek=${seekSeconds}`;
+  
+  // For MJPEG streams, we'll use the snapshot polling approach since <img> tags can't have custom headers
+  const streamUrl = null; // Disable MJPEG for now, use snapshot polling instead
+  
   // LPR simulation: periodically "detect" a plate when camera is live
   const triggerLPR = useCallback(() => {
     if (onPlateDetected && status === "live") {
@@ -83,8 +79,6 @@ export function VideoFeed({ name, cameraId, videoFile, cameraIndex, onDetectionU
 
     let cancelled = false;
     let consecutiveErrors = 0;
-    const img = new window.Image();
-    img.crossOrigin = "anonymous";
 
     const initSize = () => {
       const w = canvas.offsetWidth;
@@ -96,29 +90,81 @@ export function VideoFeed({ name, cameraId, videoFile, cameraIndex, onDetectionU
     };
     initSize();
 
-    const loadFrame = () => {
+    const loadFrame = async () => {
       if (cancelled) return;
-      img.src = withCacheBuster(snapshotUrl);
-    };
-
-    img.onload = () => {
-      if (cancelled) return;
-      consecutiveErrors = 0;
-      initSize();
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      setStatus("live");
-      if (!cancelled) {
-        pollRef.current = setTimeout(loadFrame, 1000);
-      }
-    };
-
-    img.onerror = () => {
-      if (cancelled) return;
-      consecutiveErrors++;
-      setStatus("error");
-      const delay = Math.min(1000 * Math.pow(2, consecutiveErrors), 10000);
-      if (!cancelled) {
-        pollRef.current = setTimeout(loadFrame, delay);
+      
+      try {
+        // For video-library endpoints, use direct fetch (no auth required)
+        // For camera endpoints, use api service with auth
+        const isVideoLibrary = snapshotUrl.includes('/video-library/');
+        
+        let blob: Blob;
+        if (isVideoLibrary) {
+          // Direct fetch for video-library (public endpoints)
+          const backendBase = getBackendBase();
+          const fullUrl = `${backendBase}${snapshotUrl}&t=${Date.now()}`;
+          const response = await fetch(fullUrl);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          
+          blob = await response.blob();
+        } else {
+          // Use axios with auth for regular camera endpoints
+          const response = await api.get(snapshotUrl, {
+            responseType: 'blob',
+            params: { t: Date.now() },
+            validateStatus: (status) => status < 500
+          });
+          
+          if (response.status >= 400) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          
+          blob = response.data;
+        }
+        
+        const imageUrl = URL.createObjectURL(blob);
+        
+        const img = new window.Image();
+        img.onload = () => {
+          if (cancelled) {
+            URL.revokeObjectURL(imageUrl);
+            return;
+          }
+          consecutiveErrors = 0;
+          initSize();
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          setStatus("live");
+          URL.revokeObjectURL(imageUrl);
+          
+          if (!cancelled) {
+            setTimeout(loadFrame, 1000);
+          }
+        };
+        
+        img.onerror = () => {
+          URL.revokeObjectURL(imageUrl);
+          if (cancelled) return;
+          consecutiveErrors++;
+          setStatus("error");
+          const delay = Math.min(1000 * Math.pow(2, consecutiveErrors), 10000);
+          if (!cancelled) {
+            setTimeout(loadFrame, delay);
+          }
+        };
+        
+        img.src = imageUrl;
+      } catch (error) {
+        console.error('VideoFeed error:', error);
+        if (cancelled) return;
+        consecutiveErrors++;
+        setStatus("error");
+        const delay = Math.min(1000 * Math.pow(2, consecutiveErrors), 10000);
+        if (!cancelled) {
+          setTimeout(loadFrame, delay);
+        }
       }
     };
 
@@ -126,12 +172,8 @@ export function VideoFeed({ name, cameraId, videoFile, cameraIndex, onDetectionU
 
     return () => {
       cancelled = true;
-      img.onload = null;
-      img.onerror = null;
-      img.src = "";
-      if (pollRef.current) clearTimeout(pollRef.current);
     };
-  }, [snapshotUrl, withCacheBuster]);
+  }, [snapshotUrl]);
 
   const statusColor =
     status === "live" ? "bg-green-500" : status === "error" ? "bg-red-500" : "bg-gray-500";

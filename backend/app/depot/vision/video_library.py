@@ -28,74 +28,68 @@ from pathlib import Path
 
 _THIS_FILE = Path(__file__).resolve()
 _THIS_DIR = _THIS_FILE.parent          # backend/app/depot/vision/
-LOCAL_VIDEO_DIR = _THIS_DIR / "videos"
+
+# UPDATED: Point to the actual video location in backend/tmp
+# This is where the LPR_RECOGNITION.mp4, Perimeter_Detection.mp4, and Theft Camera .mp4 are stored
+import os
+if os.path.exists(r"C:\Users\Anish\Desktop\IntelliDepo\backend\tmp"):
+    LOCAL_VIDEO_DIR = Path(r"C:\Users\Anish\Desktop\IntelliDepo\backend\tmp")
+else:
+    # Fallback to relative path
+    LOCAL_VIDEO_DIR = Path(__file__).resolve().parent.parent.parent.parent / "tmp"
 
 # ---------------------------------------------------------------------------
 # Depot video files mapped to camera scenes (0-5)
 # These are real warehouse/depot recordings from the depot pendrive.
 # Additional videos beyond the 6 primary scenes are available for
 # detection training and analytics.
+# 
+# UPDATED: Using videos from backend/tmp directory
 # ---------------------------------------------------------------------------
 SCENE_VIDEOS = [
     {
         "scene": "gate_entry",
-        "label": "GATE ENTRY NORTH",
-        "filename": "dtranshipment 1 (2).mp4",
-        "description": "Transhipment area — gate entry operations",
+        "label": "GATE ENTRY NORTH - LPR",
+        "filename": "LPR_RECOGNITION.mp4",
+        "description": "License Plate Recognition - Gate Entry",
     },
     {
         "scene": "zone_overhead",
         "label": "ZONE-A OVERHEAD",
-        "filename": "cluster 13 (1).mp4",
-        "description": "Cluster 13 — overhead zone storage view",
+        "filename": "LPR_RECOGNITION.mp4",
+        "description": "LPR Recognition - Overhead view",
     },
     {
         "scene": "loading_bay",
         "label": "LOADING BAY 1-4",
-        "filename": "cluster 4-5 (1).mp4",
-        "description": "Cluster 4-5 — loading bay operations",
+        "filename": "LPR_RECOGNITION.mp4",
+        "description": "LPR Recognition - Loading bay",
     },
     {
         "scene": "perimeter",
         "label": "ZONE-C PERIMETER",
-        "filename": "Recording 2025-07-30 115417.mp4",
-        "description": "Depot recording — perimeter monitoring",
+        "filename": "Perimeter_Detection.mp4",
+        "description": "Perimeter Detection - Security monitoring",
     },
     {
         "scene": "gate_exit",
         "label": "GATE EXIT SOUTH",
-        "filename": "Recording 2025-08-11 171805.mp4",
-        "description": "Depot recording — exit gate operations",
+        "filename": "Theft Camera .mp4",
+        "description": "Theft Detection - Exit gate",
     },
     {
         "scene": "yard",
         "label": "YARD OVERVIEW",
-        "filename": "Screen Recording 2025-08-11 174929.mp4",
-        "description": "Depot screen recording — yard overview",
+        "filename": "LPR_RECOGNITION.mp4",
+        "description": "LPR Recognition - Yard overview",
     },
 ]
 
 # All available depot videos for training/detection beyond the 6 primary scenes
 ALL_DEPOT_VIDEOS = [
-    "cluster 13 (1).mp4",
-    "cluster 4-5 (1).mp4",
-    "dtranshipment 1 (2).mp4",
-    "Recording 2025-07-30 115417.mp4",
-    "Recording 2025-08-11 171805.mp4",
-    "Screen Recording 2025-04-29 120722.mp4",
-    "Screen Recording 2025-04-29 131812.mp4",
-    "Screen Recording 2025-05-09 125537.mp4",
-    "Screen Recording 2025-05-14 081914.mp4",
-    "Screen Recording 2025-05-22 164244.mp4",
-    "Screen Recording 2025-07-14 142945.mp4",
-    "Screen Recording 2025-07-14 143106.mp4",
-    "Screen Recording 2025-07-30 115414.mp4",
-    "Screen Recording 2025-07-30 120512.mp4",
-    "Screen Recording 2025-08-11 171757.mp4",
-    "Screen Recording 2025-08-11 173926.mp4",
-    "Screen Recording 2025-08-11 174012.mp4",
-    "Screen Recording 2025-08-11 174233.mp4",
-    "Screen Recording 2025-08-11 174929.mp4",
+    "LPR_RECOGNITION.mp4",
+    "Perimeter_Detection.mp4",
+    "Theft Camera .mp4",
 ]
 
 # In-memory video capture cache: key -> cv2.VideoCapture
@@ -200,8 +194,7 @@ def get_video_frame_by_filename(filename: str, seek_seconds: float = 0.0) -> Opt
     """
     Read a frame from a specific depot video file by name.
     seek_seconds: position in the video to read from (0 = start).
-    Each call with the same filename+seek returns the next sequential frame
-    from a cached capture opened at that seek position.
+    Opens a fresh capture for each request to avoid concurrency issues.
     Thread-safe: uses a lock so concurrent snapshot requests don't corrupt state.
     """
     if not _HAS_CV2:
@@ -209,29 +202,51 @@ def get_video_frame_by_filename(filename: str, seek_seconds: float = 0.0) -> Opt
 
     video_path = get_local_video_path(filename)
     if video_path is None:
+        logger.warning(f"Video file not found: {filename}")
         return None
 
-    # Use a seek-specific cache key so different seek positions don't share state
-    key = f"file_{filename}_{int(seek_seconds)}"
+    # Open a fresh capture for each request to avoid sharing state between cameras
+    # This prevents concurrency issues when multiple cameras use the same video file
+    cap = _open_video_capture(video_path, seek_seconds=seek_seconds)
+    if cap is None:
+        logger.warning(f"Failed to open video capture for: {filename}")
+        return None
 
-    with _video_caps_lock:
-        if key not in _video_caps or _video_caps[key] is None:
-            _video_caps[key] = _open_video_capture(video_path, seek_seconds=seek_seconds)
-
-        cap = _video_caps.get(key)
-        if cap is None:
-            return None
-
+    try:
         ret, frame = cap.read()
         if not ret or frame is None:
-            # Loop: seek back to the original position
-            fps = cap.get(cv2.CAP_PROP_FPS) or 25
-            cap.set(cv2.CAP_PROP_POS_FRAMES, int(seek_seconds * fps))
-            ret, frame = cap.read()
-
-    if ret and frame is not None:
-        return frame
-    return None
+            # Try seeking to a safe position
+            try:
+                fps = cap.get(cv2.CAP_PROP_FPS) or 25
+                total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+                target_frame = int(seek_seconds * fps)
+                
+                # If seek position is beyond video length, loop back to start
+                if total_frames > 0 and target_frame >= total_frames:
+                    target_frame = target_frame % int(total_frames)
+                
+                cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
+                ret, frame = cap.read()
+                
+                if not ret or frame is None:
+                    # If still failing, try from the beginning
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    ret, frame = cap.read()
+            except Exception as e:
+                logger.warning(f"Error seeking in video {filename}: {e}")
+                return None
+        
+        if ret and frame is not None:
+            return frame
+        
+        logger.warning(f"Failed to read frame from {filename} at seek={seek_seconds}")
+        return None
+    finally:
+        # Always release the capture after reading
+        try:
+            cap.release()
+        except Exception:
+            pass
 
 
 def release_all():

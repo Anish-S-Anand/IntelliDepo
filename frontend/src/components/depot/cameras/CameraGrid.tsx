@@ -12,16 +12,17 @@ interface CameraData {
   videoFile?: string;
 }
 
-const GATE_EXIT_SOUTH_VIDEO = "Recording 2025-08-11 171805.mp4";
+const GATE_EXIT_SOUTH_VIDEO = "Theft Camera .mp4";
 
 // Exactly 6 cameras — no more, no less
+// UPDATED: Using videos from backend/tmp directory
 const FALLBACK_CAMERAS: CameraData[] = [
-  { id: "gate-entry-north", name: "Gate Entry North", videoFile: "dtranshipment 1 (2).mp4" },
-  { id: "zone-a-overhead", name: "Zone A Overhead", videoFile: "cluster 13 (1).mp4" },
-  { id: "loading-bay-1-4", name: "Loading Bay 1-4", videoFile: "cluster 4-5 (1).mp4" },
-  { id: "zone-c-perimeter", name: "Zone C Perimeter", videoFile: "Recording 2025-07-30 115417.mp4" },
-  { id: "gate-exit-south", name: "Gate Exit South", videoFile: GATE_EXIT_SOUTH_VIDEO },
-  { id: "yard-overview", name: "Yard Overview", videoFile: "Screen Recording 2025-08-11 174929.mp4" },
+  { id: "gate-entry-north", name: "Gate Entry North - LPR", videoFile: "LPR_RECOGNITION.mp4" },
+  { id: "zone-a-overhead", name: "Zone A Overhead - LPR", videoFile: "LPR_RECOGNITION.mp4" },
+  { id: "loading-bay-1-4", name: "Loading Bay 1-4 - LPR", videoFile: "LPR_RECOGNITION.mp4" },
+  { id: "zone-c-perimeter", name: "Zone C Perimeter", videoFile: "Perimeter_Detection.mp4" },
+  { id: "gate-exit-south", name: "Gate Exit South - Theft", videoFile: GATE_EXIT_SOUTH_VIDEO },
+  { id: "yard-overview", name: "Yard Overview - LPR", videoFile: "LPR_RECOGNITION.mp4" },
 ];
 
 function getBackendBase(): string {
@@ -68,49 +69,52 @@ function CameraGridInner() {
   const [detections, setDetections] = useState<Record<number, DetectionCounts>>({});
   const [plateLog, setPlateLog] = useState<Array<{ time: string; camera: string; plate: string }>>([]);
 
-  useEffect(() => {
-    async function fetchCameras() {
-      try {
-        const res = await fetch(`${getBackendBase()}/depot/vision/cameras/`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            // Only use cameras with local: stream URLs
-            const usable = data.filter((c: { stream_url?: string }) =>
-              c.stream_url?.startsWith("local:")
-            );
-
-            // Deduplicate by stream_url — keep first occurrence of each unique video
-            const seen = new Set<string>();
-            const unique = usable.filter((c: { stream_url?: string }) => {
-              if (!c.stream_url || seen.has(c.stream_url)) return false;
-              seen.add(c.stream_url);
-              return true;
-            });
-
-            // Need at least 6 distinct videos to replace fallback
-            if (unique.length < 6) {
-              return; // keep FALLBACK_CAMERAS which already have 6 distinct files
-            }
-
-            const limited = unique.slice(0, 6).map((c: { id: string; name: string; stream_url?: string }) => ({
-              id: c.id,
-              name: c.name,
-              stream_url: c.stream_url,
-              videoFile:
-                c.name === "Gate Exit South"
-                  ? GATE_EXIT_SOUTH_VIDEO
-                  : c.stream_url?.replace(/^local:/, ""),
-            }));
-            setCameras(limited);
-          }
-        }
-      } catch {
-        // Use fallback cameras (already 6 distinct videos)
-      }
-    }
-    fetchCameras();
-  }, []);
+  // DISABLED: Don't fetch cameras from backend - use fallback cameras only
+  // The backend database has cameras configured with videos that don't exist in backend/tmp
+  // We only have 3 videos: LPR_RECOGNITION.mp4, Perimeter_Detection.mp4, Theft Camera .mp4
+  // useEffect(() => {
+  //   async function fetchCameras() {
+  //     try {
+  //       const res = await fetch(`${getBackendBase()}/depot/vision/cameras/`);
+  //       if (res.ok) {
+  //         const data = await res.json();
+  //         if (Array.isArray(data) && data.length > 0) {
+  //           // Only use cameras with local: stream URLs
+  //           const usable = data.filter((c: { stream_url?: string }) =>
+  //             c.stream_url?.startsWith("local:")
+  //           );
+  //
+  //           // Deduplicate by stream_url — keep first occurrence of each unique video
+  //           const seen = new Set<string>();
+  //           const unique = usable.filter((c: { stream_url?: string }) => {
+  //             if (!c.stream_url || seen.has(c.stream_url)) return false;
+  //             seen.add(c.stream_url);
+  //             return true;
+  //           });
+  //
+  //           // Need at least 6 distinct videos to replace fallback
+  //           if (unique.length < 6) {
+  //             return; // keep FALLBACK_CAMERAS which already have 6 distinct files
+  //           }
+  //
+  //           const limited = unique.slice(0, 6).map((c: { id: string; name: string; stream_url?: string }) => ({
+  //             id: c.id,
+  //             name: c.name,
+  //             stream_url: c.stream_url,
+  //             videoFile:
+  //               c.name === "Gate Exit South"
+  //                 ? GATE_EXIT_SOUTH_VIDEO
+  //                 : c.stream_url?.replace(/^local:/, ""),
+  //           }));
+  //           setCameras(limited);
+  //         }
+  //       }
+  //     } catch {
+  //       // Use fallback cameras (already 6 distinct videos)
+  //     }
+  //   }
+  //   fetchCameras();
+  // }, []);
 
   const handleDetectionUpdate = useCallback(
     (cameraIndex: number, cameraName: string) =>
@@ -173,7 +177,7 @@ function CameraGridInner() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Camera size={18} className="text-[#3fb950]" />
-          <h2 className="text-sm font-bold text-white">Depot Camera Surveillance</h2>
+          <h2 className="text-sm font-bold text-white">IntelliVision</h2>
           <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] text-white/60">
             {activeCameras} feeds
           </span>

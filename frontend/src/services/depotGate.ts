@@ -91,11 +91,39 @@ export async function blacklistVehicle(vehicleId: string, reason: string): Promi
   return res.data;
 }
 
-// LPR
+// LPR — text scan (manual plate entry)
 export async function processLprScan(data: {
   gate_id: string; plate_number: string; confidence?: number; direction?: string;
 }): Promise<AccessLogResponse> {
   const res = await api.post<AccessLogResponse>("/depot/gate/lpr/scan", data);
+  return res.data;
+}
+
+// LPR image result from OCR endpoint
+export interface LprScanImageResult {
+  plate_number: string;
+  confidence: number;
+  raw_candidates: string[];
+  decision: string;
+  denied_reason: string | null;
+  access_log_id: string | null;
+  gate_id: string | null;
+  processed_at: string;
+}
+
+// LPR — image scan (send JPEG snapshot for OCR recognition)
+export async function processLprImageScan(
+  imageBlob: Blob,
+  gateId?: string,
+  direction: "entry" | "exit" = "entry",
+): Promise<LprScanImageResult> {
+  const form = new FormData();
+  form.append("file", imageBlob, "snapshot.jpg");
+  if (gateId) form.append("gate_id", gateId);
+  form.append("direction", direction);
+  const res = await api.post<LprScanImageResult>("/depot/gate/lpr/scan-image", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
   return res.data;
 }
 
