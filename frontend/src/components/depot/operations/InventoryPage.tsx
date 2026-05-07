@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
+import { motion } from "framer-motion";
 import { Plus, X, Calendar, Package, Layers, ChevronDown } from "lucide-react";
 import { occColor } from "@/lib/depot-data";
 
@@ -194,6 +195,126 @@ function AddClusterModal({ onClose, onAdd }: AddClusterModalProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Memoized Zone Bar Component
+// ---------------------------------------------------------------------------
+
+interface ZoneBarProps {
+  zone: ZoneData;
+}
+
+const ZoneBar = memo(({ zone }: ZoneBarProps) => {
+  const pct = Math.round(zone.utilization_pct);
+  const col = useMemo(() => zoneColor(pct), [pct]);
+
+  const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 32px rgba(229,82,26,0.12)";
+    (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(229,82,26,0.3)";
+  }, []);
+
+  const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 12px rgba(0,0,0,0.06)";
+    (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-card)";
+  }, []);
+
+  return (
+    <div
+      className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 text-center relative overflow-hidden transition-all hover:border-[#E5521A]/30 hover:shadow-[0_6px_24px_rgba(229,82,26,0.08)]"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div
+        className="absolute top-0 left-0 right-0 h-[3px]"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${col}, transparent)`,
+          opacity: 0.8,
+        }}
+      />
+      <div className="text-[11px] font-extrabold text-[#4E6090] tracking-[0.12em]">
+        ZONE {zone.zone_code}
+      </div>
+      <div className="text-[28px] font-extrabold my-1.5" style={{ color: col }}>
+        {pct}%
+      </div>
+      <div className="w-full h-1 bg-[#1E2F50] rounded-full overflow-hidden mt-1.5">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: col }} />
+      </div>
+      <div className="text-[9px] text-[#4E6090] mt-1.5">
+        {zone.current_occupancy.toLocaleString()} / {zone.max_capacity_units.toLocaleString()} bags
+      </div>
+    </div>
+  );
+});
+
+ZoneBar.displayName = "ZoneBar";
+
+// ---------------------------------------------------------------------------
+// Memoized Cluster Card Component
+// ---------------------------------------------------------------------------
+
+interface ClusterCardProps {
+  cluster: ClusterCard;
+}
+
+const ClusterCardComponent = memo(({ cluster }: ClusterCardProps) => {
+  const pct = useMemo(() => {
+    return cluster.capacity > 0 ? Math.round((cluster.occupied / cluster.capacity) * 100) : 0;
+  }, [cluster.capacity, cluster.occupied]);
+  
+  const col = useMemo(() => occColor(pct), [pct]);
+
+  const borderColor = useMemo(() => {
+    return cluster.fifo ? "#1E2F50" : "rgba(245,166,35,0.35)";
+  }, [cluster.fifo]);
+
+  return (
+    <div
+      className="bg-[#14203A] border rounded-[14px] p-[15px] transition-all hover:border-[#2A3F68] hover:-translate-y-px"
+      style={{ borderColor }}
+    >
+      <div className="flex justify-between mb-2.5">
+        <div>
+          <div className="text-[15px] font-bold text-[#E8EDF8]">Cluster {cluster.id}</div>
+          <div className="text-[11px] text-[#8A9BBF] mt-0.5">{cluster.product}</div>
+        </div>
+        <div className="flex flex-col gap-1 items-end">
+          <span
+            className="text-[9px] font-bold px-2 py-0.5 rounded-full border"
+            style={{ background: `${col}22`, color: col, borderColor: `${col}44` }}
+          >
+            {pct}%
+          </span>
+          <span
+            className="text-[9px] font-bold px-2 py-0.5 rounded-full border"
+            style={{
+              background: cluster.fifo ? "rgba(34,211,161,0.1)" : "rgba(245,166,35,0.1)",
+              color: cluster.fifo ? "#22D3A1" : "#F5A623",
+              borderColor: cluster.fifo ? "rgba(34,211,161,0.2)" : "rgba(245,166,35,0.2)",
+            }}
+          >
+            {cluster.fifo ? "✓ FIFO" : "⚠ FEFO"}
+          </span>
+        </div>
+      </div>
+      <div className="w-full h-1 bg-[#1E2F50] rounded-full overflow-hidden">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: col }} />
+      </div>
+      <div className="grid grid-cols-2 gap-x-2.5 gap-y-1 text-[10px] mt-2.5">
+        <span className="text-[#4E6090]">Capacity</span>
+        <span className="font-semibold text-[#E8EDF8]">{cluster.capacity.toLocaleString()} bags</span>
+        <span className="text-[#4E6090]">Occupied</span>
+        <span className="font-semibold text-[#E8EDF8]">{cluster.occupied.toLocaleString()} bags</span>
+        <span className="text-[#4E6090]">Batch</span>
+        <span className="font-semibold text-[#E8EDF8]">{cluster.batch}</span>
+        <span className="text-[#4E6090]">Last Activity</span>
+        <span className="font-semibold text-[#E8EDF8]">{timeAgo(cluster.lastActivity)}</span>
+      </div>
+    </div>
+  );
+});
+
+ClusterCardComponent.displayName = "ClusterCardComponent";
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -274,49 +395,53 @@ export default function InventoryPage() {
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  // Filter clusters
-  const filtered = clusters.filter((c) => {
-    const pct = c.capacity > 0 ? c.occupied / c.capacity : 0;
-    if (filter === "full" && pct < 0.85) return false;
-    if (filter === "empty" && c.occupied > 0) return false;
-    if (filter === "fifo" && c.fifo) return false;
-    if (
-      search &&
-      !c.product.toLowerCase().includes(search.toLowerCase()) &&
-      !c.id.toLowerCase().includes(search.toLowerCase()) &&
-      !c.batch.toLowerCase().includes(search.toLowerCase())
-    )
-      return false;
-    // Date range filter on lastActivity
-    if (dateFrom && new Date(c.lastActivity) < new Date(dateFrom)) return false;
-    if (dateTo && new Date(c.lastActivity) > new Date(dateTo + "T23:59:59")) return false;
-    return true;
-  });
+  // Filter clusters - memoized to prevent recalculation on every render
+  const filtered = useMemo(() => {
+    return clusters.filter((c) => {
+      const pct = c.capacity > 0 ? c.occupied / c.capacity : 0;
+      if (filter === "full" && pct < 0.85) return false;
+      if (filter === "empty" && c.occupied > 0) return false;
+      if (filter === "fifo" && c.fifo) return false;
+      if (
+        search &&
+        !c.product.toLowerCase().includes(search.toLowerCase()) &&
+        !c.id.toLowerCase().includes(search.toLowerCase()) &&
+        !c.batch.toLowerCase().includes(search.toLowerCase())
+      )
+        return false;
+      // Date range filter on lastActivity
+      if (dateFrom && new Date(c.lastActivity) < new Date(dateFrom)) return false;
+      if (dateTo && new Date(c.lastActivity) > new Date(dateTo + "T23:59:59")) return false;
+      return true;
+    });
+  }, [clusters, filter, search, dateFrom, dateTo]);
 
-  // Mock batches data
-  const BATCHES: BatchData[] = clusters.map((c) => ({
-    id: c.id,
-    batch_code: c.batch,
-    sku_code: c.id,
-    product_name: c.product,
-    zone: c.zone,
-    rack: c.rack,
-    bin_location: null,
-    quantity: c.occupied,
-    original_quantity: c.capacity,
-    sequencing_rule: c.fifo ? "FIFO" : "FEFO",
-    status: "active",
-    is_near_expiry: false,
-    days_to_expiry: null,
-    created_at: c.lastActivity,
-  }));
+  // Mock batches data - memoized
+  const BATCHES: BatchData[] = useMemo(() => {
+    return clusters.map((c) => ({
+      id: c.id,
+      batch_code: c.batch,
+      sku_code: c.id,
+      product_name: c.product,
+      zone: c.zone,
+      rack: c.rack,
+      bin_location: null,
+      quantity: c.occupied,
+      original_quantity: c.capacity,
+      sequencing_rule: c.fifo ? "FIFO" : "FEFO",
+      status: "active",
+      is_near_expiry: false,
+      days_to_expiry: null,
+      created_at: c.lastActivity,
+    }));
+  }, [clusters]);
 
-  const filters: { label: string; value: FilterType }[] = [
+  const filters: { label: string; value: FilterType }[] = useMemo(() => [
     { label: "All", value: "all" },
     { label: "Near Full", value: "full" },
     { label: "Empty", value: "empty" },
     { label: "FIFO Warn", value: "fifo" },
-  ];
+  ], []);
 
   if (loading) {
     return (
@@ -327,7 +452,12 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="p-5 animate-[fadeIn_0.3s_ease]">
+    <motion.div 
+      className="p-5 animate-[fadeIn_0.3s_ease]"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
+    >
       {/* Add Cluster Modal */}
       {showAddModal && (
         <AddClusterModal
@@ -389,36 +519,9 @@ export default function InventoryPage() {
 
       {/* ── Zone Bars ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        {zones.map((z) => {
-          const pct = Math.round(z.utilization_pct);
-          const col = zoneColor(pct);
-          return (
-            <div
-              key={z.id}
-              className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 text-center relative overflow-hidden transition-all hover:border-[#E5521A]/30 hover:shadow-[0_6px_24px_rgba(229,82,26,0.08)]"
-            >
-              <div
-                className="absolute top-0 left-0 right-0 h-[3px]"
-                style={{
-                  background: `linear-gradient(90deg, transparent, ${col}, transparent)`,
-                  opacity: 0.8,
-                }}
-              />
-              <div className="text-[11px] font-extrabold text-[#4E6090] tracking-[0.12em]">
-                ZONE {z.zone_code}
-              </div>
-              <div className="text-[28px] font-extrabold my-1.5" style={{ color: col }}>
-                {pct}%
-              </div>
-              <div className="w-full h-1 bg-[#1E2F50] rounded-full overflow-hidden mt-1.5">
-                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: col }} />
-              </div>
-              <div className="text-[9px] text-[#4E6090] mt-1.5">
-                {z.current_occupancy.toLocaleString()} / {z.max_capacity_units.toLocaleString()} bags
-              </div>
-            </div>
-          );
-        })}
+        {zones.map((z) => (
+          <ZoneBar key={z.id} zone={z} />
+        ))}
       </div>
 
       {/* ── View Tabs ── */}
@@ -501,55 +604,9 @@ export default function InventoryPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-              {filtered.map((c) => {
-                const pct = c.capacity > 0 ? Math.round((c.occupied / c.capacity) * 100) : 0;
-                const col = occColor(pct);
-                return (
-                  <div
-                    key={c.id + c.batch}
-                    className="bg-[#14203A] border rounded-[14px] p-[15px] transition-all hover:border-[#2A3F68] hover:-translate-y-px"
-                    style={{ borderColor: c.fifo ? "#1E2F50" : "rgba(245,166,35,0.35)" }}
-                  >
-                    <div className="flex justify-between mb-2.5">
-                      <div>
-                        <div className="text-[15px] font-bold text-[#E8EDF8]">Cluster {c.id}</div>
-                        <div className="text-[11px] text-[#8A9BBF] mt-0.5">{c.product}</div>
-                      </div>
-                      <div className="flex flex-col gap-1 items-end">
-                        <span
-                          className="text-[9px] font-bold px-2 py-0.5 rounded-full border"
-                          style={{ background: `${col}22`, color: col, borderColor: `${col}44` }}
-                        >
-                          {pct}%
-                        </span>
-                        <span
-                          className="text-[9px] font-bold px-2 py-0.5 rounded-full border"
-                          style={{
-                            background: c.fifo ? "rgba(34,211,161,0.1)" : "rgba(245,166,35,0.1)",
-                            color: c.fifo ? "#22D3A1" : "#F5A623",
-                            borderColor: c.fifo ? "rgba(34,211,161,0.2)" : "rgba(245,166,35,0.2)",
-                          }}
-                        >
-                          {c.fifo ? "✓ FIFO" : "⚠ FEFO"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="w-full h-1 bg-[#1E2F50] rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: col }} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-2.5 gap-y-1 text-[10px] mt-2.5">
-                      <span className="text-[#4E6090]">Capacity</span>
-                      <span className="font-semibold text-[#E8EDF8]">{c.capacity.toLocaleString()} bags</span>
-                      <span className="text-[#4E6090]">Occupied</span>
-                      <span className="font-semibold text-[#E8EDF8]">{c.occupied.toLocaleString()} bags</span>
-                      <span className="text-[#4E6090]">Batch</span>
-                      <span className="font-semibold text-[#E8EDF8]">{c.batch}</span>
-                      <span className="text-[#4E6090]">Last Activity</span>
-                      <span className="font-semibold text-[#E8EDF8]">{timeAgo(c.lastActivity)}</span>
-                    </div>
-                  </div>
-                );
-              })}
+              {filtered.map((c) => (
+                <ClusterCardComponent key={c.id + c.batch} cluster={c} />
+              ))}
             </div>
           )}
         </>
@@ -610,6 +667,6 @@ export default function InventoryPage() {
           )}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

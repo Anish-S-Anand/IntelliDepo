@@ -338,196 +338,10 @@ function RegisterVehicleModal({
 // ---------------------------------------------------------------------------
 
 export default function GateConsolePage() {
-  // --- Dummy Data ---
-  const DUMMY_ACCESS_LOGS: AccessLogResponse[] = [
-    {
-      id: "log-1",
-      gate_id: "gate-1",
-      gate_code: "G-01",
-      plate_number: "KA-01-AB-1234",
-      direction: "entry",
-      decision: "granted",
-      plate_confidence: 0.98,
-      processed_at: new Date(Date.now() - 5 * 60000).toISOString(),
-      created_at: new Date(Date.now() - 5 * 60000).toISOString(),
-      denied_reason: null,
-    },
-    {
-      id: "log-2",
-      gate_id: "gate-2",
-      gate_code: "G-02",
-      plate_number: "MH-12-CD-5678",
-      direction: "entry",
-      decision: "denied",
-      plate_confidence: 0.95,
-      processed_at: new Date(Date.now() - 10 * 60000).toISOString(),
-      created_at: new Date(Date.now() - 10 * 60000).toISOString(),
-      denied_reason: "Vehicle not registered",
-    },
-    {
-      id: "log-3",
-      gate_id: "gate-1",
-      gate_code: "G-01",
-      plate_number: "DL-03-EF-9012",
-      direction: "exit",
-      decision: "granted",
-      plate_confidence: 0.97,
-      processed_at: new Date(Date.now() - 15 * 60000).toISOString(),
-      created_at: new Date(Date.now() - 15 * 60000).toISOString(),
-      denied_reason: null,
-    },
-    {
-      id: "log-4",
-      gate_id: "gate-3",
-      gate_code: "G-03",
-      plate_number: "TN-22-GH-3456",
-      direction: "entry",
-      decision: "blacklisted",
-      plate_confidence: 0.99,
-      processed_at: new Date(Date.now() - 20 * 60000).toISOString(),
-      created_at: new Date(Date.now() - 20 * 60000).toISOString(),
-      denied_reason: "Vehicle blacklisted - Security concern",
-    },
-    {
-      id: "log-5",
-      gate_id: "gate-2",
-      gate_code: "G-02",
-      plate_number: "KA-05-IJ-7890",
-      direction: "entry",
-      decision: "granted",
-      plate_confidence: 0.96,
-      processed_at: new Date(Date.now() - 25 * 60000).toISOString(),
-      created_at: new Date(Date.now() - 25 * 60000).toISOString(),
-      denied_reason: null,
-    },
-    {
-      id: "log-6",
-      gate_id: "gate-1",
-      gate_code: "G-01",
-      plate_number: "AP-09-KL-2345",
-      direction: "exit",
-      decision: "granted",
-      plate_confidence: 0.94,
-      processed_at: new Date(Date.now() - 30 * 60000).toISOString(),
-      created_at: new Date(Date.now() - 30 * 60000).toISOString(),
-      denied_reason: null,
-    },
-    {
-      id: "log-7",
-      gate_id: "gate-3",
-      gate_code: "G-03",
-      plate_number: "GJ-18-MN-6789",
-      direction: "entry",
-      decision: "denied",
-      plate_confidence: 0.92,
-      processed_at: new Date(Date.now() - 35 * 60000).toISOString(),
-      created_at: new Date(Date.now() - 35 * 60000).toISOString(),
-      denied_reason: "Expired registration",
-    },
-    {
-      id: "log-8",
-      gate_id: "gate-2",
-      gate_code: "G-02",
-      plate_number: "RJ-14-OP-0123",
-      direction: "entry",
-      decision: "granted",
-      plate_confidence: 0.98,
-      processed_at: new Date(Date.now() - 40 * 60000).toISOString(),
-      created_at: new Date(Date.now() - 40 * 60000).toISOString(),
-      denied_reason: null,
-    },
-  ];
-
-  const DUMMY_VEHICLES: VehicleResponse[] = [
-    {
-      id: "veh-1",
-      plate_number: "KA-01-AB-1234",
-      vehicle_type: "truck",
-      owner_name: "Rajesh Kumar",
-      company: "ABC Logistics",
-      status: "registered",
-      created_at: new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
-      updated_at: new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
-    },
-    {
-      id: "veh-2",
-      plate_number: "MH-12-CD-5678",
-      vehicle_type: "van",
-      owner_name: "Priya Sharma",
-      company: "XYZ Transport",
-      status: "temporary",
-      valid_until: new Date(Date.now() + 7 * 24 * 60 * 60000).toISOString(),
-      created_at: new Date(Date.now() - 5 * 24 * 60 * 60000).toISOString(),
-      updated_at: new Date(Date.now() - 5 * 24 * 60 * 60000).toISOString(),
-    },
-    {
-      id: "veh-3",
-      plate_number: "DL-03-EF-9012",
-      vehicle_type: "car",
-      owner_name: "Amit Patel",
-      company: "Tech Solutions Inc",
-      status: "registered",
-      created_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
-      updated_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
-    },
-    {
-      id: "veh-4",
-      plate_number: "TN-22-GH-3456",
-      vehicle_type: "truck",
-      owner_name: "Suresh Reddy",
-      company: "Southern Freight",
-      status: "blacklisted",
-      blacklist_reason: "Security concern - unauthorized access attempt",
-      created_at: new Date(Date.now() - 90 * 24 * 60 * 60000).toISOString(),
-      updated_at: new Date(Date.now() - 2 * 24 * 60 * 60000).toISOString(),
-    },
-    {
-      id: "veh-5",
-      plate_number: "KA-05-IJ-7890",
-      vehicle_type: "van",
-      owner_name: "Lakshmi Iyer",
-      company: "Express Delivery Co",
-      status: "registered",
-      created_at: new Date(Date.now() - 45 * 24 * 60 * 60000).toISOString(),
-      updated_at: new Date(Date.now() - 45 * 24 * 60 * 60000).toISOString(),
-    },
-    {
-      id: "veh-6",
-      plate_number: "AP-09-KL-2345",
-      vehicle_type: "car",
-      owner_name: "Venkat Rao",
-      company: "Coastal Enterprises",
-      status: "registered",
-      created_at: new Date(Date.now() - 20 * 24 * 60 * 60000).toISOString(),
-      updated_at: new Date(Date.now() - 20 * 24 * 60 * 60000).toISOString(),
-    },
-    {
-      id: "veh-7",
-      plate_number: "GJ-18-MN-6789",
-      vehicle_type: "truck",
-      owner_name: "Mehul Shah",
-      company: "Gujarat Movers",
-      status: "expired",
-      valid_until: new Date(Date.now() - 10 * 24 * 60 * 60000).toISOString(),
-      created_at: new Date(Date.now() - 120 * 24 * 60 * 60000).toISOString(),
-      updated_at: new Date(Date.now() - 10 * 24 * 60 * 60000).toISOString(),
-    },
-    {
-      id: "veh-8",
-      plate_number: "RJ-14-OP-0123",
-      vehicle_type: "bike",
-      owner_name: "Anil Verma",
-      company: "Quick Courier",
-      status: "registered",
-      created_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
-      updated_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
-    },
-  ];
-
   // --- State ---
   const [gates, setGates] = useState<GateResponse[]>([]);
-  const [accessLogs, setAccessLogs] = useState<AccessLogResponse[]>(DUMMY_ACCESS_LOGS);
-  const [vehicles, setVehicles] = useState<VehicleResponse[]>(DUMMY_VEHICLES);
+  const [accessLogs, setAccessLogs] = useState<AccessLogResponse[]>([]);
+  const [vehicles, setVehicles] = useState<VehicleResponse[]>([]);
   const [visitors, setVisitors] = useState<VisitorResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -549,6 +363,8 @@ export default function GateConsolePage() {
   // Modals
   const [showVisitorModal, setShowVisitorModal] = useState(false);
   const [showVehicleModal, setShowVehicleModal] = useState(false);
+  const [showAnalysisImage, setShowAnalysisImage] = useState(false);
+  const [selectedPlateNumber, setSelectedPlateNumber] = useState<string>("");
 
   // Gate toggling
   const [togglingGate, setTogglingGate] = useState<string | null>(null);
@@ -573,22 +389,226 @@ export default function GateConsolePage() {
   const loadLogs = useCallback(async () => {
     try {
       const data = await getAccessLogs({ limit: 20 });
-      // Merge API data with dummy data, or use dummy data if API fails
-      setAccessLogs(data.length > 0 ? data : DUMMY_ACCESS_LOGS);
-    } catch { 
-      // Keep dummy data on error
-      setAccessLogs(DUMMY_ACCESS_LOGS);
+      if (data.length === 0) {
+        // Add dummy data if no logs exist
+        const dummyLogs: AccessLogResponse[] = [
+          {
+            id: "log-1",
+            gate_code: "GATE-01",
+            plate_number: "KA01AB1234",
+            direction: "entry",
+            decision: "granted",
+            plate_confidence: 0.95,
+            denied_reason: null,
+            processed_at: new Date(Date.now() - 5 * 60000).toISOString(),
+            created_at: new Date(Date.now() - 5 * 60000).toISOString(),
+          },
+          {
+            id: "log-2",
+            gate_code: "GATE-02",
+            plate_number: "MH02CD5678",
+            direction: "exit",
+            decision: "granted",
+            plate_confidence: 0.92,
+            denied_reason: null,
+            processed_at: new Date(Date.now() - 15 * 60000).toISOString(),
+            created_at: new Date(Date.now() - 15 * 60000).toISOString(),
+          },
+          {
+            id: "log-3",
+            gate_code: "GATE-01",
+            plate_number: "DL03EF9012",
+            direction: "entry",
+            decision: "denied",
+            plate_confidence: 0.88,
+            denied_reason: "Vehicle not registered",
+            processed_at: new Date(Date.now() - 25 * 60000).toISOString(),
+            created_at: new Date(Date.now() - 25 * 60000).toISOString(),
+          },
+          {
+            id: "log-4",
+            gate_code: "GATE-03",
+            plate_number: "TN04GH3456",
+            direction: "entry",
+            decision: "blacklisted",
+            plate_confidence: 0.97,
+            denied_reason: "Vehicle blacklisted - Security threat",
+            processed_at: new Date(Date.now() - 35 * 60000).toISOString(),
+            created_at: new Date(Date.now() - 35 * 60000).toISOString(),
+          },
+        ];
+        setAccessLogs(dummyLogs);
+      } else {
+        setAccessLogs(data);
+      }
+    } catch {
+      // Fallback to dummy data on error
+      const dummyLogs: AccessLogResponse[] = [
+        {
+          id: "log-1",
+          gate_code: "GATE-01",
+          plate_number: "KA01AB1234",
+          direction: "entry",
+          decision: "granted",
+          plate_confidence: 0.95,
+          denied_reason: null,
+          processed_at: new Date(Date.now() - 5 * 60000).toISOString(),
+          created_at: new Date(Date.now() - 5 * 60000).toISOString(),
+        },
+        {
+          id: "log-2",
+          gate_code: "GATE-02",
+          plate_number: "MH02CD5678",
+          direction: "exit",
+          decision: "granted",
+          plate_confidence: 0.92,
+          denied_reason: null,
+          processed_at: new Date(Date.now() - 15 * 60000).toISOString(),
+          created_at: new Date(Date.now() - 15 * 60000).toISOString(),
+        },
+        {
+          id: "log-3",
+          gate_code: "GATE-01",
+          plate_number: "DL03EF9012",
+          direction: "entry",
+          decision: "denied",
+          plate_confidence: 0.88,
+          denied_reason: "Vehicle not registered",
+          processed_at: new Date(Date.now() - 25 * 60000).toISOString(),
+          created_at: new Date(Date.now() - 25 * 60000).toISOString(),
+        },
+        {
+          id: "log-4",
+          gate_code: "GATE-03",
+          plate_number: "TN04GH3456",
+          direction: "entry",
+          decision: "blacklisted",
+          plate_confidence: 0.97,
+          denied_reason: "Vehicle blacklisted - Security threat",
+          processed_at: new Date(Date.now() - 35 * 60000).toISOString(),
+          created_at: new Date(Date.now() - 35 * 60000).toISOString(),
+        },
+      ];
+      setAccessLogs(dummyLogs);
     }
   }, []);
 
   const loadVehicles = useCallback(async () => {
     try {
       const data = await getVehicles();
-      // Merge API data with dummy data, or use dummy data if API fails
-      setVehicles(data.length > 0 ? data : DUMMY_VEHICLES);
-    } catch { 
-      // Keep dummy data on error
-      setVehicles(DUMMY_VEHICLES);
+      if (data.length === 0) {
+        // Add dummy data if no vehicles exist
+        const dummyVehicles: VehicleResponse[] = [
+          {
+            id: "veh-1",
+            plate_number: "KA01AB1234",
+            vehicle_type: "Car",
+            owner_name: "Rajesh Kumar",
+            company: "Tech Solutions Pvt Ltd",
+            status: "registered",
+            valid_until: null,
+            created_at: new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
+          },
+          {
+            id: "veh-2",
+            plate_number: "MH02CD5678",
+            vehicle_type: "Truck",
+            owner_name: "Priya Sharma",
+            company: "Logistics Express",
+            status: "registered",
+            valid_until: null,
+            created_at: new Date(Date.now() - 45 * 24 * 60 * 60000).toISOString(),
+          },
+          {
+            id: "veh-3",
+            plate_number: "TN04GH3456",
+            vehicle_type: "Van",
+            owner_name: "Amit Patel",
+            company: "Security Services",
+            status: "blacklisted",
+            valid_until: null,
+            created_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
+          },
+          {
+            id: "veh-4",
+            plate_number: "AP06KL2345",
+            vehicle_type: "Car",
+            owner_name: "Sunita Reddy",
+            company: "Consulting Group",
+            status: "registered",
+            valid_until: null,
+            created_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
+          },
+          {
+            id: "veh-5",
+            plate_number: "KA05IJ7890",
+            vehicle_type: "Bike",
+            owner_name: "Vikram Singh",
+            company: "Courier Services",
+            status: "temporary",
+            valid_until: new Date(Date.now() + 7 * 24 * 60 * 60000).toISOString(),
+            created_at: new Date(Date.now() - 2 * 24 * 60 * 60000).toISOString(),
+          },
+        ];
+        setVehicles(dummyVehicles);
+      } else {
+        setVehicles(data);
+      }
+    } catch {
+      // Fallback to dummy data on error
+      const dummyVehicles: VehicleResponse[] = [
+        {
+          id: "veh-1",
+          plate_number: "KA01AB1234",
+          vehicle_type: "Car",
+          owner_name: "Rajesh Kumar",
+          company: "Tech Solutions Pvt Ltd",
+          status: "registered",
+          valid_until: null,
+          created_at: new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
+        },
+        {
+          id: "veh-2",
+          plate_number: "MH02CD5678",
+          vehicle_type: "Truck",
+          owner_name: "Priya Sharma",
+          company: "Logistics Express",
+          status: "registered",
+          valid_until: null,
+          created_at: new Date(Date.now() - 45 * 24 * 60 * 60000).toISOString(),
+        },
+        {
+          id: "veh-3",
+          plate_number: "TN04GH3456",
+          vehicle_type: "Van",
+          owner_name: "Amit Patel",
+          company: "Security Services",
+          status: "blacklisted",
+          valid_until: null,
+          created_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
+        },
+        {
+          id: "veh-4",
+          plate_number: "AP06KL2345",
+          vehicle_type: "Car",
+          owner_name: "Sunita Reddy",
+          company: "Consulting Group",
+          status: "registered",
+          valid_until: null,
+          created_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
+        },
+        {
+          id: "veh-5",
+          plate_number: "KA05IJ7890",
+          vehicle_type: "Bike",
+          owner_name: "Vikram Singh",
+          company: "Courier Services",
+          status: "temporary",
+          valid_until: new Date(Date.now() + 7 * 24 * 60 * 60000).toISOString(),
+          created_at: new Date(Date.now() - 2 * 24 * 60 * 60000).toISOString(),
+        },
+      ];
+      setVehicles(dummyVehicles);
     }
   }, []);
 
@@ -1018,8 +1038,17 @@ export default function GateConsolePage() {
                       {log.decision}
                     </span>
                   </td>
-                  <td className="py-2 pr-3 text-[10px] font-mono text-[#8A9BBF]">
-                    Analysis
+                  <td className="py-2 pr-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPlateNumber(log.plate_number);
+                        setShowAnalysisImage(true);
+                      }}
+                      className="text-[11px] font-bold px-3 py-1 rounded-full border border-[#5B9BF5] text-[#5B9BF5] hover:bg-[#5B9BF5]/10 transition-colors cursor-pointer"
+                    >
+                      📊 Analysis
+                    </button>
                   </td>
                   <td className="py-2 text-[10px] text-[#F04A4A]">
                     {log.denied_reason || "—"}
@@ -1256,6 +1285,46 @@ export default function GateConsolePage() {
           onClose={() => setShowVehicleModal(false)}
           onSubmit={handleRegisterVehicle}
         />
+      )}
+      
+      {/* Analysis Image Modal */}
+      {showAnalysisImage && selectedPlateNumber && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setShowAnalysisImage(false)}>
+          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-5 w-full max-w-5xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-[16px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+                  📊 LPR Analysis
+                </h3>
+                <p className="text-[12px] text-[#8A9BBF] mt-1">License Plate: <span className="font-mono font-bold text-[#E8EDF8]">{selectedPlateNumber}</span></p>
+              </div>
+              <button
+                onClick={() => setShowAnalysisImage(false)}
+                className="text-[#8A9BBF] hover:text-[#E8EDF8] text-[20px] font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="bg-[#0F1A30] rounded-lg overflow-hidden">
+              <img
+                src={`http://localhost:8000/tmp/${selectedPlateNumber}.png`}
+                alt={`LPR Analysis for ${selectedPlateNumber}`}
+                className="w-full h-auto"
+                style={{ maxHeight: '75vh', objectFit: 'contain' }}
+                onError={(e) => {
+                  // Fallback to .jpg if .png doesn't exist
+                  const target = e.target as HTMLImageElement;
+                  if (target.src.includes('.png')) {
+                    target.src = `http://localhost:8000/tmp/${selectedPlateNumber}.jpg`;
+                  }
+                }}
+              />
+            </div>
+            <div className="mt-3 text-[11px] text-[#8A9BBF]">
+              License Plate Recognition analysis with vehicle detection and tracking
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

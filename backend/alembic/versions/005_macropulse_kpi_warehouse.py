@@ -9,7 +9,7 @@ from __future__ import annotations
 from alembic import op
 import sqlalchemy as sa
 
-revision = "005_macropulse_kpi_warehouse"
+revision = "005"
 down_revision = "005_macropulse_day3"
 branch_labels = None
 depends_on = None

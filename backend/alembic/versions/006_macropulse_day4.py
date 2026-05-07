@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 
 revision = "006_macropulse_day4"
-down_revision = "005_macropulse_kpi_warehouse"
+down_revision = "005"
 branch_labels = None
 depends_on = None
 

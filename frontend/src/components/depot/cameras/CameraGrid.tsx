@@ -15,14 +15,14 @@ interface CameraData {
 const GATE_EXIT_SOUTH_VIDEO = "Theft Camera .mp4";
 
 // Exactly 6 cameras — no more, no less
-// UPDATED: Using videos from backend/tmp directory
+// UPDATED: All cameras live with different raw videos (no detection overlays)
 const FALLBACK_CAMERAS: CameraData[] = [
-  { id: "gate-entry-north", name: "Gate Entry North - LPR", videoFile: "LPR_RECOGNITION.mp4" },
-  { id: "zone-a-overhead", name: "Zone A Overhead - LPR", videoFile: "LPR_RECOGNITION.mp4" },
-  { id: "loading-bay-1-4", name: "Loading Bay 1-4 - LPR", videoFile: "LPR_RECOGNITION.mp4" },
-  { id: "zone-c-perimeter", name: "Zone C Perimeter", videoFile: "Perimeter_Detection.mp4" },
-  { id: "gate-exit-south", name: "Gate Exit South - Theft", videoFile: GATE_EXIT_SOUTH_VIDEO },
-  { id: "yard-overview", name: "Yard Overview - LPR", videoFile: "LPR_RECOGNITION.mp4" },
+  { id: "gate-entry-north", name: "Gate Entry North - LPR", videoFile: "Screen Recording 2025-05-22 164244.mp4" },
+  { id: "zone-a-overhead", name: "Zone A Overhead", videoFile: "Screen Recording 2025-08-11 173926.mp4" },
+  { id: "loading-bay-1-4", name: "Loading Bay 1-4", videoFile: "Screen Recording 2025-07-30 115414.mp4" },
+  { id: "zone-c-perimeter", name: "Zone C Perimeter", videoFile: "Recording 2025-07-30 115417.mp4" },
+  { id: "gate-exit-south", name: "Gate Exit South", videoFile: "Recording 2025-07-30 120521.mp4" },
+  { id: "yard-overview", name: "Yard Overview", videoFile: "Recording 2025-08-11 171805.mp4" },
 ];
 
 function getBackendBase(): string {
@@ -230,6 +230,7 @@ function CameraGridInner() {
       <div className="grid flex-1 grid-cols-3 gap-2">
         {cameras.slice(0, 6).map((cam, i) => {
           const det = detections[i];
+          const isOffline = !cam.videoFile; // Camera is offline if no video file
           return (
             <div key={cam.id} className="relative flex flex-col">
               <VideoFeed
@@ -237,29 +238,32 @@ function CameraGridInner() {
                 cameraId={cam.id}
                 videoFile={cam.videoFile}
                 cameraIndex={i}
+                offline={isOffline}
                 onDetectionUpdate={handleDetectionUpdate(i, cam.name)}
                 onPlateDetected={(plate) => handlePlateDetected(i, cam.name, plate)}
               />
-              {/* Detection overlay badges */}
-              <div className="absolute top-1 left-1 flex flex-col gap-0.5">
-                {det?.vehicles != null && det.vehicles > 0 && (
-                  <div className="rounded bg-[#3fb950] px-1.5 py-0.5 text-[9px] font-bold text-black flex items-center gap-0.5">
-                    <Truck size={8} /> {det.vehicles}
-                  </div>
-                )}
-                {det?.workers != null && det.workers > 0 && (
-                  <div className="rounded bg-blue-500 px-1.5 py-0.5 text-[9px] font-bold text-white flex items-center gap-0.5">
-                    <Users size={8} /> {det.workers}
-                  </div>
-                )}
-                {det?.cementBags != null && det.cementBags > 0 && (
-                  <div className="rounded bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-black flex items-center gap-0.5">
-                    <Package size={8} /> {det.cementBags} bags
-                  </div>
-                )}
-              </div>
-              {/* Latest plate */}
-              {det?.plates?.[0] && (
+              {/* Detection overlay badges - only show for online cameras */}
+              {!isOffline && (
+                <div className="absolute top-1 left-1 flex flex-col gap-0.5">
+                  {det?.vehicles != null && det.vehicles > 0 && (
+                    <div className="rounded bg-[#3fb950] px-1.5 py-0.5 text-[9px] font-bold text-black flex items-center gap-0.5">
+                      <Truck size={8} /> {det.vehicles}
+                    </div>
+                  )}
+                  {det?.workers != null && det.workers > 0 && (
+                    <div className="rounded bg-blue-500 px-1.5 py-0.5 text-[9px] font-bold text-white flex items-center gap-0.5">
+                      <Users size={8} /> {det.workers}
+                    </div>
+                  )}
+                  {det?.cementBags != null && det.cementBags > 0 && (
+                    <div className="rounded bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-black flex items-center gap-0.5">
+                      <Package size={8} /> {det.cementBags} bags
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Latest plate - only show for online cameras */}
+              {!isOffline && det?.plates?.[0] && (
                 <div className="absolute right-1 top-1 rounded bg-white/90 px-1.5 py-0.5 text-[9px] font-bold text-black">
                   🚗 {det.plates[0]}
                 </div>
@@ -269,23 +273,8 @@ function CameraGridInner() {
         })}
       </div>
 
-      {/* LPR Log */}
-      {plateLog.length > 0 && (
-        <div className="rounded bg-[#111827] p-2">
-          <div className="text-[10px] font-bold text-white/60 mb-1.5">Recent LPR Detections</div>
-          <div className="flex flex-col gap-1 max-h-20 overflow-y-auto">
-            {plateLog.slice(0, 5).map((entry, i) => (
-              <div key={i} className="flex items-center gap-2 text-[9px]">
-                <span className="text-white/40">{entry.time}</span>
-                <span className="text-white/60">{entry.camera}</span>
-                <span className="font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                  {entry.plate}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* LPR Log Section removed to maximize video feed space */}
+      {/* plateLog state and handlePlateDetected callback preserved for future features */}
     </div>
   );
 }

@@ -73,7 +73,7 @@ async def update_sla(sla_id: str, body: SLAUpdate) -> SLAResponse:
         return SLAResponse.model_validate(sla)
 
 
-@router.delete("/{sla_id}", status_code=204)
+@router.delete("/{sla_id}", status_code=204, response_model=None)
 async def delete_sla(sla_id: str) -> None:
     async with AsyncSessionLocal() as session:
         sla = await session.get(SLADefinition, uuid.UUID(sla_id))

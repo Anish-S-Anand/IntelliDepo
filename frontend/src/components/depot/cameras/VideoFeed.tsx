@@ -2,22 +2,15 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useDetection } from "@/hooks/useDetection";
-import api from "@/services/api";
 
 interface VideoFeedProps {
   name: string;
   cameraId: string;
   videoFile?: string;
   cameraIndex: number;
+  offline?: boolean; // NEW: Mark camera as offline
   onDetectionUpdate?: (vehicles: Array<{ bbox: [number, number, number, number]; class: string; score: number }>) => void;
   onPlateDetected?: (plate: string) => void;
-}
-
-function getBackendBase(): string {
-  if (typeof window !== "undefined") {
-    return `${window.location.protocol}//${window.location.hostname}:8000`;
-  }
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 }
 
 /**
@@ -35,25 +28,23 @@ function simulateLPR(): string {
   return `${state} ${num1} ${letter1}${letter2} ${num2}`;
 }
 
-export function VideoFeed({ name, cameraId, videoFile, cameraIndex, onDetectionUpdate, onPlateDetected }: VideoFeedProps) {
+export function VideoFeed({ name, cameraId, videoFile, cameraIndex, offline = false, onDetectionUpdate, onPlateDetected }: VideoFeedProps) {
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const lprTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [status, setStatus] = useState<"connecting" | "live" | "error">("connecting");
 
-  useDetection(sourceCanvasRef, overlayCanvasRef, cameraIndex, status === "live", onDetectionUpdate);
+  // If offline, set status immediately and skip all video/detection logic
+  useEffect(() => {
+    if (offline) {
+      setStatus("error");
+    }
+  }, [offline]);
 
-  // All cameras start from the beginning of their respective videos
-  // This ensures consistent playback and avoids seek issues
-  const seekSeconds = 0;
+  useDetection(sourceCanvasRef, overlayCanvasRef, cameraIndex, status === "live" && !offline, onDetectionUpdate);
 
-  const snapshotUrl = videoFile
-    ? `/depot/vision/cameras/video-library/${encodeURIComponent(videoFile)}/snapshot?seek=${seekSeconds}`
-    : `/depot/vision/cameras/${cameraId}/snapshot?seek=${seekSeconds}`;
-  
-  // For MJPEG streams, we'll use the snapshot polling approach since <img> tags can't have custom headers
-  const streamUrl = null; // Disable MJPEG for now, use snapshot polling instead
-  
   // LPR simulation: periodically "detect" a plate when camera is live
   const triggerLPR = useCallback(() => {
     if (onPlateDetected && status === "live") {
@@ -74,11 +65,23 @@ export function VideoFeed({ name, cameraId, videoFile, cameraIndex, onDetectionU
   useEffect(() => {
     const canvas = sourceCanvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+
+    // Skip video loading if offline
+    if (offline) {
+      const ctx = canvas.getContext("2d", { alpha: false });
+      if (ctx) {
+        ctx.fillStyle = "#1E2F50";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#4E6090";
+        ctx.font = "14px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("OFFLINE", canvas.width / 2, canvas.height / 2);
+      }
+      return;
+    }
 
     let cancelled = false;
-    let consecutiveErrors = 0;
+    let video: HTMLVideoElement | null = null;
 
     const initSize = () => {
       const w = canvas.offsetWidth;
@@ -90,90 +93,91 @@ export function VideoFeed({ name, cameraId, videoFile, cameraIndex, onDetectionU
     };
     initSize();
 
-    const loadFrame = async () => {
-      if (cancelled) return;
-      
-      try {
-        // For video-library endpoints, use direct fetch (no auth required)
-        // For camera endpoints, use api service with auth
-        const isVideoLibrary = snapshotUrl.includes('/video-library/');
-        
-        let blob: Blob;
-        if (isVideoLibrary) {
-          // Direct fetch for video-library (public endpoints)
-          const backendBase = getBackendBase();
-          const fullUrl = `${backendBase}${snapshotUrl}&t=${Date.now()}`;
-          const response = await fetch(fullUrl);
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-          }
-          
-          blob = await response.blob();
-        } else {
-          // Use axios with auth for regular camera endpoints
-          const response = await api.get(snapshotUrl, {
-            responseType: 'blob',
-            params: { t: Date.now() },
-            validateStatus: (status) => status < 500
-          });
-          
-          if (response.status >= 400) {
-            throw new Error(`HTTP ${response.status}`);
-          }
-          
-          blob = response.data;
-        }
-        
-        const imageUrl = URL.createObjectURL(blob);
-        
-        const img = new window.Image();
-        img.onload = () => {
-          if (cancelled) {
-            URL.revokeObjectURL(imageUrl);
-            return;
-          }
-          consecutiveErrors = 0;
-          initSize();
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          setStatus("live");
-          URL.revokeObjectURL(imageUrl);
-          
-          if (!cancelled) {
-            setTimeout(loadFrame, 1000);
-          }
-        };
-        
-        img.onerror = () => {
-          URL.revokeObjectURL(imageUrl);
-          if (cancelled) return;
-          consecutiveErrors++;
-          setStatus("error");
-          const delay = Math.min(1000 * Math.pow(2, consecutiveErrors), 10000);
-          if (!cancelled) {
-            setTimeout(loadFrame, delay);
-          }
-        };
-        
-        img.src = imageUrl;
-      } catch (error) {
-        console.error('VideoFeed error:', error);
-        if (cancelled) return;
-        consecutiveErrors++;
-        setStatus("error");
-        const delay = Math.min(1000 * Math.pow(2, consecutiveErrors), 10000);
-        if (!cancelled) {
-          setTimeout(loadFrame, delay);
-        }
-      }
-    };
+    // Use HTML5 video element with Next.js proxy for better compatibility
+    // Use the /backend proxy to avoid CORS issues
+    const videoSrc = videoFile 
+      ? `/backend/depot/vision/cameras/video-library/${encodeURIComponent(videoFile)}/stream`
+      : null;
 
-    loadFrame();
+    if (videoSrc) {
+      // Create a video element
+      video = document.createElement("video");
+      video.crossOrigin = "anonymous";
+      video.loop = true;
+      video.muted = true;
+      video.playsInline = true;
+      video.autoplay = true;
+      
+      // Set up error handling
+      video.onerror = (e) => {
+        console.error(`Video stream error for ${name}:`, e, videoSrc);
+        if (cancelled) return;
+        setStatus("error");
+      };
+
+      // Set up loaded handler
+      video.onloadeddata = () => {
+        if (cancelled) return;
+        console.log(`Video loaded successfully for ${name}`);
+        setStatus("live");
+        video?.play().catch(err => {
+          console.error(`Play error for ${name}:`, err);
+          setStatus("error");
+        });
+      };
+
+      // Additional event listeners for debugging
+      video.onloadstart = () => {
+        console.log(`Video load started for ${name}`);
+      };
+
+      video.oncanplay = () => {
+        if (cancelled) return;
+        console.log(`Video can play for ${name}`);
+        setStatus("live");
+      };
+
+      // Set the video source
+      console.log(`Setting video source for ${name}:`, videoSrc);
+      video.src = videoSrc;
+      video.load();
+
+      // Draw video frames to canvas
+      const drawLoop = () => {
+        if (cancelled || !video) return;
+        
+        const ctx = canvas.getContext("2d", { alpha: false });
+        if (ctx && video.readyState >= video.HAVE_CURRENT_DATA) {
+          initSize();
+          try {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          } catch (e) {
+            // Ignore drawing errors
+          }
+        }
+        
+        animationFrameRef.current = requestAnimationFrame(drawLoop);
+      };
+
+      // Start drawing loop
+      drawLoop();
+    } else {
+      console.warn(`No video file specified for ${name}`);
+      setStatus("error");
+    }
 
     return () => {
       cancelled = true;
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (video) {
+        video.pause();
+        video.src = "";
+        video = null;
+      }
     };
-  }, [snapshotUrl]);
+  }, [videoFile, cameraId, offline, name]);
 
   const statusColor =
     status === "live" ? "bg-green-500" : status === "error" ? "bg-red-500" : "bg-gray-500";
@@ -181,19 +185,10 @@ export function VideoFeed({ name, cameraId, videoFile, cameraIndex, onDetectionU
     status === "live" ? "LIVE" : status === "error" ? "OFFLINE" : "CONNECTING";
 
   return (
-    <div className="relative h-[180px] overflow-hidden rounded-md bg-black">
-      {streamUrl && (
-        <img
-          src={streamUrl}
-          alt={`${name} live feed`}
-          className="absolute inset-0 h-full w-full object-cover"
-          onLoad={() => setStatus("live")}
-          onError={() => setStatus("error")}
-        />
-      )}
+    <div className="relative h-[280px] overflow-hidden rounded-md bg-black">
       <canvas
         ref={sourceCanvasRef}
-        style={{ width: "100%", height: "100%", opacity: streamUrl ? 0 : 1 }}
+        style={{ width: "100%", height: "100%", objectFit: "cover" }}
       />
       <canvas
         ref={overlayCanvasRef}

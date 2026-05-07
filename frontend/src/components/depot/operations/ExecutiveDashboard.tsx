@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
+import { motion } from "framer-motion";
 import {
   Shield,
   ShieldAlert,
@@ -38,6 +39,137 @@ interface ModuleStatus {
   detail: string;
   color: string;
 }
+
+// ---------------------------------------------------------------------------
+// Memoized KPI Card Component
+// ---------------------------------------------------------------------------
+
+interface KPICardProps {
+  label: string;
+  value: string;
+  trend: string;
+  icon: React.ElementType;
+  color: string;
+}
+
+const KPICard = memo(({ label, value, trend, icon: Icon, color }: KPICardProps) => {
+  const cardStyle = useMemo(() => ({
+    backgroundColor: "var(--bg-card)",
+    border: "1px solid var(--border-card)",
+    color: "var(--text-primary)",
+    boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+  }), []);
+
+  const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 32px rgba(229,82,26,0.12)";
+    (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(229,82,26,0.3)";
+  }, []);
+
+  const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 12px rgba(0,0,0,0.06)";
+    (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-card)";
+  }, []);
+
+  return (
+    <div
+      className="rounded-[14px] p-3 sm:p-4 relative overflow-hidden transition-all hover:-translate-y-0.5 group cursor-default"
+      style={cardStyle}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div className="flex items-center gap-1.5 mb-2">
+        <Icon className="w-3.5 h-3.5" style={{ color }} />
+        <span className="text-[9px] font-black tracking-[0.08em] uppercase" style={{ color: "var(--text-faint)" }}>
+          {label}
+        </span>
+      </div>
+      <div className="text-[24px] sm:text-[28px] font-extrabold leading-none" style={{ color }}>
+        {value}
+      </div>
+      <div className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>{trend}</div>
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#E5521A] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+    </div>
+  );
+});
+
+KPICard.displayName = "KPICard";
+
+// ---------------------------------------------------------------------------
+// Memoized Module Health Card Component
+// ---------------------------------------------------------------------------
+
+const ModuleHealthCard = memo(({ mod }: { mod: ModuleStatus }) => {
+  const Icon = mod.icon;
+  const statusColorMap: Record<string, string> = useMemo(() => ({
+    operational: "var(--color-success)",
+    degraded: "var(--color-warning)",
+    offline: "var(--color-danger)",
+  }), []);
+  
+  const sColor = statusColorMap[mod.status];
+  
+  const cardStyle = useMemo(() => ({
+    backgroundColor: "var(--bg-card)",
+    border: "1px solid var(--border-card)",
+    color: "var(--text-primary)",
+  }), []);
+
+  const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-strong)";
+  }, []);
+
+  const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-card)";
+  }, []);
+
+  const progressWidth = useMemo(() => {
+    return mod.status === "operational" ? "100%" : mod.status === "degraded" ? "60%" : "0%";
+  }, [mod.status]);
+
+  return (
+    <div
+      className="rounded-[14px] p-4 transition-all"
+      style={cardStyle}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-9 h-9 rounded-lg flex items-center justify-center border"
+            style={{ background: `${sColor}12`, borderColor: `${sColor}25` }}
+          >
+            <Icon className="w-4 h-4" style={{ color: sColor }} />
+          </div>
+          <div>
+            <div className="text-[13px] font-black" style={{ color: "var(--text-primary)" }}>{mod.name}</div>
+            <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{mod.detail}</div>
+          </div>
+        </div>
+        <span
+          className="text-[8px] font-black px-2 py-0.5 rounded-full border uppercase"
+          style={{ background: `${sColor}15`, color: sColor, borderColor: `${sColor}30` }}
+        >
+          {mod.status}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--bg-surface-2)" }}>
+          <div
+            className="h-full rounded-full transition-all"
+            style={{
+              width: progressWidth,
+              background: sColor,
+            }}
+          />
+        </div>
+        <span className="text-[11px] font-black" style={{ color: sColor }}>{mod.metric}</span>
+      </div>
+    </div>
+  );
+});
+
+ModuleHealthCard.displayName = "ModuleHealthCard";
 
 // ---------------------------------------------------------------------------
 // Skeleton loader for initial load
@@ -117,47 +249,69 @@ export default function ExecutiveDashboard() {
 
   if (loading) return <DashboardSkeleton />;
 
-  // Derived KPIs
-  const totalAlerts = visionAlerts.length + activeBreaches;
-  const openIncidents = incidents.filter((i) => i.status === "open" || i.status === "escalated").length;
-  const resolvedIncidents = incidents.filter((i) => i.status === "resolved").length;
-  const criticalIncidents = incidents.filter((i) => i.severity === "critical").length;
-  const avgCapacity = capacityStatus.length > 0
-    ? Math.round(capacityStatus.reduce((acc, c) => acc + c.utilization_pct, 0) / capacityStatus.length)
-    : 84;
-  const zonesExceedingWarning = capacityStatus.filter((c) => c.exceeds_warning).length;
+  // Derived KPIs - memoized to prevent recalculation on every render
+  const totalAlerts = useMemo(() => visionAlerts.length + activeBreaches, [visionAlerts.length, activeBreaches]);
+  const openIncidents = useMemo(() => incidents.filter((i) => i.status === "open" || i.status === "escalated").length, [incidents]);
+  const resolvedIncidents = useMemo(() => incidents.filter((i) => i.status === "resolved").length, [incidents]);
+  const criticalIncidents = useMemo(() => incidents.filter((i) => i.severity === "critical").length, [incidents]);
+  const avgCapacity = useMemo(() => {
+    return capacityStatus.length > 0
+      ? Math.round(capacityStatus.reduce((acc, c) => acc + c.utilization_pct, 0) / capacityStatus.length)
+      : 84;
+  }, [capacityStatus]);
+  const zonesExceedingWarning = useMemo(() => capacityStatus.filter((c) => c.exceeds_warning).length, [capacityStatus]);
 
-  const totalCounted = countSessions.reduce((s, c) => s + c.total_counted, 0);
-  const totalExpected = manifests.reduce((s, m) => s + (m.total_expected ?? 0), 0);
-  const countAccuracy = totalExpected > 0 ? ((totalCounted / totalExpected) * 100).toFixed(1) : "—";
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const gateEventsToday = accessLogs.filter((log) => log.processed_at.startsWith(todayKey)).length || accessLogs.length;
+  const totalCounted = useMemo(() => countSessions.reduce((s, c) => s + c.total_counted, 0), [countSessions]);
+  const totalExpected = useMemo(() => manifests.reduce((s, m) => s + (m.total_expected ?? 0), 0), [manifests]);
+  const countAccuracy = useMemo(() => {
+    return totalExpected > 0 ? ((totalCounted / totalExpected) * 100).toFixed(1) : "—";
+  }, [totalCounted, totalExpected]);
+  const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const gateEventsToday = useMemo(() => {
+    return accessLogs.filter((log) => log.processed_at.startsWith(todayKey)).length || accessLogs.length;
+  }, [accessLogs, todayKey]);
 
-  const modules: ModuleStatus[] = [
+  const modules: ModuleStatus[] = useMemo(() => [
     { name: "Object Detection", icon: Eye, status: "operational", metric: `${perimeterZones} zones`, detail: "YOLO v8 active", color: "var(--color-success)" },
     { name: "Automated Counting", icon: Hash, status: "operational", metric: `${countAccuracy}% acc`, detail: `${countSessions.length} sessions today`, color: "var(--color-success)" },
     { name: "Cluster Mapping", icon: Map, status: zonesExceedingWarning > 0 ? "degraded" : "operational", metric: `${avgCapacity}% avg`, detail: `${zonesExceedingWarning} zones over threshold`, color: zonesExceedingWarning > 0 ? "var(--color-warning)" : "var(--color-success)" },
     { name: "Inventory Sequencing", icon: Layers, status: "operational", metric: "96.4% FIFO", detail: "Rules enforced", color: "var(--color-success)" },
     { name: "Gate & LPR", icon: Shield, status: "operational", metric: `${gateEventsToday} events`, detail: "OCR active", color: "var(--color-success)" },
     { name: "Perimeter Security", icon: ShieldAlert, status: activeBreaches > 0 ? "degraded" : "operational", metric: `${perimeterZones} zones`, detail: `${activeBreaches} active breaches`, color: activeBreaches > 0 ? "var(--color-danger)" : "var(--color-success)" },
-  ];
+  ], [perimeterZones, countAccuracy, countSessions.length, zonesExceedingWarning, avgCapacity, gateEventsToday, activeBreaches]);
 
-  const maxThroughput = Math.max(...THROUGHPUT);
+  const maxThroughput = useMemo(() => Math.max(...THROUGHPUT), []);
+
+  // KPI data - memoized to prevent recreation on every render
+  const kpiData = useMemo(() => [
+    { label: "Detection Accuracy", value: `${countAccuracy}%`, trend: "YOLO v8 confidence", icon: Eye, color: "var(--color-success)" },
+    { label: "Active Alerts", value: String(totalAlerts), trend: `${visionAlerts.length} vision · ${activeBreaches} perimeter`, icon: AlertTriangle, color: totalAlerts > 0 ? "var(--color-warning)" : "var(--color-success)" },
+    { label: "Open Incidents", value: String(openIncidents), trend: `${criticalIncidents} critical`, icon: ShieldAlert, color: openIncidents > 0 ? "var(--color-danger)" : "var(--color-success)" },
+    { label: "Depot Occupancy", value: `${avgCapacity}%`, trend: `${zonesExceedingWarning} zones at risk`, icon: Package, color: avgCapacity > 90 ? "var(--color-danger)" : avgCapacity > 80 ? "var(--color-warning)" : "var(--color-success)" },
+    { label: "Gate Events", value: String(gateEventsToday), trend: "LPR scans today", icon: Truck, color: "var(--color-info)" },
+    { label: "Resolved Today", value: String(resolvedIncidents), trend: `${resolvedIncidents} incidents closed`, icon: CheckCircle2, color: "var(--color-success)" },
+  ], [countAccuracy, totalAlerts, visionAlerts.length, activeBreaches, openIncidents, criticalIncidents, avgCapacity, zonesExceedingWarning, gateEventsToday, resolvedIncidents]);
 
   // Card style using CSS vars — adapts to light/dark
-  const cardStyle = {
+  const cardStyle = useMemo(() => ({
     backgroundColor: "var(--bg-card)",
     border: "1px solid var(--border-card)",
     color: "var(--text-primary)",
-  };
+  }), []);
 
-  const innerCardStyle = {
+  const innerCardStyle = useMemo(() => ({
     backgroundColor: "var(--bg-surface-2)",
     border: "1px solid var(--border-default)",
-  };
+  }), []);
 
   return (
-    <div className="p-4 sm:p-5" style={{ animation: "fadeIn 0.3s ease" }}>
+    <motion.div 
+      className="p-4 sm:p-5" 
+      style={{ animation: "fadeIn 0.3s ease" }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
+    >
 
       {/* Header */}
       <div className="flex justify-between items-start mb-5 flex-wrap gap-3">
@@ -185,46 +339,9 @@ export default function ExecutiveDashboard() {
 
       {/* Hero KPI Strip */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-5">
-        {[
-          { label: "Detection Accuracy", value: `${countAccuracy}%`, trend: "YOLO v8 confidence", icon: Eye, color: "var(--color-success)" },
-          { label: "Active Alerts", value: String(totalAlerts), trend: `${visionAlerts.length} vision · ${activeBreaches} perimeter`, icon: AlertTriangle, color: totalAlerts > 0 ? "var(--color-warning)" : "var(--color-success)" },
-          { label: "Open Incidents", value: String(openIncidents), trend: `${criticalIncidents} critical`, icon: ShieldAlert, color: openIncidents > 0 ? "var(--color-danger)" : "var(--color-success)" },
-          { label: "Depot Occupancy", value: `${avgCapacity}%`, trend: `${zonesExceedingWarning} zones at risk`, icon: Package, color: avgCapacity > 90 ? "var(--color-danger)" : avgCapacity > 80 ? "var(--color-warning)" : "var(--color-success)" },
-          { label: "Gate Events", value: String(gateEventsToday), trend: "LPR scans today", icon: Truck, color: "var(--color-info)" },
-          { label: "Resolved Today", value: String(resolvedIncidents), trend: `${resolvedIncidents} incidents closed`, icon: CheckCircle2, color: "var(--color-success)" },
-        ].map((kpi) => {
-          const Icon = kpi.icon;
-          return (
-            <div
-              key={kpi.label}
-              className="rounded-[14px] p-3 sm:p-4 relative overflow-hidden transition-all hover:-translate-y-0.5 group cursor-default"
-              style={{
-                ...cardStyle,
-                boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 32px rgba(229,82,26,0.12)";
-                (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(229,82,26,0.3)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 12px rgba(0,0,0,0.06)";
-                (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-card)";
-              }}
-            >
-              <div className="flex items-center gap-1.5 mb-2">
-                <Icon className="w-3.5 h-3.5" style={{ color: kpi.color }} />
-                <span className="text-[9px] font-black tracking-[0.08em] uppercase" style={{ color: "var(--text-faint)" }}>
-                  {kpi.label}
-                </span>
-              </div>
-              <div className="text-[24px] sm:text-[28px] font-extrabold leading-none" style={{ color: kpi.color }}>
-                {kpi.value}
-              </div>
-              <div className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>{kpi.trend}</div>
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#E5521A] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-          );
-        })}
+        {kpiData.map((kpi) => (
+          <KPICard key={kpi.label} {...kpi} />
+        ))}
       </div>
 
       <div className="h-px mb-5" style={{ background: "linear-gradient(90deg, transparent, rgba(229,82,26,0.4), transparent)" }} />
@@ -235,57 +352,9 @@ export default function ExecutiveDashboard() {
           Module Health
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {modules.map((mod) => {
-            const Icon = mod.icon;
-            const statusColorMap: Record<string, string> = {
-              operational: "var(--color-success)",
-              degraded: "var(--color-warning)",
-              offline: "var(--color-danger)",
-            };
-            const sColor = statusColorMap[mod.status];
-            return (
-              <div
-                key={mod.name}
-                className="rounded-[14px] p-4 transition-all"
-                style={cardStyle}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-strong)")}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-card)")}
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className="w-9 h-9 rounded-lg flex items-center justify-center border"
-                      style={{ background: `${sColor}12`, borderColor: `${sColor}25` }}
-                    >
-                      <Icon className="w-4 h-4" style={{ color: sColor }} />
-                    </div>
-                    <div>
-                      <div className="text-[13px] font-black" style={{ color: "var(--text-primary)" }}>{mod.name}</div>
-                      <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{mod.detail}</div>
-                    </div>
-                  </div>
-                  <span
-                    className="text-[8px] font-black px-2 py-0.5 rounded-full border uppercase"
-                    style={{ background: `${sColor}15`, color: sColor, borderColor: `${sColor}30` }}
-                  >
-                    {mod.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--bg-surface-2)" }}>
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: mod.status === "operational" ? "100%" : mod.status === "degraded" ? "60%" : "0%",
-                        background: sColor,
-                      }}
-                    />
-                  </div>
-                  <span className="text-[11px] font-black" style={{ color: sColor }}>{mod.metric}</span>
-                </div>
-              </div>
-            );
-          })}
+          {modules.map((mod) => (
+            <ModuleHealthCard key={mod.name} mod={mod} />
+          ))}
         </div>
       </div>
 
@@ -529,6 +598,6 @@ export default function ExecutiveDashboard() {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

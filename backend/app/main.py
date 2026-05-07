@@ -20,6 +20,7 @@ def _preload_installed_cryptography() -> None:
 _preload_installed_cryptography()
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import Base, check_db_health, engine
@@ -137,6 +138,9 @@ app = FastAPI(
 )
 
 setup_middleware(app)
+
+# Mount static files for tmp folder (LPR images, etc.)
+app.mount("/tmp", StaticFiles(directory="tmp"), name="tmp")
 
 
 @app.get("/health")

@@ -1,17 +1,10 @@
 import dynamic from "next/dynamic";
+import InventorySkeleton from "@/components/depot/skeletons/InventorySkeleton";
 
 const InventoryPage = dynamic(
   () => import("@/components/depot/operations/InventoryPage"),
-  { ssr: false, loading: () => <LoadingShell /> },
+  { ssr: false, loading: () => <InventorySkeleton /> },
 );
-
-function LoadingShell() {
-  return (
-    <div className="flex h-[60vh] items-center justify-center">
-      <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#e5521a] border-t-transparent" />
-    </div>
-  );
-}
 
 export default function InventoryRoute() {
   return <InventoryPage />;

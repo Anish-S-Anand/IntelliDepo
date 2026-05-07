@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, BarChart3 } from "lucide-react";
 import AlertPanel from "@/components/depot/operations/AlertPanel";
+import VisionSkeleton from "@/components/depot/skeletons/VisionSkeleton";
 
 // CameraGrid pulls in TensorFlow + COCO-SSD (~8 MB) — lazy-load it so it
 // never blocks the initial navigation to this page.
@@ -12,11 +13,7 @@ const CameraGrid = dynamic(
   () => import("@/components/depot/cameras/CameraGrid"),
   {
     ssr: false,
-    loading: () => (
-      <div className="flex h-[60vh] items-center justify-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#e5521a] border-t-transparent" />
-      </div>
-    ),
+    loading: () => <VisionSkeleton />,
   },
 );
 

@@ -142,3 +142,5 @@ backend/app/depot/vision/training_data/
 # Test images
 dark_test.jpg
 light_test.jpg
+
+backend/tmp/

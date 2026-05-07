@@ -1,10 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import PerimeterSkeleton from "@/components/depot/skeletons/PerimeterSkeleton";
 
 const PerimeterSecurityPage = dynamic(
   () => import("@/components/depot/operations/PerimeterSecurityPage"),
-  { loading: () => <div className="flex items-center justify-center h-64 text-[#4E6090] text-sm">Loading perimeter security...</div> }
+  { loading: () => <PerimeterSkeleton /> }
 );
 
 export default function PerimeterPage() {

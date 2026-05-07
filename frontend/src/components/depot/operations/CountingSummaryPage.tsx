@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
 import {
   getCountSessions,
   getManifests,
@@ -371,7 +372,12 @@ export default function CountingSummaryPage() {
   }
 
   return (
-    <div className="p-5">
+    <motion.div 
+      className="p-5"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -772,6 +778,6 @@ export default function CountingSummaryPage() {
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

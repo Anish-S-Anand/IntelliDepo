@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = "010_intellivision_day2_to_day4"
-down_revision = "009_intellivision_day1"
+revision = "010"
+down_revision = "009"
 branch_labels = None
 depends_on = None
 

@@ -1023,8 +1023,8 @@ async def stream_local_video(filename: str, theme: str = "light", seek: float = 
         # Set capture resolution before reading — reduces per-frame memory by ~4x
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 854)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        # Stream at 15fps (skip every other frame) to halve CPU/memory load
-        TARGET_FPS = 15
+        # Stream at 24fps for smooth playback
+        TARGET_FPS = 24
         src_fps = cap.get(cv2.CAP_PROP_FPS) or 25
         frame_skip = max(1, round(src_fps / TARGET_FPS))
         seek_frame = int(seek * src_fps)
@@ -1090,4 +1090,30 @@ async def video_snapshot(filename: str, seek: float = 0.0):
         iter([jpeg_bytes]),
         media_type="image/jpeg",
         headers={"Cache-Control": "no-cache"},
+    )
+
+
+@router.get("/video-library/{filename}/stream")
+async def stream_video_file(filename: str):
+    """
+    Stream a local depot video file directly for HTML5 video playback.
+    Supports range requests for seeking.
+    """
+    from app.depot.vision.video_library import get_local_video_path
+    from fastapi import Request
+    from fastapi.responses import FileResponse
+    import os
+
+    video_path = get_local_video_path(filename)
+    if video_path is None or not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail=f"Video not found: {filename}")
+
+    # Return the video file with proper headers for streaming
+    return FileResponse(
+        path=str(video_path),
+        media_type="video/mp4",
+        headers={
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "no-cache",
+        },
     )

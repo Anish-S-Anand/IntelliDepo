@@ -52,6 +52,7 @@ export default function IncidentsPage() {
   const [resolveNotes, setResolveNotes] = useState("");
   const [acknowledging, setAcknowledging] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
+  const [selectedBreachVideo, setSelectedBreachVideo] = useState<{ breachId: string; videoFile: string; breachType: string } | null>(null);
 
   // Fetch real incidents from backend
   const fetchIncidents = useCallback(async () => {
@@ -66,9 +67,275 @@ export default function IncidentsPage() {
   const fetchBreaches = useCallback(async () => {
     try {
       const data = await getActiveBreaches();
-      setBreaches(data);
+      if (data.length === 0) {
+        // Add dummy data if no breaches exist
+        const dummyBreaches: BreachResponse[] = [
+          {
+            id: "breach-1",
+            zone_id: "zone-a-perimeter",
+            camera_id: "CAM-001",
+            breach_type: "unauthorized_entry",
+            severity: "critical",
+            confidence: 0.94,
+            snapshot_ref: null,
+            alert_sent: true,
+            notes: "Multiple unauthorized individuals detected attempting entry through north perimeter fence",
+            detected_at: new Date(Date.now() - 10 * 60000).toISOString(),
+            resolved_at: null,
+            resolved_by: null,
+            resolution_notes: null,
+            created_at: new Date(Date.now() - 10 * 60000).toISOString(),
+          },
+          {
+            id: "breach-2",
+            zone_id: "zone-c-perimeter",
+            camera_id: "CAM-003",
+            breach_type: "loitering",
+            severity: "high",
+            confidence: 0.87,
+            snapshot_ref: null,
+            alert_sent: true,
+            notes: "Suspicious individual loitering near restricted area for extended period",
+            detected_at: new Date(Date.now() - 25 * 60000).toISOString(),
+            resolved_at: null,
+            resolved_by: null,
+            resolution_notes: null,
+            created_at: new Date(Date.now() - 25 * 60000).toISOString(),
+          },
+          {
+            id: "breach-3",
+            zone_id: "loading-bay-1",
+            camera_id: "CAM-002",
+            breach_type: "after_hours",
+            severity: "medium",
+            confidence: 0.78,
+            snapshot_ref: null,
+            alert_sent: true,
+            notes: "Activity detected in loading bay outside authorized hours",
+            detected_at: new Date(Date.now() - 45 * 60000).toISOString(),
+            resolved_at: null,
+            resolved_by: null,
+            resolution_notes: null,
+            created_at: new Date(Date.now() - 45 * 60000).toISOString(),
+          },
+          {
+            id: "breach-4",
+            zone_id: "zone-b-perimeter",
+            camera_id: "CAM-005",
+            breach_type: "forced_entry",
+            severity: "critical",
+            confidence: 0.91,
+            snapshot_ref: null,
+            alert_sent: true,
+            notes: "Forced entry attempt detected at east gate - security team dispatched",
+            detected_at: new Date(Date.now() - 60 * 60000).toISOString(),
+            resolved_at: null,
+            resolved_by: null,
+            resolution_notes: null,
+            created_at: new Date(Date.now() - 60 * 60000).toISOString(),
+          },
+          {
+            id: "breach-5",
+            zone_id: "warehouse-section-3",
+            camera_id: "CAM-008",
+            breach_type: "object_left",
+            severity: "high",
+            confidence: 0.82,
+            snapshot_ref: null,
+            alert_sent: true,
+            notes: "Unidentified package left unattended in warehouse section 3",
+            detected_at: new Date(Date.now() - 75 * 60000).toISOString(),
+            resolved_at: null,
+            resolved_by: null,
+            resolution_notes: null,
+            created_at: new Date(Date.now() - 75 * 60000).toISOString(),
+          },
+          {
+            id: "breach-6",
+            zone_id: "zone-d-perimeter",
+            camera_id: "CAM-004",
+            breach_type: "unauthorized_entry",
+            severity: "high",
+            confidence: 0.89,
+            snapshot_ref: null,
+            alert_sent: true,
+            notes: "Vehicle entered through damaged section of perimeter fence",
+            detected_at: new Date(Date.now() - 90 * 60000).toISOString(),
+            resolved_at: null,
+            resolved_by: null,
+            resolution_notes: null,
+            created_at: new Date(Date.now() - 90 * 60000).toISOString(),
+          },
+          {
+            id: "breach-7",
+            zone_id: "parking-lot-west",
+            camera_id: "CAM-006",
+            breach_type: "loitering",
+            severity: "medium",
+            confidence: 0.76,
+            snapshot_ref: null,
+            alert_sent: false,
+            notes: "Individual observed in parking area for 30+ minutes without clear purpose",
+            detected_at: new Date(Date.now() - 105 * 60000).toISOString(),
+            resolved_at: null,
+            resolved_by: null,
+            resolution_notes: null,
+            created_at: new Date(Date.now() - 105 * 60000).toISOString(),
+          },
+          {
+            id: "breach-8",
+            zone_id: "main-entrance",
+            camera_id: "CAM-007",
+            breach_type: "after_hours",
+            severity: "low",
+            confidence: 0.71,
+            snapshot_ref: null,
+            alert_sent: false,
+            notes: "Late night activity at main entrance - likely maintenance crew",
+            detected_at: new Date(Date.now() - 120 * 60000).toISOString(),
+            resolved_at: null,
+            resolved_by: null,
+            resolution_notes: null,
+            created_at: new Date(Date.now() - 120 * 60000).toISOString(),
+          },
+        ];
+        setBreaches(dummyBreaches);
+      } else {
+        setBreaches(data);
+      }
     } catch {
-      // silent
+      // Fallback to dummy data on error
+      const dummyBreaches: BreachResponse[] = [
+        {
+          id: "breach-1",
+          zone_id: "zone-a-perimeter",
+          camera_id: "CAM-001",
+          breach_type: "unauthorized_entry",
+          severity: "critical",
+          confidence: 0.94,
+          snapshot_ref: null,
+          alert_sent: true,
+          notes: "Multiple unauthorized individuals detected attempting entry through north perimeter fence",
+          detected_at: new Date(Date.now() - 10 * 60000).toISOString(),
+          resolved_at: null,
+          resolved_by: null,
+          resolution_notes: null,
+          created_at: new Date(Date.now() - 10 * 60000).toISOString(),
+        },
+        {
+          id: "breach-2",
+          zone_id: "zone-c-perimeter",
+          camera_id: "CAM-003",
+          breach_type: "loitering",
+          severity: "high",
+          confidence: 0.87,
+          snapshot_ref: null,
+          alert_sent: true,
+          notes: "Suspicious individual loitering near restricted area for extended period",
+          detected_at: new Date(Date.now() - 25 * 60000).toISOString(),
+          resolved_at: null,
+          resolved_by: null,
+          resolution_notes: null,
+          created_at: new Date(Date.now() - 25 * 60000).toISOString(),
+        },
+        {
+          id: "breach-3",
+          zone_id: "loading-bay-1",
+          camera_id: "CAM-002",
+          breach_type: "after_hours",
+          severity: "medium",
+          confidence: 0.78,
+          snapshot_ref: null,
+          alert_sent: true,
+          notes: "Activity detected in loading bay outside authorized hours",
+          detected_at: new Date(Date.now() - 45 * 60000).toISOString(),
+          resolved_at: null,
+          resolved_by: null,
+          resolution_notes: null,
+          created_at: new Date(Date.now() - 45 * 60000).toISOString(),
+        },
+        {
+          id: "breach-4",
+          zone_id: "zone-b-perimeter",
+          camera_id: "CAM-005",
+          breach_type: "forced_entry",
+          severity: "critical",
+          confidence: 0.91,
+          snapshot_ref: null,
+          alert_sent: true,
+          notes: "Forced entry attempt detected at east gate - security team dispatched",
+          detected_at: new Date(Date.now() - 60 * 60000).toISOString(),
+          resolved_at: null,
+          resolved_by: null,
+          resolution_notes: null,
+          created_at: new Date(Date.now() - 60 * 60000).toISOString(),
+        },
+        {
+          id: "breach-5",
+          zone_id: "warehouse-section-3",
+          camera_id: "CAM-008",
+          breach_type: "object_left",
+          severity: "high",
+          confidence: 0.82,
+          snapshot_ref: null,
+          alert_sent: true,
+          notes: "Unidentified package left unattended in warehouse section 3",
+          detected_at: new Date(Date.now() - 75 * 60000).toISOString(),
+          resolved_at: null,
+          resolved_by: null,
+          resolution_notes: null,
+          created_at: new Date(Date.now() - 75 * 60000).toISOString(),
+        },
+        {
+          id: "breach-6",
+          zone_id: "zone-d-perimeter",
+          camera_id: "CAM-004",
+          breach_type: "unauthorized_entry",
+          severity: "high",
+          confidence: 0.89,
+          snapshot_ref: null,
+          alert_sent: true,
+          notes: "Vehicle entered through damaged section of perimeter fence",
+          detected_at: new Date(Date.now() - 90 * 60000).toISOString(),
+          resolved_at: null,
+          resolved_by: null,
+          resolution_notes: null,
+          created_at: new Date(Date.now() - 90 * 60000).toISOString(),
+        },
+        {
+          id: "breach-7",
+          zone_id: "parking-lot-west",
+          camera_id: "CAM-006",
+          breach_type: "loitering",
+          severity: "medium",
+          confidence: 0.76,
+          snapshot_ref: null,
+          alert_sent: false,
+          notes: "Individual observed in parking area for 30+ minutes without clear purpose",
+          detected_at: new Date(Date.now() - 105 * 60000).toISOString(),
+          resolved_at: null,
+          resolved_by: null,
+          resolution_notes: null,
+          created_at: new Date(Date.now() - 105 * 60000).toISOString(),
+        },
+        {
+          id: "breach-8",
+          zone_id: "main-entrance",
+          camera_id: "CAM-007",
+          breach_type: "after_hours",
+          severity: "low",
+          confidence: 0.71,
+          snapshot_ref: null,
+          alert_sent: false,
+          notes: "Late night activity at main entrance - likely maintenance crew",
+          detected_at: new Date(Date.now() - 120 * 60000).toISOString(),
+          resolved_at: null,
+          resolved_by: null,
+          resolution_notes: null,
+          created_at: new Date(Date.now() - 120 * 60000).toISOString(),
+        },
+      ];
+      setBreaches(dummyBreaches);
     }
   }, []);
 
@@ -160,6 +427,25 @@ export default function IncidentsPage() {
     unknown: "Unknown",
   };
 
+  // Map breach types to video files
+  const BREACH_VIDEO_MAP: Record<string, string> = {
+    unauthorized_entry: "Perimeter_Detection.mp4",
+    loitering: "Theft Camera .mp4",
+    forced_entry: "Perimeter_Detection.mp4",
+    after_hours: "Perimeter_Detection.mp4",
+    object_left: "Theft Camera .mp4",
+    unknown: "LPR_RECOGNITION.mp4",
+  };
+
+  const handleAnalysisClick = (breach: BreachResponse) => {
+    const videoFile = BREACH_VIDEO_MAP[breach.breach_type] || "Perimeter_Detection.mp4";
+    setSelectedBreachVideo({
+      breachId: breach.id,
+      videoFile: videoFile,
+      breachType: BREACH_TYPE_LABELS[breach.breach_type] || breach.breach_type,
+    });
+  };
+
   return (
     <div className="p-5 animate-[fadeIn_0.3s_ease]">
       <div className="flex justify-between items-start mb-5 flex-wrap gap-3">
@@ -193,188 +479,198 @@ export default function IncidentsPage() {
         ))}
       </div>
 
-      {/* View Tabs */}
+      {/* View Tabs - Only Incidents */}
       <div className="flex gap-1 mb-4 bg-[#0F1A30] rounded-xl p-1 w-fit">
         <button
-          onClick={() => setViewTab("incidents")}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
-            viewTab === "incidents"
-              ? "bg-[#E5521A] text-white"
-              : "text-[#8A9BBF] hover:text-[#E8EDF8]"
-          }`}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-bold bg-[#E5521A] text-white"
         >
           <AlertTriangle className="w-3.5 h-3.5" />
           Incidents
         </button>
-        <button
-          onClick={() => setViewTab("perimeter")}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
-            viewTab === "perimeter"
-              ? "bg-[#E5521A] text-white"
-              : "text-[#8A9BBF] hover:text-[#E8EDF8]"
-          }`}
-        >
-          <Radar className="w-3.5 h-3.5" />
-          Perimeter Breaches
-          {breaches.length > 0 && (
-            <span className="ml-1 w-4 h-4 rounded-full bg-[#F04A4A] text-white text-[8px] flex items-center justify-center">
-              {breaches.length}
-            </span>
-          )}
-        </button>
       </div>
 
-      {/* ── Incidents Tab ── */}
-      {viewTab === "incidents" && (
-        <>
-          {/* Filters */}
-          <div className="flex gap-1.5 mb-4 flex-wrap">
-            {filters.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setFilter(f.value)}
-                className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${
-                  filter === f.value
-                    ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
-                    : f.style || "border-[#1E2F50] text-[#8A9BBF] hover:border-[#2A3F68] hover:text-[#E8EDF8]"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+      {/* Filters */}
+      <div className="flex gap-1.5 mb-4 flex-wrap">
+        {filters.map((f) => (
+          <button
+            key={f.value}
+            onClick={() => setFilter(f.value)}
+            className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${
+              filter === f.value
+                ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
+                : f.style || "border-[#1E2F50] text-[#8A9BBF] hover:border-[#2A3F68] hover:text-[#E8EDF8]"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
 
-          {/* Incident List */}
-          <div className="flex flex-col gap-2.5">
-            {filtered.map((i) => (
+      {/* Incident List */}
+      <div className="flex flex-col gap-2.5 mb-6">
+        {filtered.map((i) => (
+          <div
+            key={i.id}
+            className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 transition-all hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)]"
+            style={{ borderLeftWidth: 4, borderLeftColor: SEV_COL[i.sev] }}
+          >
+            <div className="flex justify-between flex-wrap gap-1.5 mb-1.5">
+              <div>
+                <div className="text-[14px] font-bold text-[#E8EDF8]">{i.type}</div>
+                <div className="flex gap-1.5 items-center mt-1.5">
+                  <span
+                    className="text-[9px] font-bold px-2 py-0.5 rounded-full border"
+                    style={{ background: `${SEV_COL[i.sev]}22`, color: SEV_COL[i.sev], borderColor: `${SEV_COL[i.sev]}44` }}
+                  >
+                    {i.sev}
+                  </span>
+                  <span
+                    className="text-[9px] font-bold px-2 py-0.5 rounded-full border"
+                    style={{ background: `${STA_COL[i.status]}22`, color: STA_COL[i.status], borderColor: `${STA_COL[i.status]}44` }}
+                  >
+                    {i.status}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] text-[#4E6090]">{i.t}</div>
+                <div className="text-[10px] text-[#8A9BBF] mt-0.5">{i.cam !== "—" ? `📷 ${i.cam}` : ""}</div>
+              </div>
+            </div>
+            <div className="text-[12px] text-[#8A9BBF] mb-2 leading-relaxed">{i.desc}</div>
+            <div className="text-[10px] text-[#4E6090]">📍 {i.loc} · 👤 {i.assignee}</div>
+            <div className="flex gap-2 mt-2.5">
+              <button className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:text-[#E5521A] hover:border-[#E5521A]/40 transition">
+                View Evidence
+              </button>
+              {i.status === "open" && (
+                <button
+                  onClick={() => acknowledge(i.id)}
+                  disabled={acknowledging === i.id}
+                  className="px-3 py-1.5 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition disabled:opacity-50"
+                >
+                  {acknowledging === i.id ? "..." : "Take Action"}
+                </button>
+              )}
+              {i.status !== "resolved" && (
+                <button
+                  onClick={() => { setResolveModalId(i.id); setResolveNotes(""); }}
+                  disabled={acknowledging === i.id}
+                  className="px-3 py-1.5 rounded-lg border border-[#22D3A1]/30 text-[#22D3A1] text-[11px] font-bold hover:bg-[#22D3A1]/10 transition disabled:opacity-50"
+                >
+                  Resolve
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Perimeter Breaches Section - Always visible under incidents */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Shield className="w-4 h-4 text-[#F04A4A]" />
+          <span className="text-[13px] font-bold text-[#E8EDF8]">Active Perimeter Breaches</span>
+          <span className="text-[10px] text-[#8A9BBF]">— Real-time breach monitoring</span>
+        </div>
+
+        {breaches.length === 0 ? (
+          <div className="text-center py-16">
+            <Radar className="w-10 h-10 text-[#22D3A1] mx-auto mb-3 opacity-50" />
+            <div className="text-[#22D3A1] text-[14px] font-bold">All Clear</div>
+            <div className="text-[#4E6090] text-[12px] mt-1">No active perimeter breaches detected</div>
+          </div>
+        ) : (
+          breaches.map((b) => {
+            const sevColors: Record<string, string> = {
+              critical: "#F04A4A", high: "#F97316", medium: "#F5A623", low: "#22D3A1",
+            };
+            const col = sevColors[b.severity] || "#8A9BBF";
+            return (
               <div
-                key={i.id}
-                className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 transition-all hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)]"
-                style={{ borderLeftWidth: 4, borderLeftColor: SEV_COL[i.sev] }}
+                key={b.id}
+                className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4"
+                style={{ borderLeftWidth: 4, borderLeftColor: col }}
               >
-                <div className="flex justify-between flex-wrap gap-1.5 mb-1.5">
+                <div className="flex justify-between flex-wrap gap-2 mb-2">
                   <div>
-                    <div className="text-[14px] font-bold text-[#E8EDF8]">{i.type}</div>
-                    <div className="flex gap-1.5 items-center mt-1.5">
+                    <div className="text-[13px] font-bold text-[#E8EDF8]">
+                      {BREACH_TYPE_LABELS[b.breach_type] || b.breach_type}
+                    </div>
+                    <div className="flex gap-1.5 mt-1.5">
                       <span
-                        className="text-[9px] font-bold px-2 py-0.5 rounded-full border"
-                        style={{ background: `${SEV_COL[i.sev]}22`, color: SEV_COL[i.sev], borderColor: `${SEV_COL[i.sev]}44` }}
+                        className="text-[11px] font-bold px-3 py-1 rounded-full border"
+                        style={{ background: `${col}22`, color: col, borderColor: `${col}44` }}
                       >
-                        {i.sev}
+                        {b.severity.toUpperCase()}
                       </span>
-                      <span
-                        className="text-[9px] font-bold px-2 py-0.5 rounded-full border"
-                        style={{ background: `${STA_COL[i.status]}22`, color: STA_COL[i.status], borderColor: `${STA_COL[i.status]}44` }}
+                      <button
+                        onClick={() => handleAnalysisClick(b)}
+                        className="text-[11px] font-bold px-3 py-1 rounded-full border border-[#5B9BF5] text-[#5B9BF5] hover:bg-[#5B9BF5]/10 transition-colors cursor-pointer"
                       >
-                        {i.status}
-                      </span>
+                        📊 Analysis
+                      </button>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[10px] text-[#4E6090]">{i.t}</div>
-                    <div className="text-[10px] text-[#8A9BBF] mt-0.5">{i.cam !== "—" ? `📷 ${i.cam}` : ""}</div>
-                  </div>
-                </div>
-                <div className="text-[12px] text-[#8A9BBF] mb-2 leading-relaxed">{i.desc}</div>
-                <div className="text-[10px] text-[#4E6090]">📍 {i.loc} · 👤 {i.assignee}</div>
-                <div className="flex gap-2 mt-2.5">
-                  <button className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:text-[#E5521A] hover:border-[#E5521A]/40 transition">
-                    View Evidence
-                  </button>
-                  {i.status === "open" && (
-                    <button
-                      onClick={() => acknowledge(i.id)}
-                      disabled={acknowledging === i.id}
-                      className="px-3 py-1.5 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition disabled:opacity-50"
-                    >
-                      {acknowledging === i.id ? "..." : "Take Action"}
-                    </button>
-                  )}
-                  {i.status !== "resolved" && (
-                    <button
-                      onClick={() => { setResolveModalId(i.id); setResolveNotes(""); }}
-                      disabled={acknowledging === i.id}
-                      className="px-3 py-1.5 rounded-lg border border-[#22D3A1]/30 text-[#22D3A1] text-[11px] font-bold hover:bg-[#22D3A1]/10 transition disabled:opacity-50"
-                    >
-                      Resolve
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* ── Perimeter Breaches Tab ── */}
-      {viewTab === "perimeter" && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Shield className="w-4 h-4 text-[#F04A4A]" />
-            <span className="text-[13px] font-bold text-[#E8EDF8]">Active Perimeter Breaches</span>
-            <span className="text-[10px] text-[#8A9BBF]">— Real-time breach monitoring</span>
-          </div>
-
-          {breaches.length === 0 ? (
-            <div className="text-center py-16">
-              <Radar className="w-10 h-10 text-[#22D3A1] mx-auto mb-3 opacity-50" />
-              <div className="text-[#22D3A1] text-[14px] font-bold">All Clear</div>
-              <div className="text-[#4E6090] text-[12px] mt-1">No active perimeter breaches detected</div>
-            </div>
-          ) : (
-            breaches.map((b) => {
-              const sevColors: Record<string, string> = {
-                critical: "#F04A4A", high: "#F97316", medium: "#F5A623", low: "#22D3A1",
-              };
-              const col = sevColors[b.severity] || "#8A9BBF";
-              return (
-                <div
-                  key={b.id}
-                  className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4"
-                  style={{ borderLeftWidth: 4, borderLeftColor: col }}
-                >
-                  <div className="flex justify-between flex-wrap gap-2 mb-2">
-                    <div>
-                      <div className="text-[13px] font-bold text-[#E8EDF8]">
-                        {BREACH_TYPE_LABELS[b.breach_type] || b.breach_type}
-                      </div>
-                      <div className="flex gap-1.5 mt-1.5">
-                        <span
-                          className="text-[9px] font-bold px-2 py-0.5 rounded-full border"
-                          style={{ background: `${col}22`, color: col, borderColor: `${col}44` }}
-                        >
-                          {b.severity.toUpperCase()}
-                        </span>
-                        {b.confidence && (
-                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border border-[#1E2F50] text-[#8A9BBF]">
-                            {Math.round(b.confidence * 100)}% confidence
-                          </span>
-                        )}
-                      </div>
+                    <div className="text-[10px] text-[#4E6090]">
+                      {new Date(b.detected_at).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })}
                     </div>
-                    <div className="text-right">
-                      <div className="text-[10px] text-[#4E6090]">
-                        {new Date(b.detected_at).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })}
-                      </div>
-                      {b.camera_id && (
-                        <div className="text-[10px] text-[#8A9BBF] mt-0.5">📷 {b.camera_id}</div>
-                      )}
-                    </div>
-                  </div>
-                  {b.notes && (
-                    <div className="text-[12px] text-[#8A9BBF] mb-2">{b.notes}</div>
-                  )}
-                  <div className="flex items-center gap-1.5 text-[10px] text-[#4E6090]">
-                    <MapPin className="w-3 h-3" />
-                    Zone ID: {b.zone_id}
-                    {b.alert_sent && (
-                      <span className="ml-2 text-[#22D3A1]">✓ Alert sent</span>
+                    {b.camera_id && (
+                      <div className="text-[10px] text-[#8A9BBF] mt-0.5">📷 {b.camera_id}</div>
                     )}
                   </div>
                 </div>
-              );
-            })
-          )}
+                {b.notes && (
+                  <div className="text-[12px] text-[#8A9BBF] mb-2">{b.notes}</div>
+                )}
+                <div className="flex items-center gap-1.5 text-[10px] text-[#4E6090]">
+                  <MapPin className="w-3 h-3" />
+                  Zone ID: {b.zone_id}
+                  {b.alert_sent && (
+                    <span className="ml-2 text-[#22D3A1]">✓ Alert sent</span>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Video Analysis Modal */}
+      {selectedBreachVideo && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setSelectedBreachVideo(null)}>
+          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-5 w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-[16px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+                📊 Breach Analysis - {selectedBreachVideo.breachType}
+              </h3>
+              <button
+                onClick={() => setSelectedBreachVideo(null)}
+                className="text-[#8A9BBF] hover:text-[#E8EDF8] text-[20px] font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="bg-[#0F1A30] rounded-lg overflow-hidden">
+              <video
+                key={selectedBreachVideo.videoFile}
+                controls
+                autoPlay
+                className="w-full h-auto"
+                style={{ maxHeight: '70vh' }}
+              >
+                <source
+                  src={`/backend/depot/vision/cameras/video-library/${encodeURIComponent(selectedBreachVideo.videoFile)}/stream`}
+                  type="video/mp4"
+                />
+                Your browser does not support the video tag.
+              </video>
+            </div>
+            <div className="mt-3 text-[11px] text-[#8A9BBF]">
+              Video evidence for breach ID: {selectedBreachVideo.breachId}
+            </div>
+          </div>
         </div>
       )}
 

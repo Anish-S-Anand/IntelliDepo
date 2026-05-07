@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -27,72 +27,80 @@ const NAV_ITEMS = [
   { label: "VIS", fullLabel: "Vision AI", href: "/depot/vision", icon: Eye },
   { label: "CNT", fullLabel: "Counting", href: "/depot/counting", icon: Hash },
   { label: "MAP", fullLabel: "Heatmap", href: "/depot/heatmap", icon: Map },
-  { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
+  // Hidden temporarily - can be restored later
+  // { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
   { label: "SEQ", fullLabel: "Sequencing", href: "/depot/sequencing", icon: Layers },
   { label: "GTE", fullLabel: "Gate & LPR", href: "/depot/gate", icon: Shield },
   { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle },
+];
+
+const WAREHOUSE_MANAGER_NAV_ITEMS = [
+  { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard },
+  { label: "VIS", fullLabel: "Vision AI", href: "/depot/vision", icon: Eye },
+  { label: "GTE", fullLabel: "Gate & LPR", href: "/depot/gate", icon: Shield },
+  { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle },
+  { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package },
+  // Hidden temporarily - can be restored later
+  // { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
+];
+
+const REGIONAL_MANAGER_NAV_ITEMS = [
+  { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard },
+  { label: "VIS", fullLabel: "Vision AI", href: "/depot/vision", icon: Eye },
+  { label: "CMD", fullLabel: "Command", href: "/depot/command", icon: Radio },
+  { label: "GTE", fullLabel: "Gate & LPR", href: "/depot/gate", icon: Shield },
+  { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle },
+  { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package },
+  // Hidden temporarily - can be restored later
+  // { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
 ];
 
 export default function DepotSidebar({ open, onClose }: { open: boolean; onClose?: () => void }) {
   const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
   const [alertCount, setAlertCount] = useState(0);
-  const normalizedRole = (user?.role ?? "").toLowerCase().replace(/\s+/g, "_");
-  const isWarehouseManager = normalizedRole === "warehouse_manager" || normalizedRole.includes("warehouse");
-  const isRegionalManager = normalizedRole === "regional_manager" || normalizedRole.includes("regional");
+  
+  const normalizedRole = useMemo(() => (user?.role ?? "").toLowerCase().replace(/\s+/g, "_"), [user?.role]);
+  const isWarehouseManager = useMemo(() => normalizedRole === "warehouse_manager" || normalizedRole.includes("warehouse"), [normalizedRole]);
+  const isRegionalManager = useMemo(() => normalizedRole === "regional_manager" || normalizedRole.includes("regional"), [normalizedRole]);
 
-  const warehouseManagerNavItems = [
-    { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard },
-    { label: "VIS", fullLabel: "Vision AI", href: "/depot/vision", icon: Eye },
-    { label: "GTE", fullLabel: "Gate & LPR", href: "/depot/gate", icon: Shield },
-    { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle },
-    { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package },
-    { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
-  ];
+  const visibleNavItems = useMemo(() => {
+    return isWarehouseManager
+      ? WAREHOUSE_MANAGER_NAV_ITEMS
+      : isRegionalManager
+        ? REGIONAL_MANAGER_NAV_ITEMS
+        : NAV_ITEMS;
+  }, [isWarehouseManager, isRegionalManager]);
 
-  const regionalManagerNavItems = [
-    { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard },
-    { label: "VIS", fullLabel: "Vision AI", href: "/depot/vision", icon: Eye },
-    { label: "CMD", fullLabel: "Command", href: "/depot/command", icon: Radio },
-    { label: "GTE", fullLabel: "Gate & LPR", href: "/depot/gate", icon: Shield },
-    { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle },
-    { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package },
-    { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
-  ];
-
-  const visibleNavItems = isWarehouseManager
-    ? warehouseManagerNavItems
-    : isRegionalManager
-      ? regionalManagerNavItems
-      : NAV_ITEMS;
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const [visionAlerts, perimeterCount] = await Promise.allSettled([
+        getAllActiveAlerts(),
+        getPerimeterAlertCount(),
+      ]);
+      let total = 0;
+      if (visionAlerts.status === "fulfilled") total += visionAlerts.value.length;
+      if (perimeterCount.status === "fulfilled") total += perimeterCount.value;
+      setAlertCount(total);
+    } catch {
+      setAlertCount(3);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    const fetchAlerts = async () => {
-      try {
-        const [visionAlerts, perimeterCount] = await Promise.allSettled([
-          getAllActiveAlerts(),
-          getPerimeterAlertCount(),
-        ]);
-        if (!cancelled) {
-          let total = 0;
-          if (visionAlerts.status === "fulfilled") total += visionAlerts.value.length;
-          if (perimeterCount.status === "fulfilled") total += perimeterCount.value;
-          setAlertCount(total);
-        }
-      } catch {
-        if (!cancelled) setAlertCount(3);
-      }
+    const wrappedFetch = async () => {
+      if (!cancelled) await fetchAlerts();
     };
     // Defer initial fetch by 2s so it doesn't compete with the page's own data fetching on load
-    const initialTimer = window.setTimeout(() => void fetchAlerts(), 2000);
-    const interval = setInterval(() => void fetchAlerts(), 60000);
+    const initialTimer = window.setTimeout(() => void wrappedFetch(), 2000);
+    const interval = setInterval(() => void wrappedFetch(), 60000);
     return () => {
       cancelled = true;
       window.clearTimeout(initialTimer);
       clearInterval(interval);
     };
-  }, []);
+  }, [fetchAlerts]);
 
   return (
     <aside
