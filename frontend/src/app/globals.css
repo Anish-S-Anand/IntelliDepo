@@ -246,22 +246,43 @@
 }
 
 .depot-sidebar {
+  width: 204px;
   background-color: var(--bg-nav) !important;
   border-right-color: var(--bg-nav-border) !important;
+  transition: transform 0.3s ease, background-color 0.25s ease, border-color 0.25s ease;
 }
 
 .depot-sidebar-item {
   color: var(--text-nav) !important;
+  min-height: 50px;
+  padding: 0 13px;
+  gap: 10px;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 
 .depot-sidebar-item:hover {
   background-color: var(--bg-nav-item) !important;
   color: var(--text-secondary) !important;
+  border-color: var(--border-default) !important;
 }
 
 .depot-sidebar-item.active {
-  background-color: var(--bg-nav-active) !important;
+  background-color: rgba(229,82,26,0.12) !important;
   color: var(--accent) !important;
+  border-color: rgba(229,82,26,0.22) !important;
+}
+
+.depot-sidebar-item.active::before {
+  content: '';
+  position: absolute;
+  left: -9px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 28px;
+  background: var(--accent);
+  border-radius: 0 3px 3px 0;
+  transition: opacity 0.18s ease;
 }
 
 .depot-card {
@@ -546,9 +567,9 @@ html:not(.dark) .depot-sidebar-item:hover {
 }
 
 html:not(.dark) .depot-sidebar-item.active {
-  background-color: rgba(229,82,26,0.08) !important;
+  background-color: rgba(229,82,26,0.12) !important;
   color: #E5521A !important;
-  border-color: rgba(229,82,26,0.2) !important;
+  border-color: rgba(229,82,26,0.22) !important;
 }
 
 html:not(.dark) .depot-main,

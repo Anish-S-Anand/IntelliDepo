@@ -104,7 +104,7 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
 
   return (
     <aside
-      className={`depot-sidebar fixed left-0 top-[52px] bottom-0 w-16 flex flex-col items-center py-3 gap-1 z-40 transition-all duration-300 ${
+      className={`depot-sidebar fixed left-0 top-[52px] bottom-0 w-[204px] flex flex-col items-center py-3 gap-1 z-40 transition-all duration-300 ${
         open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       }`}
       style={{
@@ -126,7 +126,7 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
             scroll={false}
             onClick={() => onClose?.()}
             className={cn(
-              "depot-sidebar-item relative w-11 h-11 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all text-[16px]",
+              "depot-sidebar-item relative w-auto min-h-[50px] rounded-xl inline-flex flex-row items-center justify-start gap-[10px] px-[13px] transition-all text-[16px]",
               isActive ? "active" : ""
             )}
             style={{
