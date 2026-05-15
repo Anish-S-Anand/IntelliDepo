@@ -5,7 +5,7 @@ import PerimeterSkeleton from "@/components/depot/skeletons/PerimeterSkeleton";
 
 const PerimeterSecurityPage = dynamic(
   () => import("@/components/depot/operations/PerimeterSecurityPage"),
-  { loading: () => <PerimeterSkeleton /> }
+  { ssr: false, loading: () => <PerimeterSkeleton /> }
 );
 
 export default function PerimeterPage() {

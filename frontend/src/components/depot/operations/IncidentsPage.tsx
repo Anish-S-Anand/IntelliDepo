@@ -7,6 +7,7 @@ import type { Incident } from "@/lib/depot-data";
 import {
   getIncidents,
   getActiveBreaches,
+  createIncidentFromBreach,
   acknowledgeIncident,
   resolveIncident,
   type IncidentResponse,
@@ -14,7 +15,6 @@ import {
 } from "@/services/depotPerimeter";
 
 type FilterType = "all" | "open" | "acknowledged" | "resolved" | "CRITICAL" | "HIGH" | "perimeter";
-type ViewTab = "incidents" | "perimeter";
 
 /** Map backend incidents to the UI Incident shape */
 function mapBackendIncident(inc: IncidentResponse): Incident {
@@ -34,10 +34,10 @@ function mapBackendIncident(inc: IncidentResponse): Incident {
     id: inc.id,
     type: inc.title,
     sev: sevMap[inc.severity] || "MEDIUM",
-    loc: inc.escalated_to ? `Escalated to ${inc.escalated_to}` : "Perimeter Zone",
+    loc: `Zone ID: ${inc.zone_id}`,
     t: new Date(inc.created_at).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" }),
     status: statusMap[inc.status] || "open",
-    cam: inc.video_archive_ref ? "Evidence" : "—",
+    cam: inc.video_archive_ref || "—",
     desc: inc.description || inc.title,
     assignee: inc.acknowledged_by || inc.escalated_to || "—",
   };
@@ -45,12 +45,13 @@ function mapBackendIncident(inc: IncidentResponse): Incident {
 
 export default function IncidentsPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [rawIncidents, setRawIncidents] = useState<IncidentResponse[]>([]);
   const [breaches, setBreaches] = useState<BreachResponse[]>([]);
   const [filter, setFilter] = useState<FilterType>("all");
-  const [viewTab, setViewTab] = useState<ViewTab>("incidents");
   const [resolveModalId, setResolveModalId] = useState<string | null>(null);
   const [resolveNotes, setResolveNotes] = useState("");
   const [acknowledging, setAcknowledging] = useState<string | null>(null);
+  const [ackError, setAckError] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
   const [selectedBreachVideo, setSelectedBreachVideo] = useState<{ breachId: string; videoFile: string; breachType: string } | null>(null);
 
@@ -58,6 +59,7 @@ export default function IncidentsPage() {
   const fetchIncidents = useCallback(async () => {
     try {
       const backendIncidents = await getIncidents();
+      setRawIncidents(backendIncidents);
       setIncidents(backendIncidents.map(mapBackendIncident));
     } catch {
       // Keep empty — don't pad with stale mock data
@@ -67,278 +69,11 @@ export default function IncidentsPage() {
   const fetchBreaches = useCallback(async () => {
     try {
       const data = await getActiveBreaches();
-      if (data.length === 0) {
-        // Add dummy data if no breaches exist
-        const dummyBreaches: BreachResponse[] = [
-          {
-            id: "breach-1",
-            zone_id: "zone-a-perimeter",
-            camera_id: "CAM-001",
-            breach_type: "unauthorized_entry",
-            severity: "critical",
-            confidence: 0.94,
-            snapshot_ref: null,
-            alert_sent: true,
-            notes: "Multiple unauthorized individuals detected attempting entry through north perimeter fence",
-            detected_at: new Date(Date.now() - 10 * 60000).toISOString(),
-            resolved_at: null,
-            resolved_by: null,
-            resolution_notes: null,
-            created_at: new Date(Date.now() - 10 * 60000).toISOString(),
-          },
-          {
-            id: "breach-2",
-            zone_id: "zone-c-perimeter",
-            camera_id: "CAM-003",
-            breach_type: "loitering",
-            severity: "high",
-            confidence: 0.87,
-            snapshot_ref: null,
-            alert_sent: true,
-            notes: "Suspicious individual loitering near restricted area for extended period",
-            detected_at: new Date(Date.now() - 25 * 60000).toISOString(),
-            resolved_at: null,
-            resolved_by: null,
-            resolution_notes: null,
-            created_at: new Date(Date.now() - 25 * 60000).toISOString(),
-          },
-          {
-            id: "breach-3",
-            zone_id: "loading-bay-1",
-            camera_id: "CAM-002",
-            breach_type: "after_hours",
-            severity: "medium",
-            confidence: 0.78,
-            snapshot_ref: null,
-            alert_sent: true,
-            notes: "Activity detected in loading bay outside authorized hours",
-            detected_at: new Date(Date.now() - 45 * 60000).toISOString(),
-            resolved_at: null,
-            resolved_by: null,
-            resolution_notes: null,
-            created_at: new Date(Date.now() - 45 * 60000).toISOString(),
-          },
-          {
-            id: "breach-4",
-            zone_id: "zone-b-perimeter",
-            camera_id: "CAM-005",
-            breach_type: "forced_entry",
-            severity: "critical",
-            confidence: 0.91,
-            snapshot_ref: null,
-            alert_sent: true,
-            notes: "Forced entry attempt detected at east gate - security team dispatched",
-            detected_at: new Date(Date.now() - 60 * 60000).toISOString(),
-            resolved_at: null,
-            resolved_by: null,
-            resolution_notes: null,
-            created_at: new Date(Date.now() - 60 * 60000).toISOString(),
-          },
-          {
-            id: "breach-5",
-            zone_id: "warehouse-section-3",
-            camera_id: "CAM-008",
-            breach_type: "object_left",
-            severity: "high",
-            confidence: 0.82,
-            snapshot_ref: null,
-            alert_sent: true,
-            notes: "Unidentified package left unattended in warehouse section 3",
-            detected_at: new Date(Date.now() - 75 * 60000).toISOString(),
-            resolved_at: null,
-            resolved_by: null,
-            resolution_notes: null,
-            created_at: new Date(Date.now() - 75 * 60000).toISOString(),
-          },
-          {
-            id: "breach-6",
-            zone_id: "zone-d-perimeter",
-            camera_id: "CAM-004",
-            breach_type: "unauthorized_entry",
-            severity: "high",
-            confidence: 0.89,
-            snapshot_ref: null,
-            alert_sent: true,
-            notes: "Vehicle entered through damaged section of perimeter fence",
-            detected_at: new Date(Date.now() - 90 * 60000).toISOString(),
-            resolved_at: null,
-            resolved_by: null,
-            resolution_notes: null,
-            created_at: new Date(Date.now() - 90 * 60000).toISOString(),
-          },
-          {
-            id: "breach-7",
-            zone_id: "parking-lot-west",
-            camera_id: "CAM-006",
-            breach_type: "loitering",
-            severity: "medium",
-            confidence: 0.76,
-            snapshot_ref: null,
-            alert_sent: false,
-            notes: "Individual observed in parking area for 30+ minutes without clear purpose",
-            detected_at: new Date(Date.now() - 105 * 60000).toISOString(),
-            resolved_at: null,
-            resolved_by: null,
-            resolution_notes: null,
-            created_at: new Date(Date.now() - 105 * 60000).toISOString(),
-          },
-          {
-            id: "breach-8",
-            zone_id: "main-entrance",
-            camera_id: "CAM-007",
-            breach_type: "after_hours",
-            severity: "low",
-            confidence: 0.71,
-            snapshot_ref: null,
-            alert_sent: false,
-            notes: "Late night activity at main entrance - likely maintenance crew",
-            detected_at: new Date(Date.now() - 120 * 60000).toISOString(),
-            resolved_at: null,
-            resolved_by: null,
-            resolution_notes: null,
-            created_at: new Date(Date.now() - 120 * 60000).toISOString(),
-          },
-        ];
-        setBreaches(dummyBreaches);
-      } else {
-        setBreaches(data);
-      }
+      setBreaches(data);
     } catch {
-      // Fallback to dummy data on error
-      const dummyBreaches: BreachResponse[] = [
-        {
-          id: "breach-1",
-          zone_id: "zone-a-perimeter",
-          camera_id: "CAM-001",
-          breach_type: "unauthorized_entry",
-          severity: "critical",
-          confidence: 0.94,
-          snapshot_ref: null,
-          alert_sent: true,
-          notes: "Multiple unauthorized individuals detected attempting entry through north perimeter fence",
-          detected_at: new Date(Date.now() - 10 * 60000).toISOString(),
-          resolved_at: null,
-          resolved_by: null,
-          resolution_notes: null,
-          created_at: new Date(Date.now() - 10 * 60000).toISOString(),
-        },
-        {
-          id: "breach-2",
-          zone_id: "zone-c-perimeter",
-          camera_id: "CAM-003",
-          breach_type: "loitering",
-          severity: "high",
-          confidence: 0.87,
-          snapshot_ref: null,
-          alert_sent: true,
-          notes: "Suspicious individual loitering near restricted area for extended period",
-          detected_at: new Date(Date.now() - 25 * 60000).toISOString(),
-          resolved_at: null,
-          resolved_by: null,
-          resolution_notes: null,
-          created_at: new Date(Date.now() - 25 * 60000).toISOString(),
-        },
-        {
-          id: "breach-3",
-          zone_id: "loading-bay-1",
-          camera_id: "CAM-002",
-          breach_type: "after_hours",
-          severity: "medium",
-          confidence: 0.78,
-          snapshot_ref: null,
-          alert_sent: true,
-          notes: "Activity detected in loading bay outside authorized hours",
-          detected_at: new Date(Date.now() - 45 * 60000).toISOString(),
-          resolved_at: null,
-          resolved_by: null,
-          resolution_notes: null,
-          created_at: new Date(Date.now() - 45 * 60000).toISOString(),
-        },
-        {
-          id: "breach-4",
-          zone_id: "zone-b-perimeter",
-          camera_id: "CAM-005",
-          breach_type: "forced_entry",
-          severity: "critical",
-          confidence: 0.91,
-          snapshot_ref: null,
-          alert_sent: true,
-          notes: "Forced entry attempt detected at east gate - security team dispatched",
-          detected_at: new Date(Date.now() - 60 * 60000).toISOString(),
-          resolved_at: null,
-          resolved_by: null,
-          resolution_notes: null,
-          created_at: new Date(Date.now() - 60 * 60000).toISOString(),
-        },
-        {
-          id: "breach-5",
-          zone_id: "warehouse-section-3",
-          camera_id: "CAM-008",
-          breach_type: "object_left",
-          severity: "high",
-          confidence: 0.82,
-          snapshot_ref: null,
-          alert_sent: true,
-          notes: "Unidentified package left unattended in warehouse section 3",
-          detected_at: new Date(Date.now() - 75 * 60000).toISOString(),
-          resolved_at: null,
-          resolved_by: null,
-          resolution_notes: null,
-          created_at: new Date(Date.now() - 75 * 60000).toISOString(),
-        },
-        {
-          id: "breach-6",
-          zone_id: "zone-d-perimeter",
-          camera_id: "CAM-004",
-          breach_type: "unauthorized_entry",
-          severity: "high",
-          confidence: 0.89,
-          snapshot_ref: null,
-          alert_sent: true,
-          notes: "Vehicle entered through damaged section of perimeter fence",
-          detected_at: new Date(Date.now() - 90 * 60000).toISOString(),
-          resolved_at: null,
-          resolved_by: null,
-          resolution_notes: null,
-          created_at: new Date(Date.now() - 90 * 60000).toISOString(),
-        },
-        {
-          id: "breach-7",
-          zone_id: "parking-lot-west",
-          camera_id: "CAM-006",
-          breach_type: "loitering",
-          severity: "medium",
-          confidence: 0.76,
-          snapshot_ref: null,
-          alert_sent: false,
-          notes: "Individual observed in parking area for 30+ minutes without clear purpose",
-          detected_at: new Date(Date.now() - 105 * 60000).toISOString(),
-          resolved_at: null,
-          resolved_by: null,
-          resolution_notes: null,
-          created_at: new Date(Date.now() - 105 * 60000).toISOString(),
-        },
-        {
-          id: "breach-8",
-          zone_id: "main-entrance",
-          camera_id: "CAM-007",
-          breach_type: "after_hours",
-          severity: "low",
-          confidence: 0.71,
-          snapshot_ref: null,
-          alert_sent: false,
-          notes: "Late night activity at main entrance - likely maintenance crew",
-          detected_at: new Date(Date.now() - 120 * 60000).toISOString(),
-          resolved_at: null,
-          resolved_by: null,
-          resolution_notes: null,
-          created_at: new Date(Date.now() - 120 * 60000).toISOString(),
-        },
-      ];
-      setBreaches(dummyBreaches);
+      // Keep the current real breach data instead of substituting demo records.
     }
   }, []);
-
   useEffect(() => {
     void fetchIncidents();
     void fetchBreaches();
@@ -360,25 +95,41 @@ export default function IncidentsPage() {
   const cntAck = useMemo(() => incidents.filter((i) => i.status === "acknowledged").length, [incidents]);
   const cntRes = useMemo(() => incidents.filter((i) => i.status === "resolved").length, [incidents]);
   const cntCrit = useMemo(() => incidents.filter((i) => i.sev === "CRITICAL").length, [incidents]);
+  const incidentByBreachId = useMemo(
+    () => new Map(rawIncidents.map((incident) => [incident.breach_id, incident])),
+    [rawIncidents],
+  );
 
   const acknowledge = async (id: string) => {
-    // Prevent double-clicks
     if (acknowledging !== null) return;
     setAcknowledging(id);
+    setAckError(null);
     try {
-      // Try backend first for UUID-like IDs
-      if (id.includes("-") && id.length > 10) {
-        try {
-          await acknowledgeIncident(id, "Acknowledged from incident console");
-          void fetchIncidents();
-          return;
-        } catch { /* fall through to local state */ }
+      await acknowledgeIncident(id, "Acknowledged from incident console");
+      await fetchIncidents();
+    } catch {
+      setAckError("Unable to acknowledge this incident. The displayed data was not changed.");
+    } finally {
+      setAcknowledging(null);
+    }
+  };
+
+  const acknowledgeBreach = async (breach: BreachResponse) => {
+    if (acknowledging !== null) return;
+    setAcknowledging(breach.id);
+    setAckError(null);
+    try {
+      const existingIncident = incidentByBreachId.get(breach.id);
+      const incident =
+        existingIncident ?? await createIncidentFromBreach(breach.id);
+
+      if (incident.status !== "acknowledged") {
+        await acknowledgeIncident(incident.id, "Acknowledged from active perimeter breach card");
       }
-      setIncidents((prev) =>
-        prev.map((i) =>
-          i.id === id ? { ...i, status: "acknowledged" as const, assignee: "Command Center" } : i
-        )
-      );
+
+      await fetchIncidents();
+    } catch {
+      setAckError("Unable to acknowledge this breach. The active breach data was not changed.");
     } finally {
       setAcknowledging(null);
     }
@@ -506,6 +257,12 @@ export default function IncidentsPage() {
         ))}
       </div>
 
+      {ackError && (
+        <div className="mb-4 rounded-lg border border-[#F04A4A]/30 bg-[#F04A4A]/10 px-3 py-2 text-[12px] font-semibold text-[#F04A4A]">
+          {ackError}
+        </div>
+      )}
+
       {/* Incident List */}
       <div className="flex flex-col gap-2.5 mb-6">
         {filtered.map((i) => (
@@ -549,7 +306,7 @@ export default function IncidentsPage() {
                   disabled={acknowledging === i.id}
                   className="px-3 py-1.5 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition disabled:opacity-50"
                 >
-                  {acknowledging === i.id ? "..." : "Take Action"}
+                  {acknowledging === i.id ? "Acknowledging..." : "Acknowledge"}
                 </button>
               )}
               {i.status !== "resolved" && (
@@ -586,6 +343,8 @@ export default function IncidentsPage() {
               critical: "#F04A4A", high: "#F97316", medium: "#F5A623", low: "#22D3A1",
             };
             const col = sevColors[b.severity] || "#8A9BBF";
+            const linkedIncident = incidentByBreachId.get(b.id);
+            const isAcknowledged = linkedIncident?.status === "acknowledged";
             return (
               <div
                 key={b.id}
@@ -609,6 +368,17 @@ export default function IncidentsPage() {
                         className="text-[11px] font-bold px-3 py-1 rounded-full border border-[#5B9BF5] text-[#5B9BF5] hover:bg-[#5B9BF5]/10 transition-colors cursor-pointer"
                       >
                         📊 Analysis
+                      </button>
+                      <button
+                        onClick={() => acknowledgeBreach(b)}
+                        disabled={acknowledging === b.id || isAcknowledged}
+                        className="text-[11px] font-bold px-3 py-1 rounded-full border border-[#E5521A] text-[#E5521A] hover:bg-[#E5521A]/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {acknowledging === b.id
+                          ? "Acknowledging..."
+                          : isAcknowledged
+                            ? "Acknowledged"
+                            : "Acknowledge"}
                       </button>
                     </div>
                   </div>

@@ -1,20 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   Shield,
   Car,
   UserPlus,
   Clock,
   CheckCircle2,
-  XCircle,
   Search,
   DoorOpen,
   DoorClosed,
   ScanLine,
   ArrowDownUp,
   ArrowRightLeft,
-  AlertTriangle,
   Plus,
   X,
   LogOut,
@@ -22,6 +21,7 @@ import {
   ClipboardList,
   Users,
   Camera,
+  Calendar,
 } from "lucide-react";
 import {
   getGates,
@@ -353,8 +353,19 @@ export default function GateConsolePage() {
   const [scanning, setScanning] = useState(false);
 
   // Access log filters
-  const [logFilter, setLogFilter] = useState<"all" | "granted" | "denied" | "blacklisted">("all");
   const [logSearch, setLogSearch] = useState("");
+
+  // AI Analysis Log Feed filters (independent from ACCESS LOG FEED)
+  const [aiLogFilter, setAiLogFilter] = useState<"all" | "granted" | "denied" | "blacklisted">("all");
+  const [aiLogSearch, setAiLogSearch] = useState("");
+  const [aiLogSearchDebounced, setAiLogSearchDebounced] = useState("");
+  const aiLogSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // AI Analysis Log Feed error state
+  const [aiLogError, setAiLogError] = useState<string | null>(null);
+
+  // Visitor date filter
+  const [visitorDate, setVisitorDate] = useState("");
 
   // Vehicle blacklist
   const [blacklistTarget, setBlacklistTarget] = useState<string | null>(null);
@@ -365,6 +376,8 @@ export default function GateConsolePage() {
   const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [showAnalysisImage, setShowAnalysisImage] = useState(false);
   const [selectedPlateNumber, setSelectedPlateNumber] = useState<string>("");
+  const [showLicenseCard, setShowLicenseCard] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<VehicleResponse | null>(null);
 
   // Gate toggling
   const [togglingGate, setTogglingGate] = useState<string | null>(null);
@@ -390,51 +403,60 @@ export default function GateConsolePage() {
     try {
       const data = await getAccessLogs({ limit: 20 });
       if (data.length === 0) {
-        // Add dummy data if no logs exist
+        // Add dummy data with varied dates/times
+        const now = new Date();
         const dummyLogs: AccessLogResponse[] = [
           {
             id: "log-1",
+            gate_id: "gate-1",
             gate_code: "GATE-01",
             plate_number: "KA01AB1234",
             direction: "entry",
             decision: "granted",
             plate_confidence: 0.95,
+            vehicle_id: "veh-1",
             denied_reason: null,
-            processed_at: new Date(Date.now() - 5 * 60000).toISOString(),
-            created_at: new Date(Date.now() - 5 * 60000).toISOString(),
+            processed_at: new Date(now.getTime() - 2 * 60 * 60000 - 11 * 60000).toISOString(), // 2h 11m ago
+            created_at: new Date(now.getTime() - 2 * 60 * 60000 - 11 * 60000).toISOString(),
           },
           {
             id: "log-2",
+            gate_id: "gate-2",
             gate_code: "GATE-02",
             plate_number: "MH02CD5678",
             direction: "exit",
             decision: "granted",
             plate_confidence: 0.92,
+            vehicle_id: "veh-2",
             denied_reason: null,
-            processed_at: new Date(Date.now() - 15 * 60000).toISOString(),
-            created_at: new Date(Date.now() - 15 * 60000).toISOString(),
+            processed_at: new Date(now.getTime() - 3 * 60 * 60000 - 45 * 60000).toISOString(), // 3h 45m ago
+            created_at: new Date(now.getTime() - 3 * 60 * 60000 - 45 * 60000).toISOString(),
           },
           {
             id: "log-3",
+            gate_id: "gate-1",
             gate_code: "GATE-01",
             plate_number: "DL03EF9012",
             direction: "entry",
             decision: "denied",
             plate_confidence: 0.88,
+            vehicle_id: null,
             denied_reason: "Vehicle not registered",
-            processed_at: new Date(Date.now() - 25 * 60000).toISOString(),
-            created_at: new Date(Date.now() - 25 * 60000).toISOString(),
+            processed_at: new Date(now.getTime() - 5 * 60 * 60000 - 15 * 60000).toISOString(), // 5h 15m ago
+            created_at: new Date(now.getTime() - 5 * 60 * 60000 - 15 * 60000).toISOString(),
           },
           {
             id: "log-4",
+            gate_id: "gate-3",
             gate_code: "GATE-03",
             plate_number: "TN04GH3456",
             direction: "entry",
             decision: "blacklisted",
             plate_confidence: 0.97,
+            vehicle_id: "veh-blacklist-1",
             denied_reason: "Vehicle blacklisted - Security threat",
-            processed_at: new Date(Date.now() - 35 * 60000).toISOString(),
-            created_at: new Date(Date.now() - 35 * 60000).toISOString(),
+            processed_at: new Date(now.getTime() - 6 * 60 * 60000 - 33 * 60000).toISOString(), // 6h 33m ago
+            created_at: new Date(now.getTime() - 6 * 60 * 60000 - 33 * 60000).toISOString(),
           },
         ];
         setAccessLogs(dummyLogs);
@@ -442,51 +464,60 @@ export default function GateConsolePage() {
         setAccessLogs(data);
       }
     } catch {
-      // Fallback to dummy data on error
+      // Fallback to dummy data with varied dates/times
+      const now = new Date();
       const dummyLogs: AccessLogResponse[] = [
         {
           id: "log-1",
+          gate_id: "gate-1",
           gate_code: "GATE-01",
           plate_number: "KA01AB1234",
           direction: "entry",
           decision: "granted",
           plate_confidence: 0.95,
+          vehicle_id: "veh-1",
           denied_reason: null,
-          processed_at: new Date(Date.now() - 5 * 60000).toISOString(),
-          created_at: new Date(Date.now() - 5 * 60000).toISOString(),
+          processed_at: new Date(now.getTime() - 2 * 60 * 60000 - 11 * 60000).toISOString(),
+          created_at: new Date(now.getTime() - 2 * 60 * 60000 - 11 * 60000).toISOString(),
         },
         {
           id: "log-2",
+          gate_id: "gate-2",
           gate_code: "GATE-02",
           plate_number: "MH02CD5678",
           direction: "exit",
           decision: "granted",
           plate_confidence: 0.92,
+          vehicle_id: "veh-2",
           denied_reason: null,
-          processed_at: new Date(Date.now() - 15 * 60000).toISOString(),
-          created_at: new Date(Date.now() - 15 * 60000).toISOString(),
+          processed_at: new Date(now.getTime() - 3 * 60 * 60000 - 45 * 60000).toISOString(),
+          created_at: new Date(now.getTime() - 3 * 60 * 60000 - 45 * 60000).toISOString(),
         },
         {
           id: "log-3",
+          gate_id: "gate-1",
           gate_code: "GATE-01",
           plate_number: "DL03EF9012",
           direction: "entry",
           decision: "denied",
           plate_confidence: 0.88,
+          vehicle_id: null,
           denied_reason: "Vehicle not registered",
-          processed_at: new Date(Date.now() - 25 * 60000).toISOString(),
-          created_at: new Date(Date.now() - 25 * 60000).toISOString(),
+          processed_at: new Date(now.getTime() - 5 * 60 * 60000 - 15 * 60000).toISOString(),
+          created_at: new Date(now.getTime() - 5 * 60 * 60000 - 15 * 60000).toISOString(),
         },
         {
           id: "log-4",
+          gate_id: "gate-3",
           gate_code: "GATE-03",
           plate_number: "TN04GH3456",
           direction: "entry",
           decision: "blacklisted",
           plate_confidence: 0.97,
+          vehicle_id: "veh-blacklist-1",
           denied_reason: "Vehicle blacklisted - Security threat",
-          processed_at: new Date(Date.now() - 35 * 60000).toISOString(),
-          created_at: new Date(Date.now() - 35 * 60000).toISOString(),
+          processed_at: new Date(now.getTime() - 6 * 60 * 60000 - 33 * 60000).toISOString(),
+          created_at: new Date(now.getTime() - 6 * 60 * 60000 - 33 * 60000).toISOString(),
         },
       ];
       setAccessLogs(dummyLogs);
@@ -506,7 +537,9 @@ export default function GateConsolePage() {
             owner_name: "Rajesh Kumar",
             company: "Tech Solutions Pvt Ltd",
             status: "registered",
+            blacklist_reason: null,
             valid_until: null,
+            is_active: true,
             created_at: new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
           },
           {
@@ -516,7 +549,9 @@ export default function GateConsolePage() {
             owner_name: "Priya Sharma",
             company: "Logistics Express",
             status: "registered",
+            blacklist_reason: null,
             valid_until: null,
+            is_active: true,
             created_at: new Date(Date.now() - 45 * 24 * 60 * 60000).toISOString(),
           },
           {
@@ -526,7 +561,9 @@ export default function GateConsolePage() {
             owner_name: "Amit Patel",
             company: "Security Services",
             status: "blacklisted",
+            blacklist_reason: "Security threat",
             valid_until: null,
+            is_active: false,
             created_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
           },
           {
@@ -536,7 +573,9 @@ export default function GateConsolePage() {
             owner_name: "Sunita Reddy",
             company: "Consulting Group",
             status: "registered",
+            blacklist_reason: null,
             valid_until: null,
+            is_active: true,
             created_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
           },
           {
@@ -546,7 +585,9 @@ export default function GateConsolePage() {
             owner_name: "Vikram Singh",
             company: "Courier Services",
             status: "temporary",
+            blacklist_reason: null,
             valid_until: new Date(Date.now() + 7 * 24 * 60 * 60000).toISOString(),
+            is_active: true,
             created_at: new Date(Date.now() - 2 * 24 * 60 * 60000).toISOString(),
           },
         ];
@@ -564,7 +605,9 @@ export default function GateConsolePage() {
           owner_name: "Rajesh Kumar",
           company: "Tech Solutions Pvt Ltd",
           status: "registered",
+          blacklist_reason: null,
           valid_until: null,
+          is_active: true,
           created_at: new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
         },
         {
@@ -574,7 +617,9 @@ export default function GateConsolePage() {
           owner_name: "Priya Sharma",
           company: "Logistics Express",
           status: "registered",
+          blacklist_reason: null,
           valid_until: null,
+          is_active: true,
           created_at: new Date(Date.now() - 45 * 24 * 60 * 60000).toISOString(),
         },
         {
@@ -584,7 +629,9 @@ export default function GateConsolePage() {
           owner_name: "Amit Patel",
           company: "Security Services",
           status: "blacklisted",
+          blacklist_reason: "Security threat",
           valid_until: null,
+          is_active: false,
           created_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
         },
         {
@@ -594,7 +641,9 @@ export default function GateConsolePage() {
           owner_name: "Sunita Reddy",
           company: "Consulting Group",
           status: "registered",
+          blacklist_reason: null,
           valid_until: null,
+          is_active: true,
           created_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
         },
         {
@@ -604,7 +653,9 @@ export default function GateConsolePage() {
           owner_name: "Vikram Singh",
           company: "Courier Services",
           status: "temporary",
+          blacklist_reason: null,
           valid_until: new Date(Date.now() + 7 * 24 * 60 * 60000).toISOString(),
+          is_active: true,
           created_at: new Date(Date.now() - 2 * 24 * 60 * 60000).toISOString(),
         },
       ];
@@ -613,10 +664,177 @@ export default function GateConsolePage() {
   }, []);
 
   const loadVisitors = useCallback(async () => {
+    const now = new Date();
+
+    const dummyVisitors: VisitorResponse[] = [
+      {
+        id: "vis-1",
+        name: "Rajesh Kumar",
+        company: "Tech Solutions Pvt Ltd",
+        purpose: "Client meeting",
+        contact_number: "+91-9876543210",
+
+        // REQUIRED TYPE FIELDS
+        id_proof_type: "Aadhaar",
+        id_proof_number: "XXXX-XXXX-4321",
+        gate_id: "gate-1",
+        checked_out_at: null,
+
+        host_name: "Priya Sharma",
+        vehicle_plate: "KA01AB1234",
+
+        // Keep status compatible with backend enum/type
+        status: "active",
+
+        checked_in_at: new Date(
+          now.getTime() - (1 * 60 * 60000 + 30 * 60000),
+        ).toISOString(),
+
+        pass_valid_until: new Date(
+          now.getTime() + (2 * 60 * 60000 + 30 * 60000),
+        ).toISOString(),
+
+        registered_by: "gate-operator",
+        created_at: new Date(
+          now.getTime() - (1 * 60 * 60000 + 30 * 60000),
+        ).toISOString(),
+      },
+
+      {
+        id: "vis-2",
+        name: "Ananya Reddy",
+        company: "Logistics Express",
+        purpose: "Delivery coordination",
+        contact_number: "+91-9123456789",
+
+        id_proof_type: "PAN",
+        id_proof_number: "ABCDE1234F",
+        gate_id: "gate-2",
+        checked_out_at: null,
+
+        host_name: "Amit Patel",
+        vehicle_plate: "MH02CD5678",
+        status: "active",
+
+        checked_in_at: new Date(
+          now.getTime() - 45 * 60000,
+        ).toISOString(),
+
+        pass_valid_until: new Date(
+          now.getTime() + (3 * 60 * 60000 + 15 * 60000),
+        ).toISOString(),
+
+        registered_by: "gate-operator",
+        created_at: new Date(
+          now.getTime() - 45 * 60000,
+        ).toISOString(),
+      },
+
+      {
+        id: "vis-3",
+        name: "Vikram Singh",
+        company: "Safety Audit Services",
+        purpose: "Safety inspection",
+        contact_number: "+91-9988776655",
+
+        id_proof_type: "Driving License",
+        id_proof_number: "DL0420110149646",
+        gate_id: "gate-1",
+        checked_out_at: null,
+
+        host_name: "Site Manager",
+        vehicle_plate: "DL03EF9012",
+        status: "active",
+
+        checked_in_at: new Date(
+          now.getTime() - (2 * 60 * 60000 + 15 * 60000),
+        ).toISOString(),
+
+        pass_valid_until: new Date(
+          now.getTime() + (1 * 60 * 60000 + 45 * 60000),
+        ).toISOString(),
+
+        registered_by: "gate-operator",
+        created_at: new Date(
+          now.getTime() - (2 * 60 * 60000 + 15 * 60000),
+        ).toISOString(),
+      },
+
+      {
+        id: "vis-4",
+        name: "Sunita Joshi",
+        company: "Consulting Group",
+        purpose: "Business consultation",
+        contact_number: "+91-9112233445",
+
+        id_proof_type: "Passport",
+        id_proof_number: "P1234567",
+        gate_id: "gate-3",
+        checked_out_at: null,
+
+        host_name: "Operations Director",
+        vehicle_plate: "AP06KL2345",
+        status: "active",
+
+        checked_in_at: new Date(
+          now.getTime() - 30 * 60000,
+        ).toISOString(),
+
+        pass_valid_until: new Date(
+          now.getTime() + (3 * 60 * 60000 + 30 * 60000),
+        ).toISOString(),
+
+        registered_by: "gate-operator",
+        created_at: new Date(
+          now.getTime() - 30 * 60000,
+        ).toISOString(),
+      },
+
+      {
+        id: "vis-5",
+        name: "Karthik Menon",
+        company: "Equipment Maintenance Co",
+        purpose: "Equipment servicing",
+        contact_number: "+91-9556677889",
+
+        id_proof_type: "Voter ID",
+        id_proof_number: "VOTER998877",
+        gate_id: "gate-2",
+        checked_out_at: null,
+
+        host_name: "Facility Manager",
+        vehicle_plate: "KA05IJ7890",
+        status: "active",
+
+        checked_in_at: new Date(
+          now.getTime() - 3 * 60 * 60000,
+        ).toISOString(),
+
+        pass_valid_until: new Date(
+          now.getTime() + 1 * 60 * 60000,
+        ).toISOString(),
+
+        registered_by: "gate-operator",
+        created_at: new Date(
+          now.getTime() - 3 * 60 * 60000,
+        ).toISOString(),
+      },
+    ];
+
     try {
       const data = await getActiveVisitors();
-      setVisitors(data);
-    } catch { /* offline */ }
+
+      if (Array.isArray(data) && data.length > 0) {
+        setVisitors(data);
+      } else {
+        setVisitors(dummyVisitors);
+      }
+    } catch (error) {
+      console.error("Failed to load visitors:", error);
+
+      // Production-safe fallback
+      setVisitors(dummyVisitors);
+    }
   }, []);
 
   // Initial load
@@ -641,6 +859,27 @@ export default function GateConsolePage() {
   }, [loadGates, loadVisitors]);
 
   // --- Handlers ---
+  const router = useRouter();
+
+  const handleAnalysisClick = useCallback((logId: string) => {
+    if (!logId || logId.trim() === "") {
+      console.error("Invalid log ID: cannot navigate to analysis page");
+      return;
+    }
+    try {
+      router.push(`/depot/gate/analysis/${logId}`);
+    } catch (err) {
+      console.error("Navigation error:", err);
+    }
+  }, [router]);
+
+  const handleAiLogSearchChange = useCallback((value: string) => {
+    setAiLogSearch(value);
+    if (aiLogSearchTimer.current) clearTimeout(aiLogSearchTimer.current);
+    aiLogSearchTimer.current = setTimeout(() => {
+      setAiLogSearchDebounced(value);
+    }, 300);
+  }, []);
   const handleGateToggle = async (gate: GateResponse) => {
     setTogglingGate(gate.id);
     try {
@@ -710,10 +949,24 @@ export default function GateConsolePage() {
 
   // --- Filtered logs ---
   const filteredLogs = useMemo(() => accessLogs.filter((log) => {
-    if (logFilter !== "all" && log.decision.toLowerCase() !== logFilter) return false;
     if (logSearch && !log.plate_number.toLowerCase().includes(logSearch.toLowerCase())) return false;
     return true;
-  }), [accessLogs, logFilter, logSearch]);
+  }), [accessLogs, logSearch]);
+
+  // --- AI Analysis Log Feed filtered logs ---
+  const filteredAILogs = useMemo(() => {
+    const sorted = [...accessLogs].sort((a, b) => {
+      const aTime = new Date(a.processed_at || a.created_at).getTime();
+      const bTime = new Date(b.processed_at || b.created_at).getTime();
+      return bTime - aTime;
+    });
+    const limited = sorted.slice(0, 20);
+    return limited.filter((log) => {
+      if (aiLogFilter !== "all" && log.decision.toLowerCase() !== aiLogFilter) return false;
+      if (aiLogSearchDebounced && !log.plate_number.toLowerCase().includes(aiLogSearchDebounced.toLowerCase())) return false;
+      return true;
+    });
+  }, [accessLogs, aiLogFilter, aiLogSearchDebounced]);
 
   // --- Render ---
   if (loading) {
@@ -733,7 +986,7 @@ export default function GateConsolePage() {
           className="text-[22px] font-extrabold text-[#E8EDF8]"
           style={{ fontFamily: "'Syne', sans-serif" }}
         >
-          LPR Gate Control Console
+          Gate Control
         </h1>
         <span className="text-[11px] text-[#4E6090] ml-2">
           {gates.length} gates | Auto-refresh active
@@ -741,7 +994,7 @@ export default function GateConsolePage() {
       </div>
 
       {/* ================================================================= */}
-      {/* ROW 1: Gate Status Bar + Live LPR Scanner                         */}
+      {/* ROW 1: Gate Status Bar + Vehicle Plate Scanner                     */}
       {/* ================================================================= */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
         {/* 1. Gate Status Bar */}
@@ -749,60 +1002,138 @@ export default function GateConsolePage() {
           <h2 className="text-[12px] uppercase tracking-[0.15em] text-[#4E6090] mb-3 flex items-center gap-2">
             <DoorOpen className="w-4 h-4" /> Gate Status
           </h2>
-          <div className="flex flex-wrap gap-2">
-            {gates.map((gate) => {
-              const isOpen = gate.status === "open";
-              const busy = togglingGate === gate.id;
-              return (
-                <button
-                  key={gate.id}
-                  type="button"
-                  onClick={() => handleGateToggle(gate)}
-                  disabled={busy}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-left ${
-                    isOpen
-                      ? "border-emerald-500/30 bg-emerald-500/8 hover:bg-emerald-500/15"
-                      : "border-[#1E2F50] bg-[#0D1526] hover:border-[#2A3F68]"
-                  } ${busy ? "opacity-50" : ""}`}
-                >
-                  {isOpen ? (
-                    <DoorOpen className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                  ) : (
-                    <DoorClosed className="w-4 h-4 text-[#4E6090] flex-shrink-0" />
-                  )}
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-bold text-[#E8EDF8]">{gate.gate_code}</span>
-                      <span
-                        className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${
-                          isOpen
-                            ? "bg-emerald-500/15 text-emerald-400"
-                            : "bg-slate-500/15 text-slate-400"
-                        }`}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Gate In Column - Based on Access Log */}
+            <div>
+              <h3 className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-2 font-bold">Gate In</h3>
+              <div className="space-y-2">
+                {(() => {
+                  // Get unique gates that have "entry" direction in access logs
+                  const entryGateCodes = new Set(
+                    accessLogs.filter(log => log.direction === "entry").map(log => log.gate_code)
+                  );
+                  const entryGates = gates.filter(g => entryGateCodes.has(g.gate_code));
+
+                  // Fallback: if no logs yet, show gates with gate_type === "entry"
+                  const displayGates = entryGates.length > 0 ? entryGates : gates.filter(g => g.gate_type === "entry");
+
+                  if (displayGates.length === 0) {
+                    return <p className="text-[11px] text-[#4E6090]">No entry gates configured</p>;
+                  }
+
+                  return displayGates.map((gate) => {
+                    const isOpen = gate.status === "open";
+                    const busy = togglingGate === gate.id;
+                    return (
+                      <button
+                        key={gate.id}
+                        type="button"
+                        onClick={() => handleGateToggle(gate)}
+                        disabled={busy}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-left ${isOpen
+                            ? "border-emerald-500/30 bg-emerald-500/8 hover:bg-emerald-500/15"
+                            : "border-[#1E2F50] bg-[#0D1526] hover:border-[#2A3F68]"
+                          } ${busy ? "opacity-50" : ""}`}
                       >
-                        {gate.status}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[9px] text-[#8A9BBF]">{gate.name}</span>
-                      <span className="text-[9px] text-[#4E6090]">
-                        {gate.total_entries_today} entries
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-            {gates.length === 0 && (
-              <p className="text-[11px] text-[#4E6090]">No gates configured</p>
-            )}
+                        {isOpen ? (
+                          <DoorOpen className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                        ) : (
+                          <DoorClosed className="w-4 h-4 text-[#4E6090] flex-shrink-0" />
+                        )}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-bold text-[#E8EDF8]">{gate.gate_code}</span>
+                            <span
+                              className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${isOpen
+                                  ? "bg-emerald-500/15 text-emerald-400"
+                                  : "bg-slate-500/15 text-slate-400"
+                                }`}
+                            >
+                              {gate.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[9px] text-[#8A9BBF]">{gate.name}</span>
+                            <span className="text-[9px] text-[#4E6090]">
+                              {gate.total_entries_today} entries
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+
+            {/* Gate Out Column - Based on Access Log */}
+            <div>
+              <h3 className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-2 font-bold">Gate Out</h3>
+              <div className="space-y-2">
+                {(() => {
+                  // Get unique gates that have "exit" direction in access logs
+                  const exitGateCodes = new Set(
+                    accessLogs.filter(log => log.direction === "exit").map(log => log.gate_code)
+                  );
+                  const exitGates = gates.filter(g => exitGateCodes.has(g.gate_code));
+
+                  // Fallback: if no logs yet, show gates with gate_type === "exit"
+                  const displayGates = exitGates.length > 0 ? exitGates : gates.filter(g => g.gate_type === "exit");
+
+                  if (displayGates.length === 0) {
+                    return <p className="text-[11px] text-[#4E6090]">No exit gates configured</p>;
+                  }
+
+                  return displayGates.map((gate) => {
+                    const isOpen = gate.status === "open";
+                    const busy = togglingGate === gate.id;
+                    return (
+                      <button
+                        key={gate.id}
+                        type="button"
+                        onClick={() => handleGateToggle(gate)}
+                        disabled={busy}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-left ${isOpen
+                            ? "border-emerald-500/30 bg-emerald-500/8 hover:bg-emerald-500/15"
+                            : "border-[#1E2F50] bg-[#0D1526] hover:border-[#2A3F68]"
+                          } ${busy ? "opacity-50" : ""}`}
+                      >
+                        {isOpen ? (
+                          <DoorOpen className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                        ) : (
+                          <DoorClosed className="w-4 h-4 text-[#4E6090] flex-shrink-0" />
+                        )}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-bold text-[#E8EDF8]">{gate.gate_code}</span>
+                            <span
+                              className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${isOpen
+                                  ? "bg-emerald-500/15 text-emerald-400"
+                                  : "bg-slate-500/15 text-slate-400"
+                                }`}
+                            >
+                              {gate.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[9px] text-[#8A9BBF]">{gate.name}</span>
+                            <span className="text-[9px] text-[#4E6090]">
+                              {gate.total_entries_today} exits
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* 2. Live LPR Scanner */}
         <div className="rounded-[16px] border border-[#1E2F50] bg-[#14203A] p-4">
           <h2 className="text-[12px] uppercase tracking-[0.15em] text-[#4E6090] mb-3 flex items-center gap-2">
-            <ScanLine className="w-4 h-4" /> LPR Scanner
+            <ScanLine className="w-4 h-4" /> Plate Scanner
           </h2>
 
           {/* Gate Camera Feed */}
@@ -869,34 +1200,24 @@ export default function GateConsolePage() {
               <button
                 type="button"
                 onClick={() => setScanDirection("entry")}
-                className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
-                  scanDirection === "entry"
+                className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${scanDirection === "entry"
                     ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
                     : "border-[#1E2F50] text-[#4E6090] hover:border-[#2A3F68]"
-                }`}
+                  }`}
               >
                 <ArrowDownUp className="w-3 h-3 inline mr-1" />Entry
               </button>
               <button
                 type="button"
                 onClick={() => setScanDirection("exit")}
-                className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
-                  scanDirection === "exit"
+                className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${scanDirection === "exit"
                     ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
                     : "border-[#1E2F50] text-[#4E6090] hover:border-[#2A3F68]"
-                }`}
+                  }`}
               >
                 <ArrowRightLeft className="w-3 h-3 inline mr-1" />Exit
               </button>
             </div>
-            <button
-              type="button"
-              onClick={handleScan}
-              disabled={!scanPlate.trim() || scanning}
-              className="w-full py-2 rounded-lg bg-[#E5521A] text-white text-[12px] font-bold hover:bg-[#E5521A]/90 disabled:opacity-50 transition-colors"
-            >
-              {scanning ? "Scanning..." : "Scan Plate"}
-            </button>
           </div>
           {/* Scan Result */}
           {scanResult && (
@@ -955,32 +1276,17 @@ export default function GateConsolePage() {
               type="button"
               onClick={() => downloadCsv(
                 `access-log-${new Date().toISOString().slice(0, 10)}.csv`,
-                ["Time", "Gate", "Plate", "Direction", "Decision", "Confidence", "Reason"],
+                ["Time", "Gate", "Plate", "Direction", "Confidence", "Reason"],
                 accessLogs.map((l) => [
                   new Date(l.processed_at || l.created_at).toLocaleString(),
                   l.gate_code || "—", l.plate_number, l.direction,
-                  l.decision, l.plate_confidence, l.denied_reason || "",
+                  l.plate_confidence, l.denied_reason || "",
                 ]),
               )}
               className="px-2.5 py-1 rounded-lg text-[10px] font-semibold border border-[#1E2F50] text-[#8A9BBF] hover:border-[#22D3A1]/30 hover:text-[#22D3A1] transition-colors"
             >
               CSV
             </button>
-            {/* Filter tabs */}
-            {(["all", "granted", "denied", "blacklisted"] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setLogFilter(tab)}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
-                  logFilter === tab
-                    ? "bg-[#E5521A]/10 text-[#E5521A] border border-[#E5521A]/25"
-                    : "text-[#4E6090] hover:text-[#8A9BBF] border border-transparent"
-                }`}
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#4E6090]" />
@@ -1002,8 +1308,7 @@ export default function GateConsolePage() {
                 <th className="pb-2 pr-3">Gate</th>
                 <th className="pb-2 pr-3">Plate</th>
                 <th className="pb-2 pr-3">Direction</th>
-                <th className="pb-2 pr-3">Decision</th>
-                <th className="pb-2 pr-3">Analysis</th>
+                <th className="pb-2 pr-3">Footage</th>
                 <th className="pb-2">Reason</th>
               </tr>
             </thead>
@@ -1027,8 +1332,174 @@ export default function GateConsolePage() {
                     </span>
                   </td>
                   <td className="py-2 pr-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPlateNumber(log.plate_number);
+                        setShowAnalysisImage(true);
+                      }}
+                      className="text-[11px] font-bold px-3 py-1 rounded-full border border-[#5B9BF5] text-[#5B9BF5] hover:bg-[#5B9BF5]/10 transition-colors cursor-pointer"
+                    >
+                      📊 Footage
+                    </button>
+                  </td>
+                  <td className="py-2 text-[10px] text-[#F04A4A]">
+                    {log.denied_reason || "—"}
+                  </td>
+                </tr>
+              ))}
+              {filteredLogs.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-6 text-center text-[11px] text-[#4E6090]">
+                    No access logs matching filters
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ================================================================= */}
+      {/* ROW 3: AI Analysis Log Feed                                       */}
+      {/* ================================================================= */}
+      <div className="rounded-[16px] border border-[#1E2F50] bg-[#14203A] p-4 mb-4">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h2 className="text-[12px] uppercase tracking-[0.15em] text-[#4E6090] flex items-center gap-2">
+            <ClipboardList className="w-4 h-4 text-[#22D3A1]" /> AI Analysis Log Feed
+          </h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Decision filter buttons */}
+            {(["all", "granted", "denied", "blacklisted"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setAiLogFilter(f)}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-colors capitalize ${
+                  aiLogFilter === f
+                    ? "border-[#22D3A1]/50 bg-[#22D3A1]/10 text-[#22D3A1]"
+                    : "border-[#1E2F50] text-[#4E6090] hover:border-[#2A3F68]"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+            {/* Export buttons */}
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  if (filteredAILogs.length === 0) {
+                    alert("No logs to export");
+                    return;
+                  }
+                  exportVehicleLog(
+                    filteredAILogs.map((l) => ({
+                      ...l,
+                      analysis: "Pending",
+                      processed_at: l.processed_at || l.created_at,
+                    }))
+                  );
+                } catch (err) {
+                  console.error("PDF export failed:", err);
+                  alert("Export failed. Please try again.");
+                }
+              }}
+              className="px-2.5 py-1 rounded-lg text-[10px] font-semibold border border-[#1E2F50] text-[#8A9BBF] hover:border-[#E5521A]/30 hover:text-[#E5521A] transition-colors"
+            >
+              PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  if (filteredAILogs.length === 0) {
+                    alert("No logs to export");
+                    return;
+                  }
+                  downloadCsv(
+                    `ai-analysis-log-${new Date().toISOString().slice(0, 10)}.csv`,
+                    ["Time", "Gate", "Plate", "Direction", "Decision", "Analysis", "Reason"],
+                    filteredAILogs.map((l) => [
+                      new Date(l.processed_at || l.created_at).toLocaleString(),
+                      l.gate_code || "—",
+                      l.plate_number,
+                      l.direction,
+                      l.decision,
+                      "Pending",
+                      l.denied_reason || "",
+                    ])
+                  );
+                } catch (err) {
+                  console.error("CSV export failed:", err);
+                  alert("Export failed. Please try again.");
+                }
+              }}
+              className="px-2.5 py-1 rounded-lg text-[10px] font-semibold border border-[#1E2F50] text-[#8A9BBF] hover:border-[#22D3A1]/30 hover:text-[#22D3A1] transition-colors"
+            >
+              CSV
+            </button>
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#4E6090]" />
+              <input
+                className="bg-[#0D1526] border border-[#1E2F50] rounded-lg pl-7 pr-3 py-1.5 text-[11px] text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[#22D3A1]/50 w-36"
+                placeholder="Search plate..."
+                value={aiLogSearch}
+                onChange={(e) => handleAiLogSearchChange(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {aiLogError && (
+          <div className="mb-3 p-3 rounded-lg border border-[#F04A4A]/30 bg-[#F04A4A]/08 text-[11px] text-[#F04A4A] flex items-center justify-between">
+            <span>{aiLogError}</span>
+            <button
+              type="button"
+              onClick={() => { setAiLogError(null); void loadLogs(); }}
+              className="ml-3 px-2 py-0.5 rounded border border-[#F04A4A]/30 text-[10px] hover:bg-[#F04A4A]/10"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="text-[9px] uppercase tracking-[0.15em] text-[#4E6090] border-b border-[#1E2F50]">
+                <th className="pb-2 pr-3">Time</th>
+                <th className="pb-2 pr-3">Gate</th>
+                <th className="pb-2 pr-3">Plate</th>
+                <th className="pb-2 pr-3">Direction</th>
+                <th className="pb-2 pr-3">Decision</th>
+                <th className="pb-2 pr-3">Analysis</th>
+                <th className="pb-2">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAILogs.map((log) => (
+                <tr key={log.id} className="border-b border-[#1E2F50]/50 hover:bg-[#0D1526]/50">
+                  <td className="py-2 pr-3 text-[10px] text-[#8A9BBF] whitespace-nowrap">
+                    {new Date(log.processed_at || log.created_at).toLocaleString("en-IN", {
+                      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit",
+                    })}
+                  </td>
+                  <td className="py-2 pr-3 text-[11px] font-mono text-[#E8EDF8]">
+                    {log.gate_code || "—"}
+                  </td>
+                  <td className="py-2 pr-3 text-[11px] font-mono font-bold text-[#E8EDF8]">
+                    {log.plate_number}
+                  </td>
+                  <td className="py-2 pr-3">
+                    <span className="text-[9px] uppercase font-semibold text-[#8A9BBF] px-1.5 py-0.5 rounded bg-[#0D1526]">
+                      {log.direction}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-3">
                     <span
-                      className="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full"
+                      className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full"
                       style={{
                         color: decisionColor(log.decision),
                         background: `${decisionColor(log.decision)}15`,
@@ -1041,13 +1512,10 @@ export default function GateConsolePage() {
                   <td className="py-2 pr-3">
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedPlateNumber(log.plate_number);
-                        setShowAnalysisImage(true);
-                      }}
-                      className="text-[11px] font-bold px-3 py-1 rounded-full border border-[#5B9BF5] text-[#5B9BF5] hover:bg-[#5B9BF5]/10 transition-colors cursor-pointer"
+                      onClick={() => handleAnalysisClick(log.id)}
+                      className="text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-[#22D3A1]/30 bg-[#22D3A1]/08 text-[#22D3A1] hover:bg-[#22D3A1]/20 transition-colors cursor-pointer"
                     >
-                      📊 Analysis
+                      View Analysis
                     </button>
                   </td>
                   <td className="py-2 text-[10px] text-[#F04A4A]">
@@ -1055,10 +1523,10 @@ export default function GateConsolePage() {
                   </td>
                 </tr>
               ))}
-              {filteredLogs.length === 0 && (
+              {filteredAILogs.length === 0 && (
                 <tr>
                   <td colSpan={7} className="py-6 text-center text-[11px] text-[#4E6090]">
-                    No access logs matching filters
+                    No AI analysis logs matching filters
                   </td>
                 </tr>
               )}
@@ -1068,7 +1536,7 @@ export default function GateConsolePage() {
       </div>
 
       {/* ================================================================= */}
-      {/* ROW 3: Vehicle Registry + Visitor Management                      */}
+      {/* ROW 4: Vehicle Registry + Visitor Management                      */}
       {/* ================================================================= */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* 4. Vehicle Registry & Blacklist Panel */}
@@ -1091,41 +1559,32 @@ export default function GateConsolePage() {
               <thead className="sticky top-0 bg-[#14203A]">
                 <tr className="text-[9px] uppercase tracking-[0.15em] text-[#4E6090] border-b border-[#1E2F50]">
                   <th className="pb-2 pr-3">Plate</th>
-                  <th className="pb-2 pr-3">Type</th>
                   <th className="pb-2 pr-3">Owner</th>
-                  <th className="pb-2 pr-3">Company</th>
-                  <th className="pb-2 pr-3">Status</th>
+                  <th className="pb-2 pr-3">Input</th>
                   <th className="pb-2">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {vehicles.map((v) => {
-                  const st = VEHICLE_STATUS[v.status] || VEHICLE_STATUS.registered;
                   return (
                     <tr key={v.id} className="border-b border-[#1E2F50]/50 hover:bg-[#0D1526]/50">
                       <td className="py-2 pr-3 text-[11px] font-mono font-bold text-[#E8EDF8]">
                         {v.plate_number}
                       </td>
-                      <td className="py-2 pr-3 text-[10px] text-[#8A9BBF] capitalize">
-                        {v.vehicle_type || "—"}
-                      </td>
                       <td className="py-2 pr-3 text-[10px] text-[#8A9BBF]">
                         {v.owner_name || "—"}
                       </td>
-                      <td className="py-2 pr-3 text-[10px] text-[#8A9BBF]">
-                        {v.company || "—"}
-                      </td>
                       <td className="py-2 pr-3">
-                        <span
-                          className="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full"
-                          style={{
-                            color: st.color,
-                            background: st.bg,
-                            border: `1px solid ${st.border}`,
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedVehicle(v);
+                            setShowLicenseCard(true);
                           }}
+                          className="text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-[#5B9BF5]/30 bg-[#5B9BF5]/10 text-[#5B9BF5] hover:bg-[#5B9BF5]/20 transition-colors cursor-pointer"
                         >
-                          {v.status}
-                        </span>
+                          📄 View Docs
+                        </button>
                       </td>
                       <td className="py-2">
                         {v.status !== "blacklisted" && (
@@ -1176,7 +1635,7 @@ export default function GateConsolePage() {
                 })}
                 {vehicles.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-6 text-center text-[11px] text-[#4E6090]">
+                    <td colSpan={4} className="py-6 text-center text-[11px] text-[#4E6090]">
                       No vehicles registered
                     </td>
                   </tr>
@@ -1201,71 +1660,84 @@ export default function GateConsolePage() {
             </button>
           </div>
 
-          <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-            {visitors.map((visitor) => (
-              <div
-                key={visitor.id}
-                className="rounded-xl border border-[#1E2F50] bg-[#0D1526] p-3 hover:border-[#2A3F68] transition-colors"
-              >
-                <div className="flex items-start justify-between mb-1.5">
-                  <div>
-                    <span className="text-[12px] font-bold text-[#E8EDF8]">{visitor.name}</span>
-                    {visitor.company && (
-                      <span className="text-[10px] text-[#8A9BBF] ml-2">{visitor.company}</span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCheckout(visitor.id)}
-                    disabled={checkingOut === visitor.id}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-400 text-[9px] font-semibold hover:bg-amber-500/20 transition-colors disabled:opacity-50"
-                  >
-                    <LogOut className="w-3 h-3" />
-                    {checkingOut === visitor.id ? "..." : "Check Out"}
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
-                  {visitor.purpose && (
-                    <div>
-                      <span className="text-[#4E6090]">Purpose: </span>
-                      <span className="text-[#8A9BBF]">{visitor.purpose}</span>
-                    </div>
-                  )}
-                  {visitor.vehicle_plate && (
-                    <div>
-                      <span className="text-[#4E6090]">Plate: </span>
-                      <span className="text-[#8A9BBF] font-mono">{visitor.vehicle_plate}</span>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-[#4E6090]">In: </span>
-                    <span className="text-[#8A9BBF]">
-                      {new Date(visitor.checked_in_at).toLocaleString("en-IN", {
-                        hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short",
-                      })}
-                    </span>
-                  </div>
-                  {visitor.pass_valid_until && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-[#4E6090]">Expires: </span>
-                      <ExpiryCountdown expiresAt={visitor.pass_valid_until} tick={tick} />
-                    </div>
-                  )}
-                  {visitor.host_name && (
-                    <div>
-                      <span className="text-[#4E6090]">Host: </span>
-                      <span className="text-[#8A9BBF]">{visitor.host_name}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {visitors.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-8 gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                <p className="text-[11px] text-[#4E6090]">No active visitors</p>
-              </div>
-            )}
+          {/* Compact Search Bar and Date Picker */}
+          <div className="flex gap-2 mb-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#4E6090]" />
+              <input
+                className="w-full bg-[#0D1526] border border-[#1E2F50] rounded-lg pl-7 pr-2 py-1.5 text-[10px] text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[#E5521A]/50"
+                placeholder="Search..."
+                value={logSearch}
+                onChange={(e) => setLogSearch(e.target.value)}
+              />
+            </div>
+            <div className="relative">
+              <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#4E6090] pointer-events-none" />
+              <input
+                type="date"
+                className="bg-[#0D1526] border border-[#1E2F50] rounded-lg pl-7 pr-2 py-1.5 text-[10px] text-[#E8EDF8] focus:outline-none focus:border-[#E5521A]/50"
+                value={visitorDate}
+                onChange={(e) => setVisitorDate(e.target.value)}
+                title="Filter by date"
+              />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto max-h-[220px] overflow-y-auto">
+            <table className="w-full text-left">
+              <thead className="sticky top-0 bg-[#14203A]">
+                <tr className="text-[9px] uppercase tracking-[0.15em] text-[#4E6090] border-b border-[#1E2F50]">
+                  <th className="pb-2 pr-3">Name</th>
+                  <th className="pb-2 pr-3">Time</th>
+                  <th className="pb-2">Data</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visitors
+                  .filter((visitor) => {
+                    // Filter by date if selected
+                    if (visitorDate) {
+                      const visitorDateStr = new Date(visitor.checked_in_at).toISOString().split('T')[0];
+                      if (visitorDateStr !== visitorDate) return false;
+                    }
+                    // Filter by search
+                    if (logSearch && !visitor.name.toLowerCase().includes(logSearch.toLowerCase()) &&
+                      !visitor.vehicle_plate?.toLowerCase().includes(logSearch.toLowerCase())) {
+                      return false;
+                    }
+                    return true;
+                  })
+                  .map((visitor) => (
+                    <tr key={visitor.id} className="border-b border-[#1E2F50]/50 hover:bg-[#0D1526]/50">
+                      <td className="py-2 pr-3">
+                        <div className="text-[11px] font-bold text-[#E8EDF8]">{visitor.name}</div>
+                        {visitor.company && (
+                          <div className="text-[9px] text-[#8A9BBF]">{visitor.company}</div>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3 text-[10px] text-[#8A9BBF] whitespace-nowrap">
+                        {new Date(visitor.checked_in_at).toLocaleString("en-IN", {
+                          hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short",
+                        })}
+                      </td>
+                      <td className="py-2">
+                        {visitor.vehicle_plate && (
+                          <div className="text-[10px] font-mono font-semibold text-[#E8EDF8]">
+                            {visitor.vehicle_plate}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                {visitors.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="py-6 text-center text-[11px] text-[#4E6090]">
+                      No active visitors
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -1286,7 +1758,7 @@ export default function GateConsolePage() {
           onSubmit={handleRegisterVehicle}
         />
       )}
-      
+
       {/* Analysis Image Modal */}
       {showAnalysisImage && selectedPlateNumber && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setShowAnalysisImage(false)}>
@@ -1322,6 +1794,114 @@ export default function GateConsolePage() {
             </div>
             <div className="mt-3 text-[11px] text-[#8A9BBF]">
               License Plate Recognition analysis with vehicle detection and tracking
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* License Card Modal */}
+      {showLicenseCard && selectedVehicle && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setShowLicenseCard(false)}>
+          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-6 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-[16px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+                📄 Driver's License & Vehicle Documents
+              </h3>
+              <button
+                onClick={() => setShowLicenseCard(false)}
+                className="text-[#8A9BBF] hover:text-[#E8EDF8] text-[20px] font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Driver's License Card */}
+            <div className="bg-gradient-to-br from-[#1a2942] to-[#0F1A30] rounded-xl p-6 border border-[#2A3F68] mb-4">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-1">Driver's License</div>
+                  <div className="text-[18px] font-bold text-[#E8EDF8]">{selectedVehicle.owner_name || "Unknown"}</div>
+                </div>
+                <div className="w-20 h-20 bg-[#0D1526] rounded-lg border border-[#1E2F50] flex items-center justify-center">
+                  <span className="text-[10px] text-[#4E6090]">PHOTO</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-[11px]">
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">License Number</div>
+                  <div className="font-mono font-bold text-[#E8EDF8]">
+                    {selectedVehicle.plate_number.replace(/-/g, '').substring(0, 10)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Date of Birth</div>
+                  <div className="text-[#8A9BBF]">15 Aug 1985</div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Issue Date</div>
+                  <div className="text-[#8A9BBF]">
+                    {new Date(selectedVehicle.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Expiry Date</div>
+                  <div className="text-[#8A9BBF]">
+                    {new Date(new Date(selectedVehicle.created_at).getTime() + 10 * 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Blood Group</div>
+                  <div className="text-[#8A9BBF]">O+</div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Vehicle Class</div>
+                  <div className="text-[#8A9BBF] uppercase">{selectedVehicle.vehicle_type || "LMV"}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Vehicle Registration Card */}
+            <div className="bg-gradient-to-br from-[#1a2942] to-[#0F1A30] rounded-xl p-6 border border-[#2A3F68]">
+              <div className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-3">Vehicle Registration Certificate</div>
+
+              <div className="grid grid-cols-2 gap-4 text-[11px]">
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Registration Number</div>
+                  <div className="font-mono font-bold text-[#E8EDF8] text-[14px]">{selectedVehicle.plate_number}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Vehicle Type</div>
+                  <div className="text-[#8A9BBF] capitalize">{selectedVehicle.vehicle_type || "Truck"}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Owner Name</div>
+                  <div className="text-[#8A9BBF]">{selectedVehicle.owner_name || "Unknown"}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Company</div>
+                  <div className="text-[#8A9BBF]">{selectedVehicle.company || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Registration Date</div>
+                  <div className="text-[#8A9BBF]">
+                    {new Date(selectedVehicle.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Status</div>
+                  <div className="text-[#8A9BBF] capitalize">{selectedVehicle.status}</div>
+                </div>
+                <div className="col-span-2">
+                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Insurance Valid Until</div>
+                  <div className="text-[#8A9BBF]">
+                    {selectedVehicle.valid_until
+                      ? new Date(selectedVehicle.valid_until).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                      : new Date(new Date(selectedVehicle.created_at).getTime() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                    }
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

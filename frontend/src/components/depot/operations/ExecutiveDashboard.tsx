@@ -1,603 +1,571 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, memo } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
 import {
-  Shield,
   ShieldAlert,
-  Eye,
-  Package,
-  Hash,
-  Map,
-  Layers,
-  AlertTriangle,
   CheckCircle2,
-  TrendingUp,
   Activity,
-  Truck,
-  Camera,
-  BarChart3,
-  Zap,
   Clock,
+  UserX,
+  PersonStanding,
+  Flame,
+  Camera,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  AlertTriangle,
+  Truck,
+  Package,
+  Eye,
+  Wifi,
+  WifiOff,
+  CircleDot,
+  TriangleAlert,
 } from "lucide-react";
-import { THROUGHPUT, DAYS } from "@/lib/depot-data";
-import { getAllActiveAlerts, type UnifiedAlert } from "@/services/depotVision";
-import { getActiveBreaches, getIncidents, getPerimeterZones, type IncidentResponse } from "@/services/depotPerimeter";
-import { getCapacityStatus, type CapacityStatusEntry } from "@/services/depotCluster";
-import { getCountSessions, getManifests, type CountSessionResponse, type ManifestResponse } from "@/services/depotCounting";
-import { getAccessLogs, type AccessLogResponse } from "@/services/depotGate";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+// ─── Throughput data ────────────────────────────────────────────────────────
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const WEEKLY = [
+  { enter: 12400, exit: 11800 },
+  { enter: 14150, exit: 13600 },
+  { enter: 10300, exit:  9800 },
+  { enter: 14800, exit: 14200 },
+  { enter: 16200, exit: 15400 }, // Friday — peak
+  { enter: 13100, exit: 12500 },
+  { enter:  8600, exit:  8100 },
+];
+const WEEKLY_TOTALS = WEEKLY.reduce(
+  (a, d) => ({ enter: a.enter + d.enter, exit: a.exit + d.exit }),
+  { enter: 0, exit: 0 }
+);
 
-interface ModuleStatus {
-  name: string;
+// ─── 6 Cameras ──────────────────────────────────────────────────────────────
+const CAMERAS = [
+  { id: "CAM-01", location: "Gate C – Entry",      status: "online"  as const, zone: "Zone A" },
+  { id: "CAM-02", location: "Dock B – Loading",    status: "online"  as const, zone: "Zone B" },
+  { id: "CAM-03", location: "Bay 7 – Staging",     status: "online"  as const, zone: "Zone B" },
+  { id: "CAM-04", location: "Zone C – Receiving",  status: "online"  as const, zone: "Zone C" },
+  { id: "CAM-05", location: "Exit E-2 – South",    status: "online"  as const, zone: "Zone D" },
+  { id: "CAM-06", location: "Zone B – Aisle 4",    status: "offline" as const, zone: "Zone B" },
+];
+
+// ─── 4 Zones ─────────────────────────────────────────────────────────────────
+const ZONES = [
+  { id: "Z-A", name: "Zone A", pct: 91,  used: 1820, total: 2000 },
+  { id: "Z-B", name: "Zone B", pct: 74,  used: 1480, total: 2000 },
+  { id: "Z-C", name: "Zone C", pct: 97,  used: 1940, total: 2000 },
+  { id: "Z-D", name: "Zone D", pct: 63,  used: 1260, total: 2000 },
+];
+
+// ─── Incidents ───────────────────────────────────────────────────────────────
+type Severity = "critical" | "high" | "medium";
+type Status   = "open" | "escalated" | "monitoring";
+
+interface Incident {
+  id: string;
+  title: string;
+  what: string;           // plain-language "what happened"
+  where: string;          // plain-language "where"
+  doWhat: string;         // plain-language "what to do"
+  severity: Severity;
+  status: Status;
+  assignee: string;
+  ago: string;
+  countdown?: number;     // minutes until escalation
   icon: React.ElementType;
-  status: "operational" | "degraded" | "offline";
-  metric: string;
-  detail: string;
-  color: string;
 }
 
-// ---------------------------------------------------------------------------
-// Memoized KPI Card Component
-// ---------------------------------------------------------------------------
+const INCIDENTS: Incident[] = [
+  {
+    id: "INC-001",
+    title: "Unauthorized Entry",
+    what: "Someone entered Gate C without a valid badge — scan failed 3 times in a row.",
+    where: "Gate C · North Side",
+    doWhat: "Security officer should check Gate C immediately.",
+    severity: "critical", status: "escalated",
+    assignee: "Sec. Officer Rajan",
+    ago: "12 min ago", countdown: 18,
+    icon: UserX,
+  },
+  {
+    id: "INC-002",
+    title: "Person Loitering",
+    what: "Someone has been standing in the restricted staging area near Bay 7 for over 15 minutes with no work order.",
+    where: "Bay 7 · Staging Area",
+    doWhat: "Supervisor should go and check this person's access.",
+    severity: "high", status: "open",
+    assignee: "Supervisor Meera",
+    ago: "27 min ago", countdown: 33,
+    icon: PersonStanding,
+  },
+  {
+    id: "INC-003",
+    title: "Unauthorized Entry",
+    what: "A vehicle entered Dock B at 08:42 but its number plate was not in our system.",
+    where: "Dock B · Vehicle Gate",
+    doWhat: "Ops Lead should verify the vehicle and driver at Dock B.",
+    severity: "high", status: "open",
+    assignee: "Ops Lead Vishal",
+    ago: "44 min ago", countdown: 16,
+    icon: UserX,
+  },
+  {
+    id: "INC-004",
+    title: "Bag Count Mismatch",
+    what: "Camera counted 1,208 bags but the delivery note says 1,300. That's 92 bags unaccounted for.",
+    where: "Zone C · Receiving Area",
+    doWhat: "Count team should do a manual recount in Zone C.",
+    severity: "high", status: "monitoring",
+    assignee: "Count Lead Priya",
+    ago: "1 hr ago",
+    icon: Eye,
+  },
+  {
+    id: "INC-005",
+    title: "Person Loitering",
+    what: "Two people were spotted near Emergency Exit E-2 for 22 minutes after their shift ended.",
+    where: "Emergency Exit E-2",
+    doWhat: "Security should check Emergency Exit E-2 now.",
+    severity: "medium", status: "open",
+    assignee: "Unassigned",
+    ago: "1 hr 21 min ago",
+    icon: PersonStanding,
+  },
+  {
+    id: "INC-006",
+    title: "Zone A Almost Full",
+    what: "Zone A is 91% full and getting close to its limit. New bags may not fit soon.",
+    where: "Zone A · Storage",
+    doWhat: "Warehouse manager should redirect incoming bags to Zone D.",
+    severity: "medium", status: "monitoring",
+    assignee: "Warehouse Mgr. Anil",
+    ago: "1 hr 37 min ago",
+    icon: Flame,
+  },
+  {
+    id: "INC-007",
+    title: "Camera Signal Lost",
+    what: "Camera CAM-06 in Zone B (Aisle 4) is not sending a clear picture — signal keeps dropping.",
+    where: "Zone B · Aisle 4",
+    doWhat: "Tech team should check and restart CAM-06.",
+    severity: "medium", status: "open",
+    assignee: "Tech. Support Karan",
+    ago: "1 hr 50 min ago",
+    icon: Camera,
+  },
+];
 
-interface KPICardProps {
-  label: string;
-  value: string;
-  trend: string;
-  icon: React.ElementType;
-  color: string;
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function zoneColor(pct: number): string {
+  if (pct >= 95) return "var(--color-danger)";
+  if (pct >= 85) return "var(--color-warning)";
+  return "var(--color-success)";
+}
+function zoneLabel(pct: number): string {
+  if (pct >= 95) return "⚠ Critical – Full";
+  if (pct >= 85) return "! Almost Full";
+  return "✓ Normal";
+}
+function sevColor(s: Severity): string {
+  if (s === "critical") return "var(--color-danger)";
+  if (s === "high")     return "#F97316";
+  return "var(--color-warning)";
+}
+function statusBg(s: Status): { bg: string; text: string; border: string; label: string } {
+  if (s === "escalated")  return { bg: "rgba(240,74,74,0.10)",   text: "var(--color-danger)",  border: "rgba(240,74,74,0.25)",   label: "🚨 Escalated" };
+  if (s === "open")       return { bg: "rgba(245,166,35,0.12)",  text: "var(--color-warning)", border: "rgba(245,166,35,0.28)",  label: "⚡ Action Needed" };
+  return                         { bg: "rgba(91,155,245,0.10)",  text: "var(--color-info)",    border: "rgba(91,155,245,0.25)",  label: "👁 Watching" };
+}
+function fmtK(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
 
-const KPICard = memo(({ label, value, trend, icon: Icon, color }: KPICardProps) => {
-  const cardStyle = useMemo(() => ({
-    backgroundColor: "var(--bg-card)",
-    border: "1px solid var(--border-card)",
-    color: "var(--text-primary)",
-    boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
-  }), []);
-
-  const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 32px rgba(229,82,26,0.12)";
-    (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(229,82,26,0.3)";
-  }, []);
-
-  const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 12px rgba(0,0,0,0.06)";
-    (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-card)";
-  }, []);
-
+// ─── KPI Card ────────────────────────────────────────────────────────────────
+function KpiCard({
+  label, value, sub, color, icon: Icon, cardStyle,
+}: {
+  label: string; value: string; sub: string; color: string;
+  icon: React.ElementType; cardStyle: React.CSSProperties;
+}) {
   return (
     <div
-      className="rounded-[14px] p-3 sm:p-4 relative overflow-hidden transition-all hover:-translate-y-0.5 group cursor-default"
-      style={cardStyle}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      className="rounded-[14px] p-3 sm:p-4 relative overflow-hidden cursor-default transition-all hover:-translate-y-0.5 group"
+      style={{ ...cardStyle, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 6px 24px rgba(229,82,26,0.10)";
+        (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(229,82,26,0.25)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 1px 6px rgba(0,0,0,0.05)";
+        (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-card)";
+      }}
     >
       <div className="flex items-center gap-1.5 mb-2">
-        <Icon className="w-3.5 h-3.5" style={{ color }} />
-        <span className="text-[9px] font-black tracking-[0.08em] uppercase" style={{ color: "var(--text-faint)" }}>
+        <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" style={{ color }} />
+        <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wide leading-tight" style={{ color: "var(--text-faint)" }}>
           {label}
         </span>
       </div>
       <div className="text-[24px] sm:text-[28px] font-extrabold leading-none" style={{ color }}>
         {value}
       </div>
-      <div className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>{trend}</div>
-      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#E5521A] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-    </div>
-  );
-});
-
-KPICard.displayName = "KPICard";
-
-// ---------------------------------------------------------------------------
-// Memoized Module Health Card Component
-// ---------------------------------------------------------------------------
-
-const ModuleHealthCard = memo(({ mod }: { mod: ModuleStatus }) => {
-  const Icon = mod.icon;
-  const statusColorMap: Record<string, string> = useMemo(() => ({
-    operational: "var(--color-success)",
-    degraded: "var(--color-warning)",
-    offline: "var(--color-danger)",
-  }), []);
-  
-  const sColor = statusColorMap[mod.status];
-  
-  const cardStyle = useMemo(() => ({
-    backgroundColor: "var(--bg-card)",
-    border: "1px solid var(--border-card)",
-    color: "var(--text-primary)",
-  }), []);
-
-  const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-strong)";
-  }, []);
-
-  const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-card)";
-  }, []);
-
-  const progressWidth = useMemo(() => {
-    return mod.status === "operational" ? "100%" : mod.status === "degraded" ? "60%" : "0%";
-  }, [mod.status]);
-
-  return (
-    <div
-      className="rounded-[14px] p-4 transition-all"
-      style={cardStyle}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex items-center gap-2.5">
-          <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center border"
-            style={{ background: `${sColor}12`, borderColor: `${sColor}25` }}
-          >
-            <Icon className="w-4 h-4" style={{ color: sColor }} />
-          </div>
-          <div>
-            <div className="text-[13px] font-black" style={{ color: "var(--text-primary)" }}>{mod.name}</div>
-            <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{mod.detail}</div>
-          </div>
-        </div>
-        <span
-          className="text-[8px] font-black px-2 py-0.5 rounded-full border uppercase"
-          style={{ background: `${sColor}15`, color: sColor, borderColor: `${sColor}30` }}
-        >
-          {mod.status}
-        </span>
-      </div>
-      <div className="flex items-center gap-2">
-        <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--bg-surface-2)" }}>
-          <div
-            className="h-full rounded-full transition-all"
-            style={{
-              width: progressWidth,
-              background: sColor,
-            }}
-          />
-        </div>
-        <span className="text-[11px] font-black" style={{ color: sColor }}>{mod.metric}</span>
-      </div>
-    </div>
-  );
-});
-
-ModuleHealthCard.displayName = "ModuleHealthCard";
-
-// ---------------------------------------------------------------------------
-// Skeleton loader for initial load
-// ---------------------------------------------------------------------------
-
-function DashboardSkeleton() {
-  return (
-    <div className="p-4 sm:p-5 animate-pulse" style={{ color: "var(--text-primary)" }}>
-      {/* Header skeleton */}
-      <div className="flex justify-between items-start mb-5">
-        <div className="space-y-2">
-          <div className="route-skeleton-bar h-3 w-24" />
-          <div className="route-skeleton-bar h-6 w-48" />
-          <div className="route-skeleton-bar h-3 w-36" />
-        </div>
-        <div className="route-skeleton-bar h-8 w-28 rounded-lg" />
-      </div>
-      {/* KPI strip skeleton */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-5">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="route-skeleton-bar h-20 rounded-[14px]" />
-        ))}
-      </div>
-      {/* Module grid skeleton */}
-      <div className="route-skeleton-bar h-5 w-32 mb-3" />
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-5">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="route-skeleton-bar h-20 rounded-[14px]" />
-        ))}
-      </div>
+      <div className="text-[9px] sm:text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>{sub}</div>
+      <div className="absolute bottom-0 left-0 right-0 h-[3px] rounded-b-[14px] opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+// ─── Section heading ─────────────────────────────────────────────────────────
+function SectionHeading({ children, sub }: { children: React.ReactNode; sub?: string }) {
+  return (
+    <div className="flex items-baseline gap-2 mb-3">
+      <h2 className="text-[13px] sm:text-[14px] font-black" style={{ color: "var(--text-primary)" }}>
+        {children}
+      </h2>
+      {sub && <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{sub}</span>}
+    </div>
+  );
+}
 
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function ExecutiveDashboard() {
-  const [visionAlerts, setVisionAlerts] = useState<UnifiedAlert[]>([]);
-  const [activeBreaches, setActiveBreaches] = useState(0);
-  const [incidents, setIncidents] = useState<IncidentResponse[]>([]);
-  const [capacityStatus, setCapacityStatus] = useState<CapacityStatusEntry[]>([]);
-  const [perimeterZones, setPerimeterZones] = useState(0);
-  const [countSessions, setCountSessions] = useState<CountSessionResponse[]>([]);
-  const [manifests, setManifests] = useState<ManifestResponse[]>([]);
-  const [accessLogs, setAccessLogs] = useState<AccessLogResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchAll = useCallback(async () => {
-    const results = await Promise.allSettled([
-      getAllActiveAlerts(),
-      getActiveBreaches(),
-      getIncidents(),
-      getCapacityStatus(),
-      getPerimeterZones(),
-      getCountSessions(),
-      getManifests(),
-      getAccessLogs({ limit: 100 }),
-    ]);
-    if (results[0].status === "fulfilled") setVisionAlerts(results[0].value);
-    if (results[1].status === "fulfilled") setActiveBreaches(results[1].value.length);
-    if (results[2].status === "fulfilled") setIncidents(results[2].value);
-    if (results[3].status === "fulfilled") setCapacityStatus(results[3].value);
-    if (results[4].status === "fulfilled") setPerimeterZones(results[4].value.length);
-    if (results[5].status === "fulfilled") setCountSessions(results[5].value);
-    if (results[6].status === "fulfilled") setManifests(results[6].value);
-    if (results[7].status === "fulfilled") setAccessLogs(results[7].value);
-    setLoading(false);
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
   }, []);
 
-  useEffect(() => {
-    void fetchAll();
-    const interval = setInterval(() => void fetchAll(), 60000);
-    return () => clearInterval(interval);
-  }, [fetchAll]);
+  const openCount     = INCIDENTS.filter((i) => i.status === "open" || i.status === "escalated").length;
+  const critCount     = INCIDENTS.filter((i) => i.severity === "critical").length;
+  const offlineCams   = CAMERAS.filter((c) => c.status === "offline").length;
+  const atRiskZones   = ZONES.filter((z) => z.pct >= 85).length;
+  const avgOccupancy  = Math.round(ZONES.reduce((a, z) => a + z.pct, 0) / ZONES.length);
 
-  if (loading) return <DashboardSkeleton />;
+  const MAX_BAR = Math.max(...WEEKLY.flatMap((d) => [d.enter, d.exit]));
+  const CHART_H = 130;
 
-  // Derived KPIs - memoized to prevent recalculation on every render
-  const totalAlerts = useMemo(() => visionAlerts.length + activeBreaches, [visionAlerts.length, activeBreaches]);
-  const openIncidents = useMemo(() => incidents.filter((i) => i.status === "open" || i.status === "escalated").length, [incidents]);
-  const resolvedIncidents = useMemo(() => incidents.filter((i) => i.status === "resolved").length, [incidents]);
-  const criticalIncidents = useMemo(() => incidents.filter((i) => i.severity === "critical").length, [incidents]);
-  const avgCapacity = useMemo(() => {
-    return capacityStatus.length > 0
-      ? Math.round(capacityStatus.reduce((acc, c) => acc + c.utilization_pct, 0) / capacityStatus.length)
-      : 84;
-  }, [capacityStatus]);
-  const zonesExceedingWarning = useMemo(() => capacityStatus.filter((c) => c.exceeds_warning).length, [capacityStatus]);
-
-  const totalCounted = useMemo(() => countSessions.reduce((s, c) => s + c.total_counted, 0), [countSessions]);
-  const totalExpected = useMemo(() => manifests.reduce((s, m) => s + (m.total_expected ?? 0), 0), [manifests]);
-  const countAccuracy = useMemo(() => {
-    return totalExpected > 0 ? ((totalCounted / totalExpected) * 100).toFixed(1) : "—";
-  }, [totalCounted, totalExpected]);
-  const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const gateEventsToday = useMemo(() => {
-    return accessLogs.filter((log) => log.processed_at.startsWith(todayKey)).length || accessLogs.length;
-  }, [accessLogs, todayKey]);
-
-  const modules: ModuleStatus[] = useMemo(() => [
-    { name: "Object Detection", icon: Eye, status: "operational", metric: `${perimeterZones} zones`, detail: "YOLO v8 active", color: "var(--color-success)" },
-    { name: "Automated Counting", icon: Hash, status: "operational", metric: `${countAccuracy}% acc`, detail: `${countSessions.length} sessions today`, color: "var(--color-success)" },
-    { name: "Cluster Mapping", icon: Map, status: zonesExceedingWarning > 0 ? "degraded" : "operational", metric: `${avgCapacity}% avg`, detail: `${zonesExceedingWarning} zones over threshold`, color: zonesExceedingWarning > 0 ? "var(--color-warning)" : "var(--color-success)" },
-    { name: "Inventory Sequencing", icon: Layers, status: "operational", metric: "96.4% FIFO", detail: "Rules enforced", color: "var(--color-success)" },
-    { name: "Gate & LPR", icon: Shield, status: "operational", metric: `${gateEventsToday} events`, detail: "OCR active", color: "var(--color-success)" },
-    { name: "Perimeter Security", icon: ShieldAlert, status: activeBreaches > 0 ? "degraded" : "operational", metric: `${perimeterZones} zones`, detail: `${activeBreaches} active breaches`, color: activeBreaches > 0 ? "var(--color-danger)" : "var(--color-success)" },
-  ], [perimeterZones, countAccuracy, countSessions.length, zonesExceedingWarning, avgCapacity, gateEventsToday, activeBreaches]);
-
-  const maxThroughput = useMemo(() => Math.max(...THROUGHPUT), []);
-
-  // KPI data - memoized to prevent recreation on every render
-  const kpiData = useMemo(() => [
-    { label: "Detection Accuracy", value: `${countAccuracy}%`, trend: "YOLO v8 confidence", icon: Eye, color: "var(--color-success)" },
-    { label: "Active Alerts", value: String(totalAlerts), trend: `${visionAlerts.length} vision · ${activeBreaches} perimeter`, icon: AlertTriangle, color: totalAlerts > 0 ? "var(--color-warning)" : "var(--color-success)" },
-    { label: "Open Incidents", value: String(openIncidents), trend: `${criticalIncidents} critical`, icon: ShieldAlert, color: openIncidents > 0 ? "var(--color-danger)" : "var(--color-success)" },
-    { label: "Depot Occupancy", value: `${avgCapacity}%`, trend: `${zonesExceedingWarning} zones at risk`, icon: Package, color: avgCapacity > 90 ? "var(--color-danger)" : avgCapacity > 80 ? "var(--color-warning)" : "var(--color-success)" },
-    { label: "Gate Events", value: String(gateEventsToday), trend: "LPR scans today", icon: Truck, color: "var(--color-info)" },
-    { label: "Resolved Today", value: String(resolvedIncidents), trend: `${resolvedIncidents} incidents closed`, icon: CheckCircle2, color: "var(--color-success)" },
-  ], [countAccuracy, totalAlerts, visionAlerts.length, activeBreaches, openIncidents, criticalIncidents, avgCapacity, zonesExceedingWarning, gateEventsToday, resolvedIncidents]);
-
-  // Card style using CSS vars — adapts to light/dark
-  const cardStyle = useMemo(() => ({
+  const cardStyle: React.CSSProperties = {
     backgroundColor: "var(--bg-card)",
     border: "1px solid var(--border-card)",
     color: "var(--text-primary)",
-  }), []);
-
-  const innerCardStyle = useMemo(() => ({
+  };
+  const innerCard: React.CSSProperties = {
     backgroundColor: "var(--bg-surface-2)",
     border: "1px solid var(--border-default)",
-  }), []);
+  };
 
   return (
-    <motion.div 
-      className="p-4 sm:p-5" 
-      style={{ animation: "fadeIn 0.3s ease" }}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.2 }}
-    >
+    <div className="p-3 sm:p-4 lg:p-5 w-full max-w-full">
 
-      {/* Header */}
-      <div className="flex justify-between items-start mb-5 flex-wrap gap-3">
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap justify-between items-start gap-3 mb-5">
         <div>
-          <div className="text-[11px] font-black tracking-[0.1em] uppercase mb-1" style={{ color: "#E5521A" }}>
+          <div className="text-[10px] sm:text-[11px] font-black tracking-[0.1em] uppercase mb-1" style={{ color: "#E5521A" }}>
             Executive Overview
           </div>
-          <h1 className="text-[20px] sm:text-[22px] font-extrabold" style={{ color: "var(--text-primary)" }}>
+          <h1 className="text-[18px] sm:text-[22px] font-extrabold" style={{ color: "var(--text-primary)" }}>
             Operations Hub
           </h1>
-          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-            IntelliDepot · All 6 modules active
+          <p className="text-[10px] sm:text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+            IntelliDepot · {CAMERAS.filter(c => c.status === "online").length} of {CAMERAS.length} cameras active
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold"
-            style={{ backgroundColor: "rgba(34,211,161,0.1)", border: "1px solid rgba(34,211,161,0.25)", color: "var(--color-success)" }}
-          >
-            <Activity className="w-3.5 h-3.5" />
-            System Online
-          </span>
-        </div>
+        <span
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold self-start"
+          style={{ backgroundColor: "rgba(34,211,161,0.1)", border: "1px solid rgba(34,211,161,0.25)", color: "var(--color-success)" }}
+        >
+          <Activity className="w-3.5 h-3.5" />
+          System Online
+        </span>
       </div>
 
-      {/* Hero KPI Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-5">
-        {kpiData.map((kpi) => (
-          <KPICard key={kpi.label} {...kpi} />
-        ))}
+      {/* ── KPI Strip ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3 mb-5">
+        <KpiCard label="Camera Accuracy" value="97.3%"          sub="Vision working well"              color="var(--color-success)" icon={Eye}          cardStyle={cardStyle} />
+        <KpiCard label="Alerts Right Now" value={String(critCount + offlineCams + atRiskZones)}
+                                                                sub={`${critCount} urgent · ${offlineCams} camera offline`} color={(critCount + offlineCams) > 0 ? "var(--color-warning)" : "var(--color-success)"} icon={AlertTriangle} cardStyle={cardStyle} />
+        <KpiCard label="Problems to Fix" value={String(openCount)} sub={`${critCount} urgent right now`} color={openCount > 0 ? "var(--color-danger)" : "var(--color-success)"} icon={ShieldAlert}  cardStyle={cardStyle} />
+        <KpiCard label="Storage Used"   value={`${avgOccupancy}%`} sub={`${atRiskZones} zones almost full`} color={avgOccupancy > 90 ? "var(--color-danger)" : avgOccupancy > 80 ? "var(--color-warning)" : "var(--color-success)"} icon={Package} cardStyle={cardStyle} />
+        <KpiCard label="Vehicles Today" value="127"             sub="Scanned at gate today"            color="var(--color-info)"    icon={Truck}        cardStyle={cardStyle} />
+        <KpiCard label="Fixed Today"    value="4"               sub="Problems resolved"                color="var(--color-success)" icon={CheckCircle2} cardStyle={cardStyle} />
       </div>
 
-      <div className="h-px mb-5" style={{ background: "linear-gradient(90deg, transparent, rgba(229,82,26,0.4), transparent)" }} />
+      <div className="h-px mb-5" style={{ background: "linear-gradient(90deg, transparent, rgba(229,82,26,0.35), transparent)" }} />
 
-      {/* Module Health Grid */}
+      {/* ── Cameras ────────────────────────────────────────────────────────── */}
       <div className="mb-5">
-        <h2 className="text-[14px] font-black mb-3" style={{ color: "var(--text-primary)" }}>
-          Module Health
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {modules.map((mod) => (
-            <ModuleHealthCard key={mod.name} mod={mod} />
-          ))}
+        <SectionHeading sub="Live status of all 6 cameras">📷 Camera Status</SectionHeading>
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-2.5">
+          {CAMERAS.map((cam) => {
+            const online = cam.status === "online";
+            const col = online ? "var(--color-success)" : "var(--color-danger)";
+            return (
+              <div key={cam.id} className="rounded-[12px] p-3" style={cardStyle}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[11px] sm:text-[12px] font-black" style={{ color: "var(--text-primary)" }}>
+                    {cam.id}
+                  </span>
+                  <span
+                    className="flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-full"
+                    style={{ background: `${col}15`, color: col, border: `1px solid ${col}30` }}
+                  >
+                    {online ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                    {online ? "ON" : "OFF"}
+                  </span>
+                </div>
+                <div className="text-[9px] sm:text-[10px] leading-snug" style={{ color: "var(--text-muted)" }}>
+                  {cam.location}
+                </div>
+                <div className="text-[9px] mt-1 font-bold" style={{ color: "var(--text-faint)" }}>
+                  {cam.zone}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4 mb-5">
-        {/* Throughput Chart */}
-        <div className="rounded-[14px] p-4 sm:p-[18px]" style={cardStyle}>
-          <div className="flex justify-between items-center mb-3.5">
+      {/* ── Throughput Chart ───────────────────────────────────────────────── */}
+      <div className="rounded-[14px] p-4 sm:p-[18px] mb-5" style={cardStyle}>
+        {/* Chart header */}
+        <div className="flex flex-wrap justify-between items-start gap-2 mb-4">
+          <div>
             <span className="text-[13px] font-black" style={{ color: "var(--text-primary)" }}>
-              Daily Throughput (Bags)
+              📦 Bags In &amp; Out — This Week
             </span>
-            <span
-              className="text-[9px] font-black px-2 py-0.5 rounded-full border"
-              style={{ background: "rgba(229,82,26,0.1)", color: "#E5521A", borderColor: "rgba(229,82,26,0.2)" }}
-            >
-              THIS WEEK
-            </span>
+            <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+              How many bags entered and left the depot each day
+            </p>
           </div>
-          <div className="flex items-end gap-1.5 sm:gap-2 h-[140px] sm:h-[170px] px-1 sm:px-2">
-            {THROUGHPUT.map((v, i) => {
-              const h = Math.round((v / maxThroughput) * 130);
-              const isHighlight = i === 4;
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm" style={{ background: "#E5521A" }} />
+              <span className="text-[10px] font-bold" style={{ color: "var(--text-muted)" }}>Bags In</span>
+              <span className="text-[10px] font-black" style={{ color: "#E5521A" }}>{fmtK(WEEKLY_TOTALS.enter)}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm" style={{ background: "rgba(91,155,245,0.85)" }} />
+              <span className="text-[10px] font-bold" style={{ color: "var(--text-muted)" }}>Bags Out</span>
+              <span className="text-[10px] font-black" style={{ color: "var(--color-info)" }}>{fmtK(WEEKLY_TOTALS.exit)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Grouped bars */}
+        <div className="w-full overflow-x-auto">
+          <div className="flex items-end gap-1.5 sm:gap-2.5" style={{ minWidth: 300, minHeight: CHART_H + 52 }}>
+            {WEEKLY.map((day, i) => {
+              const eH   = Math.max(6, Math.round((day.enter / MAX_BAR) * CHART_H));
+              const xH   = Math.max(6, Math.round((day.exit  / MAX_BAR) * CHART_H));
+              const peak = i === 4;
               return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                  <span className="text-[8px]" style={{ color: "var(--text-muted)" }}>{(v / 1000).toFixed(1)}k</span>
-                  <div
-                    className="w-full rounded-t transition-all hover:opacity-90"
-                    style={{
-                      height: h,
-                      background: isHighlight
-                        ? "linear-gradient(to bottom, #FF7A42, rgba(255,122,66,0.4))"
-                        : "linear-gradient(to bottom, rgba(229,82,26,0.9), rgba(229,82,26,0.3))",
-                      filter: isHighlight ? "drop-shadow(0 0 4px rgba(229,82,26,0.5))" : undefined,
-                    }}
-                  />
-                  <span className="text-[9px]" style={{ color: "var(--text-faint)" }}>{DAYS[i]}</span>
+                <div key={i} className="flex-1 flex flex-col items-center gap-1" style={{ minWidth: 32 }}>
+                  <div className="flex items-end gap-[3px]" style={{ height: CHART_H }}>
+                    {/* In bar */}
+                    <div className="flex flex-col items-center justify-end gap-[2px]" style={{ height: CHART_H }}>
+                      <span className="text-[7px] font-bold" style={{ color: peak ? "#E5521A" : "var(--text-muted)" }}>
+                        {fmtK(day.enter)}
+                      </span>
+                      <div style={{
+                        width: "clamp(9px,1.8vw,17px)", height: eH,
+                        borderRadius: "3px 3px 0 0",
+                        background: peak
+                          ? "linear-gradient(to bottom,#FF7A42,rgba(255,122,66,0.45))"
+                          : "linear-gradient(to bottom,rgba(229,82,26,0.92),rgba(229,82,26,0.32))",
+                        filter: peak ? "drop-shadow(0 0 5px rgba(229,82,26,0.5))" : undefined,
+                      }} />
+                    </div>
+                    {/* Out bar */}
+                    <div className="flex flex-col items-center justify-end gap-[2px]" style={{ height: CHART_H }}>
+                      <span className="text-[7px] font-bold" style={{ color: peak ? "var(--color-info)" : "var(--text-faint)" }}>
+                        {fmtK(day.exit)}
+                      </span>
+                      <div style={{
+                        width: "clamp(9px,1.8vw,17px)", height: xH,
+                        borderRadius: "3px 3px 0 0",
+                        background: peak
+                          ? "linear-gradient(to bottom,rgba(91,155,245,1),rgba(91,155,245,0.4))"
+                          : "linear-gradient(to bottom,rgba(91,155,245,0.8),rgba(91,155,245,0.22))",
+                      }} />
+                    </div>
+                  </div>
+                  <span className="text-[9px] sm:text-[10px]"
+                    style={{ color: peak ? "#E5521A" : "var(--text-faint)", fontWeight: peak ? 900 : 400 }}>
+                    {DAYS[i]}
+                  </span>
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* Counting Sessions */}
-        <div className="rounded-[14px] p-4 sm:p-[18px]" style={cardStyle}>
-          <div className="flex justify-between items-center mb-3.5">
-            <span className="text-[13px] font-black" style={{ color: "var(--text-primary)" }}>
-              Counting Sessions
+        {/* Summary strip */}
+        <div className="mt-4 pt-3 grid grid-cols-2 gap-2 sm:gap-3"
+          style={{ borderTop: "1px solid var(--border-default)" }}>
+          <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+            style={{ backgroundColor: "rgba(229,82,26,0.07)", border: "1px solid rgba(229,82,26,0.15)" }}>
+            <ArrowUpCircle className="w-4 h-4 shrink-0" style={{ color: "#E5521A" }} />
+            <div>
+              <div className="text-[9px] font-black uppercase" style={{ color: "var(--text-faint)" }}>Total Bags In</div>
+              <div className="text-[14px] sm:text-[15px] font-extrabold" style={{ color: "#E5521A" }}>
+                {(WEEKLY_TOTALS.enter / 1000).toFixed(1)}k this week
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+            style={{ backgroundColor: "rgba(91,155,245,0.07)", border: "1px solid rgba(91,155,245,0.18)" }}>
+            <ArrowDownCircle className="w-4 h-4 shrink-0" style={{ color: "var(--color-info)" }} />
+            <div>
+              <div className="text-[9px] font-black uppercase" style={{ color: "var(--text-faint)" }}>Total Bags Out</div>
+              <div className="text-[14px] sm:text-[15px] font-extrabold" style={{ color: "var(--color-info)" }}>
+                {(WEEKLY_TOTALS.exit / 1000).toFixed(1)}k this week
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Zone Capacity ──────────────────────────────────────────────────── */}
+      <div className="rounded-[14px] p-4 sm:p-[18px] mb-5" style={cardStyle}>
+        <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
+          <SectionHeading sub="How full each storage area is">🏭 Storage Zone Levels</SectionHeading>
+          {atRiskZones > 0 && (
+            <span className="text-[9px] font-black px-2 py-0.5 rounded-full border"
+              style={{ background: "rgba(245,166,35,0.12)", color: "var(--color-warning)", borderColor: "rgba(245,166,35,0.25)" }}>
+              {atRiskZones} zone{atRiskZones > 1 ? "s" : ""} need attention
             </span>
-            <span
-              className="text-[9px] font-black px-2 py-0.5 rounded-full border"
-              style={{ background: "rgba(91,155,245,0.12)", color: "var(--color-info)", borderColor: "rgba(91,155,245,0.25)" }}
-            >
-              {countSessions.length} TODAY
+          )}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+          {ZONES.map((z) => {
+            const col   = zoneColor(z.pct);
+            const label = zoneLabel(z.pct);
+            return (
+              <div key={z.id} className="rounded-[12px] p-3 sm:p-4" style={innerCard}>
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-[13px] sm:text-[15px] font-black" style={{ color: "var(--text-primary)" }}>
+                    {z.name}
+                  </span>
+                  <span className="text-[15px] sm:text-[18px] font-extrabold" style={{ color: col }}>
+                    {z.pct}%
+                  </span>
+                </div>
+                {/* Progress bar */}
+                <div className="w-full h-2.5 sm:h-3 rounded-full overflow-hidden mb-2"
+                  style={{ backgroundColor: "var(--bg-surface-3)" }}>
+                  <div className="h-full rounded-full transition-all"
+                    style={{ width: `${z.pct}%`, background: col }} />
+                </div>
+                {/* Status label */}
+                <div className="text-[9px] sm:text-[10px] font-black" style={{ color: col }}>{label}</div>
+                <div className="text-[9px] mt-0.5" style={{ color: "var(--text-faint)" }}>
+                  {z.used.toLocaleString()} / {z.total.toLocaleString()} bags
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Incidents ──────────────────────────────────────────────────────── */}
+      <div className="rounded-[14px] p-4 sm:p-[18px]" style={cardStyle}>
+        <div className="flex flex-wrap justify-between items-start gap-2 mb-4">
+          <div>
+            <SectionHeading sub="What is happening and what needs to be done">🚨 Active Incidents</SectionHeading>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {critCount > 0 && (
+              <span className="flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full border"
+                style={{ background: "rgba(240,74,74,0.10)", color: "var(--color-danger)", borderColor: "rgba(240,74,74,0.25)" }}>
+                <TriangleAlert className="w-3 h-3" />
+                {critCount} Urgent
+              </span>
+            )}
+            <span className="text-[9px] font-black px-2 py-0.5 rounded-full border"
+              style={{ background: "rgba(245,166,35,0.10)", color: "var(--color-warning)", borderColor: "rgba(245,166,35,0.25)" }}>
+              {openCount} Needs Action
             </span>
           </div>
-          <div className="space-y-2">
-            {countSessions.length === 0 ? (
-              <div className="text-center py-6 text-[11px]" style={{ color: "var(--text-faint)" }}>
-                No counting sessions today
-              </div>
-            ) : (
-              countSessions.slice(0, 5).map((cs) => {
-                const matchColor = cs.reconciliation_status === "matched"
-                  ? "var(--color-success)"
-                  : cs.reconciliation_status === "mismatch"
-                  ? "var(--color-danger)"
-                  : "var(--color-warning)";
-                const manifest = manifests.find((m) => m.id === cs.manifest_id);
-                return (
-                  <div key={cs.id} className="p-2.5 rounded-[10px]" style={innerCardStyle}>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[11px] font-black" style={{ color: "var(--text-primary)" }}>
-                        {manifest?.manifest_code ?? "—"}
-                      </span>
-                      <span
-                        className="text-[8px] font-black px-1.5 py-0.5 rounded-full"
-                        style={{ background: `${matchColor}15`, color: matchColor }}
-                      >
-                        {cs.reconciliation_status.toUpperCase()}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          {INCIDENTS.map((inc) => {
+            const sc  = sevColor(inc.severity);
+            const sb  = statusBg(inc.status);
+            const Icon = inc.icon;
+            return (
+              <div key={inc.id}
+                className="rounded-[14px] overflow-hidden transition-all hover:-translate-y-0.5"
+                style={{ ...innerCard, borderLeft: `4px solid ${sc}` }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.borderColor = sc)}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-default)")}
+              >
+                {/* Coloured top strip */}
+                <div className="px-3 pt-3 pb-2">
+                  {/* Status badge */}
+                  <div className="flex justify-between items-start gap-1.5 mb-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Icon className="w-4 h-4 shrink-0" style={{ color: sc }} />
+                      <span className="text-[11px] sm:text-[12px] font-black leading-tight" style={{ color: sc }}>
+                        {inc.title}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>
-                      <span>{cs.total_counted}/{manifest?.total_expected ?? "?"} items</span>
-                      <span style={{ color: cs.discrepancy_total !== 0 ? "var(--color-danger)" : "var(--color-success)" }}>
-                        {cs.discrepancy_total >= 0 ? "+" : ""}{cs.discrepancy_total}
+                    <span className="text-[8px] sm:text-[9px] font-black px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap"
+                      style={{ background: sb.bg, color: sb.text, border: `1px solid ${sb.border}` }}>
+                      {sb.label}
+                    </span>
+                  </div>
+
+                  {/* What happened — plain language */}
+                  <div className="rounded-lg px-2.5 py-2 mb-2"
+                    style={{ backgroundColor: "var(--bg-surface-3)", border: "1px solid var(--border-default)" }}>
+                    <div className="text-[9px] font-black uppercase mb-1" style={{ color: "var(--text-faint)" }}>What happened</div>
+                    <p className="text-[10px] sm:text-[11px] leading-relaxed" style={{ color: "var(--text-primary)" }}>
+                      {inc.what}
+                    </p>
+                  </div>
+
+                  {/* Action needed */}
+                  <div className="rounded-lg px-2.5 py-2 mb-2"
+                    style={{ backgroundColor: `${sc}0D`, border: `1px solid ${sc}25` }}>
+                    <div className="text-[9px] font-black uppercase mb-0.5" style={{ color: sc }}>Action needed</div>
+                    <p className="text-[10px] sm:text-[11px] leading-snug font-bold" style={{ color: sc }}>
+                      {inc.doWhat}
+                    </p>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex justify-between items-center text-[9px]" style={{ color: "var(--text-faint)" }}>
+                    <div className="flex flex-col gap-0.5 min-w-0 pr-2">
+                      <span className="font-bold truncate" style={{ color: "var(--text-muted)" }}>
+                        📍 {inc.where}
                       </span>
+                      <span className="truncate">👤 {inc.assignee}</span>
+                    </div>
+                    <div className="flex flex-col items-end gap-0.5 shrink-0">
+                      <span>{inc.ago}</span>
+                      {inc.countdown !== undefined && (
+                        <span className="flex items-center gap-0.5 font-black" style={{ color: "var(--color-warning)" }}>
+                          <Clock className="w-3 h-3" />
+                          {inc.countdown}m left
+                        </span>
+                      )}
                     </div>
                   </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Capacity Overview */}
-      {capacityStatus.length > 0 && (
-        <div className="rounded-[14px] p-4 sm:p-[18px] mb-5" style={cardStyle}>
-          <div className="flex justify-between items-center mb-3.5">
-            <span className="text-[13px] font-black" style={{ color: "var(--text-primary)" }}>
-              Zone Capacity Status
-            </span>
-            <span
-              className="text-[9px] font-black px-2 py-0.5 rounded-full border"
-              style={{ background: "rgba(245,166,35,0.12)", color: "var(--color-warning)", borderColor: "rgba(245,166,35,0.25)" }}
-            >
-              {zonesExceedingWarning} AT RISK
-            </span>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5">
-            {capacityStatus.map((cs) => {
-              const color = cs.exceeds_critical
-                ? "var(--color-danger)"
-                : cs.exceeds_warning
-                ? "var(--color-warning)"
-                : "var(--color-success)";
-              return (
-                <div key={cs.zone_code} className="rounded-lg p-3" style={innerCardStyle}>
-                  <div className="text-[11px] font-black mb-1" style={{ color: "var(--text-primary)" }}>
-                    {cs.name}
-                  </div>
-                  <div className="w-full h-2 rounded-full overflow-hidden mb-1" style={{ backgroundColor: "var(--bg-surface-3)" }}>
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{ width: `${Math.min(100, cs.utilization_pct)}%`, background: color }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-[9px]">
-                    <span style={{ color: "var(--text-muted)" }}>{cs.current_occupancy}/{cs.max_capacity_units}</span>
-                    <span style={{ color, fontWeight: 900 }}>{cs.utilization_pct.toFixed(0)}%</span>
-                  </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Security & Incident Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Vision Alerts */}
-        <div className="rounded-[14px] p-4 sm:p-[18px]" style={cardStyle}>
-          <div className="flex justify-between items-center mb-3.5">
-            <span className="text-[13px] font-black" style={{ color: "var(--text-primary)" }}>
-              Vision Alerts
-            </span>
-            <span
-              className="text-[9px] font-black px-2 py-0.5 rounded-full border"
-              style={{ background: "rgba(245,166,35,0.12)", color: "var(--color-warning)", borderColor: "rgba(245,166,35,0.25)" }}
-            >
-              {visionAlerts.length} ACTIVE
-            </span>
-          </div>
-          <div className="space-y-2">
-            {visionAlerts.slice(0, 4).map((alert) => {
-              const sevColor = alert.severity === "critical"
-                ? "var(--color-danger)"
-                : alert.severity === "high"
-                ? "#F97316"
-                : "var(--color-warning)";
-              return (
-                <div
-                  key={alert.id}
-                  className="p-2.5 rounded-[10px]"
-                  style={{ ...innerCardStyle, borderLeft: `3px solid ${sevColor}` }}
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-black" style={{ color: sevColor }}>
-                      {alert.type === "count_mismatch" ? "Count Mismatch" : "Colour Mismatch"}
-                    </span>
-                    <span className="text-[9px]" style={{ color: "var(--text-faint)" }}>
-                      {new Date(alert.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                  <div className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>{alert.message}</div>
-                </div>
-              );
-            })}
-            {visionAlerts.length === 0 && (
-              <div className="text-center py-6 text-[11px]" style={{ color: "var(--text-faint)" }}>
-                No active vision alerts
               </div>
-            )}
-          </div>
+            );
+          })}
         </div>
 
-        {/* Security Incidents */}
-        <div className="rounded-[14px] p-4 sm:p-[18px]" style={cardStyle}>
-          <div className="flex justify-between items-center mb-3.5">
-            <span className="text-[13px] font-black" style={{ color: "var(--text-primary)" }}>
-              Security Incidents
-            </span>
-            <span
-              className="text-[9px] font-black px-2 py-0.5 rounded-full border"
-              style={{ background: "rgba(240,74,74,0.12)", color: "var(--color-danger)", borderColor: "rgba(240,74,74,0.25)" }}
-            >
-              {openIncidents} OPEN
-            </span>
+        {/* All-clear state (if no incidents) */}
+        {INCIDENTS.length === 0 && (
+          <div className="text-center py-10">
+            <CircleDot className="w-8 h-8 mx-auto mb-2" style={{ color: "var(--color-success)" }} />
+            <p className="font-black" style={{ color: "var(--color-success)" }}>All clear — no active incidents</p>
           </div>
-          <div className="space-y-2">
-            {incidents.filter((i) => i.status !== "resolved").slice(0, 4).map((inc) => {
-              const sevColor = inc.severity === "critical"
-                ? "var(--color-danger)"
-                : inc.severity === "high"
-                ? "#F97316"
-                : "var(--color-warning)";
-              return (
-                <div
-                  key={inc.id}
-                  className="p-2.5 rounded-[10px]"
-                  style={{ ...innerCardStyle, borderLeft: `3px solid ${sevColor}` }}
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-black" style={{ color: sevColor }}>{inc.title}</span>
-                    <span
-                      className="text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase"
-                      style={{ background: `${sevColor}15`, color: sevColor }}
-                    >
-                      {inc.status}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center mt-1">
-                    <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-                      {inc.escalated_to || "Unassigned"}
-                    </span>
-                    {inc.escalation_deadline && inc.status === "open" && (
-                      <span className="flex items-center gap-1 text-[9px]" style={{ color: "var(--color-warning)" }}>
-                        <Clock className="w-3 h-3" />
-                        {Math.max(0, Math.round((new Date(inc.escalation_deadline).getTime() - Date.now()) / 60000))}m
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            {incidents.filter((i) => i.status !== "resolved").length === 0 && (
-              <div className="text-center py-6 text-[11px]" style={{ color: "var(--text-faint)" }}>
-                No active security incidents
-              </div>
-            )}
-          </div>
-        </div>
+        )}
       </div>
-    </motion.div>
+    </div>
   );
 }

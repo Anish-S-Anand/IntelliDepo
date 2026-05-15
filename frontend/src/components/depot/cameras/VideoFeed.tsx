@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDetection } from "@/hooks/useDetection";
 
 interface VideoFeedProps {
@@ -10,30 +10,12 @@ interface VideoFeedProps {
   cameraIndex: number;
   offline?: boolean; // NEW: Mark camera as offline
   onDetectionUpdate?: (vehicles: Array<{ bbox: [number, number, number, number]; class: string; score: number }>) => void;
-  onPlateDetected?: (plate: string) => void;
 }
 
-/**
- * Simulates LPR detection by generating a plausible license plate string.
- * In production this would call a real LPR API or Tesseract.js OCR on the vehicle ROI.
- */
-function simulateLPR(): string {
-  const states = ["MH", "DL", "KA", "TN", "GJ", "RJ", "UP", "WB"];
-  const state = states[Math.floor(Math.random() * states.length)];
-  const num1 = String(Math.floor(Math.random() * 99) + 1).padStart(2, "0");
-  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-  const letter1 = letters[Math.floor(Math.random() * letters.length)];
-  const letter2 = letters[Math.floor(Math.random() * letters.length)];
-  const num2 = String(Math.floor(Math.random() * 9999) + 1).padStart(4, "0");
-  return `${state} ${num1} ${letter1}${letter2} ${num2}`;
-}
-
-export function VideoFeed({ name, cameraId, videoFile, cameraIndex, offline = false, onDetectionUpdate, onPlateDetected }: VideoFeedProps) {
+export function VideoFeed({ name, cameraId, videoFile, cameraIndex, offline = false, onDetectionUpdate }: VideoFeedProps) {
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const lprTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [status, setStatus] = useState<"connecting" | "live" | "error">("connecting");
 
   // If offline, set status immediately and skip all video/detection logic
@@ -44,23 +26,6 @@ export function VideoFeed({ name, cameraId, videoFile, cameraIndex, offline = fa
   }, [offline]);
 
   useDetection(sourceCanvasRef, overlayCanvasRef, cameraIndex, status === "live" && !offline, onDetectionUpdate);
-
-  // LPR simulation: periodically "detect" a plate when camera is live
-  const triggerLPR = useCallback(() => {
-    if (onPlateDetected && status === "live") {
-      // Only trigger occasionally (simulate real detection rate)
-      if (Math.random() < 0.15) {
-        onPlateDetected(simulateLPR());
-      }
-    }
-  }, [onPlateDetected, status]);
-
-  useEffect(() => {
-    lprTimerRef.current = setInterval(triggerLPR, 5000);
-    return () => {
-      if (lprTimerRef.current) clearInterval(lprTimerRef.current);
-    };
-  }, [triggerLPR]);
 
   useEffect(() => {
     const canvas = sourceCanvasRef.current;
@@ -151,7 +116,7 @@ export function VideoFeed({ name, cameraId, videoFile, cameraIndex, offline = fa
           initSize();
           try {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          } catch (e) {
+          } catch {
             // Ignore drawing errors
           }
         }

@@ -255,7 +255,7 @@ async def list_batches(
         query = query.where(InventoryBatch.zone == zone)
     if status:
         query = query.where(InventoryBatch.status == status)
-    result = await db.execute(query.order_by(InventoryBatch.priority_score.asc()))
+    result = await db.execute(query.order_by(InventoryBatch.expiry_date.asc()))
     return result.scalars().all()
 
 

@@ -19,7 +19,8 @@ import asyncio
 import logging
 import os
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -81,9 +82,9 @@ PERIMETER_ZONES = [
 
 CLUSTER_ZONES = [
     {"zone_code": "A", "name": "Storage Bay A — Cement", "zone_type": "storage", "floor": "ground", "area_sqm": 2400, "max_capacity_units": 1000, "current_occupancy": 810},
-    {"zone_code": "B", "name": "Storage Bay B — Fertilizers", "zone_type": "storage", "floor": "ground", "area_sqm": 2800, "max_capacity_units": 1000, "current_occupancy": 450},
-    {"zone_code": "C", "name": "Hazmat Storage C", "zone_type": "hazmat", "floor": "ground", "area_sqm": 1600, "max_capacity_units": 800, "current_occupancy": 595},
-    {"zone_code": "D", "name": "Heavy Materials D", "zone_type": "storage", "floor": "ground", "area_sqm": 3200, "max_capacity_units": 1200, "current_occupancy": 1092},
+    {"zone_code": "B", "name": "Storage Bay B — Cement", "zone_type": "storage", "floor": "ground", "area_sqm": 2800, "max_capacity_units": 1000, "current_occupancy": 450},
+    {"zone_code": "C", "name": "Storage Bay C — Cement", "zone_type": "storage", "floor": "ground", "area_sqm": 1600, "max_capacity_units": 800, "current_occupancy": 595},
+    {"zone_code": "D", "name": "Storage Bay D — Cement", "zone_type": "storage", "floor": "ground", "area_sqm": 3200, "max_capacity_units": 1200, "current_occupancy": 1092},
 ]
 
 MANIFESTS = [
@@ -97,7 +98,7 @@ DETECTION_MODEL = {
     "model_version": "2025-05-29",
     "weights_path": os.getenv(
         "YOLO_WEIGHTS",
-        r"C:\Users\karte\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\intelli-platform\best_cement_bags_2025-05-29.pt",
+        str(Path(__file__).resolve().parents[2] / "best_cement_bags_2025-05-29.pt"),
     ),
     "confidence_threshold": 0.25,
     "iou_threshold": 0.45,
@@ -106,11 +107,26 @@ DETECTION_MODEL = {
 }
 
 BATCHES = [
-    {"sku_id": "SKU-CEM-53", "product_name": "OPC Cement 53 Grade", "batch_number": "B2025-1022", "quantity": 498, "zone": "A", "rack": "A-01", "bin_location": "A-01-L1", "manufacturing_date": "2026-01-15", "expiry_date": "2027-01-15", "rule_type": "FIFO"},
-    {"sku_id": "SKU-CEM-33", "product_name": "PPC Cement 33 Grade", "batch_number": "B2025-1019", "quantity": 320, "zone": "A", "rack": "A-02", "bin_location": "A-02-L1", "manufacturing_date": "2026-02-01", "expiry_date": "2027-02-01", "rule_type": "FIFO"},
-    {"sku_id": "SKU-FRT-GA", "product_name": "Fertilizer Grade A", "batch_number": "B2025-1021", "quantity": 450, "zone": "B", "rack": "B-02", "bin_location": "B-02-L2", "manufacturing_date": "2025-10-01", "expiry_date": "2026-10-01", "rule_type": "FEFO"},
-    {"sku_id": "SKU-HAZ-03", "product_name": "Chemicals HAZ-3", "batch_number": "B2025-1018", "quantity": 148, "zone": "C", "rack": "C-01", "bin_location": "C-01-L1", "manufacturing_date": "2025-11-15", "expiry_date": "2026-05-15", "rule_type": "FEFO"},
-    {"sku_id": "SKU-STL-02", "product_name": "Steel Coils Grade 2", "batch_number": "B2025-1023", "quantity": 580, "zone": "D", "rack": "D-01", "bin_location": "D-01-L1", "manufacturing_date": "2026-03-01", "expiry_date": "2028-03-01", "rule_type": "FIFO"},
+    # Zone A batches (should total 810 bags to match CLUSTER_ZONES occupancy)
+    {"sku_id": "SKU-CEM-01", "product_name": "UltraTech Cement", "batch_number": "B2026-1022", "quantity": 490, "zone": "A", "rack": "A-01", "bin_location": "A-01-L1", "manufacturing_date": date(2026, 1, 15), "expiry_date": date(2026, 4, 15), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-02", "product_name": "ACC Cement", "batch_number": "B2026-1019", "quantity": 320, "zone": "A", "rack": "A-02", "bin_location": "A-02-L1", "manufacturing_date": date(2026, 2, 1), "expiry_date": date(2026, 5, 1), "rule_type": "FIFO"},
+    # Zone B batches (should total 450 bags to match CLUSTER_ZONES occupancy)
+    {"sku_id": "SKU-CEM-03", "product_name": "UltraTech Cement", "batch_number": "B2026-1021", "quantity": 450, "zone": "B", "rack": "B-02", "bin_location": "B-02-L2", "manufacturing_date": date(2026, 1, 10), "expiry_date": date(2026, 4, 10), "rule_type": "FEFO"},
+    # Zone C batches (should total 595 bags to match CLUSTER_ZONES occupancy)
+    {"sku_id": "SKU-CEM-04", "product_name": "ACC Cement", "batch_number": "B2026-1018", "quantity": 595, "zone": "C", "rack": "C-01", "bin_location": "C-01-L1", "manufacturing_date": date(2026, 1, 5), "expiry_date": date(2026, 4, 5), "rule_type": "FEFO"},
+    # Zone D batches (should total 1092 bags to match CLUSTER_ZONES occupancy)
+    {"sku_id": "SKU-CEM-05", "product_name": "UltraTech Cement", "batch_number": "B2026-1023", "quantity": 1092, "zone": "D", "rack": "D-01", "bin_location": "D-01-L1", "manufacturing_date": date(2026, 3, 1), "expiry_date": date(2026, 6, 1), "rule_type": "FIFO"},
+    # Additional batches for more data
+    {"sku_id": "SKU-CEM-06", "product_name": "UltraTech Cement", "batch_number": "B2026-1024", "quantity": 250, "zone": "A", "rack": "A-03", "bin_location": "A-03-L1", "manufacturing_date": date(2026, 1, 20), "expiry_date": date(2026, 4, 20), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-07", "product_name": "ACC Cement", "batch_number": "B2026-1025", "quantity": 180, "zone": "B", "rack": "B-03", "bin_location": "B-03-L1", "manufacturing_date": date(2026, 1, 8), "expiry_date": date(2026, 4, 8), "rule_type": "FEFO"},
+    {"sku_id": "SKU-CEM-08", "product_name": "UltraTech Cement", "batch_number": "B2026-1026", "quantity": 420, "zone": "C", "rack": "C-02", "bin_location": "C-02-L1", "manufacturing_date": date(2026, 1, 3), "expiry_date": date(2026, 4, 3), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-09", "product_name": "ACC Cement", "batch_number": "B2026-1027", "quantity": 350, "zone": "D", "rack": "D-02", "bin_location": "D-02-L1", "manufacturing_date": date(2026, 2, 15), "expiry_date": date(2026, 5, 15), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-10", "product_name": "UltraTech Cement", "batch_number": "B2026-1028", "quantity": 290, "zone": "A", "rack": "A-04", "bin_location": "A-04-L1", "manufacturing_date": date(2026, 1, 5), "expiry_date": date(2026, 4, 5), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-11", "product_name": "ACC Cement", "batch_number": "B2026-1029", "quantity": 220, "zone": "B", "rack": "B-04", "bin_location": "B-04-L1", "manufacturing_date": date(2026, 1, 12), "expiry_date": date(2026, 4, 12), "rule_type": "FEFO"},
+    {"sku_id": "SKU-CEM-12", "product_name": "UltraTech Cement", "batch_number": "B2026-1030", "quantity": 380, "zone": "C", "rack": "C-03", "bin_location": "C-03-L1", "manufacturing_date": date(2026, 1, 7), "expiry_date": date(2026, 4, 7), "rule_type": "FEFO"},
+    {"sku_id": "SKU-CEM-13", "product_name": "ACC Cement", "batch_number": "B2026-1031", "quantity": 460, "zone": "D", "rack": "D-03", "bin_location": "D-03-L1", "manufacturing_date": date(2026, 3, 10), "expiry_date": date(2026, 6, 10), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-14", "product_name": "UltraTech Cement", "batch_number": "B2026-1032", "quantity": 310, "zone": "A", "rack": "A-05", "bin_location": "A-05-L1", "manufacturing_date": date(2026, 1, 25), "expiry_date": date(2026, 4, 25), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-15", "product_name": "ACC Cement", "batch_number": "B2026-1033", "quantity": 270, "zone": "B", "rack": "B-05", "bin_location": "B-05-L1", "manufacturing_date": date(2026, 1, 9), "expiry_date": date(2026, 4, 9), "rule_type": "FEFO"},
 ]
 
 DEMO_USERS = [
@@ -316,12 +332,31 @@ async def seed_database(db_url: str | None = None):
             logger.info(f"Seeded {len(MANIFESTS)} shipment manifests")
 
             # ── Inventory Batches ──
+            # Vary batch creation timestamps for realistic activity patterns
+            batch_timestamps = [
+                now - timedelta(hours=2),   # 2 hours ago
+                now - timedelta(days=5),    # 5 days ago
+                now - timedelta(hours=12),  # 12 hours ago
+                now - timedelta(days=3),    # 3 days ago
+                now - timedelta(days=1),    # 1 day ago
+                now - timedelta(hours=6),   # 6 hours ago
+                now - timedelta(days=2),    # 2 days ago
+                now - timedelta(hours=18),  # 18 hours ago
+                now - timedelta(days=4),    # 4 days ago
+                now - timedelta(hours=8),   # 8 hours ago
+                now - timedelta(days=6),    # 6 days ago
+                now - timedelta(hours=4),   # 4 hours ago
+                now - timedelta(days=7),    # 7 days ago
+                now - timedelta(hours=10),  # 10 hours ago
+                now - timedelta(days=8),    # 8 days ago
+            ]
             try:
                 async with db.begin_nested():
-                    for batch in BATCHES:
+                    for idx, batch in enumerate(BATCHES):
+                        batch_time = batch_timestamps[idx] if idx < len(batch_timestamps) else now
                         await db.execute(text("""
                             INSERT INTO depot_inventory_batches (id, batch_code, sku_code, product_name, zone, rack, bin_location, quantity, original_quantity, manufacture_date, expiry_date, received_at, sequencing_rule, status, priority_score, is_near_expiry, created_at, updated_at)
-                            VALUES (:id, :batch_code, :sku_code, :product_name, :zone, :rack, :bin_location, :quantity, :quantity, :mfg, :exp, :now, :sequencing_rule, 'active', 0.0, false, :now, :now)
+                            VALUES (:id, :batch_code, :sku_code, :product_name, :zone, :rack, :bin_location, :quantity, :quantity, :mfg, :exp, :batch_time, :sequencing_rule, 'active', 0.0, false, :batch_time, :batch_time)
                             ON CONFLICT DO NOTHING
                         """), {
                             "id": new_id(), "product_name": batch["product_name"],
@@ -330,7 +365,7 @@ async def seed_database(db_url: str | None = None):
                             "quantity": batch["quantity"],
                             "zone": batch["zone"], "rack": batch["rack"], "bin_location": batch["bin_location"],
                             "mfg": batch["manufacturing_date"], "exp": batch["expiry_date"],
-                            "sequencing_rule": batch["rule_type"], "now": now,
+                            "sequencing_rule": batch["rule_type"], "batch_time": batch_time,
                         })
                 logger.info(f"Seeded {len(BATCHES)} inventory batches")
             except Exception as e:
@@ -370,7 +405,7 @@ async def seed_database(db_url: str | None = None):
             # ── IntelliOps Exceptions ──
             exceptions = [
                 {"exception_type": "count_mismatch",        "location": "Cluster B-09",       "zone": "Zone-B", "root_cause": "ERP sync delay",   "description": "Physical count shows -5 bags vs ERP record.", "status": "open",         "severity": "high",   "sla_minutes": 60},
-                {"exception_type": "fifo_violation",        "location": "Zone B Cluster B2",  "zone": "Zone-B", "root_cause": "Manual override",   "description": "Batch B2025-1021 picked out of FIFO order.",  "status": "investigating","severity": "high",   "sla_minutes": 120},
+                {"exception_type": "fifo_violation",        "location": "Zone B Cluster B2",  "zone": "Zone-B", "root_cause": "Manual override",   "description": "Batch B2026-1021 picked out of FIFO order.",  "status": "investigating","severity": "high",   "sla_minutes": 120},
                 {"exception_type": "damaged_goods",         "location": "Zone C Bay 4",       "zone": "Zone-C", "root_cause": "Handling error",    "description": "5 bags torn during unloading. Est. loss ₹4,200.", "status": "open",      "severity": "medium", "sla_minutes": 30},
                 {"exception_type": "missing_documentation", "location": "Gate Entry",         "zone": "Entry Gate", "root_cause": "Driver oversight", "description": "Delivery challan missing for TN-04-AB-1234.", "status": "open",       "severity": "low",    "sla_minutes": 240},
             ]
@@ -561,33 +596,7 @@ async def seed_database(db_url: str | None = None):
                 })
             logger.info("Seeded 5 monitoring alerts")
 
-            # ── Sequencing Batches (fixed columns) ──
-            try:
-                async with db.begin_nested():
-                    seq_batches = [
-                        {"sku_code": "CEM-53", "product_name": "OPC Cement 53 Grade", "zone": "A", "rack": "A-01", "bin_location": "A-01-L1", "quantity": 498, "rule": "FIFO", "days": 365},
-                        {"sku_code": "FERT-DAP", "product_name": "DAP Fertilizer 50kg", "zone": "A", "rack": "A-03", "bin_location": "A-03-L2", "quantity": 320, "rule": "FEFO", "days": 180},
-                        {"sku_code": "CHEM-H2SO4", "product_name": "Sulfuric Acid Drums", "zone": "C", "rack": "C-01", "bin_location": "C-01-L1", "quantity": 50, "rule": "FIFO", "days": 730},
-                        {"sku_code": "STEEL-TMT", "product_name": "TMT Steel Bars 12mm", "zone": "B", "rack": "B-05", "bin_location": "B-05-L3", "quantity": 1200, "rule": "FIFO", "days": 9999},
-                        {"sku_code": "RICE-BAS", "product_name": "Basmati Rice 25kg", "zone": "D", "rack": "D-02", "bin_location": "D-02-L1", "quantity": 800, "rule": "FEFO", "days": 365},
-                    ]
-                    for sb in seq_batches:
-                        mfg = (now - timedelta(days=30)).date()
-                        exp = (now + timedelta(days=sb["days"])).date()
-                        days_to = sb["days"]
-                        await db.execute(text("""
-                            INSERT INTO depot_inventory_batches (id, batch_code, sku_code, product_name, zone, rack, bin_location, quantity, original_quantity, manufacture_date, expiry_date, received_at, sequencing_rule, priority_score, status, is_near_expiry, days_to_expiry, created_at, updated_at)
-                            VALUES (:id, :batch_code, :sku, :name, :zone, :rack, :bin, :qty, :qty, :mfg, :exp, :now, :rule, 0.0, 'active', :near, :days, :now, :now)
-                            ON CONFLICT DO NOTHING
-                        """), {
-                            "id": new_id(), "batch_code": f"B2026-{sb['sku_code']}", "sku": sb["sku_code"], "name": sb["product_name"],
-                            "zone": sb["zone"], "rack": sb["rack"], "bin": sb["bin_location"],
-                            "qty": sb["quantity"], "mfg": mfg, "exp": exp,
-                            "rule": sb["rule"], "near": days_to < 60, "days": days_to, "now": now,
-                        })
-                logger.info(f"Seeded {len(seq_batches)} sequencing batches")
-            except Exception as e:
-                logger.warning(f"Skipped sequencing batches: {e}")
+
 
             # ── Scorecard Entries ──
             try:

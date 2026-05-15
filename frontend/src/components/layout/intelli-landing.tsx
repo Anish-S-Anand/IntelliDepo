@@ -4,88 +4,52 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   Building2,
-  Zap,
-  Coffee,
-  Users,
   ArrowRight,
   Shield,
   BarChart3,
-  Eye,
-  Cpu,
+  Truck,
+  Package,
   Menu,
   X,
   ChevronDown,
+  Bell,
+  RefreshCw,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
+/* ── Only IntelliDepot ── */
 const PRODUCTS = [
-  {
-    id: "stream",
-    name: "IntelliStream",
-    tagline: "Financial Intelligence",
-    description:
-      "Real-time financial analytics, scenario planning, and macro pulse monitoring for strategic decision-making.",
-    icon: Zap,
-    color: "#3B82F6",
-    gradient: "from-blue-500/20 to-blue-600/5",
-    border: "rgba(59,130,246,0.3)",
-    href: "/platform/stream",
-  },
   {
     id: "depot",
     name: "IntelliDepot",
     tagline: "Warehouse Operations",
     description:
-      "AI-powered warehouse management with live cameras, inventory tracking, gate LPR, and incident response.",
+      "Comprehensive warehouse management with live camera monitoring, inventory tracking, gate management, and real-time incident response.",
     icon: Building2,
     color: "#E5521A",
     gradient: "from-orange-500/20 to-orange-600/5",
-    border: "rgba(229,82,26,0.3)",
+    border: "rgba(229,82,26,0.4)",
     href: "/platform/depot",
-  },
-  {
-    id: "cafe",
-    name: "IntelliCafe",
-    tagline: "Employee Engagement",
-    description:
-      "A modern employee engagement platform for culture, updates, recognition, and internal community.",
-    icon: Coffee,
-    color: "#22C55E",
-    gradient: "from-green-500/20 to-green-600/5",
-    border: "rgba(34,197,94,0.3)",
-    href: "/platform/cafe",
-  },
-  {
-    id: "recruit",
-    name: "IntelliRecruit",
-    tagline: "Talent Platform",
-    description:
-      "Hiring pipeline command, candidate intelligence, and collaborative recruiting decisions.",
-    icon: Users,
-    color: "#A855F7",
-    gradient: "from-purple-500/20 to-purple-600/5",
-    border: "rgba(168,85,247,0.3)",
-    href: "/platform/recruit",
   },
 ];
 
+/* ── Business-friendly stats (no technical jargon) ── */
 const STATS = [
-  { label: "AI Models Active", value: "12+", icon: Cpu, color: "#3B82F6" },
-  { label: "Camera Feeds", value: "6", icon: Eye, color: "#22C55E" },
-  { label: "Incidents Resolved", value: "99%", icon: Shield, color: "#E5521A" },
-  { label: "Analytics Dashboards", value: "8", icon: BarChart3, color: "#A855F7" },
+  { label: "Depots Managed",      value: "15+",  icon: Building2, color: "#E5521A" },
+  { label: "Trucks Tracked Daily", value: "200+", icon: Truck,     color: "#22C55E" },
+  { label: "Incidents Resolved",   value: "99%",  icon: Shield,    color: "#3B82F6" },
+  { label: "Accuracy Rate",        value: "99.8%",icon: BarChart3, color: "#A855F7" },
 ];
 
 export function IntelliLanding() {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const [visible, setVisible] = useState(false);
+  const [scrolled, setScrolled]             = useState(false);
+  const [visible, setVisible]               = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    // Trigger entrance animations
     const t = setTimeout(() => setVisible(true), 100);
     return () => clearTimeout(t);
   }, []);
@@ -97,141 +61,241 @@ export function IntelliLanding() {
   }, []);
 
   useEffect(() => {
-    // Ensure video plays on mobile (some browsers block autoplay)
-    if (videoRef.current) {
-      videoRef.current.play().catch(() => {});
-    }
+    videoRef.current?.play().catch(() => {});
   }, []);
 
   return (
     <div className="min-h-screen text-white overflow-x-hidden" style={{ background: "#010810" }}>
 
-      {/* ── Navigation ── */}
-      <nav
-        className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-8 lg:px-16 py-3 sm:py-4 transition-all duration-500 ${
+      {/* ══ TOPBAR — matches reference HTML exactly ══ */}
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 flex items-center gap-2.5 px-4 py-0 transition-all duration-500 ${
           scrolled
-            ? "bg-[#010810]/95 backdrop-blur-xl border-b border-white/8 shadow-2xl"
-            : "bg-transparent"
+            ? "bg-[#0B1220]/98 backdrop-blur-xl shadow-2xl"
+            : "bg-[#0B1220]/90 backdrop-blur-md"
         }`}
+        style={{
+          height: 60,
+          borderBottom: "1px solid #1C2D4F",
+        }}
       >
         {/* Logo */}
         <button
           onClick={() => router.push("/")}
-          className="flex items-center gap-2.5 group"
+          className="flex items-center gap-2.5 flex-shrink-0 group"
           aria-label="Home"
+          style={{ textDecoration: "none" }}
         >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-sm overflow-hidden flex-shrink-0 group-hover:border-[#E5521A]/50 transition-colors">
+          <div
+            className="flex items-center justify-center rounded-xl overflow-hidden flex-shrink-0"
+            style={{ width: 28, height: 28 }}
+          >
             <Image
               src="/fidelis-logo.png"
               alt="Fidelis"
               width={28}
               height={28}
-              className="w-6 h-6 sm:w-7 sm:h-7 object-contain"
+              className="object-contain"
+              style={{ filter: "drop-shadow(0 0 6px rgba(229,82,26,0.5))" }}
               priority
             />
           </div>
           <div>
-            <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.35em] text-[#E5521A] leading-none">
-              INTELLI
-            </p>
-            <p className="text-[8px] sm:text-[9px] uppercase tracking-[0.2em] text-white/40 leading-none mt-0.5">
-              A Fidelis Platform
-            </p>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#E5521A", letterSpacing: "-0.4px", lineHeight: 1.1 }}>
+              Fidelis
+            </div>
+            <div style={{ fontSize: 11, color: "#7A8FAE", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+              IntelliDepot™
+            </div>
           </div>
         </button>
 
-        {/* Desktop nav links */}
-        <div className="hidden lg:flex items-center gap-6">
-          {PRODUCTS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => router.push(p.href)}
-              className="text-[13px] text-white/50 hover:text-white transition-colors duration-200 font-semibold relative group"
-            >
-              {p.name}
-              <span
-                className="absolute -bottom-0.5 left-0 right-0 h-px scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"
-                style={{ background: p.color }}
-              />
-            </button>
-          ))}
+        {/* Vertical divider */}
+        <div style={{ width: 1, height: 24, background: "#1C2D4F", flexShrink: 0 }} />
+
+        {/* Depot selector */}
+        <select
+          className="depot-sel"
+          style={{
+            padding: "7px 12px",
+            background: "#0D1526",
+            border: "1px solid #1C2D4F",
+            borderRadius: 7,
+            color: "#E8EDF8",
+            fontSize: 15,
+            fontWeight: 700,
+            outline: "none",
+          }}
+        >
+          <option>📍 Mumbai Central</option>
+          <option>📍 Delhi North Hub</option>
+          <option>📍 Dubai South</option>
+        </select>
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* LIVE badge */}
+        <div
+          style={{
+            display: "flex", alignItems: "center", gap: 5,
+            padding: "6px 14px", borderRadius: 99,
+            background: "rgba(34,197,94,0.08)",
+            border: "1px solid rgba(34,197,94,0.2)",
+            fontSize: 14, fontWeight: 700, color: "#22C55E",
+            letterSpacing: "0.04em",
+          }}
+        >
+          <span
+            style={{
+              width: 7, height: 7, borderRadius: "50%",
+              background: "#22C55E",
+              animation: "blink 1.4s ease-in-out infinite",
+              display: "inline-block",
+            }}
+          />
+          LIVE
         </div>
 
-        {/* Right side */}
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
+        {/* Theme toggle */}
+        <ThemeToggle />
+
+        {/* Refresh */}
+        <button
+          title="Refresh"
+          style={{
+            width: 34, height: 34, borderRadius: 7,
+            border: "1px solid #1C2D4F",
+            background: "transparent", color: "#7A8FAE",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", flexShrink: 0,
+          }}
+        >
+          <RefreshCw size={16} />
+        </button>
+
+        {/* Alerts bell */}
+        <div style={{ position: "relative" }}>
           <button
             onClick={() => router.push("/login")}
-            className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#E5521A] hover:bg-[#FF7A42] text-white text-[13px] font-bold transition-all duration-200 shadow-[0_0_20px_rgba(229,82,26,0.3)] hover:shadow-[0_0_30px_rgba(229,82,26,0.5)] active:scale-95"
+            title="Alerts"
+            style={{
+              width: 34, height: 34, borderRadius: 7,
+              border: "1px solid #1C2D4F",
+              background: "transparent", color: "#7A8FAE",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", flexShrink: 0,
+            }}
           >
-            Sign In
-            <ArrowRight className="w-3.5 h-3.5" />
+            <Bell size={16} />
           </button>
-          {/* Mobile menu toggle */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden w-9 h-9 flex items-center justify-center text-white/60 hover:text-white transition rounded-lg border border-white/10 hover:border-white/20"
-            aria-label="Toggle menu"
+          <span
+            style={{
+              position: "absolute", top: -4, right: -4,
+              width: 16, height: 16, borderRadius: 99,
+              background: "#991B1B", color: "#fff",
+              fontSize: 9, fontWeight: 800,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              border: "2px solid #0B1220",
+            }}
           >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+            3
+          </span>
         </div>
-      </nav>
 
-      {/* Mobile menu */}
+        {/* Avatar / Sign In */}
+        <button
+          onClick={() => router.push("/login")}
+          style={{
+            width: 34, height: 34, borderRadius: 8,
+            background: "linear-gradient(135deg, #C43A08, #E5521A)",
+            color: "#fff", fontSize: 13, fontWeight: 700,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", flexShrink: 0,
+            border: "1px solid rgba(229,82,26,0.3)",
+          }}
+          title="Sign In"
+        >
+          AD
+        </button>
+
+        {/* Mobile menu toggle */}
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="lg:hidden"
+          style={{
+            width: 34, height: 34, borderRadius: 7,
+            border: "1px solid #1C2D4F",
+            background: "transparent", color: "#7A8FAE",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer",
+          }}
+          aria-label="Toggle menu"
+        >
+          {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
+      </header>
+
+      {/* Mobile dropdown menu */}
       <div
         className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
           mobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
-        style={{ paddingTop: "64px" }}
+        style={{ paddingTop: 64 }}
       >
-        <div className="bg-[#010810]/98 backdrop-blur-xl border-b border-white/8 px-4 py-4">
-          {PRODUCTS.map((p) => {
-            const Icon = p.icon;
-            return (
-              <button
-                key={p.id}
-                onClick={() => { router.push(p.href); setMobileMenuOpen(false); }}
-                className="w-full flex items-center gap-3 py-3 text-left border-b border-white/5 last:border-0 group"
-              >
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: `${p.color}20`, border: `1px solid ${p.color}30` }}
-                >
-                  <Icon className="w-4 h-4" style={{ color: p.color }} />
-                </div>
-                <div>
-                  <div className="text-[14px] font-bold text-white/80 group-hover:text-white transition">{p.name}</div>
-                  <div className="text-[11px] text-white/40">{p.tagline}</div>
-                </div>
-              </button>
-            );
-          })}
+        <div
+          style={{
+            background: "rgba(1,8,16,0.98)",
+            backdropFilter: "blur(16px)",
+            borderBottom: "1px solid #1C2D4F",
+            padding: "12px 16px",
+          }}
+        >
+          <button
+            onClick={() => { router.push("/platform/depot"); setMobileMenuOpen(false); }}
+            className="w-full flex items-center gap-3 py-3 text-left"
+          >
+            <div
+              style={{
+                width: 36, height: 36, borderRadius: 9,
+                background: "rgba(229,82,26,0.12)",
+                border: "1px solid rgba(229,82,26,0.25)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              <Building2 size={18} style={{ color: "#E5521A" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#E8EDF8" }}>IntelliDepot</div>
+              <div style={{ fontSize: 13, color: "#7A8FAE" }}>Warehouse Operations</div>
+            </div>
+          </button>
           <button
             onClick={() => { router.push("/login"); setMobileMenuOpen(false); }}
-            className="w-full mt-3 py-3 rounded-xl bg-[#E5521A] text-white font-bold text-[14px] transition active:scale-95"
+            className="w-full mt-3 py-3 rounded-xl text-white font-bold text-base transition active:scale-95"
+            style={{ background: "#E5521A", fontSize: 16 }}
           >
             Sign In
           </button>
         </div>
       </div>
 
-      {/* ── Hero Section with Video ── */}
-      <section className="relative h-screen min-h-[600px] max-h-[1000px] flex flex-col items-center justify-center overflow-hidden">
-        {/* Looping background video */}
+      {/* ══ Hero Section ══ */}
+      <section
+        className="relative flex flex-col items-center justify-center overflow-hidden"
+        style={{ height: "100vh", minHeight: 600, maxHeight: 1000 }}
+      >
+        {/* Background video */}
         <video
           ref={videoRef}
-          autoPlay
-          loop
-          muted
-          playsInline
+          autoPlay loop muted playsInline
           className="absolute inset-0 w-full h-full object-cover"
           style={{ zIndex: 0 }}
         >
           <source src="/logo_intro.mp4" type="video/mp4" />
         </video>
 
-        {/* Gradient overlays for text readability */}
+        {/* Gradient overlays */}
         <div className="absolute inset-0 z-10" style={{
           background: "linear-gradient(to bottom, rgba(1,8,16,0.55) 0%, rgba(1,8,16,0.3) 40%, rgba(1,8,16,0.7) 85%, rgba(1,8,16,1) 100%)"
         }} />
@@ -246,100 +310,153 @@ export function IntelliLanding() {
           }`}
         >
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#E5521A]/30 bg-[#E5521A]/10 backdrop-blur-sm text-[#E5521A] text-[10px] sm:text-[11px] font-bold uppercase tracking-widest mb-6 sm:mb-8">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#E5521A] animate-pulse" />
-            AI-Powered Enterprise Platform
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            padding: "8px 18px", borderRadius: 99,
+            border: "1px solid rgba(229,82,26,0.3)",
+            background: "rgba(229,82,26,0.10)",
+            color: "#E5521A", fontSize: 13, fontWeight: 800,
+            textTransform: "uppercase", letterSpacing: "0.12em",
+            marginBottom: 28,
+          }}>
+            <span style={{
+              width: 7, height: 7, borderRadius: "50%",
+              background: "#E5521A", display: "inline-block",
+              animation: "blink 1.4s ease-in-out infinite",
+            }} />
+            Smart Warehouse Platform
           </div>
 
           {/* Headline */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black tracking-tight mb-5 sm:mb-7 leading-[1.02]">
-            <span className="text-white drop-shadow-2xl">The Intelligence</span>
+          <h1 style={{
+            fontSize: "clamp(2.6rem, 6vw, 5.5rem)",
+            fontWeight: 900, letterSpacing: "-0.03em",
+            lineHeight: 1.05, marginBottom: 24,
+          }}>
+            <span style={{ color: "#fff" }}>Intelligent Depot</span>
             <br />
             <span
-              className="bg-clip-text text-transparent"
               style={{
                 backgroundImage: "linear-gradient(135deg, #E5521A 0%, #FF9A6C 40%, #FFD4B8 60%, #E5521A 100%)",
                 backgroundSize: "200% 200%",
                 animation: "gradient-shift 4s ease infinite",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
               }}
             >
-              Platform for Fidelis
+              Operations by Fidelis
             </span>
           </h1>
 
-          <p
-            className="text-base sm:text-lg lg:text-xl text-white/60 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed px-2"
-            style={{ transitionDelay: "200ms" }}
-          >
-            One unified platform combining warehouse operations, financial intelligence,
-            employee engagement, and talent management — all powered by AI.
+          <p style={{
+            fontSize: "clamp(1rem, 2vw, 1.25rem)",
+            color: "rgba(255,255,255,0.65)",
+            maxWidth: 640, margin: "0 auto 36px",
+            lineHeight: 1.7,
+          }}>
+            Manage your entire depot with live cameras, smart inventory tracking,
+            automated gate entry, and real-time alerts — all from one screen.
           </p>
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <button
               onClick={() => router.push("/login")}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-7 sm:px-8 py-3.5 rounded-2xl bg-[#E5521A] hover:bg-[#FF7A42] text-white font-black text-[15px] transition-all duration-200 shadow-[0_0_50px_rgba(229,82,26,0.4)] hover:shadow-[0_0_70px_rgba(229,82,26,0.6)] active:scale-[0.98]"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                gap: 8, padding: "14px 32px", borderRadius: 14,
+                background: "#E5521A", color: "#fff",
+                fontWeight: 800, fontSize: 17,
+                boxShadow: "0 0 50px rgba(229,82,26,0.4)",
+                border: "none", cursor: "pointer",
+                transition: "all 0.2s",
+              }}
             >
               Get Started
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight size={18} />
             </button>
             <button
               onClick={() => router.push("/platform/depot")}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-7 sm:px-8 py-3.5 rounded-2xl border border-white/20 text-white/70 hover:text-white hover:border-white/40 hover:bg-white/5 font-bold text-[15px] transition-all duration-200 backdrop-blur-sm active:scale-[0.98]"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                gap: 8, padding: "14px 32px", borderRadius: 14,
+                border: "1px solid rgba(255,255,255,0.25)",
+                color: "rgba(255,255,255,0.75)", background: "rgba(255,255,255,0.05)",
+                fontWeight: 700, fontSize: 17, cursor: "pointer",
+                backdropFilter: "blur(8px)", transition: "all 0.2s",
+              }}
             >
-              Explore IntelliDepot
+              <Package size={18} />
+              Open IntelliDepot
             </button>
           </div>
         </div>
 
         {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 text-white/30 animate-bounce">
-          <span className="text-[10px] font-bold uppercase tracking-widest">Scroll</span>
-          <ChevronDown className="w-4 h-4" />
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 animate-bounce"
+          style={{ color: "rgba(255,255,255,0.3)" }}>
+          <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em" }}>Scroll</span>
+          <ChevronDown size={16} />
         </div>
       </section>
 
-      {/* Gradient animation keyframe */}
+      {/* Animations */}
       <style>{`
         @keyframes gradient-shift {
           0%, 100% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
         }
-        @keyframes stat-count {
-          from { opacity: 0; transform: translateY(16px); }
-          to   { opacity: 1; transform: translateY(0); }
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
         }
       `}</style>
 
-      {/* ── Stats Bar ── */}
-      <section className="relative z-10 px-4 sm:px-8 lg:px-16 py-10 sm:py-14">
-        <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+      {/* ══ Stats Bar ══ */}
+      <section style={{ position: "relative", zIndex: 10, padding: "48px 16px" }}>
+        <div
+          style={{
+            maxWidth: 800, margin: "0 auto",
+            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: 14,
+          }}
+        >
           {STATS.map((stat, i) => {
             const Icon = stat.icon;
             return (
               <div
                 key={stat.label}
-                className="flex flex-col items-center gap-2 p-4 sm:p-5 rounded-2xl border backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group"
                 style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+                  padding: "22px 12px", borderRadius: 18,
                   background: "rgba(255,255,255,0.03)",
-                  borderColor: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  backdropFilter: "blur(8px)",
+                  transition: "transform 0.3s, box-shadow 0.3s",
                   animationDelay: `${i * 100}ms`,
+                  cursor: "default",
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLDivElement).style.transform = "translateY(-4px)";
+                  (e.currentTarget as HTMLDivElement).style.boxShadow = `0 12px 32px ${stat.color}20`;
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
+                  (e.currentTarget as HTMLDivElement).style.boxShadow = "none";
                 }}
               >
-                <div
-                  className="w-9 h-9 rounded-xl flex items-center justify-center mb-1"
-                  style={{ background: `${stat.color}15`, border: `1px solid ${stat.color}30` }}
-                >
-                  <Icon className="w-4 h-4" style={{ color: stat.color }} />
+                <div style={{
+                  width: 40, height: 40, borderRadius: 11,
+                  background: `${stat.color}15`, border: `1px solid ${stat.color}30`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Icon size={18} style={{ color: stat.color }} />
                 </div>
-                <div
-                  className="text-2xl sm:text-3xl font-black"
-                  style={{ color: stat.color }}
-                >
+                <div style={{ fontSize: 30, fontWeight: 900, color: stat.color, letterSpacing: "-0.5px" }}>
                   {stat.value}
                 </div>
-                <div className="text-[10px] sm:text-[11px] text-white/40 text-center leading-tight font-semibold">
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", textAlign: "center", fontWeight: 700, lineHeight: 1.3 }}>
                   {stat.label}
                 </div>
               </div>
@@ -348,120 +465,151 @@ export function IntelliLanding() {
         </div>
       </section>
 
-      {/* ── Divider ── */}
-      <div className="px-8 lg:px-16 max-w-6xl mx-auto">
-        <div className="h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(229,82,26,0.4), transparent)" }} />
+      {/* ══ Divider ══ */}
+      <div style={{ padding: "0 32px", maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ height: 1, background: "linear-gradient(90deg, transparent, rgba(229,82,26,0.4), transparent)" }} />
       </div>
 
-      {/* ── Products Grid ── */}
-      <section className="relative z-10 px-4 sm:px-8 lg:px-16 py-14 sm:py-20">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-10 sm:mb-14">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.03] text-white/40 text-[10px] font-bold uppercase tracking-widest mb-4">
-              Platform Suite
+      {/* ══ IntelliDepot Feature Section ══ */}
+      <section style={{ position: "relative", zIndex: 10, padding: "64px 16px 80px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 48 }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "6px 16px", borderRadius: 99,
+              border: "1px solid rgba(255,255,255,0.1)",
+              background: "rgba(255,255,255,0.03)",
+              color: "rgba(255,255,255,0.45)", fontSize: 13, fontWeight: 700,
+              textTransform: "uppercase", letterSpacing: "0.12em",
+              marginBottom: 18,
+            }}>
+              Platform
             </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white mb-3">
-              Four Powerful Applications
+            <h2 style={{
+              fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)",
+              fontWeight: 900, color: "#fff", marginBottom: 14, letterSpacing: "-0.02em",
+            }}>
+              IntelliDepot — One Platform, Full Control
             </h2>
-            <p className="text-white/40 text-[13px] sm:text-[15px] max-w-xl mx-auto">
-              Each module is purpose-built for its domain, seamlessly integrated across the Fidelis enterprise.
+            <p style={{
+              color: "rgba(255,255,255,0.45)", fontSize: 17, maxWidth: 560, margin: "0 auto",
+              lineHeight: 1.7,
+            }}>
+              Purpose-built for warehouse operations — seamlessly integrated across the Fidelis enterprise.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-            {PRODUCTS.map((product, i) => {
-              const Icon = product.icon;
-              return (
-                <button
-                  key={product.id}
-                  onClick={() => router.push(product.href)}
-                  className={`group text-left p-5 sm:p-7 rounded-3xl border transition-all duration-400 hover:-translate-y-1.5 active:scale-[0.98] relative overflow-hidden`}
-                  style={{
-                    background: `linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)`,
-                    borderColor: "rgba(255,255,255,0.08)",
-                    animationDelay: `${i * 80}ms`,
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = product.border;
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 20px 60px ${product.color}20`;
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.08)";
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
-                  }}
-                >
-                  {/* Background glow */}
-                  <div
-                    className="absolute -top-20 -right-20 w-48 h-48 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                    style={{ background: `${product.color}15` }}
-                  />
+          {/* Single large product card */}
+          {PRODUCTS.map((product) => {
+            const Icon = product.icon;
+            return (
+              <button
+                key={product.id}
+                onClick={() => router.push(product.href)}
+                style={{
+                  width: "100%", textAlign: "left",
+                  padding: "36px 40px", borderRadius: 28,
+                  background: "linear-gradient(135deg, rgba(229,82,26,0.08) 0%, rgba(255,255,255,0.02) 100%)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  cursor: "pointer", position: "relative", overflow: "hidden",
+                  transition: "all 0.3s",
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = product.border;
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 24px 72px ${product.color}25`;
+                  (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-4px)";
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.08)";
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
+                  (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+                }}
+              >
+                {/* Background glow */}
+                <div style={{
+                  position: "absolute", top: -80, right: -80,
+                  width: 300, height: 300, borderRadius: "50%",
+                  background: `${product.color}12`, filter: "blur(60px)",
+                  pointerEvents: "none",
+                }} />
 
-                  <div className="relative z-10">
-                    <div className="flex items-start gap-4 mb-4">
-                      <div
-                        className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110"
-                        style={{
-                          background: `${product.color}18`,
-                          border: `1px solid ${product.color}35`,
-                        }}
-                      >
-                        <Icon className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: product.color }} />
-                      </div>
-                      <div>
-                        <div
-                          className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest mb-1"
-                          style={{ color: product.color }}
-                        >
-                          {product.tagline}
-                        </div>
-                        <h3 className="text-[17px] sm:text-[19px] font-black text-white">
-                          {product.name}
-                        </h3>
-                      </div>
+                <div style={{ position: "relative", zIndex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 20, marginBottom: 20 }}>
+                    <div style={{
+                      width: 56, height: 56, borderRadius: 16,
+                      background: `${product.color}18`,
+                      border: `1px solid ${product.color}35`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      <Icon size={26} style={{ color: product.color }} />
                     </div>
-                    <p className="text-[12px] sm:text-[13px] text-white/45 leading-relaxed mb-5">
-                      {product.description}
-                    </p>
-                    <div
-                      className="flex items-center gap-1.5 text-[12px] font-black group-hover:gap-3 transition-all duration-200"
-                      style={{ color: product.color }}
-                    >
-                      Launch Application
-                      <ArrowRight className="w-3.5 h-3.5" />
+                    <div>
+                      <div style={{
+                        fontSize: 13, fontWeight: 800, textTransform: "uppercase",
+                        letterSpacing: "0.12em", color: product.color, marginBottom: 6,
+                      }}>
+                        {product.tagline}
+                      </div>
+                      <h3 style={{ fontSize: 26, fontWeight: 900, color: "#fff", letterSpacing: "-0.02em" }}>
+                        {product.name}
+                      </h3>
                     </div>
                   </div>
-                </button>
-              );
-            })}
-          </div>
+                  <p style={{
+                    fontSize: 16, color: "rgba(255,255,255,0.55)", lineHeight: 1.8, marginBottom: 28,
+                    maxWidth: 580,
+                  }}>
+                    {product.description}
+                  </p>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    fontSize: 16, fontWeight: 800, color: product.color,
+                  }}>
+                    Launch Application
+                    <ArrowRight size={18} />
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </section>
 
-      {/* ── Footer ── */}
+      {/* ══ Footer ══ */}
       <footer
-        className="relative z-10 border-t px-4 sm:px-8 lg:px-16 py-7 sm:py-9"
-        style={{ borderColor: "rgba(255,255,255,0.06)" }}
+        style={{
+          position: "relative", zIndex: 10,
+          borderTop: "1px solid rgba(255,255,255,0.06)",
+          padding: "28px 16px",
+        }}
       >
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-5 h-5 rounded overflow-hidden flex-shrink-0">
+        <div style={{
+          maxWidth: 1200, margin: "0 auto",
+          display: "flex", flexWrap: "wrap",
+          alignItems: "center", justifyContent: "space-between", gap: 12,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 20, height: 20, borderRadius: 4, overflow: "hidden", flexShrink: 0 }}>
               <Image
                 src="/fidelis-logo.png"
                 alt="Fidelis"
                 width={20}
                 height={20}
-                className="w-5 h-5 object-contain opacity-50"
+                className="object-contain opacity-50"
               />
             </div>
-            <span className="text-[11px] sm:text-[12px] text-white/25 text-center sm:text-left">
-              Fidelis Platform · INTELLI Intelligence Suite · {new Date().getFullYear()}
+            <span style={{ fontSize: 13, color: "rgba(255,255,255,0.28)" }}>
+              Fidelis Platform · IntelliDepot™ · {new Date().getFullYear()}
             </span>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5 text-[11px] text-white/25">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              All systems operational
-            </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "rgba(255,255,255,0.28)" }}>
+            <span style={{
+              width: 7, height: 7, borderRadius: "50%",
+              background: "#22C55E", display: "inline-block",
+              animation: "blink 1.4s ease-in-out infinite",
+            }} />
+            All systems operational
           </div>
         </div>
       </footer>

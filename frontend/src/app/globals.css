@@ -11,6 +11,16 @@
 @layer base {
   /* ── Light Theme (default) ─────────────────────────────── */
   :root {
+    /* Typography System Variables - Requirements 1.3, 1.4, 1.5, 1.7, 1.9 */
+    --font-family: var(--font-inter), 'Inter', 'Arial', 'Helvetica Neue', 'Helvetica', sans-serif;
+    --font-size-base: 16px;
+    --line-height-base: 1.6;
+    --line-height-heading: 1.2;
+    --font-weight-body: 500;
+    --font-weight-label: 600;
+    --font-weight-button: 700;
+    --font-weight-heading: 800;
+    
     /* Page — warm off-white, clearly NOT dark */
     --bg-page:          #F0F4FA;
     --bg-page-2:        #E8EDF7;
@@ -169,23 +179,74 @@
   body {
     background-color: var(--bg-page);
     color: var(--text-primary);
-    font-family: "Arial", "Helvetica Neue", "Helvetica", sans-serif;
-    font-weight: 700;
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-body);
+    line-height: var(--line-height-base);
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.25s ease, color 0.25s ease;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: "Arial", "Helvetica Neue", "Helvetica", sans-serif;
-    font-weight: 800;
+    font-family: var(--font-family);
+    font-weight: var(--font-weight-heading);
     color: var(--text-primary);
+    line-height: var(--line-height-heading);
+  }
+
+  /* Heading Size System - Requirements 1.4, 1.6, 1.8 */
+  h1 { 
+    font-size: 26px; 
+    font-weight: 800; 
+    line-height: 1.2; 
+    letter-spacing: -0.4px; 
+  }
+  
+  h2 { 
+    font-size: 22px; 
+    font-weight: 800; 
+    line-height: 1.2; 
+    letter-spacing: -0.3px; 
+  }
+  
+  h3 { 
+    font-size: 18px; 
+    font-weight: 800; 
+    line-height: 1.2; 
+    letter-spacing: -0.2px; 
+  }
+  
+  h4 { 
+    font-size: 16px; 
+    font-weight: 800; 
+    line-height: 1.2; 
+    letter-spacing: -0.1px; 
+  }
+  
+  h5 { 
+    font-size: 14px; 
+    font-weight: 800; 
+    line-height: 1.2; 
+  }
+  
+  h6 { 
+    font-size: 13px; 
+    font-weight: 800; 
+    line-height: 1.2; 
   }
 
   p, span, label, input, textarea, select, button, a, li, td, th, div {
-    font-family: "Arial", "Helvetica Neue", "Helvetica", sans-serif;
-    font-weight: 700;
+    font-family: var(--font-family);
   }
+
+  /* Ensure body text is always readable */
+  p { font-size: 1rem; font-weight: var(--font-weight-body); line-height: 1.7; }
+  label { font-size: 0.95rem; font-weight: var(--font-weight-label); }
+  input, select, textarea { font-size: 1rem; font-weight: var(--font-weight-body); }
+  button { font-size: 1rem; font-weight: var(--font-weight-button); }
+  td, th { font-size: 0.95rem; }
 
   ::selection {
     background-color: rgba(229, 82, 26, 0.2);
@@ -247,17 +308,19 @@
 
 .depot-sidebar {
   width: 204px;
+  padding: 10px 8px;
+  gap: 3px;
   background-color: var(--bg-nav) !important;
   border-right-color: var(--bg-nav-border) !important;
   transition: transform 0.3s ease, background-color 0.25s ease, border-color 0.25s ease;
 }
 
 .depot-sidebar-item {
-  color: var(--text-nav) !important;
   min-height: 50px;
   padding: 0 13px;
   gap: 10px;
-  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  color: var(--text-nav) !important;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease !important;
 }
 
 .depot-sidebar-item:hover {
@@ -268,7 +331,7 @@
 
 .depot-sidebar-item.active {
   background-color: rgba(229,82,26,0.12) !important;
-  color: var(--accent) !important;
+  color: #E5521A !important;
   border-color: rgba(229,82,26,0.22) !important;
 }
 
@@ -277,10 +340,10 @@
   position: absolute;
   left: -9px;
   top: 50%;
-  transform: translateY(-50%);
   width: 4px;
   height: 28px;
-  background: var(--accent);
+  transform: translateY(-50%);
+  background: #E5521A;
   border-radius: 0 3px 3px 0;
   transition: opacity 0.18s ease;
 }
@@ -559,6 +622,7 @@ html:not(.dark) .depot-topbar {
 
 html:not(.dark) .depot-sidebar-item {
   color: #374151 !important;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease !important;
 }
 
 html:not(.dark) .depot-sidebar-item:hover {
@@ -591,28 +655,38 @@ main {
   transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }
 
+.depot-page-transition {
+  animation: fadeIn 0.2s ease-out both;
+}
+
+@media (min-width: 768px) {
+  .depot-sidebar {
+    transform: translateX(0) !important;
+  }
+}
+
 canvas, video, img {
   transition: none !important;
 }
 
-/* ── Universal Arial Bold ── */
+/* ── Universal Inter Font — clear, legible for all users ── */
 *, *::before, *::after {
-  font-family: "Arial", "Helvetica Neue", "Helvetica", sans-serif !important;
-  font-weight: 700 !important;
+  font-family: var(--font-family) !important;
 }
 
 canvas, video, img, svg {
   font-family: inherit;
 }
 
+
 /* ============================================================
    MOBILE RESPONSIVE
    ============================================================ */
-@media (max-width: 640px) {
+@media (max-width: 767px) {
   .depot-sidebar {
     position: fixed !important;
     z-index: 40;
-    width: 280px !important;
+    width: 204px !important;
     transform: translateX(-100%);
     transition: transform 0.3s ease !important;
   }

@@ -25,7 +25,7 @@
  * - Visual element rendering (KPI cards, charts, tables)
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Test Utilities and Simulation Functions
@@ -89,6 +89,8 @@ interface ThemeBehavior {
 }
 
 function simulateThemeSwitching(component: string, theme: 'light' | 'dark'): ThemeBehavior {
+  void component;
+  void theme;
   // Simulate theme switching observed in unfixed code
   // All components use CSS variables: var(--bg-card), var(--text-primary), etc.
   // ThemeToggle component updates CSS variables on document root
@@ -129,9 +131,9 @@ function simulateRoleBasedAccess(role: 'admin' | 'warehouse_manager' | 'regional
   // DepotSidebar has different nav item arrays for different roles
   
   const navItemsByRole: Record<string, string[]> = {
-    'admin': ['CMD', 'OPS', 'INV', 'VIS', 'CNT', 'MAP', 'SEQ', 'GTE', 'INC'],
-    'warehouse_manager': ['OPS', 'VIS', 'GTE', 'INC', 'INV'],
-    'regional_manager': ['OPS', 'VIS', 'CMD', 'GTE', 'INC', 'INV'],
+    'admin': ['CMD', 'OPS', 'INV', 'CAM', 'CNT', 'MAP', 'GTE', 'INC'],
+    'warehouse_manager': ['OPS', 'CAM', 'GTE', 'INC', 'INV'],
+    'regional_manager': ['OPS', 'CAM', 'CMD', 'GTE', 'INC', 'INV'],
   };
   
   return {
@@ -158,6 +160,7 @@ interface RefreshBehavior {
 }
 
 function simulateRefreshButton(currentPage: string): RefreshBehavior {
+  void currentPage;
   // Simulate refresh button behavior observed in unfixed code
   // Note: Current implementation may not have full refresh logic
   // This test captures the EXPECTED behavior to preserve
@@ -213,6 +216,7 @@ interface BrowserNavigationBehavior {
 }
 
 function simulateBrowserNavigation(action: 'back' | 'forward'): BrowserNavigationBehavior {
+  void action;
   // Simulate browser navigation observed in unfixed code
   // Next.js router handles back/forward navigation
   
@@ -276,6 +280,7 @@ interface ErrorHandlingBehavior {
 }
 
 function simulateAPIFailure(endpoint: string): ErrorHandlingBehavior {
+  void endpoint;
   // Simulate error handling observed in unfixed code
   // ExecutiveDashboard: Promise.allSettled - continues even if some calls fail
   // DepotSidebar: try/catch with fallback setAlertCount(3)
@@ -309,6 +314,7 @@ interface VisualRenderingBehavior {
 }
 
 function simulateVisualRendering(component: 'kpi-cards' | 'charts' | 'tables'): VisualRenderingBehavior {
+  void component;
   // Simulate visual rendering observed in unfixed code
   // All components use CSS variables for theming
   // Animations: fadeIn, hover effects, transitions
@@ -434,14 +440,14 @@ describe('Preservation Property Tests - Existing Functionality', () => {
       
       // ASSERTION: Warehouse managers should see specific tabs
       expect(access.visibleNavItems).toContain('OPS');
-      expect(access.visibleNavItems).toContain('VIS');
+      expect(access.visibleNavItems).toContain('CAM');
       expect(access.visibleNavItems).toContain('GTE');
       expect(access.visibleNavItems).toContain('INC');
       expect(access.visibleNavItems).toContain('INV');
       
       // ASSERTION: Warehouse managers should NOT see all tabs
       expect(access.visibleNavItems).not.toContain('CMD');
-      expect(access.visibleNavItems.length).toBeLessThan(9); // Less than admin
+      expect(access.visibleNavItems.length).toBeLessThan(8); // Less than admin
     });
     
     it('should show different tabs for regional managers', () => {
@@ -453,7 +459,7 @@ describe('Preservation Property Tests - Existing Functionality', () => {
       
       // ASSERTION: Regional managers should see specific tabs
       expect(access.visibleNavItems).toContain('OPS');
-      expect(access.visibleNavItems).toContain('VIS');
+      expect(access.visibleNavItems).toContain('CAM');
       expect(access.visibleNavItems).toContain('CMD');
       expect(access.visibleNavItems).toContain('GTE');
       expect(access.visibleNavItems).toContain('INC');
@@ -471,14 +477,13 @@ describe('Preservation Property Tests - Existing Functionality', () => {
       expect(access.accessControlEnforced).toBe(true);
       
       // ASSERTION: Admins should see all tabs
-      expect(access.visibleNavItems.length).toBe(9);
+      expect(access.visibleNavItems.length).toBe(8);
       expect(access.visibleNavItems).toContain('CMD');
       expect(access.visibleNavItems).toContain('OPS');
       expect(access.visibleNavItems).toContain('INV');
-      expect(access.visibleNavItems).toContain('VIS');
+      expect(access.visibleNavItems).toContain('CAM');
       expect(access.visibleNavItems).toContain('CNT');
       expect(access.visibleNavItems).toContain('MAP');
-      expect(access.visibleNavItems).toContain('SEQ');
       expect(access.visibleNavItems).toContain('GTE');
       expect(access.visibleNavItems).toContain('INC');
     });
@@ -742,7 +747,7 @@ describe('Preservation Property Tests - Existing Functionality', () => {
       
       const tabs = ['dashboard', 'inventory', 'vision', 'counting', 'gate'];
       
-      tabs.forEach(tab => {
+      tabs.forEach(() => {
         const behavior = simulateVisualRendering('kpi-cards');
         
         // ASSERTION: Content should render correctly

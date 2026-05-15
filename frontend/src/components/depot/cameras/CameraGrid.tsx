@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { VideoFeed } from "./VideoFeed";
 import { ModelProvider, useCocoSsd } from "@/hooks/useCocoSsd";
 import { Camera, ShieldCheck, Truck, AlertTriangle, Users, Package } from "lucide-react";
@@ -12,12 +12,10 @@ interface CameraData {
   videoFile?: string;
 }
 
-const GATE_EXIT_SOUTH_VIDEO = "Theft Camera .mp4";
-
 // Exactly 6 cameras — no more, no less
 // UPDATED: All cameras live with different raw videos (no detection overlays)
 const FALLBACK_CAMERAS: CameraData[] = [
-  { id: "gate-entry-north", name: "Gate Entry North - LPR", videoFile: "Screen Recording 2025-05-22 164244.mp4" },
+  { id: "gate-entry-north", name: "Gate Entry North", videoFile: "Screen Recording 2025-05-22 164244.mp4" },
   { id: "zone-a-overhead", name: "Zone A Overhead", videoFile: "Screen Recording 2025-08-11 173926.mp4" },
   { id: "loading-bay-1-4", name: "Loading Bay 1-4", videoFile: "Screen Recording 2025-07-30 115414.mp4" },
   { id: "zone-c-perimeter", name: "Zone C Perimeter", videoFile: "Recording 2025-07-30 115417.mp4" },
@@ -25,18 +23,10 @@ const FALLBACK_CAMERAS: CameraData[] = [
   { id: "yard-overview", name: "Yard Overview", videoFile: "Recording 2025-08-11 171805.mp4" },
 ];
 
-function getBackendBase(): string {
-  if (typeof window !== "undefined") {
-    return `${window.location.protocol}//${window.location.hostname}:8000`;
-  }
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-}
-
 interface DetectionCounts {
   vehicles: number;
   workers: number;
   cementBags: number;
-  plates: string[];
 }
 
 function ModelStatus() {
@@ -53,21 +43,20 @@ function ModelStatus() {
     return (
       <span className="flex items-center gap-1.5 rounded bg-blue-500/20 px-2 py-1 text-[10px] text-blue-400">
         <span className="inline-block h-2 w-2 animate-spin rounded-full border border-blue-400 border-t-transparent" />
-        Loading AI models...
+        Loading Cameras...
       </span>
     );
   }
   return (
     <span className="flex items-center gap-1.5 rounded bg-green-500/20 px-2 py-1 text-[10px] text-green-400">
-      <ShieldCheck size={12} /> AI Detection Active
+      <ShieldCheck size={12} /> Cameras active
     </span>
   );
 }
 
 function CameraGridInner() {
-  const [cameras, setCameras] = useState<CameraData[]>(FALLBACK_CAMERAS);
+  const [cameras] = useState<CameraData[]>(FALLBACK_CAMERAS);
   const [detections, setDetections] = useState<Record<number, DetectionCounts>>({});
-  const [plateLog, setPlateLog] = useState<Array<{ time: string; camera: string; plate: string }>>([]);
 
   // DISABLED: Don't fetch cameras from backend - use fallback cameras only
   // The backend database has cameras configured with videos that don't exist in backend/tmp
@@ -117,7 +106,7 @@ function CameraGridInner() {
   // }, []);
 
   const handleDetectionUpdate = useCallback(
-    (cameraIndex: number, cameraName: string) =>
+    (cameraIndex: number) =>
       (vehicles: Array<{ bbox: [number, number, number, number]; class: string; score: number }>) => {
         // Classify detections: vehicles, persons (workers), and bags
         const vehicleClasses = ["car", "truck", "bus", "motorcycle", "bicycle", "vehicle"];
@@ -142,27 +131,9 @@ function CameraGridInner() {
             vehicles: vehicleCount,
             workers: workerCount,
             cementBags: bagCount,
-            plates: prev[cameraIndex]?.plates || [],
           },
         }));
       },
-    [],
-  );
-
-  const handlePlateDetected = useCallback(
-    (cameraIndex: number, cameraName: string, plate: string) => {
-      setPlateLog((prev) => [
-        { time: new Date().toLocaleTimeString(), camera: cameraName, plate },
-        ...prev.slice(0, 19),
-      ]);
-      setDetections((prev) => ({
-        ...prev,
-        [cameraIndex]: {
-          ...(prev[cameraIndex] || { vehicles: 0, workers: 0, cementBags: 0, plates: [] }),
-          plates: [plate, ...(prev[cameraIndex]?.plates || []).slice(0, 4)],
-        },
-      }));
-    },
     [],
   );
 
@@ -185,46 +156,6 @@ function CameraGridInner() {
         <ModelStatus />
       </div>
 
-      {/* Metrics bar */}
-      <div className="flex gap-2 flex-wrap">
-        <div className="flex items-center gap-2 rounded bg-[#111827] px-3 py-1.5">
-          <Truck size={14} className="text-[#3fb950]" />
-          <div>
-            <div className="text-[10px] text-white/50">Vehicles</div>
-            <div className="text-sm font-bold text-white">{totalVehicles}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 rounded bg-[#111827] px-3 py-1.5">
-          <Users size={14} className="text-blue-400" />
-          <div>
-            <div className="text-[10px] text-white/50">Workers</div>
-            <div className="text-sm font-bold text-white">{totalWorkers}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 rounded bg-[#111827] px-3 py-1.5">
-          <Package size={14} className="text-amber-400" />
-          <div>
-            <div className="text-[10px] text-white/50">Cement Bags</div>
-            <div className="text-sm font-bold text-white">{totalBags}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 rounded bg-[#111827] px-3 py-1.5">
-          <Camera size={14} className="text-blue-400" />
-          <div>
-            <div className="text-[10px] text-white/50">Active Feeds</div>
-            <div className="text-sm font-bold text-white">{activeCameras}</div>
-          </div>
-        </div>
-        {plateLog.length > 0 && (
-          <div className="flex items-center gap-2 rounded bg-[#111827] px-3 py-1.5">
-            <ShieldCheck size={14} className="text-amber-400" />
-            <div>
-              <div className="text-[10px] text-white/50">Plates Detected</div>
-              <div className="text-sm font-bold text-white">{plateLog.length}</div>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Camera grid — exactly 3x2 = 6 cameras */}
       <div className="grid flex-1 grid-cols-3 gap-2">
@@ -239,8 +170,7 @@ function CameraGridInner() {
                 videoFile={cam.videoFile}
                 cameraIndex={i}
                 offline={isOffline}
-                onDetectionUpdate={handleDetectionUpdate(i, cam.name)}
-                onPlateDetected={(plate) => handlePlateDetected(i, cam.name, plate)}
+                onDetectionUpdate={handleDetectionUpdate(i)}
               />
               {/* Detection overlay badges - only show for online cameras */}
               {!isOffline && (
@@ -262,19 +192,10 @@ function CameraGridInner() {
                   )}
                 </div>
               )}
-              {/* Latest plate - only show for online cameras */}
-              {!isOffline && det?.plates?.[0] && (
-                <div className="absolute right-1 top-1 rounded bg-white/90 px-1.5 py-0.5 text-[9px] font-bold text-black">
-                  🚗 {det.plates[0]}
-                </div>
-              )}
             </div>
           );
         })}
       </div>
-
-      {/* LPR Log Section removed to maximize video feed space */}
-      {/* plateLog state and handlePlateDetected callback preserved for future features */}
     </div>
   );
 }

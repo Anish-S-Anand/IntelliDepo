@@ -35,6 +35,10 @@ from app.shared.models.user import User
 
 logger = logging.getLogger("intelli.depot.detection")
 ALLOW_SIMULATED_VISION = os.getenv("ALLOW_SIMULATED_VISION", "false").lower() in {"1", "true", "yes"}
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
+PROJECT_CEMENT_BAG_WEIGHTS = PROJECT_ROOT / "best_cement_bags_2025-05-29.pt"
+PROJECT_DEPOT_BEST_WEIGHTS = Path(__file__).resolve().parent / "training_data" / "weights" / "depot_best.pt"
+PROJECT_GENERAL_WEIGHTS = PROJECT_ROOT / "backend" / "yolov8n.pt"
 
 
 def _default_yolo_weights() -> str:
@@ -43,6 +47,9 @@ def _default_yolo_weights() -> str:
         return env_weights
 
     candidates = [
+        str(PROJECT_CEMENT_BAG_WEIGHTS),
+        str(PROJECT_DEPOT_BEST_WEIGHTS),
+        str(PROJECT_GENERAL_WEIGHTS),
         r"C:\Users\DELL\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\INTELLI\DEPOT\JSW Design\videos\best_cement_bags_2025-05-29.pt",
         r"C:\Users\karte\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\intelli-platform\best_cement_bags_2025-05-29.pt",
     ]

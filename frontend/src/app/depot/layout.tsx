@@ -42,7 +42,7 @@ export default function DepotLayout({ children }: { children: React.ReactNode })
 
         {/* Main Content */}
         <main
-          className="pt-[52px] md:ml-16 min-h-[100vh] theme-transition"
+          className="pt-[52px] md:ml-[204px] min-h-[100vh] theme-transition depot-page-transition"
           style={{ backgroundColor: "var(--bg-page)" }}
         >
           {/* Responsive padding: tight on mobile, comfortable on desktop */}

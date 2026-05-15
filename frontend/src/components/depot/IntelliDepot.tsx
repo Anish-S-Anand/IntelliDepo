@@ -43,7 +43,7 @@ export default function IntelliDepot() {
     { id: 'command', icon: Settings, label: 'COMMAND' },
     { id: 'analytics', icon: BarChart3, label: 'ANALYTICS' },
     { id: 'zones', icon: Grid3x3, label: 'ZONES' },
-    { id: 'sequencing', icon: Layers, label: 'SEQ' },
+    // { id: 'sequencing', icon: Layers, label: 'SEQ' },
     { id: 'perimeter', icon: Lock, label: 'PERI' },
     { id: 'alerts', icon: Bell, label: 'ALERTS' },
     { id: 'risk', icon: TrendingUp, label: 'RISK' },

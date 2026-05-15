@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 type Theme = "light" | "dark";
 
@@ -19,6 +19,10 @@ const ThemeContext = createContext<ThemeContextValue>({
 function applyTheme(theme: Theme) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
+  
+  // Apply smooth color transitions (0.25s ease) - Requirement 11.6
+  root.style.transition = "background-color 0.25s ease, color 0.25s ease";
+  
   if (theme === "dark") {
     root.classList.add("dark");
     root.classList.remove("light");

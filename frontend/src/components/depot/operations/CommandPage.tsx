@@ -149,45 +149,6 @@ export default function CommandPage() {
         </div>
       )}
 
-      {/* Global Incident Feed — real data */}
-      <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px]">
-        <div className="text-[13px] font-bold text-[#E8EDF8] mb-3.5">Global Incident Feed</div>
-        {incidents.length === 0 ? (
-          <div className="text-center py-8 text-[#4E6090] text-[11px]">No active incidents</div>
-        ) : (
-          <div className="space-y-2">
-            {incidents.slice(0, 8).map((i) => {
-              const sevKey = i.severity?.toUpperCase() as keyof typeof SEV_COL;
-              const col = SEV_COL[sevKey] || "#8A9BBF";
-              return (
-                <div
-                  key={i.id}
-                  className="flex justify-between items-center p-2.5 bg-[#0F1A30] rounded-[10px] transition-all hover:bg-[#E5521A]/4"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-1 h-[34px] rounded flex-shrink-0" style={{ background: col }} />
-                    <div>
-                      <div className="text-[11px] font-semibold text-[#E8EDF8]">{i.title}</div>
-                      <div className="text-[10px] text-[#8A9BBF]">{i.zone_id || i.escalated_to || "—"}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="text-[9px] font-bold px-2 py-0.5 rounded-full border"
-                      style={{ background: `${col}22`, color: col, borderColor: `${col}33` }}
-                    >
-                      {i.severity?.toUpperCase()}
-                    </span>
-                    <span className="text-[9px] text-[#4E6090]">
-                      {new Date(i.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
-    </div>
   );
 }
