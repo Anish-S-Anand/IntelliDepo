@@ -1258,12 +1258,7 @@ export default function GateConsolePage() {
             if (!selectedGate) return null;
 
             if (!selectedGate.camera_id) {
-              return (
-                <div className="mb-3 flex items-center justify-center aspect-video rounded-xl bg-[#0A1628] border border-[#1E2F50] text-[11px] text-[#4E6090]">
-                  <Camera className="w-4 h-4 mr-2 opacity-40" />
-                  No camera assigned to this gate
-                </div>
-              );
+              return null;
             }
 
             return (
