@@ -7,11 +7,8 @@ import {
   getDensityAnalytics,
   getDensityHistory,
   getThresholds,
-  getCapacityAlerts,
-  type ZoneResponse,
   type DensityEntry,
   type DensityHistoryEntry,
-  type CapacityAlertResponse,
   type ThresholdResponse,
 } from "@/services/depotCluster";
 import {
@@ -23,6 +20,10 @@ import {
   Loader2,
 } from "lucide-react";
 
+import dynamic from "next/dynamic";
+
+const Warehouse3DMap = dynamic(() => import("./Warehouse3DMap"), { ssr: false });
+
 /* ------------------------------------------------------------------ */
 /* Helper functions                                                    */
 /* ------------------------------------------------------------------ */
@@ -30,12 +31,6 @@ import {
 function statusColor(status: string): string {
   if (status === "critical") return "#F04A4A";
   if (status === "warning") return "#F5A623";
-  return "#22D3A1";
-}
-
-function densityColor(density: number): string {
-  if (density >= 0.35) return "#F04A4A";
-  if (density >= 0.25) return "#F5A623";
   return "#22D3A1";
 }
 
@@ -60,30 +55,34 @@ interface MergedZone {
 
 const STATUS_LABEL: Record<string, string> = { normal: "NORMAL", warning: "WARNING", critical: "CRITICAL" };
 
+const DEMO_ZONES: MergedZone[] = [
+  { id: "demo-a", code: "A", name: "Storage Bay A — Cement",       type: "storage", floor: "ground", areaSqm: 2400, maxCapacity: 1000, currentOccupancy: 810,  utilizationPct: 81, status: "warning",  polygon: [], densityPerSqm: 0.34 },
+  { id: "demo-b", code: "B", name: "Storage Bay B — Fertilizers",  type: "storage", floor: "ground", areaSqm: 2800, maxCapacity: 1000, currentOccupancy: 450,  utilizationPct: 45, status: "normal",   polygon: [], densityPerSqm: 0.16 },
+  { id: "demo-c", code: "C", name: "Hazmat Storage C",             type: "hazmat",  floor: "ground", areaSqm: 1600, maxCapacity: 800,  currentOccupancy: 595,  utilizationPct: 74, status: "normal",   polygon: [], densityPerSqm: 0.37 },
+  { id: "demo-d", code: "D", name: "Heavy Materials D",            type: "storage", floor: "ground", areaSqm: 3200, maxCapacity: 1200, currentOccupancy: 1092, utilizationPct: 91, status: "critical", polygon: [], densityPerSqm: 0.34 },
+];
+
 /* ------------------------------------------------------------------ */
 /* Component                                                           */
 /* ------------------------------------------------------------------ */
 
 export default function HeatmapPage() {
   const [zones, setZones] = useState<MergedZone[]>([]);
-  const [alerts, setAlerts] = useState<CapacityAlertResponse[]>([]);
   const [thresholds, setThresholds] = useState<{ warning: number; critical: number }>({ warning: 80, critical: 95 });
   const [loading, setLoading] = useState(true);
 
   const [selectedZone, setSelectedZone] = useState<MergedZone | null>(null);
-  const [viewMode, setViewMode] = useState<"density" | "utilization">("utilization");
   const [historyRange, setHistoryRange] = useState(0); // 0 = live, 1-30 = days ago
   const [historyData, setHistoryData] = useState<DensityHistoryEntry[]>([]);
 
   /* ---- data fetcher ---- */
   const fetchData = useCallback(async () => {
     try {
-      const [zonesRes, _heatmap, densityRes, thresholdRes, alertsRes] = await Promise.all([
+      const [zonesRes, _heatmap, densityRes, thresholdRes] = await Promise.all([
         getZones(),
         getHeatmap(),
         getDensityAnalytics(),
         getThresholds(),
-        getCapacityAlerts(false),
       ]);
 
       // Build a density lookup by zone_code
@@ -111,8 +110,7 @@ export default function HeatmapPage() {
           };
         });
 
-      setZones(merged);
-      setAlerts(alertsRes);
+      setZones(merged.length > 0 ? merged : DEMO_ZONES);
 
       // Use first global threshold found, else default 80/95
       if (thresholdRes.length > 0) {
@@ -127,6 +125,7 @@ export default function HeatmapPage() {
       });
     } catch (err) {
       console.error("HeatmapPage: failed to fetch data", err);
+      setZones(DEMO_ZONES);
     } finally {
       setLoading(false);
     }
@@ -181,18 +180,9 @@ export default function HeatmapPage() {
   const overallUtil = totalCap > 0 ? ((totalOcc / totalCap) * 100).toFixed(1) : "0";
   const criticalZones = displayZones.filter((z) => z.status === "critical").length;
   const warningZones = displayZones.filter((z) => z.status === "warning").length;
-
-  const getZoneColor = (zone: MergedZone) => {
-    if (viewMode === "density") return densityColor(zone.densityPerSqm);
-    return statusColor(zone.status);
-  };
-
-  const getZoneOpacity = (zone: MergedZone) => {
-    if (viewMode === "utilization") {
-      return 0.15 + (zone.utilizationPct / 100) * 0.55;
-    }
-    return 0.15 + Math.min(zone.densityPerSqm / 0.5, 1) * 0.55;
-  };
+  const capacityAlerts = displayZones
+    .filter((z) => z.utilizationPct >= thresholds.warning || z.status === "warning" || z.status === "critical")
+    .sort((a, b) => b.utilizationPct - a.utilizationPct);
 
   /* ---- loading state ---- */
   if (loading) {
@@ -219,43 +209,9 @@ export default function HeatmapPage() {
             Zone density visualization · Capacity alerts · Real-time occupancy
           </p>
         </div>
-        <div className="flex gap-2">
-          {(["utilization", "density"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
-                viewMode === mode
-                  ? "bg-[#E5521A]/12 text-[#E5521A] border-[#E5521A]/25"
-                  : "bg-transparent text-[#4E6090] border-[#1E2F50] hover:text-[#8A9BBF]"
-              }`}
-            >
-              {mode === "utilization" ? "Utilization" : "Density"}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {/* Historical Time-Range Slider */}
-      <div className="flex items-center gap-4 mb-5 bg-[#14203A] border border-[#1E2F50] rounded-[14px] px-5 py-3">
-        <span className="text-[11px] font-bold text-[#E8EDF8] whitespace-nowrap" style={{ fontFamily: "'Syne', sans-serif" }}>
-          {historyRange === 0 ? "Live" : `${historyRange} day${historyRange > 1 ? "s" : ""} ago`}
-        </span>
-        <input
-          type="range"
-          min={0}
-          max={30}
-          value={historyRange}
-          onChange={(e) => setHistoryRange(Number(e.target.value))}
-          className="flex-1 h-1.5 accent-[#E5521A] cursor-pointer"
-        />
-        <div className="flex justify-between text-[9px] text-[#4E6090] gap-4">
-          <span>Live</span>
-          <span>30 days ago</span>
-        </div>
-      </div>
-
-      {/* KPI Row */}
+      {/* KPI Row — above slider */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {[
           { label: "Overall Utilization", value: `${overallUtil}%`, color: parseFloat(overallUtil) >= 80 ? "#F5A623" : "#22D3A1", icon: Layers },
@@ -272,6 +228,42 @@ export default function HeatmapPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Historical Time-Range Slider — constrained to floor plan column width */}
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4 mb-5">
+        <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] px-5 py-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold text-[#E8EDF8] whitespace-nowrap" style={{ fontFamily: "'Syne', sans-serif" }}>
+              {historyRange === 0 ? "🔴 Live" : `${historyRange} day${historyRange > 1 ? "s" : ""} ago`}
+            </span>
+            <span className="text-[9px] text-[#4E6090]">Scrub to replay historical occupancy</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={30}
+            value={historyRange}
+            onChange={(e) => setHistoryRange(Number(e.target.value))}
+            className="w-full h-1.5 accent-[#E5521A] cursor-pointer"
+          />
+          <div className="flex justify-between mt-1.5">
+            {["Live", "7d", "14d", "21d", "30d"].map((label, i) => {
+              const val = [0, 7, 14, 21, 30][i];
+              return (
+                <button
+                  key={label}
+                  onClick={() => setHistoryRange(val)}
+                  className="text-[9px] font-bold transition-colors"
+                  style={{ color: historyRange === val ? "#E5521A" : "#4E6090" }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="hidden lg:block" />
       </div>
 
       <div className="h-px bg-gradient-to-r from-transparent via-[#E5521A]/40 to-transparent mb-5" />
@@ -301,75 +293,15 @@ export default function HeatmapPage() {
             </div>
           </div>
 
-          {/* SVG Floor Plan */}
-          <div className="relative bg-[#0A0E1A] rounded-xl border border-[#1E2F50]/50 overflow-hidden">
-            <svg viewBox="0 0 1000 560" className="w-full h-auto">
-              {/* Grid lines */}
-              {Array.from({ length: 21 }).map((_, i) => (
-                <line key={`vg-${i}`} x1={i * 50} y1={0} x2={i * 50} y2={560} stroke="#1E2F50" strokeWidth={0.5} opacity={0.3} />
-              ))}
-              {Array.from({ length: 12 }).map((_, i) => (
-                <line key={`hg-${i}`} x1={0} y1={i * 50} x2={1000} y2={560 > i * 50 ? i * 50 : 560} stroke="#1E2F50" strokeWidth={0.5} opacity={0.3} />
-              ))}
-
-              {/* Zone rectangles */}
-              {displayZones.map((zone) => {
-                // polygon_coords: [[x1,y1],[x2,y2],[x3,y3],[x4,y4]] — use corners 0 and 2 for bounding rect
-                if (zone.polygon.length < 3) return null;
-                const [[x1, y1], , [x2, y2]] = [zone.polygon[0], zone.polygon[1], zone.polygon[2]];
-                const color = getZoneColor(zone);
-                const opacity = getZoneOpacity(zone);
-                const isSelected = selectedZone?.id === zone.id;
-                const w = x2 - x1;
-                const h = y2 - y1;
-                const cx = x1 + w / 2;
-                const cy = y1 + h / 2;
-
-                return (
-                  <g
-                    key={zone.id}
-                    onClick={() => setSelectedZone(selectedZone?.id === zone.id ? null : zone)}
-                    className="cursor-pointer"
-                  >
-                    <rect
-                      x={x1}
-                      y={y1}
-                      width={w}
-                      height={h}
-                      rx={8}
-                      fill={color}
-                      fillOpacity={opacity}
-                      stroke={isSelected ? "#E5521A" : color}
-                      strokeWidth={isSelected ? 3 : 1.5}
-                      strokeOpacity={isSelected ? 1 : 0.4}
-                    />
-                    {/* Zone label */}
-                    <text x={cx} y={cy - 18} textAnchor="middle" fill="#E8EDF8" fontSize={14} fontWeight={700}>
-                      {zone.name.split("—")[0].trim()}
-                    </text>
-                    <text x={cx} y={cy + 2} textAnchor="middle" fill={color} fontSize={22} fontWeight={800}>
-                      {zone.utilizationPct}%
-                    </text>
-                    <text x={cx} y={cy + 20} textAnchor="middle" fill="#8A9BBF" fontSize={10}>
-                      {zone.currentOccupancy} / {zone.maxCapacity} units
-                    </text>
-                    {/* Status badge */}
-                    <rect x={cx - 28} y={cy + 28} width={56} height={16} rx={8} fill={color} fillOpacity={0.2} />
-                    <text x={cx} y={cy + 40} textAnchor="middle" fill={color} fontSize={8} fontWeight={700}>
-                      {STATUS_LABEL[zone.status] ?? zone.status.toUpperCase()}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {/* Warehouse outline */}
-              <rect x={20} y={20} width={960} height={520} rx={12} fill="none" stroke="#1E2F50" strokeWidth={2} strokeDasharray="8 4" />
-
-              {/* Entry/Exit labels */}
-              <text x={500} y={15} textAnchor="middle" fill="#4E6090" fontSize={10} fontWeight={600}>NORTH GATE — ENTRY</text>
-              <text x={500} y={555} textAnchor="middle" fill="#4E6090" fontSize={10} fontWeight={600}>SOUTH GATE — EXIT</text>
-            </svg>
-          </div>
+          {/* 3D Warehouse Map */}
+          <Warehouse3DMap
+            zones={displayZones}
+            selectedZone={selectedZone?.code ?? null}
+            onZoneClick={(code) => {
+              const match = displayZones.find((z) => z.code === code);
+              setSelectedZone(match && selectedZone?.id === match.id ? null : match ?? null);
+            }}
+          />
 
           {/* Threshold bar */}
           <div className="mt-4 flex items-center gap-3">
@@ -464,25 +396,23 @@ export default function HeatmapPage() {
                 </span>
               </div>
               <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#F04A4A]/12 text-[#F04A4A] border border-[#F04A4A]/25">
-                {alerts.length} Active
+                {capacityAlerts.length} Active
               </span>
             </div>
             <div className="space-y-2">
-              {alerts.map((alert) => {
-                const sevColor = alert.severity === "critical" ? "#F04A4A" : "#F5A623";
+              {capacityAlerts.map((zone) => {
+                const isCritical = zone.status === "critical" || zone.utilizationPct >= thresholds.critical;
+                const sevColor = isCritical ? "#F04A4A" : "#F5A623";
                 return (
                   <div
-                    key={alert.id}
+                    key={zone.id}
                     className="p-2.5 rounded-[10px] bg-[#0F1A30] hover:bg-[#E5521A]/5 transition-colors cursor-pointer"
                     style={{ borderLeft: `3px solid ${sevColor}` }}
-                    onClick={() => {
-                      const match = displayZones.find((z) => z.id === alert.zone_id);
-                      if (match) setSelectedZone(match);
-                    }}
+                    onClick={() => setSelectedZone(zone)}
                   >
                     <div className="flex justify-between items-center">
                       <span className="text-[11px] font-bold" style={{ color: sevColor }}>
-                        {alert.zone_code ?? "Zone"}
+                        Zone {zone.code}
                       </span>
                       <span
                         className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border"
@@ -492,16 +422,16 @@ export default function HeatmapPage() {
                           borderColor: `${sevColor}33`,
                         }}
                       >
-                        {alert.current_pct.toFixed(1)}%
+                        {zone.utilizationPct.toFixed(1)}%
                       </span>
                     </div>
                     <div className="text-[10px] text-[#8A9BBF] mt-0.5">
-                      {alert.message ?? `${alert.severity.toUpperCase()} — threshold ${alert.threshold_pct}%`}
+                      {zone.name} is at {zone.currentOccupancy.toLocaleString()} / {zone.maxCapacity.toLocaleString()} capacity
                     </div>
                   </div>
                 );
               })}
-              {alerts.length === 0 && (
+              {capacityAlerts.length === 0 && (
                 <div className="text-center text-[11px] text-[#4E6090] py-4">No capacity alerts</div>
               )}
             </div>
