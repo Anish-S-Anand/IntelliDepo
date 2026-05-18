@@ -31,12 +31,8 @@ _THIS_DIR = _THIS_FILE.parent          # backend/app/depot/vision/
 
 # UPDATED: Point to the actual video location in backend/tmp
 # This is where the LPR_RECOGNITION.mp4, Perimeter_Detection.mp4, and Theft Camera .mp4 are stored
-import os
-if os.path.exists(r"C:\Users\Anish\Desktop\IntelliDepo\backend\tmp"):
-    LOCAL_VIDEO_DIR = Path(r"C:\Users\Anish\Desktop\IntelliDepo\backend\tmp")
-else:
-    # Fallback to relative path
-    LOCAL_VIDEO_DIR = Path(__file__).resolve().parent.parent.parent.parent / "tmp"
+# Video directory — always use the tmp folder relative to this file
+LOCAL_VIDEO_DIR = Path(__file__).resolve().parent.parent.parent.parent / "tmp"
 
 # ---------------------------------------------------------------------------
 # Depot video files mapped to camera scenes (0-5)
