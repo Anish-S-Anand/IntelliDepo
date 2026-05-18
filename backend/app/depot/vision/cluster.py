@@ -516,16 +516,81 @@ async def record_density_snapshot(
 @router.get("/density/history", response_model=list[DensityHistoryResponse])
 async def get_density_history(
     zone_id: Optional[uuid.UUID] = None,
+    days_ago: Optional[int] = None,
     limit: int = 500,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get zone density history for trend analysis."""
+    """Get zone density history for trend analysis. Optionally filter by days_ago."""
+    from datetime import timedelta
     query = select(ZoneDensityHistory)
     if zone_id:
         query = query.where(ZoneDensityHistory.zone_id == zone_id)
-    result = await db.execute(query.order_by(ZoneDensityHistory.recorded_at.desc()).limit(limit))
+    if days_ago is not None and days_ago > 0:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days_ago)
+        query = query.where(ZoneDensityHistory.recorded_at >= cutoff)
+    result = await db.execute(query.order_by(ZoneDensityHistory.recorded_at.asc()).limit(limit))
     return result.scalars().all()
+
+
+@router.post("/density/seed-history", status_code=201)
+async def seed_demo_history(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Seed 30 days of realistic demo history for all active zones.
+    Safe to call multiple times — skips if history already exists.
+    """
+    import random
+    from datetime import timedelta
+
+    # Check if history already exists
+    existing = await db.execute(select(ZoneDensityHistory).limit(1))
+    if existing.scalar_one_or_none():
+        return {"seeded": 0, "message": "History already exists"}
+
+    zones_result = await db.execute(select(DepotZone).where(DepotZone.is_active == True))
+    zones = zones_result.scalars().all()
+
+    if not zones:
+        return {"seeded": 0, "message": "No active zones found"}
+
+    # Base occupancy patterns per zone code (realistic warehouse patterns)
+    base_patterns = {
+        "A": 0.81, "B": 0.45, "C": 0.74, "D": 0.91,
+    }
+
+    now = datetime.now(timezone.utc)
+    records_added = 0
+
+    for zone in zones:
+        base = base_patterns.get(zone.zone_code, 0.60)
+        # Generate one snapshot per day for 30 days, with realistic variation
+        for day in range(30, -1, -1):
+            # Add weekly pattern (higher mid-week) and random noise
+            day_of_week = (now - timedelta(days=day)).weekday()
+            weekly_factor = 1.0 + 0.08 * (2 - abs(day_of_week - 2)) / 2
+            noise = random.uniform(-0.08, 0.08)
+            util_pct = min(100, max(5, (base * weekly_factor + noise) * 100))
+            occupancy = int((util_pct / 100) * zone.max_capacity_units)
+            status = "critical" if util_pct >= 95 else "warning" if util_pct >= 80 else "normal"
+
+            record = ZoneDensityHistory(
+                zone_id=zone.id,
+                zone_code=zone.zone_code,
+                occupancy=occupancy,
+                capacity=zone.max_capacity_units,
+                utilization_pct=round(util_pct, 1),
+                status=status,
+                recorded_at=now - timedelta(days=day),
+            )
+            db.add(record)
+            records_added += 1
+
+    await db.commit()
+    logger.info(f"Seeded {records_added} demo history records")
+    return {"seeded": records_added, "message": "Demo history seeded successfully"}
 
 
 class ThresholdCreate(BaseModel):

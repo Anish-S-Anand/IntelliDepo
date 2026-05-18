@@ -469,6 +469,7 @@ async def list_incidents(
 
 @router.get("/active", response_model=list[IncidentResponse])
 async def list_active_incidents(
+    limit: int = 50,
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -478,6 +479,7 @@ async def list_active_incidents(
             IncidentStatus.ESCALATED, IncidentStatus.IN_PROGRESS,
         ]))
         .order_by(desc(OpsIncident.created_at))
+        .limit(limit)
     )
     return [IncidentResponse.model_validate(i) for i in result.scalars().all()]
 

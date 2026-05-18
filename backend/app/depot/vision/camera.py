@@ -17,7 +17,7 @@ from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, select
@@ -82,7 +82,7 @@ class Camera(DBBaseModel):
     name = Column(String, nullable=False)
     stream_url = Column(String, nullable=False)           # e.g. rtsp://192.168.1.10:554/stream
     protocol = Column(String, default=StreamProtocol.RTSP)
-    zone = Column(String, nullable=True)                  # e.g. "Zone-A", "Entry Gate"
+    zone = Column(String, nullable=True)                  # e.g. "Zone A", "Gate — North Entry"
     status = Column(String, default=CameraStatus.INACTIVE)
     is_active = Column(Boolean, default=True)
     last_seen = Column(DateTime(timezone=True), nullable=True)
@@ -98,7 +98,7 @@ class CameraRegister(BaseModel):
     name: str = Field(..., json_schema_extra={"example": "Gate-A Camera 1"})
     stream_url: str = Field(..., json_schema_extra={"example": "rtsp://192.168.1.10:554/stream1"})
     protocol: StreamProtocol = StreamProtocol.RTSP
-    zone: Optional[str] = Field(None, json_schema_extra={"example": "Zone-A"})
+    zone: Optional[str] = Field(None, json_schema_extra={"example": "Zone A"})
     frame_rate: int = Field(25, ge=1, le=60)
     resolution: str = Field("1920x1080", json_schema_extra={"example": "1920x1080"})
 
@@ -276,11 +276,11 @@ async def stream_connect(camera_id: str, stream_url: str, zone: str = "") -> boo
 
 # Scene labels per camera (deterministic by camera_id hash)
 _SCENE_LABELS = [
-    "GATE ENTRY NORTH",
-    "ZONE-A OVERHEAD",
+    "GATE — NORTH ENTRY",
+    "ZONE A OVERHEAD",
     "LOADING BAY 1-4",
-    "ZONE-C PERIMETER",
-    "GATE EXIT SOUTH",
+    "ZONE C PERIMETER",
+    "GATE — SOUTH EXIT",
     "YARD OVERVIEW",
 ]
 
@@ -297,12 +297,12 @@ _SCENE_DETECTIONS = [
 
 # Map zone names to fixed scene indices so each camera always gets a unique scene
 _ZONE_SCENE_MAP: dict[str, int] = {
-    "entry gate":   0,
-    "zone-a":       1,
-    "loading dock": 2,
-    "zone-c":       3,
-    "exit gate":    4,
-    "yard":         5,
+    "gate — north entry": 0,
+    "zone a":             1,
+    "loading dock":       2,
+    "zone c":             3,
+    "gate — south exit":  4,
+    "yard":               5,
 }
 
 # Global counter to assign unique scene indices to cameras as they connect
@@ -1094,26 +1094,73 @@ async def video_snapshot(filename: str, seek: float = 0.0):
 
 
 @router.get("/video-library/{filename}/stream")
-async def stream_video_file(filename: str):
+async def stream_video_file(filename: str, request: Request):
     """
-    Stream a local depot video file directly for HTML5 video playback.
-    Supports range requests for seeking.
+    Stream a local depot video file with proper HTTP range request support.
+    This allows browsers to start playing immediately without downloading the full file.
     """
     from app.depot.vision.video_library import get_local_video_path
-    from fastapi import Request
-    from fastapi.responses import FileResponse
+    from fastapi.responses import StreamingResponse, Response
     import os
 
     video_path = get_local_video_path(filename)
-    if video_path is None or not os.path.exists(video_path):
+    if video_path is None or not os.path.exists(str(video_path)):
         raise HTTPException(status_code=404, detail=f"Video not found: {filename}")
 
-    # Return the video file with proper headers for streaming
-    return FileResponse(
-        path=str(video_path),
-        media_type="video/mp4",
+    file_size = os.path.getsize(str(video_path))
+    range_header = request.headers.get("range")
+
+    if range_header:
+        # Parse Range: bytes=start-end
+        try:
+            range_val = range_header.replace("bytes=", "")
+            start_str, _, end_str = range_val.partition("-")
+            start = int(start_str) if start_str else 0
+            end = int(end_str) if end_str else file_size - 1
+            end = min(end, file_size - 1)
+            chunk_size = end - start + 1
+
+            def iter_file(path: str, s: int, length: int):
+                with open(path, "rb") as f:
+                    f.seek(s)
+                    remaining = length
+                    while remaining > 0:
+                        data = f.read(min(512 * 1024, remaining))  # 512KB chunks
+                        if not data:
+                            break
+                        remaining -= len(data)
+                        yield data
+
+            headers = {
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(chunk_size),
+                "Content-Type": "video/mp4",
+                "Cache-Control": "no-cache",
+            }
+            return StreamingResponse(
+                iter_file(str(video_path), start, chunk_size),
+                status_code=206,
+                headers=headers,
+                media_type="video/mp4",
+            )
+        except Exception:
+            pass  # Fall through to full file response
+
+    # No range header — return full file
+    def iter_full(path: str):
+        with open(path, "rb") as f:
+            while chunk := f.read(512 * 1024):  # 512KB chunks
+                yield chunk
+
+    return StreamingResponse(
+        iter_full(str(video_path)),
+        status_code=200,
         headers={
             "Accept-Ranges": "bytes",
+            "Content-Length": str(file_size),
+            "Content-Type": "video/mp4",
             "Cache-Control": "no-cache",
         },
+        media_type="video/mp4",
     )

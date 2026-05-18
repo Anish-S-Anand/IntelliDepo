@@ -23,7 +23,7 @@ from datetime import datetime, timezone, timedelta
 
 
 DEPOTS = ["Depot Alpha — Chennai", "Depot Beta — Bangalore", "Depot Gamma — Hyderabad"]
-ZONES = ["inbound_gate", "staging_area", "dock_area", "cold_storage", "parking_yard", "outbound_gate"]
+ZONES = ["Gate — North Entry", "Zone B", "Loading Dock", "Zone C", "Yard", "Gate — South Exit"]
 VEHICLE_TYPES = ["truck", "truck", "truck", "refrigerated", "van", "trailer"]
 CLIENTS = ["Acme Corp", "ColdChain Inc", "Global Logistics", "FreshCo", "Metro Supply", "QuickShip", "BigHaul"]
 DRIVERS = ["Rajesh K", "Suresh M", "Anil P", "Priya S", "Deepak R", "Vijay N", "Kumar L", "Meera D", "Ravi T", "Sanjay B"]
@@ -124,14 +124,14 @@ def gen_seed_data():
 
     # --- Dock Slots (F-065) ---
     data["docks"] = [
-        {"dock_id": "DOCK-A1", "dock_name": "Bay A1", "zone": "dock_area", "dock_type": "standard"},
-        {"dock_id": "DOCK-A2", "dock_name": "Bay A2", "zone": "dock_area", "dock_type": "standard"},
-        {"dock_id": "DOCK-B1", "dock_name": "Bay B1", "zone": "dock_area", "dock_type": "standard"},
-        {"dock_id": "DOCK-B2", "dock_name": "Bay B2", "zone": "dock_area", "dock_type": "standard"},
-        {"dock_id": "DOCK-C1", "dock_name": "Cold Bay 1", "zone": "cold_storage", "dock_type": "refrigerated"},
-        {"dock_id": "DOCK-C2", "dock_name": "Cold Bay 2", "zone": "cold_storage", "dock_type": "refrigerated"},
-        {"dock_id": "DOCK-D1", "dock_name": "Hazmat Bay", "zone": "dock_area", "dock_type": "hazmat"},
-        {"dock_id": "DOCK-D2", "dock_name": "Bay D2", "zone": "dock_area", "dock_type": "standard"},
+        {"dock_id": "DOCK-A1", "dock_name": "Bay A1", "zone": "Loading Dock", "dock_type": "standard"},
+        {"dock_id": "DOCK-A2", "dock_name": "Bay A2", "zone": "Loading Dock", "dock_type": "standard"},
+        {"dock_id": "DOCK-B1", "dock_name": "Bay B1", "zone": "Loading Dock", "dock_type": "standard"},
+        {"dock_id": "DOCK-B2", "dock_name": "Bay B2", "zone": "Loading Dock", "dock_type": "standard"},
+        {"dock_id": "DOCK-C1", "dock_name": "Cold Bay 1", "zone": "Zone C", "dock_type": "refrigerated"},
+        {"dock_id": "DOCK-C2", "dock_name": "Cold Bay 2", "zone": "Zone C", "dock_type": "refrigerated"},
+        {"dock_id": "DOCK-D1", "dock_name": "Hazmat Bay", "zone": "Loading Dock", "dock_type": "hazmat"},
+        {"dock_id": "DOCK-D2", "dock_name": "Bay D2", "zone": "Loading Dock", "dock_type": "standard"},
     ]
 
     # --- Incidents (F-069–F-073) ---
