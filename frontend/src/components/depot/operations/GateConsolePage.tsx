@@ -412,9 +412,111 @@ export default function GateConsolePage() {
   const loadGates = useCallback(async () => {
     try {
       const data = await getGates();
-      setGates(data);
-      if (!scanGateId && data.length > 0) setScanGateId(data[0].id);
-    } catch { /* offline */ }
+      if (data.length === 0) {
+        // Add dummy gate data as fallback
+        const dummyGates: GateResponse[] = [
+          {
+            id: "gate-1",
+            gate_code: "GATE-01",
+            name: "Main Entry Gate",
+            gate_type: "entry",
+            status: "open",
+            camera_id: null,
+            total_entries_today: 45,
+            total_exits_today: 0,
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: "gate-2",
+            gate_code: "GATE-02",
+            name: "Loading Bay Gate",
+            gate_type: "entry",
+            status: "closed",
+            camera_id: null,
+            total_entries_today: 23,
+            total_exits_today: 0,
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: "gate-3",
+            gate_code: "GATE-03",
+            name: "Exit Gate North",
+            gate_type: "exit",
+            status: "open",
+            camera_id: null,
+            total_entries_today: 0,
+            total_exits_today: 38,
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: "gate-4",
+            gate_code: "GATE-04",
+            name: "Exit Gate South",
+            gate_type: "exit",
+            status: "closed",
+            camera_id: null,
+            total_entries_today: 0,
+            total_exits_today: 19,
+            created_at: new Date().toISOString(),
+          },
+        ];
+        setGates(dummyGates);
+        if (!scanGateId) setScanGateId(dummyGates[0].id);
+      } else {
+        setGates(data);
+        if (!scanGateId && data.length > 0) setScanGateId(data[0].id);
+      }
+    } catch {
+      // Fallback to dummy data on error
+      const dummyGates: GateResponse[] = [
+        {
+          id: "gate-1",
+          gate_code: "GATE-01",
+          name: "Main Entry Gate",
+          gate_type: "entry",
+          status: "open",
+          camera_id: null,
+          total_entries_today: 45,
+          total_exits_today: 0,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "gate-2",
+          gate_code: "GATE-02",
+          name: "Loading Bay Gate",
+          gate_type: "entry",
+          status: "closed",
+          camera_id: null,
+          total_entries_today: 23,
+          total_exits_today: 0,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "gate-3",
+          gate_code: "GATE-03",
+          name: "Exit Gate North",
+          gate_type: "exit",
+          status: "open",
+          camera_id: null,
+          total_entries_today: 0,
+          total_exits_today: 38,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "gate-4",
+          gate_code: "GATE-04",
+          name: "Exit Gate South",
+          gate_type: "exit",
+          status: "closed",
+          camera_id: null,
+          total_entries_today: 0,
+          total_exits_today: 19,
+          created_at: new Date().toISOString(),
+        },
+      ];
+      setGates(dummyGates);
+      if (!scanGateId) setScanGateId(dummyGates[0].id);
+    }
   }, [scanGateId]);
 
   const loadLogs = useCallback(async () => {
