@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Shield,
   Car,
@@ -118,7 +117,7 @@ function RegisterVisitorModal({
     id_proof_number: "",
     vehicle_plate: "",
     host_name: "",
-    gate_id: gates[0]?.id || "",
+    gate_id: "Gate-1",
     pass_valid_hours: 4,
   });
   const [submitting, setSubmitting] = useState(false);
@@ -164,14 +163,6 @@ function RegisterVisitorModal({
             <input className={inputCls} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Visitor full name" />
           </div>
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-1 block">Company</label>
-            <input className={inputCls} value={form.company} onChange={(e) => set("company", e.target.value)} placeholder="Company name" />
-          </div>
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-1 block">Purpose</label>
-            <input className={inputCls} value={form.purpose} onChange={(e) => set("purpose", e.target.value)} placeholder="Visit purpose" />
-          </div>
-          <div>
             <label className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-1 block">Contact Number</label>
             <input className={inputCls} value={form.contact_number} onChange={(e) => set("contact_number", e.target.value)} placeholder="+91 ..." />
           </div>
@@ -186,23 +177,16 @@ function RegisterVisitorModal({
             </select>
           </div>
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-1 block">ID Proof Number</label>
-            <input className={inputCls} value={form.id_proof_number} onChange={(e) => set("id_proof_number", e.target.value)} placeholder="ID number" />
-          </div>
-          <div>
             <label className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-1 block">Vehicle Plate</label>
             <input className={inputCls} value={form.vehicle_plate} onChange={(e) => set("vehicle_plate", e.target.value)} placeholder="KA-01-XX-1234" />
           </div>
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-1 block">Host Name</label>
-            <input className={inputCls} value={form.host_name} onChange={(e) => set("host_name", e.target.value)} placeholder="Person to meet" />
-          </div>
-          <div>
             <label className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-1 block">Gate</label>
             <select className={inputCls} value={form.gate_id} onChange={(e) => set("gate_id", e.target.value)}>
-              {gates.map((g) => (
-                <option key={g.id} value={g.id}>{g.gate_code} - {g.name}</option>
-              ))}
+              <option value="Gate-1">Gate-1</option>
+              <option value="Gate-2">Gate-2</option>
+              <option value="Gate-3">Gate-3</option>
+              <option value="Gate-4">Gate-4</option>
             </select>
           </div>
           <div>
@@ -245,10 +229,22 @@ function RegisterVehicleModal({
     status: "registered",
     valid_until: "",
   });
+  const [uploadedDocs, setUploadedDocs] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const set = (key: string, val: string) =>
     setForm((prev) => ({ ...prev, [key]: val }));
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      setUploadedDocs((prev) => [...prev, ...filesArray]);
+    }
+  };
+
+  const removeDoc = (index: number) => {
+    setUploadedDocs((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const inputCls =
     "w-full bg-[#0D1526] border border-[#1E2F50] rounded-lg px-3 py-2 text-[12px] text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[#E5521A]/50";
@@ -307,8 +303,39 @@ function RegisterVehicleModal({
             <input className={inputCls} value={form.owner_name} onChange={(e) => set("owner_name", e.target.value)} placeholder="Owner name" />
           </div>
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-1 block">Company</label>
-            <input className={inputCls} value={form.company} onChange={(e) => set("company", e.target.value)} placeholder="Company name" />
+            <label className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-1 block">Add Docs</label>
+            <div className="space-y-2">
+              <label className="flex items-center justify-center gap-2 w-full bg-[#0D1526] border border-dashed border-[#1E2F50] rounded-lg px-3 py-3 text-[12px] text-[#8A9BBF] hover:border-[#E5521A]/50 hover:text-[#E8EDF8] cursor-pointer transition">
+                <Plus className="w-4 h-4" />
+                <span>Upload Documents (PDF, JPG, PNG)</span>
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+              {uploadedDocs.length > 0 && (
+                <div className="space-y-1">
+                  {uploadedDocs.map((file, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between bg-[#0D1526] border border-[#1E2F50] rounded-lg px-3 py-2"
+                    >
+                      <span className="text-[11px] text-[#E8EDF8] truncate flex-1">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeDoc(idx)}
+                        className="text-[#F04A4A] hover:text-[#F04A4A]/80 ml-2"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           {form.status === "temporary" && (
             <div>
@@ -354,16 +381,7 @@ export default function GateConsolePage() {
 
   // Access log filters
   const [logSearch, setLogSearch] = useState("");
-
-  // AI Analysis Log Feed filters (independent from ACCESS LOG FEED)
-  const [aiLogFilter, setAiLogFilter] = useState<"all" | "granted" | "denied" | "blacklisted">("all");
-  const [aiLogSearch, setAiLogSearch] = useState("");
-  const [aiLogSearchDebounced, setAiLogSearchDebounced] = useState("");
-  const aiLogSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // AI Analysis Log Feed error state
-  const [aiLogError, setAiLogError] = useState<string | null>(null);
-
+  
   // Visitor date filter
   const [visitorDate, setVisitorDate] = useState("");
 
@@ -664,175 +682,202 @@ export default function GateConsolePage() {
   }, []);
 
   const loadVisitors = useCallback(async () => {
-    const now = new Date();
-
-    const dummyVisitors: VisitorResponse[] = [
-      {
-        id: "vis-1",
-        name: "Rajesh Kumar",
-        company: "Tech Solutions Pvt Ltd",
-        purpose: "Client meeting",
-        contact_number: "+91-9876543210",
-
-        // REQUIRED TYPE FIELDS
-        id_proof_type: "Aadhaar",
-        id_proof_number: "XXXX-XXXX-4321",
-        gate_id: "gate-1",
-        checked_out_at: null,
-
-        host_name: "Priya Sharma",
-        vehicle_plate: "KA01AB1234",
-
-        // Keep status compatible with backend enum/type
-        status: "active",
-
-        checked_in_at: new Date(
-          now.getTime() - (1 * 60 * 60000 + 30 * 60000),
-        ).toISOString(),
-
-        pass_valid_until: new Date(
-          now.getTime() + (2 * 60 * 60000 + 30 * 60000),
-        ).toISOString(),
-
-        registered_by: "gate-operator",
-        created_at: new Date(
-          now.getTime() - (1 * 60 * 60000 + 30 * 60000),
-        ).toISOString(),
-      },
-
-      {
-        id: "vis-2",
-        name: "Ananya Reddy",
-        company: "Logistics Express",
-        purpose: "Delivery coordination",
-        contact_number: "+91-9123456789",
-
-        id_proof_type: "PAN",
-        id_proof_number: "ABCDE1234F",
-        gate_id: "gate-2",
-        checked_out_at: null,
-
-        host_name: "Amit Patel",
-        vehicle_plate: "MH02CD5678",
-        status: "active",
-
-        checked_in_at: new Date(
-          now.getTime() - 45 * 60000,
-        ).toISOString(),
-
-        pass_valid_until: new Date(
-          now.getTime() + (3 * 60 * 60000 + 15 * 60000),
-        ).toISOString(),
-
-        registered_by: "gate-operator",
-        created_at: new Date(
-          now.getTime() - 45 * 60000,
-        ).toISOString(),
-      },
-
-      {
-        id: "vis-3",
-        name: "Vikram Singh",
-        company: "Safety Audit Services",
-        purpose: "Safety inspection",
-        contact_number: "+91-9988776655",
-
-        id_proof_type: "Driving License",
-        id_proof_number: "DL0420110149646",
-        gate_id: "gate-1",
-        checked_out_at: null,
-
-        host_name: "Site Manager",
-        vehicle_plate: "DL03EF9012",
-        status: "active",
-
-        checked_in_at: new Date(
-          now.getTime() - (2 * 60 * 60000 + 15 * 60000),
-        ).toISOString(),
-
-        pass_valid_until: new Date(
-          now.getTime() + (1 * 60 * 60000 + 45 * 60000),
-        ).toISOString(),
-
-        registered_by: "gate-operator",
-        created_at: new Date(
-          now.getTime() - (2 * 60 * 60000 + 15 * 60000),
-        ).toISOString(),
-      },
-
-      {
-        id: "vis-4",
-        name: "Sunita Joshi",
-        company: "Consulting Group",
-        purpose: "Business consultation",
-        contact_number: "+91-9112233445",
-
-        id_proof_type: "Passport",
-        id_proof_number: "P1234567",
-        gate_id: "gate-3",
-        checked_out_at: null,
-
-        host_name: "Operations Director",
-        vehicle_plate: "AP06KL2345",
-        status: "active",
-
-        checked_in_at: new Date(
-          now.getTime() - 30 * 60000,
-        ).toISOString(),
-
-        pass_valid_until: new Date(
-          now.getTime() + (3 * 60 * 60000 + 30 * 60000),
-        ).toISOString(),
-
-        registered_by: "gate-operator",
-        created_at: new Date(
-          now.getTime() - 30 * 60000,
-        ).toISOString(),
-      },
-
-      {
-        id: "vis-5",
-        name: "Karthik Menon",
-        company: "Equipment Maintenance Co",
-        purpose: "Equipment servicing",
-        contact_number: "+91-9556677889",
-
-        id_proof_type: "Voter ID",
-        id_proof_number: "VOTER998877",
-        gate_id: "gate-2",
-        checked_out_at: null,
-
-        host_name: "Facility Manager",
-        vehicle_plate: "KA05IJ7890",
-        status: "active",
-
-        checked_in_at: new Date(
-          now.getTime() - 3 * 60 * 60000,
-        ).toISOString(),
-
-        pass_valid_until: new Date(
-          now.getTime() + 1 * 60 * 60000,
-        ).toISOString(),
-
-        registered_by: "gate-operator",
-        created_at: new Date(
-          now.getTime() - 3 * 60 * 60000,
-        ).toISOString(),
-      },
-    ];
-
     try {
       const data = await getActiveVisitors();
-
-      if (Array.isArray(data) && data.length > 0) {
-        setVisitors(data);
-      } else {
+      if (data.length === 0) {
+        // Add realistic dummy visitor data
+        const now = new Date();
+        const dummyVisitors: VisitorResponse[] = [
+          {
+            id: "vis-1",
+            name: "Rajesh Kumar",
+            company: "Tech Solutions Pvt Ltd",
+            purpose: "Client meeting",
+            contact_number: "+91-9876543210",
+            id_proof_type: "Aadhaar",
+            id_proof_number: "XXXX-XXXX-1234",
+            host_name: "Priya Sharma",
+            gate_id: null,
+            vehicle_plate: "KA01AB1234",
+            status: "checked_in",
+            checked_in_at: new Date(now.getTime() - 1 * 60 * 60000 - 30 * 60000).toISOString(),
+            checked_out_at: null,
+            pass_valid_until: new Date(now.getTime() + 2 * 60 * 60000 + 30 * 60000).toISOString(),
+            registered_by: "gate-operator",
+            created_at: new Date(now.getTime() - 1 * 60 * 60000 - 30 * 60000).toISOString(),
+          },
+          {
+            id: "vis-2",
+            name: "Ananya Reddy",
+            company: "Logistics Express",
+            purpose: "Delivery coordination",
+            contact_number: "+91-9123456789",
+            id_proof_type: "PAN",
+            id_proof_number: "ABCDE1234F",
+            host_name: "Amit Patel",
+            gate_id: null,
+            vehicle_plate: "MH02CD5678",
+            status: "checked_in",
+            checked_in_at: new Date(now.getTime() - 45 * 60000).toISOString(),
+            checked_out_at: null,
+            pass_valid_until: new Date(now.getTime() + 3 * 60 * 60000 + 15 * 60000).toISOString(),
+            registered_by: "gate-operator",
+            created_at: new Date(now.getTime() - 45 * 60000).toISOString(),
+          },
+          {
+            id: "vis-3",
+            name: "Vikram Singh",
+            company: "Safety Audit Services",
+            purpose: "Safety inspection",
+            contact_number: "+91-9988776655",
+            id_proof_type: "Passport",
+            id_proof_number: "P1234567",
+            host_name: "Site Manager",
+            gate_id: null,
+            vehicle_plate: "DL03EF9012",
+            status: "checked_in",
+            checked_in_at: new Date(now.getTime() - 2 * 60 * 60000 - 15 * 60000).toISOString(),
+            checked_out_at: null,
+            pass_valid_until: new Date(now.getTime() + 1 * 60 * 60000 + 45 * 60000).toISOString(),
+            registered_by: "gate-operator",
+            created_at: new Date(now.getTime() - 2 * 60 * 60000 - 15 * 60000).toISOString(),
+          },
+          {
+            id: "vis-4",
+            name: "Sunita Joshi",
+            company: "Consulting Group",
+            purpose: "Business consultation",
+            contact_number: "+91-9112233445",
+            id_proof_type: "Aadhaar",
+            id_proof_number: "XXXX-XXXX-5678",
+            host_name: "Operations Director",
+            gate_id: null,
+            vehicle_plate: "AP06KL2345",
+            status: "checked_in",
+            checked_in_at: new Date(now.getTime() - 30 * 60000).toISOString(),
+            checked_out_at: null,
+            pass_valid_until: new Date(now.getTime() + 3 * 60 * 60000 + 30 * 60000).toISOString(),
+            registered_by: "gate-operator",
+            created_at: new Date(now.getTime() - 30 * 60000).toISOString(),
+          },
+          {
+            id: "vis-5",
+            name: "Karthik Menon",
+            company: "Equipment Maintenance Co",
+            purpose: "Equipment servicing",
+            contact_number: "+91-9556677889",
+            id_proof_type: "Driving License",
+            id_proof_number: "KA0120210012345",
+            host_name: "Facility Manager",
+            gate_id: null,
+            vehicle_plate: "KA05IJ7890",
+            status: "checked_in",
+            checked_in_at: new Date(now.getTime() - 3 * 60 * 60000).toISOString(),
+            checked_out_at: null,
+            pass_valid_until: new Date(now.getTime() + 1 * 60 * 60000).toISOString(),
+            registered_by: "gate-operator",
+            created_at: new Date(now.getTime() - 3 * 60 * 60000).toISOString(),
+          },
+        ];
         setVisitors(dummyVisitors);
+      } else {
+        setVisitors(data);
       }
-    } catch (error) {
-      console.error("Failed to load visitors:", error);
-
-      // Production-safe fallback
+    } catch {
+      // Fallback to dummy data
+      const now = new Date();
+      const dummyVisitors: VisitorResponse[] = [
+        {
+          id: "vis-1",
+          name: "Rajesh Kumar",
+          company: "Tech Solutions Pvt Ltd",
+          purpose: "Client meeting",
+          contact_number: "+91-9876543210",
+          id_proof_type: "Aadhaar",
+          id_proof_number: "XXXX-XXXX-1234",
+          host_name: "Priya Sharma",
+          gate_id: null,
+          vehicle_plate: "KA01AB1234",
+          status: "checked_in",
+          checked_in_at: new Date(now.getTime() - 1 * 60 * 60000 - 30 * 60000).toISOString(),
+          checked_out_at: null,
+          pass_valid_until: new Date(now.getTime() + 2 * 60 * 60000 + 30 * 60000).toISOString(),
+          registered_by: "gate-operator",
+          created_at: new Date(now.getTime() - 1 * 60 * 60000 - 30 * 60000).toISOString(),
+        },
+        {
+          id: "vis-2",
+          name: "Ananya Reddy",
+          company: "Logistics Express",
+          purpose: "Delivery coordination",
+          contact_number: "+91-9123456789",
+          id_proof_type: "PAN",
+          id_proof_number: "ABCDE1234F",
+          host_name: "Amit Patel",
+          gate_id: null,
+          vehicle_plate: "MH02CD5678",
+          status: "checked_in",
+          checked_in_at: new Date(now.getTime() - 45 * 60000).toISOString(),
+          checked_out_at: null,
+          pass_valid_until: new Date(now.getTime() + 3 * 60 * 60000 + 15 * 60000).toISOString(),
+          registered_by: "gate-operator",
+          created_at: new Date(now.getTime() - 45 * 60000).toISOString(),
+        },
+        {
+          id: "vis-3",
+          name: "Vikram Singh",
+          company: "Safety Audit Services",
+          purpose: "Safety inspection",
+          contact_number: "+91-9988776655",
+          id_proof_type: "Passport",
+          id_proof_number: "P1234567",
+          host_name: "Site Manager",
+          gate_id: null,
+          vehicle_plate: "DL03EF9012",
+          status: "checked_in",
+          checked_in_at: new Date(now.getTime() - 2 * 60 * 60000 - 15 * 60000).toISOString(),
+          checked_out_at: null,
+          pass_valid_until: new Date(now.getTime() + 1 * 60 * 60000 + 45 * 60000).toISOString(),
+          registered_by: "gate-operator",
+          created_at: new Date(now.getTime() - 2 * 60 * 60000 - 15 * 60000).toISOString(),
+        },
+        {
+          id: "vis-4",
+          name: "Sunita Joshi",
+          company: "Consulting Group",
+          purpose: "Business consultation",
+          contact_number: "+91-9112233445",
+          id_proof_type: "Aadhaar",
+          id_proof_number: "XXXX-XXXX-5678",
+          host_name: "Operations Director",
+          gate_id: null,
+          vehicle_plate: "AP06KL2345",
+          status: "checked_in",
+          checked_in_at: new Date(now.getTime() - 30 * 60000).toISOString(),
+          checked_out_at: null,
+          pass_valid_until: new Date(now.getTime() + 3 * 60 * 60000 + 30 * 60000).toISOString(),
+          registered_by: "gate-operator",
+          created_at: new Date(now.getTime() - 30 * 60000).toISOString(),
+        },
+        {
+          id: "vis-5",
+          name: "Karthik Menon",
+          company: "Equipment Maintenance Co",
+          purpose: "Equipment servicing",
+          contact_number: "+91-9556677889",
+          id_proof_type: "Driving License",
+          id_proof_number: "KA0120210012345",
+          host_name: "Facility Manager",
+          gate_id: null,
+          vehicle_plate: "KA05IJ7890",
+          status: "checked_in",
+          checked_in_at: new Date(now.getTime() - 3 * 60 * 60000).toISOString(),
+          checked_out_at: null,
+          pass_valid_until: new Date(now.getTime() + 1 * 60 * 60000).toISOString(),
+          registered_by: "gate-operator",
+          created_at: new Date(now.getTime() - 3 * 60 * 60000).toISOString(),
+        },
+      ];
       setVisitors(dummyVisitors);
     }
   }, []);
@@ -859,27 +904,6 @@ export default function GateConsolePage() {
   }, [loadGates, loadVisitors]);
 
   // --- Handlers ---
-  const router = useRouter();
-
-  const handleAnalysisClick = useCallback((logId: string) => {
-    if (!logId || logId.trim() === "") {
-      console.error("Invalid log ID: cannot navigate to analysis page");
-      return;
-    }
-    try {
-      router.push(`/depot/gate/analysis/${logId}`);
-    } catch (err) {
-      console.error("Navigation error:", err);
-    }
-  }, [router]);
-
-  const handleAiLogSearchChange = useCallback((value: string) => {
-    setAiLogSearch(value);
-    if (aiLogSearchTimer.current) clearTimeout(aiLogSearchTimer.current);
-    aiLogSearchTimer.current = setTimeout(() => {
-      setAiLogSearchDebounced(value);
-    }, 300);
-  }, []);
   const handleGateToggle = async (gate: GateResponse) => {
     setTogglingGate(gate.id);
     try {
@@ -953,21 +977,6 @@ export default function GateConsolePage() {
     return true;
   }), [accessLogs, logSearch]);
 
-  // --- AI Analysis Log Feed filtered logs ---
-  const filteredAILogs = useMemo(() => {
-    const sorted = [...accessLogs].sort((a, b) => {
-      const aTime = new Date(a.processed_at || a.created_at).getTime();
-      const bTime = new Date(b.processed_at || b.created_at).getTime();
-      return bTime - aTime;
-    });
-    const limited = sorted.slice(0, 20);
-    return limited.filter((log) => {
-      if (aiLogFilter !== "all" && log.decision.toLowerCase() !== aiLogFilter) return false;
-      if (aiLogSearchDebounced && !log.plate_number.toLowerCase().includes(aiLogSearchDebounced.toLowerCase())) return false;
-      return true;
-    });
-  }, [accessLogs, aiLogFilter, aiLogSearchDebounced]);
-
   // --- Render ---
   if (loading) {
     return (
@@ -994,7 +1003,7 @@ export default function GateConsolePage() {
       </div>
 
       {/* ================================================================= */}
-      {/* ROW 1: Gate Status Bar + Vehicle Plate Scanner                     */}
+      {/* ROW 1: Gate Status Bar + Live LPR Scanner                         */}
       {/* ================================================================= */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
         {/* 1. Gate Status Bar */}
@@ -1013,14 +1022,14 @@ export default function GateConsolePage() {
                     accessLogs.filter(log => log.direction === "entry").map(log => log.gate_code)
                   );
                   const entryGates = gates.filter(g => entryGateCodes.has(g.gate_code));
-
+                  
                   // Fallback: if no logs yet, show gates with gate_type === "entry"
                   const displayGates = entryGates.length > 0 ? entryGates : gates.filter(g => g.gate_type === "entry");
-
+                  
                   if (displayGates.length === 0) {
                     return <p className="text-[11px] text-[#4E6090]">No entry gates configured</p>;
                   }
-
+                  
                   return displayGates.map((gate) => {
                     const isOpen = gate.status === "open";
                     const busy = togglingGate === gate.id;
@@ -1030,10 +1039,11 @@ export default function GateConsolePage() {
                         type="button"
                         onClick={() => handleGateToggle(gate)}
                         disabled={busy}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-left ${isOpen
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-left ${
+                          isOpen
                             ? "border-emerald-500/30 bg-emerald-500/8 hover:bg-emerald-500/15"
                             : "border-[#1E2F50] bg-[#0D1526] hover:border-[#2A3F68]"
-                          } ${busy ? "opacity-50" : ""}`}
+                        } ${busy ? "opacity-50" : ""}`}
                       >
                         {isOpen ? (
                           <DoorOpen className="w-4 h-4 text-emerald-400 flex-shrink-0" />
@@ -1044,10 +1054,11 @@ export default function GateConsolePage() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-[11px] font-bold text-[#E8EDF8]">{gate.gate_code}</span>
                             <span
-                              className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${isOpen
+                              className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${
+                                isOpen
                                   ? "bg-emerald-500/15 text-emerald-400"
                                   : "bg-slate-500/15 text-slate-400"
-                                }`}
+                              }`}
                             >
                               {gate.status}
                             </span>
@@ -1065,7 +1076,7 @@ export default function GateConsolePage() {
                 })()}
               </div>
             </div>
-
+            
             {/* Gate Out Column - Based on Access Log */}
             <div>
               <h3 className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-2 font-bold">Gate Out</h3>
@@ -1076,14 +1087,14 @@ export default function GateConsolePage() {
                     accessLogs.filter(log => log.direction === "exit").map(log => log.gate_code)
                   );
                   const exitGates = gates.filter(g => exitGateCodes.has(g.gate_code));
-
+                  
                   // Fallback: if no logs yet, show gates with gate_type === "exit"
                   const displayGates = exitGates.length > 0 ? exitGates : gates.filter(g => g.gate_type === "exit");
-
+                  
                   if (displayGates.length === 0) {
                     return <p className="text-[11px] text-[#4E6090]">No exit gates configured</p>;
                   }
-
+                  
                   return displayGates.map((gate) => {
                     const isOpen = gate.status === "open";
                     const busy = togglingGate === gate.id;
@@ -1093,10 +1104,11 @@ export default function GateConsolePage() {
                         type="button"
                         onClick={() => handleGateToggle(gate)}
                         disabled={busy}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-left ${isOpen
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-left ${
+                          isOpen
                             ? "border-emerald-500/30 bg-emerald-500/8 hover:bg-emerald-500/15"
                             : "border-[#1E2F50] bg-[#0D1526] hover:border-[#2A3F68]"
-                          } ${busy ? "opacity-50" : ""}`}
+                        } ${busy ? "opacity-50" : ""}`}
                       >
                         {isOpen ? (
                           <DoorOpen className="w-4 h-4 text-emerald-400 flex-shrink-0" />
@@ -1107,10 +1119,11 @@ export default function GateConsolePage() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-[11px] font-bold text-[#E8EDF8]">{gate.gate_code}</span>
                             <span
-                              className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${isOpen
+                              className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${
+                                isOpen
                                   ? "bg-emerald-500/15 text-emerald-400"
                                   : "bg-slate-500/15 text-slate-400"
-                                }`}
+                              }`}
                             >
                               {gate.status}
                             </span>
@@ -1131,9 +1144,10 @@ export default function GateConsolePage() {
           </div>
         </div>
 
+        {/* 2. Live LPR Scanner */}
         <div className="rounded-[16px] border border-[#1E2F50] bg-[#14203A] p-4">
           <h2 className="text-[12px] uppercase tracking-[0.15em] text-[#4E6090] mb-3 flex items-center gap-2">
-            <ScanLine className="w-4 h-4" /> Plate Scanner
+            <ScanLine className="w-4 h-4" /> LPR Scanner
           </h2>
 
           {/* Gate Camera Feed */}
@@ -1200,20 +1214,22 @@ export default function GateConsolePage() {
               <button
                 type="button"
                 onClick={() => setScanDirection("entry")}
-                className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${scanDirection === "entry"
+                className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
+                  scanDirection === "entry"
                     ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
                     : "border-[#1E2F50] text-[#4E6090] hover:border-[#2A3F68]"
-                  }`}
+                }`}
               >
                 <ArrowDownUp className="w-3 h-3 inline mr-1" />Entry
               </button>
               <button
                 type="button"
                 onClick={() => setScanDirection("exit")}
-                className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${scanDirection === "exit"
+                className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
+                  scanDirection === "exit"
                     ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
                     : "border-[#1E2F50] text-[#4E6090] hover:border-[#2A3F68]"
-                  }`}
+                }`}
               >
                 <ArrowRightLeft className="w-3 h-3 inline mr-1" />Exit
               </button>
@@ -1361,182 +1377,7 @@ export default function GateConsolePage() {
       </div>
 
       {/* ================================================================= */}
-      {/* ROW 3: AI Analysis Log Feed                                       */}
-      {/* ================================================================= */}
-      <div className="rounded-[16px] border border-[#1E2F50] bg-[#14203A] p-4 mb-4">
-        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <h2 className="text-[12px] uppercase tracking-[0.15em] text-[#4E6090] flex items-center gap-2">
-            <ClipboardList className="w-4 h-4 text-[#22D3A1]" /> AI Analysis Log Feed
-          </h2>
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Decision filter buttons */}
-            {(["all", "granted", "denied", "blacklisted"] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setAiLogFilter(f)}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-colors capitalize ${
-                  aiLogFilter === f
-                    ? "border-[#22D3A1]/50 bg-[#22D3A1]/10 text-[#22D3A1]"
-                    : "border-[#1E2F50] text-[#4E6090] hover:border-[#2A3F68]"
-                }`}
-              >
-                {f}
-              </button>
-            ))}
-            {/* Export buttons */}
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  if (filteredAILogs.length === 0) {
-                    alert("No logs to export");
-                    return;
-                  }
-                  exportVehicleLog(
-                    filteredAILogs.map((l) => ({
-                      ...l,
-                      analysis: "Pending",
-                      processed_at: l.processed_at || l.created_at,
-                    }))
-                  );
-                } catch (err) {
-                  console.error("PDF export failed:", err);
-                  alert("Export failed. Please try again.");
-                }
-              }}
-              className="px-2.5 py-1 rounded-lg text-[10px] font-semibold border border-[#1E2F50] text-[#8A9BBF] hover:border-[#E5521A]/30 hover:text-[#E5521A] transition-colors"
-            >
-              PDF
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  if (filteredAILogs.length === 0) {
-                    alert("No logs to export");
-                    return;
-                  }
-                  downloadCsv(
-                    `ai-analysis-log-${new Date().toISOString().slice(0, 10)}.csv`,
-                    ["Time", "Gate", "Plate", "Direction", "Decision", "Analysis", "Reason"],
-                    filteredAILogs.map((l) => [
-                      new Date(l.processed_at || l.created_at).toLocaleString(),
-                      l.gate_code || "—",
-                      l.plate_number,
-                      l.direction,
-                      l.decision,
-                      "Pending",
-                      l.denied_reason || "",
-                    ])
-                  );
-                } catch (err) {
-                  console.error("CSV export failed:", err);
-                  alert("Export failed. Please try again.");
-                }
-              }}
-              className="px-2.5 py-1 rounded-lg text-[10px] font-semibold border border-[#1E2F50] text-[#8A9BBF] hover:border-[#22D3A1]/30 hover:text-[#22D3A1] transition-colors"
-            >
-              CSV
-            </button>
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#4E6090]" />
-              <input
-                className="bg-[#0D1526] border border-[#1E2F50] rounded-lg pl-7 pr-3 py-1.5 text-[11px] text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[#22D3A1]/50 w-36"
-                placeholder="Search plate..."
-                value={aiLogSearch}
-                onChange={(e) => handleAiLogSearchChange(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        {aiLogError && (
-          <div className="mb-3 p-3 rounded-lg border border-[#F04A4A]/30 bg-[#F04A4A]/08 text-[11px] text-[#F04A4A] flex items-center justify-between">
-            <span>{aiLogError}</span>
-            <button
-              type="button"
-              onClick={() => { setAiLogError(null); void loadLogs(); }}
-              className="ml-3 px-2 py-0.5 rounded border border-[#F04A4A]/30 text-[10px] hover:bg-[#F04A4A]/10"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="text-[9px] uppercase tracking-[0.15em] text-[#4E6090] border-b border-[#1E2F50]">
-                <th className="pb-2 pr-3">Time</th>
-                <th className="pb-2 pr-3">Gate</th>
-                <th className="pb-2 pr-3">Plate</th>
-                <th className="pb-2 pr-3">Direction</th>
-                <th className="pb-2 pr-3">Decision</th>
-                <th className="pb-2 pr-3">Analysis</th>
-                <th className="pb-2">Reason</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAILogs.map((log) => (
-                <tr key={log.id} className="border-b border-[#1E2F50]/50 hover:bg-[#0D1526]/50">
-                  <td className="py-2 pr-3 text-[10px] text-[#8A9BBF] whitespace-nowrap">
-                    {new Date(log.processed_at || log.created_at).toLocaleString("en-IN", {
-                      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit",
-                    })}
-                  </td>
-                  <td className="py-2 pr-3 text-[11px] font-mono text-[#E8EDF8]">
-                    {log.gate_code || "—"}
-                  </td>
-                  <td className="py-2 pr-3 text-[11px] font-mono font-bold text-[#E8EDF8]">
-                    {log.plate_number}
-                  </td>
-                  <td className="py-2 pr-3">
-                    <span className="text-[9px] uppercase font-semibold text-[#8A9BBF] px-1.5 py-0.5 rounded bg-[#0D1526]">
-                      {log.direction}
-                    </span>
-                  </td>
-                  <td className="py-2 pr-3">
-                    <span
-                      className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full"
-                      style={{
-                        color: decisionColor(log.decision),
-                        background: `${decisionColor(log.decision)}15`,
-                        border: `1px solid ${decisionColor(log.decision)}30`,
-                      }}
-                    >
-                      {log.decision}
-                    </span>
-                  </td>
-                  <td className="py-2 pr-3">
-                    <button
-                      type="button"
-                      onClick={() => handleAnalysisClick(log.id)}
-                      className="text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-[#22D3A1]/30 bg-[#22D3A1]/08 text-[#22D3A1] hover:bg-[#22D3A1]/20 transition-colors cursor-pointer"
-                    >
-                      View Analysis
-                    </button>
-                  </td>
-                  <td className="py-2 text-[10px] text-[#F04A4A]">
-                    {log.denied_reason || "—"}
-                  </td>
-                </tr>
-              ))}
-              {filteredAILogs.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="py-6 text-center text-[11px] text-[#4E6090]">
-                    No AI analysis logs matching filters
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ================================================================= */}
-      {/* ROW 4: Vehicle Registry + Visitor Management                      */}
+      {/* ROW 3: Vehicle Registry + Visitor Management                      */}
       {/* ================================================================= */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* 4. Vehicle Registry & Blacklist Panel */}
@@ -1701,8 +1542,8 @@ export default function GateConsolePage() {
                       if (visitorDateStr !== visitorDate) return false;
                     }
                     // Filter by search
-                    if (logSearch && !visitor.name.toLowerCase().includes(logSearch.toLowerCase()) &&
-                      !visitor.vehicle_plate?.toLowerCase().includes(logSearch.toLowerCase())) {
+                    if (logSearch && !visitor.name.toLowerCase().includes(logSearch.toLowerCase()) && 
+                        !visitor.vehicle_plate?.toLowerCase().includes(logSearch.toLowerCase())) {
                       return false;
                     }
                     return true;
@@ -1711,9 +1552,6 @@ export default function GateConsolePage() {
                     <tr key={visitor.id} className="border-b border-[#1E2F50]/50 hover:bg-[#0D1526]/50">
                       <td className="py-2 pr-3">
                         <div className="text-[11px] font-bold text-[#E8EDF8]">{visitor.name}</div>
-                        {visitor.company && (
-                          <div className="text-[9px] text-[#8A9BBF]">{visitor.company}</div>
-                        )}
                       </td>
                       <td className="py-2 pr-3 text-[10px] text-[#8A9BBF] whitespace-nowrap">
                         {new Date(visitor.checked_in_at).toLocaleString("en-IN", {
@@ -1758,7 +1596,7 @@ export default function GateConsolePage() {
           onSubmit={handleRegisterVehicle}
         />
       )}
-
+      
       {/* Analysis Image Modal */}
       {showAnalysisImage && selectedPlateNumber && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setShowAnalysisImage(false)}>
@@ -1814,7 +1652,7 @@ export default function GateConsolePage() {
                 ×
               </button>
             </div>
-
+            
             {/* Driver's License Card */}
             <div className="bg-gradient-to-br from-[#1a2942] to-[#0F1A30] rounded-xl p-6 border border-[#2A3F68] mb-4">
               <div className="flex items-start justify-between mb-4">
@@ -1826,7 +1664,7 @@ export default function GateConsolePage() {
                   <span className="text-[10px] text-[#4E6090]">PHOTO</span>
                 </div>
               </div>
-
+              
               <div className="grid grid-cols-2 gap-4 text-[11px]">
                 <div>
                   <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">License Number</div>
@@ -1864,7 +1702,7 @@ export default function GateConsolePage() {
             {/* Vehicle Registration Card */}
             <div className="bg-gradient-to-br from-[#1a2942] to-[#0F1A30] rounded-xl p-6 border border-[#2A3F68]">
               <div className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-3">Vehicle Registration Certificate</div>
-
+              
               <div className="grid grid-cols-2 gap-4 text-[11px]">
                 <div>
                   <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Registration Number</div>
@@ -1895,7 +1733,7 @@ export default function GateConsolePage() {
                 <div className="col-span-2">
                   <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Insurance Valid Until</div>
                   <div className="text-[#8A9BBF]">
-                    {selectedVehicle.valid_until
+                    {selectedVehicle.valid_until 
                       ? new Date(selectedVehicle.valid_until).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
                       : new Date(new Date(selectedVehicle.created_at).getTime() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
                     }

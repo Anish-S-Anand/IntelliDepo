@@ -20,7 +20,6 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone, timedelta, date
-from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -81,10 +80,10 @@ PERIMETER_ZONES = [
 ]
 
 CLUSTER_ZONES = [
-    {"zone_code": "A", "name": "Storage Bay A — Cement", "zone_type": "storage", "floor": "ground", "area_sqm": 2400, "max_capacity_units": 1000, "current_occupancy": 810},
-    {"zone_code": "B", "name": "Storage Bay B — Cement", "zone_type": "storage", "floor": "ground", "area_sqm": 2800, "max_capacity_units": 1000, "current_occupancy": 450},
-    {"zone_code": "C", "name": "Storage Bay C — Cement", "zone_type": "storage", "floor": "ground", "area_sqm": 1600, "max_capacity_units": 800, "current_occupancy": 595},
-    {"zone_code": "D", "name": "Storage Bay D — Cement", "zone_type": "storage", "floor": "ground", "area_sqm": 3200, "max_capacity_units": 1200, "current_occupancy": 1092},
+    {"zone_code": "A", "name": "Zone A", "zone_type": "storage", "floor": "ground", "area_sqm": 2400, "max_capacity_units": 1000, "current_occupancy": 810},
+    {"zone_code": "B", "name": "Zone B", "zone_type": "storage", "floor": "ground", "area_sqm": 2800, "max_capacity_units": 1000, "current_occupancy": 450},
+    {"zone_code": "C", "name": "Zone C", "zone_type": "storage", "floor": "ground", "area_sqm": 1600, "max_capacity_units": 800, "current_occupancy": 595},
+    {"zone_code": "D", "name": "Zone D", "zone_type": "storage", "floor": "ground", "area_sqm": 3200, "max_capacity_units": 1200, "current_occupancy": 1092},
 ]
 
 MANIFESTS = [
@@ -98,7 +97,7 @@ DETECTION_MODEL = {
     "model_version": "2025-05-29",
     "weights_path": os.getenv(
         "YOLO_WEIGHTS",
-        str(Path(__file__).resolve().parents[2] / "best_cement_bags_2025-05-29.pt"),
+        r"C:\Users\karte\OneDrive - Fidelis Technology Services Pvt Ltd\Desktop\intelli-platform\best_cement_bags_2025-05-29.pt",
     ),
     "confidence_threshold": 0.25,
     "iou_threshold": 0.45,
