@@ -80,10 +80,10 @@ PERIMETER_ZONES = [
 ]
 
 CLUSTER_ZONES = [
-    {"zone_code": "A", "name": "Zone A", "zone_type": "storage", "floor": "ground", "area_sqm": 2400, "max_capacity_units": 1000, "current_occupancy": 810},
-    {"zone_code": "B", "name": "Zone B", "zone_type": "storage", "floor": "ground", "area_sqm": 2800, "max_capacity_units": 1000, "current_occupancy": 450},
-    {"zone_code": "C", "name": "Zone C", "zone_type": "storage", "floor": "ground", "area_sqm": 1600, "max_capacity_units": 800, "current_occupancy": 595},
-    {"zone_code": "D", "name": "Zone D", "zone_type": "storage", "floor": "ground", "area_sqm": 3200, "max_capacity_units": 1200, "current_occupancy": 1092},
+    {"zone_code": "A", "name": "UltraTech Cement — Zone A", "zone_type": "storage", "floor": "ground", "area_sqm": 2400, "max_capacity_units": 1000, "current_occupancy": 810},
+    {"zone_code": "B", "name": "ACC Cement — Zone B",       "zone_type": "storage", "floor": "ground", "area_sqm": 2800, "max_capacity_units": 1000, "current_occupancy": 450},
+    {"zone_code": "C", "name": "JSW Cement — Zone C",       "zone_type": "storage", "floor": "ground", "area_sqm": 1600, "max_capacity_units": 800, "current_occupancy": 595},
+    {"zone_code": "D", "name": "Ambuja Cement — Zone D",    "zone_type": "storage", "floor": "ground", "area_sqm": 3200, "max_capacity_units": 1200, "current_occupancy": 1092},
 ]
 
 MANIFESTS = [
