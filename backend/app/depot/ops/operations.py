@@ -428,50 +428,41 @@ async def update_exception(
 async def get_ops_kpis(
     db: AsyncSession = Depends(get_db),
 ):
-    """Aggregate KPI summary for the IntelliOps dashboard — single-pass queries."""
-    from sqlalchemy import case
+    """Aggregate KPI summary for the IntelliOps dashboard."""
+    # Tasks
+    tasks_total_r     = await db.execute(select(func.count()).select_from(OpsTask))
+    tasks_completed_r = await db.execute(select(func.count()).select_from(OpsTask).where(OpsTask.status == TaskStatus.COMPLETED))
+    tasks_inprog_r    = await db.execute(select(func.count()).select_from(OpsTask).where(OpsTask.status == TaskStatus.IN_PROGRESS))
+    tasks_pending_r   = await db.execute(select(func.count()).select_from(OpsTask).where(OpsTask.status == TaskStatus.PENDING))
 
-    # Single query: count tasks by status + distinct active workers
-    task_agg = await db.execute(
-        select(
-            func.count().label("total"),
-            func.count(case((OpsTask.status == TaskStatus.COMPLETED, 1))).label("completed"),
-            func.count(case((OpsTask.status == TaskStatus.IN_PROGRESS, 1))).label("in_progress"),
-            func.count(case((OpsTask.status == TaskStatus.PENDING, 1))).label("pending"),
-            func.count(
-                case((
-                    (OpsTask.status == TaskStatus.IN_PROGRESS) & OpsTask.worker_id.isnot(None),
-                    OpsTask.worker_id
-                ))
-            ).label("active_workers"),
-        ).select_from(OpsTask)
-    )
-    row = task_agg.one()
-    tasks_total     = row.total or 0
-    tasks_completed = row.completed or 0
-    tasks_inprog    = row.in_progress or 0
-    tasks_pending   = row.pending or 0
-    active_workers  = row.active_workers or 0
+    tasks_total     = tasks_total_r.scalar() or 0
+    tasks_completed = tasks_completed_r.scalar() or 0
+    tasks_inprog    = tasks_inprog_r.scalar() or 0
+    tasks_pending   = tasks_pending_r.scalar() or 0
 
-    # Single query: count checklists + exceptions by status
-    cl_exc_agg = await db.execute(
-        select(
-            func.count(case((SOPChecklist.id.isnot(None), 1))).label("cl_total"),
-            func.count(case((SOPChecklist.status == ChecklistStatus.COMPLETE, 1))).label("cl_done"),
-        ).select_from(SOPChecklist)
+    # Active workers = distinct worker_ids on in-progress tasks
+    workers_r = await db.execute(
+        select(func.count(OpsTask.worker_id.distinct()))
+        .where(OpsTask.status == TaskStatus.IN_PROGRESS, OpsTask.worker_id.isnot(None))
     )
-    cl_row  = cl_exc_agg.one()
-    cl_total = cl_row.cl_total or 0
-    cl_done  = cl_row.cl_done or 0
+    active_workers = workers_r.scalar() or 0
+
+    # Checklists
+    cl_total_r = await db.execute(select(func.count()).select_from(SOPChecklist))
+    cl_done_r  = await db.execute(select(func.count()).select_from(SOPChecklist).where(SOPChecklist.status == ChecklistStatus.COMPLETE))
+    cl_total   = cl_total_r.scalar() or 0
+    cl_done    = cl_done_r.scalar() or 0
     compliance = round((cl_done / cl_total) * 100, 1) if cl_total > 0 else 0.0
 
-    exc_agg = await db.execute(
-        select(
-            func.count(case((OpsException.status.in_([ExceptionStatus.OPEN, ExceptionStatus.INVESTIGATING]), 1))).label("open_exc"),
-            func.count(case((OpsException.status == ExceptionStatus.ESCALATED, 1))).label("escalated"),
-        ).select_from(OpsException)
+    # Exceptions
+    open_exc_r = await db.execute(
+        select(func.count()).select_from(OpsException)
+        .where(OpsException.status.in_([ExceptionStatus.OPEN, ExceptionStatus.INVESTIGATING]))
     )
-    exc_row = exc_agg.one()
+    escalated_r = await db.execute(
+        select(func.count()).select_from(OpsException)
+        .where(OpsException.status == ExceptionStatus.ESCALATED)
+    )
 
     return OpsKPISummary(
         tasks_total=tasks_total,
@@ -482,6 +473,6 @@ async def get_ops_kpis(
         sop_compliance_pct=compliance,
         checklists_total=cl_total,
         checklists_done=cl_done,
-        open_exceptions=exc_row.open_exc or 0,
-        exceptions_needing_escalation=exc_row.escalated or 0,
+        open_exceptions=open_exc_r.scalar() or 0,
+        exceptions_needing_escalation=escalated_r.scalar() or 0,
     )

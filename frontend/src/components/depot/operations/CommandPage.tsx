@@ -1,16 +1,45 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Activity, AlertTriangle, Camera, Shield, Truck } from "lucide-react";
+import { Activity, AlertTriangle, Camera, Shield, Truck, BellRing, DoorOpen, DoorClosed, Lock, Phone } from "lucide-react";
 import { SEV_COL } from "@/lib/depot-data";
 import { getActiveIncidents, type IncidentResponse } from "@/services/depotPerimeter";
-import { getDepotCommandSnapshot, type CameraRecord, type GateRecord } from "@/services/depotCommand";
+import {
+  getDepotCommandSnapshot,
+  openCommandGate,
+  closeCommandGate,
+  lockCommandZone,
+  triggerCommandAlert,
+  contactCommandOperator,
+  type CameraRecord,
+  type GateRecord,
+  type CommandActionResponse,
+} from "@/services/depotCommand";
 
 export default function CommandPage() {
   const [incidents, setIncidents] = useState<IncidentResponse[]>([]);
   const [cameras, setCameras] = useState<CameraRecord[]>([]);
   const [gates, setGates] = useState<GateRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ msg: string; ok: boolean } | null>(null);
+
+  const showFeedback = (msg: string, ok = true) => {
+    setFeedback({ msg, ok });
+    setTimeout(() => setFeedback(null), 3000);
+  };
+
+  const runAction = async (key: string, fn: () => Promise<CommandActionResponse>, successMsg: string) => {
+    setActionLoading(key);
+    try {
+      await fn();
+      showFeedback(successMsg, true);
+    } catch {
+      showFeedback("Action failed — check connection", false);
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const fetchAll = useCallback(async () => {
     const [incRes, snapRes] = await Promise.allSettled([
@@ -62,6 +91,93 @@ export default function CommandPage() {
         <p className="text-[11px] text-[#8A9BBF] mt-0.5">
           Live depot overview — cameras, gates, and incident feed
         </p>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <BellRing className="w-4 h-4 text-[#E5521A]" />
+            <span className="text-[13px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>Quick Actions</span>
+          </div>
+          {feedback && (
+            <span className={`text-[11px] font-bold px-3 py-1 rounded-full ${feedback.ok ? "bg-[#22D3A1]/15 text-[#22D3A1]" : "bg-[#F04A4A]/15 text-[#F04A4A]"}`}>
+              {feedback.msg}
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {[
+            {
+              key: "open-gate",
+              icon: DoorOpen,
+              label: "Open Gate",
+              sub: gates.find((g) => g.status !== "open")?.name ?? gates[0]?.name ?? "No gates",
+              color: "#22D3A1",
+              fn: () => openCommandGate(gates.find((g) => g.status !== "open")?.id),
+              successMsg: `${gates.find((g) => g.status !== "open")?.name ?? "Gate"} opened`,
+            },
+            {
+              key: "close-gate",
+              icon: DoorClosed,
+              label: "Close Gate",
+              sub: gates.find((g) => g.status === "open")?.name ?? "All closed",
+              color: "#F5A623",
+              fn: () => closeCommandGate(gates.find((g) => g.status === "open")?.id),
+              successMsg: `${gates.find((g) => g.status === "open")?.name ?? "Gate"} closed`,
+            },
+            {
+              key: "lock-zone",
+              icon: Lock,
+              label: "Lock Zone",
+              sub: "Initiate lockdown",
+              color: "#F04A4A",
+              fn: () => lockCommandZone(openIncidents[0]?.zone ?? "Depot perimeter"),
+              successMsg: "Zone lockdown initiated",
+            },
+            {
+              key: "trigger-alert",
+              icon: BellRing,
+              label: "Trigger Alert",
+              sub: "Broadcast to all",
+              color: "#E5521A",
+              fn: triggerCommandAlert,
+              successMsg: "Manual alert triggered",
+            },
+            {
+              key: "contact",
+              icon: Phone,
+              label: "Contact Operator",
+              sub: "Page via intercom",
+              color: "#5B9BF5",
+              fn: contactCommandOperator,
+              successMsg: "Operator paged via intercom",
+            },
+          ].map((action) => {
+            const Icon = action.icon;
+            const isLoading = actionLoading === action.key;
+            return (
+              <button
+                key={action.key}
+                onClick={() => runAction(action.key, action.fn, action.successMsg)}
+                disabled={!!actionLoading}
+                className="flex flex-col items-center gap-2 p-4 rounded-[12px] border border-[#1E2F50] bg-[#0F1A30] hover:bg-[#1A2A45] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${action.color}15`, border: `1px solid ${action.color}30` }}>
+                  {isLoading ? (
+                    <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: action.color, borderTopColor: "transparent" }} />
+                  ) : (
+                    <Icon className="w-4 h-4" style={{ color: action.color }} />
+                  )}
+                </div>
+                <div className="text-center">
+                  <div className="text-[11px] font-bold" style={{ color: action.color }}>{action.label}</div>
+                  <div className="text-[9px] text-[#4E6090] mt-0.5">{action.sub}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Summary KPIs */}

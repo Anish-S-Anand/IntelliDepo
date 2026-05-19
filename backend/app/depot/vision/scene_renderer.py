@@ -213,7 +213,7 @@ def _scene_zone_overhead(h, w, t, theme='dark'):
         py = int(h*0.75 + 10*math.cos(t*0.3+i))
         _draw_person(frame, px, py, 0.7)
     cv2.rectangle(frame, (10, 30), (200, 70), (0,0,0), -1)
-    cv2.putText(frame, "ZONE A  OVERHEAD", (14, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (34, 211, 160), 1)
+    cv2.putText(frame, "ZONE-A  OVERHEAD", (14, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (34, 211, 160), 1)
     cv2.putText(frame, "PALLETS: 124  UTIL: 81%", (14, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.32, (200, 200, 200), 1)
     return _apply_theme(frame, theme)
 
@@ -271,7 +271,7 @@ def _scene_perimeter(h, w, t, theme='dark'):
     cv2.putText(frame, "NV-MODE  IR", (w-120, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (35, 180, 35), 1)
     cv2.circle(frame, (w-130, 30), 5, (35, 180, 35), -1)
     cv2.rectangle(frame, (10, 30), (220, 70), (0,0,0), -1)
-    cv2.putText(frame, "ZONE C PERIMETER", (14, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (35, 200, 35), 1)
+    cv2.putText(frame, "ZONE-C PERIMETER", (14, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (35, 200, 35), 1)
     cv2.putText(frame, "ALERT: MOTION DETECTED", (14, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.32, (0, 60, 220), 1)
     return _apply_theme(frame, theme) if theme == 'light' else frame
 
@@ -295,7 +295,7 @@ def _scene_gate_exit(h, w, t, theme='dark'):
     cv2.putText(frame, "TN04AB1234", (plate_x+2, plate_y+11), cv2.FONT_HERSHEY_SIMPLEX, 0.26, (20,20,20), 1)
     cv2.rectangle(frame, (plate_x-2, plate_y-2), (plate_x+52, plate_y+16), (59, 246, 130), 2)
     cv2.rectangle(frame, (10, 30), (240, 85), (0,0,0), -1)
-    cv2.putText(frame, "GATE — SOUTH EXIT", (14, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (34, 211, 160), 1)
+    cv2.putText(frame, "GATE EXIT SOUTH", (14, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (34, 211, 160), 1)
     cv2.putText(frame, "LPR: TN04AB1234", (14, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (59, 246, 130), 1)
     cv2.putText(frame, "STATUS: APPROVED", (14, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.32, (34, 211, 160), 1)
     return _apply_theme(frame, theme)

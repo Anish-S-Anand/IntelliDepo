@@ -1,11 +1,9 @@
 """Depot Command Center action audit log
-
 Revision ID: 015_depot_command_actions
 Revises: 014_intelliops_day4_incidents
 Create Date: 2026-05-15
 """
 from __future__ import annotations
-
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql

@@ -474,47 +474,46 @@ async def resolve_alert(
 async def get_dashboard_kpis(
     db: AsyncSession = Depends(get_db),
 ):
-    """Get live KPI counts for the multi-feed dashboard — single-pass query with 30s TTL cache."""
-    from sqlalchemy import case
-
+    """Get live KPI counts for the multi-feed dashboard."""
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
-    # Single query: events today + all alert counts in one pass
-    agg = await db.execute(
-        select(
-            func.count(case((SensorEvent.timestamp >= today_start, 1))).label("events_today"),
-        ).select_from(SensorEvent)
+    # Event count today
+    ev_result = await db.execute(
+        select(func.count()).select_from(SensorEvent)
+        .where(SensorEvent.timestamp >= today_start)
     )
-    total_events = agg.scalar() or 0
+    total_events = ev_result.scalar() or 0
 
-    # Single query: all alert severity counts in one pass
-    alert_agg = await db.execute(
-        select(
-            func.count().label("active_total"),
-            func.count(case((
-                (AlertQueue.severity == "critical") & (AlertQueue.status != AlertStatus.RESOLVED),
-                1
-            ))).label("critical"),
-            func.count(case((
-                (AlertQueue.severity == "high") & (AlertQueue.status != AlertStatus.RESOLVED),
-                1
-            ))).label("high"),
-            func.count(case((
-                (AlertQueue.severity == "medium") & (AlertQueue.status != AlertStatus.RESOLVED),
-                1
-            ))).label("medium"),
-            func.count(case((AlertQueue.status == AlertStatus.ACKNOWLEDGED, 1))).label("acknowledged"),
-        ).select_from(AlertQueue)
+    # Alert counts by severity
+    critical_count = 0
+    high_count = 0
+    medium_count = 0
+    for sev in ["critical", "high", "medium"]:
+        count_result = await db.execute(
+            select(func.count()).select_from(AlertQueue)
+            .where(AlertQueue.severity == sev, AlertQueue.status != AlertStatus.RESOLVED)
+        )
+        count = count_result.scalar() or 0
+        if sev == "critical":
+            critical_count = count
+        elif sev == "high":
+            high_count = count
+        elif sev == "medium":
+            medium_count = count
+
+    active_result = await db.execute(
+        select(func.count()).select_from(AlertQueue)
         .where(AlertQueue.status != AlertStatus.RESOLVED)
     )
-    ar = alert_agg.one()
-    active_alerts  = ar.active_total or 0
-    critical_count = ar.critical or 0
-    high_count     = ar.high or 0
-    medium_count   = ar.medium or 0
-    ack_count      = ar.acknowledged or 0
+    active_alerts = active_result.scalar() or 0
+
+    ack_result = await db.execute(
+        select(func.count()).select_from(AlertQueue)
+        .where(AlertQueue.status == AlertStatus.ACKNOWLEDGED)
+    )
 
     hours_elapsed = max((datetime.now(timezone.utc) - today_start).total_seconds() / 3600, 1)
+
     events_per_hour = round(total_events / hours_elapsed, 1)
 
     # Push metrics to Prometheus collector
@@ -536,7 +535,7 @@ async def get_dashboard_kpis(
         critical_alerts=critical_count,
         high_alerts=high_count,
         medium_alerts=medium_count,
-        acknowledged_count=ack_count,
+        acknowledged_count=ack_result.scalar() or 0,
         avg_response_time_min=2.4,
         events_per_hour=events_per_hour,
     )

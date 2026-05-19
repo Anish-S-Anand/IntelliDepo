@@ -45,13 +45,13 @@ LOCAL_VIDEO_DIR = Path(__file__).resolve().parent.parent.parent.parent / "tmp"
 SCENE_VIDEOS = [
     {
         "scene": "gate_entry",
-        "label": "GATE — NORTH ENTRY - LPR",
+        "label": "GATE ENTRY NORTH - LPR",
         "filename": "Screen Recording 2025-05-22 164244.mp4",
         "description": "Gate entry monitoring",
     },
     {
         "scene": "zone_overhead",
-        "label": "ZONE A OVERHEAD",
+        "label": "ZONE-A OVERHEAD",
         "filename": "Screen Recording 2025-08-11 173926.mp4",
         "description": "Zone overhead view",
     },
@@ -63,13 +63,13 @@ SCENE_VIDEOS = [
     },
     {
         "scene": "perimeter",
-        "label": "ZONE C PERIMETER",
+        "label": "ZONE-C PERIMETER",
         "filename": "Recording 2025-07-30 115417.mp4",
         "description": "Perimeter monitoring",
     },
     {
         "scene": "gate_exit",
-        "label": "GATE — SOUTH EXIT",
+        "label": "GATE EXIT SOUTH",
         "filename": "Recording 2025-07-30 120521.mp4",
         "description": "Exit gate monitoring",
     },

@@ -1,0 +1,40 @@
+﻿<!DOCTYPE html>
+<html>
+<head><title>Video Stream Test</title></head>
+<body style="background:#111;color:#fff;font-family:monospace;padding:20px">
+<h2>Video Stream Diagnostic</h2>
+
+<div id="test1">
+  <h3>Test 1: Direct backend (port 8000)</h3>
+  <video id="v1" controls muted loop style="width:480px;background:#000" preload="auto"></video>
+  <div id="s1" style="color:yellow">Loading...</div>
+</div>
+
+<div id="test2" style="margin-top:20px">
+  <h3>Test 2: Via Next.js proxy (/backend/...)</h3>
+  <video id="v2" controls muted loop style="width:480px;background:#000" preload="auto"></video>
+  <div id="s2" style="color:yellow">Loading...</div>
+</div>
+
+<script>
+const file = "Screen Recording 2025-05-22 164244.mp4";
+const directUrl = `http://${location.hostname}:8000/depot/vision/cameras/video-library/${encodeURIComponent(file)}/stream`;
+const proxyUrl = `/backend/depot/vision/cameras/video-library/${encodeURIComponent(file)}/stream`;
+
+function setup(videoId, statusId, url) {
+  const v = document.getElementById(videoId);
+  const s = document.getElementById(statusId);
+  s.textContent = "URL: " + url;
+  v.onerror = () => { s.style.color="red"; s.textContent = "ERROR code=" + v.error?.code + " msg=" + v.error?.message + " | URL: " + url; };
+  v.oncanplay = () => { s.style.color="lime"; s.textContent = "CANPLAY ✓ | URL: " + url; };
+  v.onloadeddata = () => { s.style.color="lime"; s.textContent = "LOADEDDATA ✓ | URL: " + url; };
+  v.onstalled = () => { s.style.color="orange"; s.textContent = "STALLED | URL: " + url; };
+  v.src = url;
+  v.load();
+}
+
+setup("v1", "s1", directUrl);
+setup("v2", "s2", proxyUrl);
+</script>
+</body>
+</html>

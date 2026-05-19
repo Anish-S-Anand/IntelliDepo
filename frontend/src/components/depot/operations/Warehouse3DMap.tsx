@@ -26,6 +26,13 @@ const ZONE_LAYOUT: Record<string, { x: number; z: number; w: number; d: number }
   D: { x:  2, z:  1, w: 7, d: 5 },
 };
 
+const ZONE_LABELS: Record<string, string> = {
+  A: "UltraTech Cement",
+  B: "ACC Cement",
+  C: "JSW Cement",
+  D: "Ambuja Cement",
+};
+
 function getZoneColor(status: string, utilPct: number): number {
   if (status === "critical" || utilPct >= 90) return 0xF04A4A;
   if (status === "warning"  || utilPct >= 75) return 0xF5A623;
@@ -168,16 +175,15 @@ export default function Warehouse3DMap({ zones, onZoneClick, selectedZone, flash
       ctx.roundRect(4, 4, 248, 120, 12);
       ctx.fill();
       ctx.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
-      ctx.font = "bold 36px sans-serif";
+      ctx.font = "bold 22px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(`Zone ${code}`, 128, 44);
+      ctx.fillText(ZONE_LABELS[code] ?? `Zone ${code}`, 128, 38);
       ctx.fillStyle = "#e8edf8";
       ctx.font = "bold 28px sans-serif";
-      ctx.fillText(`${utilPct}%`, 128, 78);
+      ctx.fillText(`${utilPct}%`, 128, 72);
       ctx.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
       ctx.font = "bold 18px sans-serif";
-      ctx.fillText(getStatusLabel(utilPct), 128, 108);
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
+      ctx.fillText(getStatusLabel(utilPct), 128, 108);      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
       sprite.position.set(cx, 0.15 + stackH + 1.8, cz);
       sprite.scale.set(3.5, 1.75, 1);
       scene.add(sprite);

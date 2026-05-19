@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Radar, Shield, AlertTriangle, MapPin } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Radar, Shield, AlertTriangle, MapPin, Camera, X } from "lucide-react";
 import { SEV_COL, STA_COL } from "@/lib/depot-data";
 import type { Incident } from "@/lib/depot-data";
+import { getVideoUrl } from "@/services/depotVision";
 import {
   getIncidents,
   getActiveBreaches,
@@ -14,7 +16,73 @@ import {
   type BreachResponse,
 } from "@/services/depotPerimeter";
 
-type FilterType = "all" | "open" | "acknowledged" | "resolved" | "CRITICAL" | "HIGH" | "perimeter";
+type FilterType = "all" | "acknowledged" | "resolved" | "CRITICAL" | "HIGH" | "perimeter";
+
+type SelectedVideo = {
+  evidenceId: string;
+  videoFile: string;
+  title: string;
+};
+
+const EMPTY_VALUE = "—";
+
+const BREACH_TYPE_LABELS: Record<string, string> = {
+  unauthorized_entry: "Unauthorized Entry",
+  loitering: "Loitering",
+  forced_entry: "Forced Entry",
+  after_hours: "After Hours",
+  object_left: "Object Left Behind",
+  unknown: "Unknown",
+};
+
+const BREACH_VIDEO_MAP: Record<string, string> = {
+  unauthorized_entry: "Perimeter_Detection.mp4",
+  loitering: "Theft Camera .mp4",
+  forced_entry: "Perimeter_Detection.mp4",
+  after_hours: "Recording 2025-07-30 115417.mp4",
+  object_left: "Theft Camera .mp4",
+  unknown: "LPR_RECOGNITION.mp4",
+};
+
+const SEED_EVIDENCE_VIDEO_MAP: Record<string, string> = {
+  "seed://breach-0": "Perimeter_Detection.mp4",
+  "seed://breach-cold-storage": "Recording 2025-07-30 115417.mp4",
+  "seed://breach-inbound-gate": "Screen Recording 2025-05-22 164244.mp4",
+  "seed://breach-staging-area": "Theft Camera .mp4",
+  "seed://breach-dispatch-bay": "Recording 2025-07-30 120521.mp4",
+};
+
+function resolveEvidenceVideo(ref?: string | null, breachType?: string | null): string | null {
+  if (ref?.toLowerCase().endsWith(".mp4")) return ref;
+  if (ref && SEED_EVIDENCE_VIDEO_MAP[ref]) return SEED_EVIDENCE_VIDEO_MAP[ref];
+  if (breachType && BREACH_VIDEO_MAP[breachType]) return BREACH_VIDEO_MAP[breachType];
+  return ref?.startsWith("seed://") ? "Perimeter_Detection.mp4" : null;
+}
+
+function dedupeIncidents(backendIncidents: IncidentResponse[]): IncidentResponse[] {
+  const seen = new Set<string>();
+  const unique: IncidentResponse[] = [];
+
+  for (const incident of backendIncidents) {
+    const baseDescription = (incident.description || "")
+      .split("Acknowledged:")[0]
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+    const key = [
+      incident.title.trim().toLowerCase(),
+      baseDescription,
+      incident.severity,
+      resolveEvidenceVideo(incident.video_archive_ref) || "",
+    ].join("|");
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(incident);
+  }
+
+  return unique;
+}
 
 /** Map backend incidents to the UI Incident shape */
 function mapBackendIncident(inc: IncidentResponse): Incident {
@@ -37,13 +105,14 @@ function mapBackendIncident(inc: IncidentResponse): Incident {
     loc: `Zone ID: ${inc.zone_id}`,
     t: new Date(inc.created_at).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" }),
     status: statusMap[inc.status] || "open",
-    cam: inc.video_archive_ref || "—",
+    cam: resolveEvidenceVideo(inc.video_archive_ref) || EMPTY_VALUE,
     desc: inc.description || inc.title,
-    assignee: inc.acknowledged_by || inc.escalated_to || "—",
+    assignee: inc.acknowledged_by || inc.escalated_to || EMPTY_VALUE,
   };
 }
 
 export default function IncidentsPage() {
+  const searchParams = useSearchParams();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [rawIncidents, setRawIncidents] = useState<IncidentResponse[]>([]);
   const [breaches, setBreaches] = useState<BreachResponse[]>([]);
@@ -53,14 +122,16 @@ export default function IncidentsPage() {
   const [acknowledging, setAcknowledging] = useState<string | null>(null);
   const [ackError, setAckError] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
-  const [selectedBreachVideo, setSelectedBreachVideo] = useState<{ breachId: string; videoFile: string; breachType: string } | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<SelectedVideo | null>(null);
+  const selectedIncidentId = searchParams.get("incident");
 
   // Fetch real incidents from backend
   const fetchIncidents = useCallback(async () => {
     try {
       const backendIncidents = await getIncidents();
-      setRawIncidents(backendIncidents);
-      setIncidents(backendIncidents.map(mapBackendIncident));
+      const uniqueIncidents = dedupeIncidents(backendIncidents);
+      setRawIncidents(uniqueIncidents);
+      setIncidents(uniqueIncidents.map(mapBackendIncident));
     } catch {
       // Keep empty — don't pad with stale mock data
     }
@@ -91,7 +162,7 @@ export default function IncidentsPage() {
     return false;
   }), [incidents, filter]);
 
-  const cntOpen = useMemo(() => incidents.filter((i) => i.status === "open").length, [incidents]);
+  const cntTotal = incidents.length;
   const cntAck = useMemo(() => incidents.filter((i) => i.status === "acknowledged").length, [incidents]);
   const cntRes = useMemo(() => incidents.filter((i) => i.status === "resolved").length, [incidents]);
   const cntCrit = useMemo(() => incidents.filter((i) => i.sev === "CRITICAL").length, [incidents]);
@@ -99,6 +170,31 @@ export default function IncidentsPage() {
     () => new Map(rawIncidents.map((incident) => [incident.breach_id, incident])),
     [rawIncidents],
   );
+  const incidentById = useMemo(
+    () => new Map(rawIncidents.map((incident) => [incident.id, incident])),
+    [rawIncidents],
+  );
+
+  useEffect(() => {
+    if (!selectedIncidentId || rawIncidents.length === 0) return;
+
+    const selectedIncident = rawIncidents.find((incident) => incident.id === selectedIncidentId);
+    if (!selectedIncident) return;
+
+    const normalizedStatus = selectedIncident.status === "escalated" ? "acknowledged" : selectedIncident.status;
+    if (normalizedStatus === "acknowledged" || normalizedStatus === "resolved") {
+      setFilter(normalizedStatus);
+    } else {
+      setFilter("all");
+    }
+
+    window.setTimeout(() => {
+      document.getElementById(`incident-${selectedIncidentId}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 80);
+  }, [rawIncidents, selectedIncidentId]);
 
   const acknowledge = async (id: string) => {
     if (acknowledging !== null) return;
@@ -138,67 +234,52 @@ export default function IncidentsPage() {
   const handleResolve = async () => {
     if (!resolveModalId || resolveNotes.length < 5 || resolving) return;
     setResolving(true);
+    setAckError(null);
     try {
-      if (resolveModalId.includes("-") && resolveModalId.length > 10) {
-        try {
-          await resolveIncident(resolveModalId, resolveNotes);
-          void fetchIncidents();
-          setResolveModalId(null);
-          setResolveNotes("");
-          return;
-        } catch { /* fall through */ }
-      }
-      setIncidents((prev) =>
-        prev.map((i) =>
-          i.id === resolveModalId ? { ...i, status: "resolved" as const } : i
-        )
-      );
+      await resolveIncident(resolveModalId, resolveNotes);
+      await Promise.all([fetchIncidents(), fetchBreaches()]);
       setResolveModalId(null);
       setResolveNotes("");
+    } catch {
+      setAckError("Unable to resolve this incident. The displayed data was not changed.");
     } finally {
       setResolving(false);
     }
   };
 
   const filters: { label: string; value: FilterType; style?: string }[] = [
-    { label: "All", value: "all" },
-    { label: "Open", value: "open" },
+    { label: "All Incidents", value: "all" },
     { label: "Acknowledged", value: "acknowledged" },
     { label: "Resolved", value: "resolved" },
     { label: "Critical", value: "CRITICAL", style: "border-[#EF4444] text-[#EF4444]" },
     { label: "High", value: "HIGH", style: "border-[#F97316] text-[#F97316]" },
   ];
 
-  const BREACH_TYPE_LABELS: Record<string, string> = {
-    unauthorized_entry: "Unauthorized Entry",
-    loitering: "Loitering",
-    forced_entry: "Forced Entry",
-    after_hours: "After Hours",
-    object_left: "Object Left Behind",
-    unknown: "Unknown",
+  const handleBreachAnalysisClick = (breach: BreachResponse) => {
+    const linkedIncident = incidentByBreachId.get(breach.id);
+    const videoFile = resolveEvidenceVideo(linkedIncident?.video_archive_ref, breach.breach_type) || "Perimeter_Detection.mp4";
+    setSelectedVideo({
+      evidenceId: breach.id,
+      videoFile,
+      title: `${BREACH_TYPE_LABELS[breach.breach_type] || breach.breach_type} Analysis`,
+    });
   };
 
-  // Map breach types to video files
-  const BREACH_VIDEO_MAP: Record<string, string> = {
-    unauthorized_entry: "Perimeter_Detection.mp4",
-    loitering: "Theft Camera .mp4",
-    forced_entry: "Perimeter_Detection.mp4",
-    after_hours: "Perimeter_Detection.mp4",
-    object_left: "Theft Camera .mp4",
-    unknown: "LPR_RECOGNITION.mp4",
-  };
+  const handleIncidentAnalysisClick = (incident: Incident) => {
+    const rawIncident = incidentById.get(incident.id);
+    const linkedBreach = breaches.find((breach) => breach.id === rawIncident?.breach_id);
+    const videoFile = resolveEvidenceVideo(rawIncident?.video_archive_ref, linkedBreach?.breach_type);
+    if (!videoFile) return;
 
-  const handleAnalysisClick = (breach: BreachResponse) => {
-    const videoFile = BREACH_VIDEO_MAP[breach.breach_type] || "Perimeter_Detection.mp4";
-    setSelectedBreachVideo({
-      breachId: breach.id,
-      videoFile: videoFile,
-      breachType: BREACH_TYPE_LABELS[breach.breach_type] || breach.breach_type,
+    setSelectedVideo({
+      evidenceId: incident.id,
+      videoFile,
+      title: `${incident.type} Evidence`,
     });
   };
 
   return (
-    <div className="p-5 animate-[fadeIn_0.3s_ease]">
+    <div className="p-3 sm:p-5 animate-[fadeIn_0.3s_ease]">
       <div className="flex justify-between items-start mb-5 flex-wrap gap-3">
         <div>
           <h1 className="text-[22px] font-extrabold text-[#E8EDF8]">
@@ -214,9 +295,9 @@ export default function IncidentsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         {[
-          { v: cntOpen, l: "Open", c: "#F5A623" },
+          { v: cntTotal, l: "All Incidents", c: "#F5A623" },
           { v: cntAck, l: "Acknowledged", c: "#5B9BF5" },
           { v: cntRes, l: "Resolved", c: "#22D3A1" },
           { v: cntCrit, l: "Critical", c: "#F04A4A" },
@@ -267,8 +348,11 @@ export default function IncidentsPage() {
       <div className="flex flex-col gap-2.5 mb-6">
         {filtered.map((i) => (
           <div
+            id={`incident-${i.id}`}
             key={i.id}
-            className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 transition-all hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)]"
+            className={`bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 transition-all hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)] ${
+              selectedIncidentId === i.id ? "ring-2 ring-[#E5521A]/70" : ""
+            }`}
             style={{ borderLeftWidth: 4, borderLeftColor: SEV_COL[i.sev] }}
           >
             <div className="flex justify-between flex-wrap gap-1.5 mb-1.5">
@@ -296,8 +380,13 @@ export default function IncidentsPage() {
             </div>
             <div className="text-[12px] text-[#8A9BBF] mb-2 leading-relaxed">{i.desc}</div>
             <div className="text-[10px] text-[#4E6090]">📍 {i.loc} · 👤 {i.assignee}</div>
-            <div className="flex gap-2 mt-2.5">
-              <button className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:text-[#E5521A] hover:border-[#E5521A]/40 transition">
+            <div className="flex flex-wrap gap-2 mt-2.5">
+              <button
+                onClick={() => handleIncidentAnalysisClick(i)}
+                disabled={i.cam === EMPTY_VALUE}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:text-[#E5521A] hover:border-[#E5521A]/40 transition disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Camera className="w-3.5 h-3.5" />
                 View Evidence
               </button>
               {i.status === "open" && (
@@ -356,7 +445,7 @@ export default function IncidentsPage() {
                     <div className="text-[13px] font-bold text-[#E8EDF8]">
                       {BREACH_TYPE_LABELS[b.breach_type] || b.breach_type}
                     </div>
-                    <div className="flex gap-1.5 mt-1.5">
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
                       <span
                         className="text-[11px] font-bold px-3 py-1 rounded-full border"
                         style={{ background: `${col}22`, color: col, borderColor: `${col}44` }}
@@ -364,8 +453,8 @@ export default function IncidentsPage() {
                         {b.severity.toUpperCase()}
                       </span>
                       <button
-                        onClick={() => handleAnalysisClick(b)}
-                        className="text-[11px] font-bold px-3 py-1 rounded-full border border-[#5B9BF5] text-[#5B9BF5] hover:bg-[#5B9BF5]/10 transition-colors cursor-pointer"
+                        onClick={() => handleBreachAnalysisClick(b)}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full border border-[#5B9BF5] text-[#5B9BF5] hover:bg-[#5B9BF5]/10 transition-colors cursor-pointer"
                       >
                         📊 Analysis
                       </button>
@@ -408,37 +497,39 @@ export default function IncidentsPage() {
       </div>
 
       {/* Video Analysis Modal */}
-      {selectedBreachVideo && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setSelectedBreachVideo(null)}>
-          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-5 w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
+      {selectedVideo && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-3 sm:p-4" onClick={() => setSelectedVideo(null)}>
+          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-3 sm:p-5 w-full max-w-4xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center gap-3 mb-4">
               <h3 className="text-[16px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
-                📊 Breach Analysis - {selectedBreachVideo.breachType}
+                {selectedVideo.title}
               </h3>
               <button
-                onClick={() => setSelectedBreachVideo(null)}
-                className="text-[#8A9BBF] hover:text-[#E8EDF8] text-[20px] font-bold"
+                onClick={() => setSelectedVideo(null)}
+                className="rounded-lg p-1 text-[#8A9BBF] hover:text-[#E8EDF8] hover:bg-[#1E2F50] transition"
+                aria-label="Close evidence video"
               >
-                ×
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="bg-[#0F1A30] rounded-lg overflow-hidden">
+            <div className="bg-[#0F1A30] rounded-lg overflow-hidden aspect-video">
               <video
-                key={selectedBreachVideo.videoFile}
+                key={`${selectedVideo.evidenceId}-${selectedVideo.videoFile}`}
                 controls
                 autoPlay
-                className="w-full h-auto"
-                style={{ maxHeight: '70vh' }}
+                playsInline
+                preload="metadata"
+                className="w-full h-full object-contain bg-black"
               >
                 <source
-                  src={`/backend/depot/vision/cameras/video-library/${encodeURIComponent(selectedBreachVideo.videoFile)}/stream`}
+                  src={getVideoUrl(selectedVideo.videoFile)}
                   type="video/mp4"
                 />
                 Your browser does not support the video tag.
               </video>
             </div>
             <div className="mt-3 text-[11px] text-[#8A9BBF]">
-              Video evidence for breach ID: {selectedBreachVideo.breachId}
+              Video evidence ID: {selectedVideo.evidenceId}
             </div>
           </div>
         </div>
@@ -447,7 +538,7 @@ export default function IncidentsPage() {
       {/* Resolve Modal */}
       {resolveModalId && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setResolveModalId(null)}>
-          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-5 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-4 sm:p-5 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[16px] font-bold text-[#E8EDF8] mb-4" style={{ fontFamily: "'Syne', sans-serif" }}>
               Resolve Incident
             </h3>

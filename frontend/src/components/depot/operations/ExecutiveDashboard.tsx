@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { getDepotCommandSnapshot, type CameraRecord } from "@/services/depotCommand";
+import { getZones, type ZoneResponse } from "@/services/depotCluster";
+import { getIncidents, type IncidentResponse } from "@/services/depotPerimeter";
 import {
   ShieldAlert,
   CheckCircle2,
@@ -13,7 +17,6 @@ import {
   ArrowUpCircle,
   ArrowDownCircle,
   AlertTriangle,
-  Truck,
   Package,
   Eye,
   Wifi,
@@ -38,23 +41,11 @@ const WEEKLY_TOTALS = WEEKLY.reduce(
   { enter: 0, exit: 0 }
 );
 
-// ─── 6 Cameras ──────────────────────────────────────────────────────────────
-const CAMERAS = [
-  { id: "CAM-01", location: "Gate C – Entry",      status: "online"  as const, zone: "Zone A" },
-  { id: "CAM-02", location: "Dock B – Loading",    status: "online"  as const, zone: "Zone B" },
-  { id: "CAM-03", location: "Bay 7 – Staging",     status: "online"  as const, zone: "Zone B" },
-  { id: "CAM-04", location: "Zone C – Receiving",  status: "online"  as const, zone: "Zone C" },
-  { id: "CAM-05", location: "Exit E-2 – South",    status: "online"  as const, zone: "Zone D" },
-  { id: "CAM-06", location: "Zone B – Aisle 4",    status: "offline" as const, zone: "Zone B" },
-];
+// ─── 6 Cameras — replaced by live backend data ──────────────────────────────
+// (CAMERAS constant removed — now fetched from API)
 
-// ─── 4 Zones ─────────────────────────────────────────────────────────────────
-const ZONES = [
-  { id: "Z-A", name: "Zone A", pct: 91,  used: 1820, total: 2000 },
-  { id: "Z-B", name: "Zone B", pct: 74,  used: 1480, total: 2000 },
-  { id: "Z-C", name: "Zone C", pct: 97,  used: 1940, total: 2000 },
-  { id: "Z-D", name: "Zone D", pct: 63,  used: 1260, total: 2000 },
-];
+// ─── 4 Zones — replaced by live backend data ─────────────────────────────────
+// (ZONES constant removed — now fetched from API)
 
 // ─── Incidents ───────────────────────────────────────────────────────────────
 type Severity = "critical" | "high" | "medium";
@@ -74,6 +65,7 @@ interface Incident {
   icon: React.ElementType;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const INCIDENTS: Incident[] = [
   {
     id: "INC-001",
@@ -178,6 +170,61 @@ function statusBg(s: Status): { bg: string; text: string; border: string; label:
 function fmtK(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
+function relativeTime(value: string): string {
+  const diffMs = Date.now() - new Date(value).getTime();
+  const minutes = Math.max(0, Math.floor(diffMs / 60000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr${hours > 1 ? "s" : ""} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days > 1 ? "s" : ""} ago`;
+}
+function countdownMinutes(deadline: string | null): number | undefined {
+  if (!deadline) return undefined;
+  return Math.max(0, Math.ceil((new Date(deadline).getTime() - Date.now()) / 60000));
+}
+function normalizeSeverity(severity: string): Severity {
+  if (severity === "critical" || severity === "high" || severity === "medium") return severity;
+  return "medium";
+}
+function normalizeStatus(status: string): Status {
+  if (status === "escalated") return "escalated";
+  if (status === "acknowledged") return "monitoring";
+  return "open";
+}
+function incidentIcon(title: string): React.ElementType {
+  const lowerTitle = title.toLowerCase();
+  if (lowerTitle.includes("loiter")) return PersonStanding;
+  if (lowerTitle.includes("camera")) return Camera;
+  if (lowerTitle.includes("storage") || lowerTitle.includes("zone")) return Flame;
+  if (lowerTitle.includes("count")) return Eye;
+  return UserX;
+}
+function dedupeIncidentResponses(incidents: IncidentResponse[]): IncidentResponse[] {
+  const seen = new Set<string>();
+  const unique: IncidentResponse[] = [];
+
+  for (const incident of incidents) {
+    const baseDescription = (incident.description || "")
+      .split("Acknowledged:")[0]
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+    const key = [
+      incident.title.trim().toLowerCase(),
+      baseDescription,
+      incident.severity,
+      incident.video_archive_ref || "",
+    ].join("|");
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(incident);
+  }
+
+  return unique;
+}
 
 // ─── KPI Card ────────────────────────────────────────────────────────────────
 function KpiCard({
@@ -229,20 +276,78 @@ function SectionHeading({ children, sub }: { children: React.ReactNode; sub?: st
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function ExecutiveDashboard() {
+  const router = useRouter();
   const [, setTick] = useState(0);
+  const [cameras, setCameras] = useState<CameraRecord[]>([]);
+  const [zones, setZones] = useState<ZoneResponse[]>([]);
+  const [backendIncidents, setBackendIncidents] = useState<IncidentResponse[]>([]);
+
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
 
-  const openCount     = INCIDENTS.filter((i) => i.status === "open" || i.status === "escalated").length;
-  const critCount     = INCIDENTS.filter((i) => i.severity === "critical").length;
+  useEffect(() => {
+    const loadDashboardData = () => {
+      getDepotCommandSnapshot().then((snap) => {
+        if (snap.cameras.data.length > 0) setCameras(snap.cameras.data);
+      }).catch(() => {});
+      getZones().then((z) => { if (z.length > 0) setZones(z); }).catch(() => {});
+      getIncidents().then((items) => setBackendIncidents(dedupeIncidentResponses(items))).catch(() => {});
+    };
+
+    loadDashboardData();
+    const id = setInterval(loadDashboardData, 20000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Map backend cameras to the shape used in the UI
+  const CAMERAS = cameras.length > 0
+    ? cameras.map((c) => ({
+        id: c.id,
+        location: c.name,
+        status: c.status === "active" ? "online" as const : "offline" as const,
+        zone: c.zone ?? "—",
+      }))
+    : [] as { id: string; location: string; status: "online" | "offline"; zone: string }[];
+
+  // Map backend zones to the shape used in the UI
+  const ZONES = zones.length > 0
+    ? zones.map((z) => ({
+        id: z.id,
+        name: z.name,
+        pct: Math.round(z.utilization_pct),
+        used: z.current_occupancy,
+        total: z.max_capacity_units,
+      }))
+    : [] as { id: string; name: string; pct: number; used: number; total: number }[];
+
+  const activeIncidents: Incident[] = backendIncidents
+    .filter((incident) => incident.status !== "resolved")
+    .map((incident) => ({
+      id: incident.id,
+      title: incident.title,
+      what: incident.description || incident.title,
+      where: `Zone ID: ${incident.zone_id}`,
+      doWhat: incident.status === "acknowledged"
+        ? "Incident is acknowledged and awaiting closure."
+        : "Ops team should review and take action.",
+      severity: normalizeSeverity(incident.severity),
+      status: normalizeStatus(incident.status),
+      assignee: incident.acknowledged_by || incident.escalated_to || "Unassigned",
+      ago: relativeTime(incident.created_at),
+      countdown: countdownMinutes(incident.escalation_deadline),
+      icon: incidentIcon(incident.title),
+    }));
+
+  const openCount     = activeIncidents.filter((i) => i.status === "open" || i.status === "escalated").length;
+  const critCount     = activeIncidents.filter((i) => i.severity === "critical").length;
   const offlineCams   = CAMERAS.filter((c) => c.status === "offline").length;
   const atRiskZones   = ZONES.filter((z) => z.pct >= 85).length;
-  const avgOccupancy  = Math.round(ZONES.reduce((a, z) => a + z.pct, 0) / ZONES.length);
+  const avgOccupancy  = ZONES.length > 0 ? Math.round(ZONES.reduce((a, z) => a + z.pct, 0) / ZONES.length) : 0;
 
   const MAX_BAR = Math.max(...WEEKLY.flatMap((d) => [d.enter, d.exit]));
-  const CHART_H = 130;
+  const CHART_H = 220;
 
   const cardStyle: React.CSSProperties = {
     backgroundColor: "var(--bg-card)",
@@ -281,12 +386,11 @@ export default function ExecutiveDashboard() {
 
       {/* ── KPI Strip ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3 mb-5">
-        <KpiCard label="Camera Accuracy" value="97.3%"          sub="Vision working well"              color="var(--color-success)" icon={Eye}          cardStyle={cardStyle} />
+        
         <KpiCard label="Alerts Right Now" value={String(critCount + offlineCams + atRiskZones)}
                                                                 sub={`${critCount} urgent · ${offlineCams} camera offline`} color={(critCount + offlineCams) > 0 ? "var(--color-warning)" : "var(--color-success)"} icon={AlertTriangle} cardStyle={cardStyle} />
         <KpiCard label="Problems to Fix" value={String(openCount)} sub={`${critCount} urgent right now`} color={openCount > 0 ? "var(--color-danger)" : "var(--color-success)"} icon={ShieldAlert}  cardStyle={cardStyle} />
         <KpiCard label="Storage Used"   value={`${avgOccupancy}%`} sub={`${atRiskZones} zones almost full`} color={avgOccupancy > 90 ? "var(--color-danger)" : avgOccupancy > 80 ? "var(--color-warning)" : "var(--color-success)"} icon={Package} cardStyle={cardStyle} />
-        <KpiCard label="Vehicles Today" value="127"             sub="Scanned at gate today"            color="var(--color-info)"    icon={Truck}        cardStyle={cardStyle} />
         <KpiCard label="Fixed Today"    value="4"               sub="Problems resolved"                color="var(--color-success)" icon={CheckCircle2} cardStyle={cardStyle} />
       </div>
 
@@ -303,7 +407,7 @@ export default function ExecutiveDashboard() {
               <div key={cam.id} className="rounded-[12px] p-3" style={cardStyle}>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[11px] sm:text-[12px] font-black" style={{ color: "var(--text-primary)" }}>
-                    {cam.id}
+                    {cam.location}
                   </span>
                   <span
                     className="flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-full"
@@ -312,9 +416,6 @@ export default function ExecutiveDashboard() {
                     {online ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
                     {online ? "ON" : "OFF"}
                   </span>
-                </div>
-                <div className="text-[9px] sm:text-[10px] leading-snug" style={{ color: "var(--text-muted)" }}>
-                  {cam.location}
                 </div>
                 <div className="text-[9px] mt-1 font-bold" style={{ color: "var(--text-faint)" }}>
                   {cam.zone}
@@ -331,7 +432,7 @@ export default function ExecutiveDashboard() {
         <div className="flex flex-wrap justify-between items-start gap-2 mb-4">
           <div>
             <span className="text-[13px] font-black" style={{ color: "var(--text-primary)" }}>
-              📦 Bags In &amp; Out — This Week
+              📦 Daily Throughput — Bags
             </span>
             <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
               How many bags entered and left the depot each day
@@ -363,7 +464,7 @@ export default function ExecutiveDashboard() {
                   <div className="flex items-end gap-[3px]" style={{ height: CHART_H }}>
                     {/* In bar */}
                     <div className="flex flex-col items-center justify-end gap-[2px]" style={{ height: CHART_H }}>
-                      <span className="text-[7px] font-bold" style={{ color: peak ? "#E5521A" : "var(--text-muted)" }}>
+                      <span className="text-[9px] font-bold" style={{ color: peak ? "#E5521A" : "var(--text-muted)" }}>
                         {fmtK(day.enter)}
                       </span>
                       <div style={{
@@ -377,7 +478,7 @@ export default function ExecutiveDashboard() {
                     </div>
                     {/* Out bar */}
                     <div className="flex flex-col items-center justify-end gap-[2px]" style={{ height: CHART_H }}>
-                      <span className="text-[7px] font-bold" style={{ color: peak ? "var(--color-info)" : "var(--text-faint)" }}>
+                      <span className="text-[9px] font-bold" style={{ color: peak ? "var(--color-info)" : "var(--text-faint)" }}>
                         {fmtK(day.exit)}
                       </span>
                       <div style={{
@@ -428,7 +529,7 @@ export default function ExecutiveDashboard() {
       {/* ── Zone Capacity ──────────────────────────────────────────────────── */}
       <div className="rounded-[14px] p-4 sm:p-[18px] mb-5" style={cardStyle}>
         <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
-          <SectionHeading sub="How full each storage area is">🏭 Storage Zone Levels</SectionHeading>
+          <SectionHeading sub="">🏭 Storage Zone Levels</SectionHeading>
           {atRiskZones > 0 && (
             <span className="text-[9px] font-black px-2 py-0.5 rounded-full border"
               style={{ background: "rgba(245,166,35,0.12)", color: "var(--color-warning)", borderColor: "rgba(245,166,35,0.25)" }}>
@@ -489,13 +590,22 @@ export default function ExecutiveDashboard() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {INCIDENTS.map((inc) => {
+          {activeIncidents.map((inc) => {
             const sc  = sevColor(inc.severity);
             const sb  = statusBg(inc.status);
             const Icon = inc.icon;
             return (
               <div key={inc.id}
-                className="rounded-[14px] overflow-hidden transition-all hover:-translate-y-0.5"
+                role="button"
+                tabIndex={0}
+                onClick={() => router.push(`/depot/incidents?incident=${encodeURIComponent(inc.id)}`)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    router.push(`/depot/incidents?incident=${encodeURIComponent(inc.id)}`);
+                  }
+                }}
+                className="rounded-[14px] overflow-hidden transition-all hover:-translate-y-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#E5521A]/50"
                 style={{ ...innerCard, borderLeft: `4px solid ${sc}` }}
                 onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.borderColor = sc)}
                 onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-default)")}
@@ -559,7 +669,7 @@ export default function ExecutiveDashboard() {
         </div>
 
         {/* All-clear state (if no incidents) */}
-        {INCIDENTS.length === 0 && (
+        {activeIncidents.length === 0 && (
           <div className="text-center py-10">
             <CircleDot className="w-8 h-8 mx-auto mb-2" style={{ color: "var(--color-success)" }} />
             <p className="font-black" style={{ color: "var(--color-success)" }}>All clear — no active incidents</p>

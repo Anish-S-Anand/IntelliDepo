@@ -250,16 +250,6 @@ YARD_ZONES = {
     "outbound_gate": {"lat_min": 13.020, "lat_max": 13.050, "lng_min": 77.580, "lng_max": 77.620},
 }
 
-# Canonical display names for GPS zone keys
-YARD_ZONE_DISPLAY: dict[str, str] = {
-    "inbound_gate":  "Gate — North Entry",
-    "staging_area":  "Zone B",
-    "dock_area":     "Loading Dock",
-    "cold_storage":  "Zone C",
-    "parking_yard":  "Yard",
-    "outbound_gate": "Gate — South Exit",
-}
-
 
 def _detect_zone(lat: float, lng: float) -> Optional[str]:
     for zone_name, bounds in YARD_ZONES.items():

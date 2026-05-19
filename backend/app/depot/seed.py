@@ -35,12 +35,12 @@ logger = logging.getLogger("intelli.depot.seed")
 CAMERAS = [
     # Local depot videos — real warehouse CCTV recordings from depot pendrive
     # stream_url uses "local:{filename}" prefix; video_library.py serves frames
-    {"name": "Gate Entry North",  "stream_url": "local:dtranshipment 1 (2).mp4",                "zone": "Gate — North Entry",   "frame_rate": 25, "resolution": "854x480"},  # Transhipment area
-    {"name": "Zone A Overhead",   "stream_url": "local:cluster 13 (1).mp4",                     "zone": "Zone A",               "frame_rate": 25, "resolution": "854x480"},  # Cluster 13 storage
-    {"name": "Loading Bay 1-4",   "stream_url": "local:cluster 4-5 (1).mp4",                    "zone": "Loading Dock",         "frame_rate": 25, "resolution": "854x480"},  # Cluster 4-5 bay
-    {"name": "Zone C Perimeter",  "stream_url": "local:Recording 2025-07-30 115417.mp4",        "zone": "Zone C",               "frame_rate": 25, "resolution": "854x480"},  # Depot perimeter
-    {"name": "Gate Exit South",   "stream_url": "local:Recording 2025-08-11 171805.mp4",        "zone": "Gate — South Exit",    "frame_rate": 25, "resolution": "854x480"},  # Exit gate ops
-    {"name": "Yard Overview",     "stream_url": "local:Screen Recording 2025-08-11 174929.mp4", "zone": "Yard",                 "frame_rate": 25, "resolution": "854x480"},  # Yard overview
+    {"name": "Gate Entry North",  "stream_url": "local:dtranshipment 1 (2).mp4",                "zone": "Entry Gate",   "frame_rate": 25, "resolution": "854x480"},  # Transhipment area
+    {"name": "Zone A Overhead",   "stream_url": "local:cluster 13 (1).mp4",                     "zone": "Zone-A",       "frame_rate": 25, "resolution": "854x480"},  # Cluster 13 storage
+    {"name": "Loading Bay 1-4",   "stream_url": "local:cluster 4-5 (1).mp4",                    "zone": "Loading Dock", "frame_rate": 25, "resolution": "854x480"},  # Cluster 4-5 bay
+    {"name": "Zone C Perimeter",  "stream_url": "local:Recording 2025-07-30 115417.mp4",        "zone": "Zone-C",       "frame_rate": 25, "resolution": "854x480"},  # Depot perimeter
+    {"name": "Gate Exit South",   "stream_url": "local:Recording 2025-08-11 171805.mp4",        "zone": "Exit Gate",    "frame_rate": 25, "resolution": "854x480"},  # Exit gate ops
+    {"name": "Yard Overview",     "stream_url": "local:Screen Recording 2025-08-11 174929.mp4", "zone": "Yard",         "frame_rate": 25, "resolution": "854x480"},  # Yard overview
 ]
 
 GATES = [
@@ -71,19 +71,17 @@ VISITORS = [
 ]
 
 PERIMETER_ZONES = [
-    {"name": "Server Room Entrance", "zone_type": "restricted", "alert_severity": "critical", "alert_on_entry": True},
-    {"name": "Hazmat Storage Perimeter", "zone_type": "hazardous", "alert_severity": "high", "alert_on_entry": True},
-    {"name": "Loading Dock Boundary", "zone_type": "loading", "alert_severity": "medium", "alert_on_entry": True},
-    {"name": "North Fence Line", "zone_type": "restricted", "alert_severity": "high", "alert_on_entry": True},
-    {"name": "South Perimeter Wall", "zone_type": "general", "alert_severity": "medium", "alert_on_entry": True},
-    {"name": "Emergency Exit Corridor", "zone_type": "controlled", "alert_severity": "high", "alert_on_entry": True},
+    {"name": "Cold Storage", "zone_type": "controlled", "alert_severity": "high", "alert_on_entry": True},
+    {"name": "Inbound Gate", "zone_type": "controlled", "alert_severity": "high", "alert_on_entry": True},
+    {"name": "Staging Area", "zone_type": "controlled", "alert_severity": "high", "alert_on_entry": True},
+    {"name": "Dispatch Bay", "zone_type": "controlled", "alert_severity": "high", "alert_on_entry": True},
 ]
 
 CLUSTER_ZONES = [
-    {"zone_code": "A", "name": "Storage Bay A — Cement", "zone_type": "storage", "floor": "ground", "area_sqm": 2400, "max_capacity_units": 1000, "current_occupancy": 810},
-    {"zone_code": "B", "name": "Storage Bay B — Fertilizers", "zone_type": "storage", "floor": "ground", "area_sqm": 2800, "max_capacity_units": 1000, "current_occupancy": 450},
-    {"zone_code": "C", "name": "Hazmat Storage C", "zone_type": "hazmat", "floor": "ground", "area_sqm": 1600, "max_capacity_units": 800, "current_occupancy": 595},
-    {"zone_code": "D", "name": "Heavy Materials D", "zone_type": "storage", "floor": "ground", "area_sqm": 3200, "max_capacity_units": 1200, "current_occupancy": 1092},
+    {"zone_code": "A", "name": "UltraTech Cement — Zone A", "zone_type": "storage", "floor": "ground", "area_sqm": 2400, "max_capacity_units": 1000, "current_occupancy": 810},
+    {"zone_code": "B", "name": "ACC Cement — Zone B",       "zone_type": "storage", "floor": "ground", "area_sqm": 2800, "max_capacity_units": 1000, "current_occupancy": 450},
+    {"zone_code": "C", "name": "JSW Cement — Zone C",       "zone_type": "storage", "floor": "ground", "area_sqm": 1600, "max_capacity_units": 800, "current_occupancy": 595},
+    {"zone_code": "D", "name": "Ambuja Cement — Zone D",    "zone_type": "storage", "floor": "ground", "area_sqm": 3200, "max_capacity_units": 1200, "current_occupancy": 1092},
 ]
 
 MANIFESTS = [
@@ -106,11 +104,26 @@ DETECTION_MODEL = {
 }
 
 BATCHES = [
-    {"sku_id": "SKU-CEM-53", "product_name": "OPC Cement 53 Grade", "batch_number": "B2025-1022", "quantity": 498, "zone": "A", "rack": "A-01", "bin_location": "A-01-L1", "manufacturing_date": "2026-01-15", "expiry_date": "2027-01-15", "rule_type": "FIFO"},
-    {"sku_id": "SKU-CEM-33", "product_name": "PPC Cement 33 Grade", "batch_number": "B2025-1019", "quantity": 320, "zone": "A", "rack": "A-02", "bin_location": "A-02-L1", "manufacturing_date": "2026-02-01", "expiry_date": "2027-02-01", "rule_type": "FIFO"},
-    {"sku_id": "SKU-FRT-GA", "product_name": "Fertilizer Grade A", "batch_number": "B2025-1021", "quantity": 450, "zone": "B", "rack": "B-02", "bin_location": "B-02-L2", "manufacturing_date": "2025-10-01", "expiry_date": "2026-10-01", "rule_type": "FEFO"},
-    {"sku_id": "SKU-HAZ-03", "product_name": "Chemicals HAZ-3", "batch_number": "B2025-1018", "quantity": 148, "zone": "C", "rack": "C-01", "bin_location": "C-01-L1", "manufacturing_date": "2025-11-15", "expiry_date": "2026-05-15", "rule_type": "FEFO"},
-    {"sku_id": "SKU-STL-02", "product_name": "Steel Coils Grade 2", "batch_number": "B2025-1023", "quantity": 580, "zone": "D", "rack": "D-01", "bin_location": "D-01-L1", "manufacturing_date": "2026-03-01", "expiry_date": "2028-03-01", "rule_type": "FIFO"},
+    # Zone A batches (should total 810 bags to match CLUSTER_ZONES occupancy)
+    {"sku_id": "SKU-CEM-01", "product_name": "UltraTech Cement", "batch_number": "B2026-1022", "quantity": 490, "zone": "A", "rack": "A-01", "bin_location": "A-01-L1", "manufacturing_date": date(2026, 1, 15), "expiry_date": date(2026, 4, 15), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-02", "product_name": "ACC Cement", "batch_number": "B2026-1019", "quantity": 320, "zone": "A", "rack": "A-02", "bin_location": "A-02-L1", "manufacturing_date": date(2026, 2, 1), "expiry_date": date(2026, 5, 1), "rule_type": "FIFO"},
+    # Zone B batches (should total 450 bags to match CLUSTER_ZONES occupancy)
+    {"sku_id": "SKU-CEM-03", "product_name": "UltraTech Cement", "batch_number": "B2026-1021", "quantity": 450, "zone": "B", "rack": "B-02", "bin_location": "B-02-L2", "manufacturing_date": date(2026, 1, 10), "expiry_date": date(2026, 4, 10), "rule_type": "FEFO"},
+    # Zone C batches (should total 595 bags to match CLUSTER_ZONES occupancy)
+    {"sku_id": "SKU-CEM-04", "product_name": "ACC Cement", "batch_number": "B2026-1018", "quantity": 595, "zone": "C", "rack": "C-01", "bin_location": "C-01-L1", "manufacturing_date": date(2026, 1, 5), "expiry_date": date(2026, 4, 5), "rule_type": "FEFO"},
+    # Zone D batches (should total 1092 bags to match CLUSTER_ZONES occupancy)
+    {"sku_id": "SKU-CEM-05", "product_name": "UltraTech Cement", "batch_number": "B2026-1023", "quantity": 1092, "zone": "D", "rack": "D-01", "bin_location": "D-01-L1", "manufacturing_date": date(2026, 3, 1), "expiry_date": date(2026, 6, 1), "rule_type": "FIFO"},
+    # Additional batches for more data
+    {"sku_id": "SKU-CEM-06", "product_name": "UltraTech Cement", "batch_number": "B2026-1024", "quantity": 250, "zone": "A", "rack": "A-03", "bin_location": "A-03-L1", "manufacturing_date": date(2026, 1, 20), "expiry_date": date(2026, 4, 20), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-07", "product_name": "ACC Cement", "batch_number": "B2026-1025", "quantity": 180, "zone": "B", "rack": "B-03", "bin_location": "B-03-L1", "manufacturing_date": date(2026, 1, 8), "expiry_date": date(2026, 4, 8), "rule_type": "FEFO"},
+    {"sku_id": "SKU-CEM-08", "product_name": "UltraTech Cement", "batch_number": "B2026-1026", "quantity": 420, "zone": "C", "rack": "C-02", "bin_location": "C-02-L1", "manufacturing_date": date(2026, 1, 3), "expiry_date": date(2026, 4, 3), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-09", "product_name": "ACC Cement", "batch_number": "B2026-1027", "quantity": 350, "zone": "D", "rack": "D-02", "bin_location": "D-02-L1", "manufacturing_date": date(2026, 2, 15), "expiry_date": date(2026, 5, 15), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-10", "product_name": "UltraTech Cement", "batch_number": "B2026-1028", "quantity": 290, "zone": "A", "rack": "A-04", "bin_location": "A-04-L1", "manufacturing_date": date(2026, 1, 5), "expiry_date": date(2026, 4, 5), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-11", "product_name": "ACC Cement", "batch_number": "B2026-1029", "quantity": 220, "zone": "B", "rack": "B-04", "bin_location": "B-04-L1", "manufacturing_date": date(2026, 1, 12), "expiry_date": date(2026, 4, 12), "rule_type": "FEFO"},
+    {"sku_id": "SKU-CEM-12", "product_name": "UltraTech Cement", "batch_number": "B2026-1030", "quantity": 380, "zone": "C", "rack": "C-03", "bin_location": "C-03-L1", "manufacturing_date": date(2026, 1, 7), "expiry_date": date(2026, 4, 7), "rule_type": "FEFO"},
+    {"sku_id": "SKU-CEM-13", "product_name": "ACC Cement", "batch_number": "B2026-1031", "quantity": 460, "zone": "D", "rack": "D-03", "bin_location": "D-03-L1", "manufacturing_date": date(2026, 3, 10), "expiry_date": date(2026, 6, 10), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-14", "product_name": "UltraTech Cement", "batch_number": "B2026-1032", "quantity": 310, "zone": "A", "rack": "A-05", "bin_location": "A-05-L1", "manufacturing_date": date(2026, 1, 25), "expiry_date": date(2026, 4, 25), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-15", "product_name": "ACC Cement", "batch_number": "B2026-1033", "quantity": 270, "zone": "B", "rack": "B-05", "bin_location": "B-05-L1", "manufacturing_date": date(2026, 1, 9), "expiry_date": date(2026, 4, 9), "rule_type": "FEFO"},
 ]
 
 DEMO_USERS = [
@@ -206,37 +219,101 @@ async def seed_database(db_url: str | None = None):
 
             # ── Perimeter Zones ──
             pz_ids = []
+            zone_refs = {}  # Dictionary to store zone references by name for later use
             for j, pz in enumerate(PERIMETER_ZONES):
                 pzid = new_id()
                 pz_ids.append(pzid)
+                zone_refs[pz["name"]] = pzid  # Store zone ID by name
                 cam_id = camera_ids[j % len(camera_ids)]
                 await db.execute(text("""
                     INSERT INTO depot_perimeter_zones (id, name, zone_type, alert_severity, alert_on_entry, camera_id, is_active, night_vision_enabled, night_vision_mode, created_by, created_at, updated_at)
                     VALUES (:id, :name, :zone_type, :alert_severity, :alert_on_entry, :cam_id, true, true, 'auto', :user, :now, :now)
                     ON CONFLICT DO NOTHING
                 """), {**pz, "id": pzid, "cam_id": cam_id, "user": seed_user, "now": now})
-            logger.info(f"Seeded {len(PERIMETER_ZONES)} perimeter zones")
+            logger.info(f"Seeded {len(PERIMETER_ZONES)} perimeter zones with references: {list(zone_refs.keys())}")
 
-            # ── Sample Breaches ──
-            for k in range(3):
+            # ── Sample Breaches (5 breaches corresponding to 5 sample incidents) ──
+            # Mapping: incident source → breach_type
+            # perimeter → unauthorized_entry, alert → loitering, sensor → unknown, sla_breach → after_hours
+            # Mapping: incident priority → severity
+            # P1 → critical, P2 → high, P3 → medium, default → low
+            
+            sample_breaches = [
+                {
+                    "zone_name": "Cold Storage",
+                    "breach_type": "after_hours",  # sla_breach source
+                    "severity": "critical",  # P1 priority
+                    "confidence": 0.95,
+                    "video_ref": "Recording 2025-07-30 115417.mp4",
+                    "notes": "Temperature compliance SLA violated for ColdChain Inc shipment.",
+                    "detected_minutes_ago": 8
+                },
+                {
+                    "zone_name": "Inbound Gate",
+                    "breach_type": "unauthorized_entry",  # perimeter source
+                    "severity": "high",  # default (no priority specified)
+                    "confidence": 0.92,
+                    "video_ref": "Perimeter_Detection.mp4",
+                    "notes": "LPR mismatch. Vehicle not in approved list.",
+                    "detected_minutes_ago": 25
+                },
+                {
+                    "zone_name": "Staging Area",
+                    "breach_type": "loitering",  # alert source
+                    "severity": "medium",  # default (no priority specified)
+                    "confidence": 0.87,
+                    "video_ref": "Theft Camera .mp4",
+                    "notes": "Vehicle in staging area for 4h 30m. SLA threshold: 3h.",
+                    "detected_minutes_ago": 62
+                },
+                {
+                    "zone_name": "Dispatch Bay",
+                    "breach_type": "unknown",  # sensor source
+                    "severity": "medium",  # P3 priority
+                    "confidence": 0.78,
+                    "video_ref": "Recording 2025-07-30 120521.mp4",
+                    "notes": "Hydraulic pressure below threshold.",
+                    "detected_minutes_ago": 15
+                },
+                {
+                    "zone_name": "Cold Storage",
+                    "breach_type": "unknown",  # sensor source
+                    "severity": "low",  # default (no priority specified)
+                    "confidence": 0.85,
+                    "video_ref": "LPR_RECOGNITION.mp4",
+                    "notes": "Smoke detector activated in section B.",
+                    "detected_minutes_ago": 45
+                }
+            ]
+            
+            for breach_data in sample_breaches:
                 bid = new_id()
+                # Get zone_id from zone_refs dictionary
+                zone_id = zone_refs.get(breach_data["zone_name"])
+                if zone_id is None:
+                    logger.warning(f"Zone '{breach_data['zone_name']}' not found in zone_refs, skipping breach")
+                    continue
+                
+                # Select camera based on zone
+                cam_id = camera_ids[list(zone_refs.keys()).index(breach_data["zone_name"]) % len(camera_ids)]
+                
                 await db.execute(text("""
                     INSERT INTO depot_perimeter_breaches (id, zone_id, camera_id, breach_type, severity, confidence, snapshot_ref, alert_sent, notes, detected_at, created_at, updated_at)
                     VALUES (:id, :zone_id, :cam_id, :breach_type, :severity, :confidence, :snapshot, true, :notes, :detected_at, :now, :now)
                     ON CONFLICT DO NOTHING
                 """), {
                     "id": bid,
-                    "zone_id": pz_ids[k],
-                    "cam_id": camera_ids[k],
-                    "breach_type": ["unauthorized_entry", "loitering", "after_hours"][k],
-                    "severity": ["critical", "high", "medium"][k],
-                    "confidence": [0.94, 0.87, 0.78][k],
-                    "snapshot": f"seed://breach-{k}",
-                    "notes": f"Seed breach event {k+1} for demo",
-                    "detected_at": now - timedelta(minutes=[5, 25, 90][k]),
+                    "zone_id": zone_id,
+                    "cam_id": cam_id,
+                    "breach_type": breach_data["breach_type"],
+                    "severity": breach_data["severity"],
+                    "confidence": breach_data["confidence"],
+                    "snapshot": breach_data["video_ref"],
+                    "notes": breach_data["notes"],
+                    "detected_at": now - timedelta(minutes=breach_data["detected_minutes_ago"]),
                     "now": now,
                 })
-            logger.info("Seeded 3 sample breaches")
+            logger.info(f"Seeded {len(sample_breaches)} perimeter breaches corresponding to sample incidents")
 
             # ── Cluster Zones ──
             for cz in CLUSTER_ZONES:
@@ -316,12 +393,31 @@ async def seed_database(db_url: str | None = None):
             logger.info(f"Seeded {len(MANIFESTS)} shipment manifests")
 
             # ── Inventory Batches ──
+            # Vary batch creation timestamps for realistic activity patterns
+            batch_timestamps = [
+                now - timedelta(hours=2),   # 2 hours ago
+                now - timedelta(days=5),    # 5 days ago
+                now - timedelta(hours=12),  # 12 hours ago
+                now - timedelta(days=3),    # 3 days ago
+                now - timedelta(days=1),    # 1 day ago
+                now - timedelta(hours=6),   # 6 hours ago
+                now - timedelta(days=2),    # 2 days ago
+                now - timedelta(hours=18),  # 18 hours ago
+                now - timedelta(days=4),    # 4 days ago
+                now - timedelta(hours=8),   # 8 hours ago
+                now - timedelta(days=6),    # 6 days ago
+                now - timedelta(hours=4),   # 4 hours ago
+                now - timedelta(days=7),    # 7 days ago
+                now - timedelta(hours=10),  # 10 hours ago
+                now - timedelta(days=8),    # 8 days ago
+            ]
             try:
                 async with db.begin_nested():
-                    for batch in BATCHES:
+                    for idx, batch in enumerate(BATCHES):
+                        batch_time = batch_timestamps[idx] if idx < len(batch_timestamps) else now
                         await db.execute(text("""
                             INSERT INTO depot_inventory_batches (id, batch_code, sku_code, product_name, zone, rack, bin_location, quantity, original_quantity, manufacture_date, expiry_date, received_at, sequencing_rule, status, priority_score, is_near_expiry, created_at, updated_at)
-                            VALUES (:id, :batch_code, :sku_code, :product_name, :zone, :rack, :bin_location, :quantity, :quantity, :mfg, :exp, :now, :sequencing_rule, 'active', 0.0, false, :now, :now)
+                            VALUES (:id, :batch_code, :sku_code, :product_name, :zone, :rack, :bin_location, :quantity, :quantity, :mfg, :exp, :batch_time, :sequencing_rule, 'active', 0.0, false, :batch_time, :batch_time)
                             ON CONFLICT DO NOTHING
                         """), {
                             "id": new_id(), "product_name": batch["product_name"],
@@ -330,7 +426,7 @@ async def seed_database(db_url: str | None = None):
                             "quantity": batch["quantity"],
                             "zone": batch["zone"], "rack": batch["rack"], "bin_location": batch["bin_location"],
                             "mfg": batch["manufacturing_date"], "exp": batch["expiry_date"],
-                            "sequencing_rule": batch["rule_type"], "now": now,
+                            "sequencing_rule": batch["rule_type"], "batch_time": batch_time,
                         })
                 logger.info(f"Seeded {len(BATCHES)} inventory batches")
             except Exception as e:
@@ -338,11 +434,11 @@ async def seed_database(db_url: str | None = None):
 
             # ── IntelliOps Tasks ──
             ops_tasks = [
-                {"title": "Unload Truck TN-04-AB-1234", "worker_name": "Ramesh K.", "worker_id": "W-001", "area": "Zone C Bay 4", "zone": "Zone C", "priority": "high",   "status": "in_progress"},
-                {"title": "FIFO Compliance Check — Zone B", "worker_name": "Priya S.", "worker_id": "W-002", "area": "Zone B Clusters", "zone": "Zone B", "priority": "medium", "status": "pending"},
-                {"title": "LPR Gate Calibration", "worker_name": "Tech Team", "worker_id": "W-003", "area": "Gate Entry North", "zone": "Gate — North Entry", "priority": "low",    "status": "pending"},
-                {"title": "Damage Assessment — INC-002", "worker_name": "QA Lead", "worker_id": "W-004", "area": "Zone C", "zone": "Zone C", "priority": "high",   "status": "in_progress"},
-                {"title": "Inventory Reconciliation — Zone A", "worker_name": "Anita R.", "worker_id": "W-005", "area": "Zone A", "zone": "Zone A", "priority": "medium", "status": "completed"},
+                {"title": "Unload Truck TN-04-AB-1234", "worker_name": "Ramesh K.", "worker_id": "W-001", "area": "Zone C Bay 4", "zone": "Zone-C", "priority": "high",   "status": "in_progress"},
+                {"title": "FIFO Compliance Check — Zone B", "worker_name": "Priya S.", "worker_id": "W-002", "area": "Zone B Clusters", "zone": "Zone-B", "priority": "medium", "status": "pending"},
+                {"title": "LPR Gate Calibration", "worker_name": "Tech Team", "worker_id": "W-003", "area": "Gate Entry North", "zone": "Entry Gate", "priority": "low",    "status": "pending"},
+                {"title": "Damage Assessment — INC-002", "worker_name": "QA Lead", "worker_id": "W-004", "area": "Zone C", "zone": "Zone-C", "priority": "high",   "status": "in_progress"},
+                {"title": "Inventory Reconciliation — Zone A", "worker_name": "Anita R.", "worker_id": "W-005", "area": "Zone A", "zone": "Zone-A", "priority": "medium", "status": "completed"},
             ]
             for t in ops_tasks:
                 await db.execute(text("""
@@ -354,10 +450,10 @@ async def seed_database(db_url: str | None = None):
 
             # ── IntelliOps SOP Checklists ──
             checklists = [
-                {"name": "Inbound Inspection — Shift A", "shift": "Shift A", "zone": "Gate — North Entry", "progress_pct": 85, "status": "in_progress", "item_count": 20, "items_done": 17},
-                {"name": "FIFO Daily Audit",              "shift": "Shift A", "zone": "Zone B",             "progress_pct": 100, "status": "complete",    "item_count": 10, "items_done": 10},
-                {"name": "Perimeter Security Check",      "shift": "Shift B", "zone": "Perimeter",          "progress_pct": 60,  "status": "in_progress", "item_count": 15, "items_done": 9},
-                {"name": "Cold Storage Temperature Log",  "shift": "Shift A", "zone": "Zone C",             "progress_pct": 0,   "status": "not_started", "item_count": 8,  "items_done": 0},
+                {"name": "Inbound Inspection — Shift A", "shift": "Shift A", "zone": "Entry Gate", "progress_pct": 85, "status": "in_progress", "item_count": 20, "items_done": 17},
+                {"name": "FIFO Daily Audit",              "shift": "Shift A", "zone": "Zone-B",     "progress_pct": 100, "status": "complete",    "item_count": 10, "items_done": 10},
+                {"name": "Perimeter Security Check",      "shift": "Shift B", "zone": "Perimeter",  "progress_pct": 60,  "status": "in_progress", "item_count": 15, "items_done": 9},
+                {"name": "Cold Storage Temperature Log",  "shift": "Shift A", "zone": "Zone-C",     "progress_pct": 0,   "status": "not_started", "item_count": 8,  "items_done": 0},
             ]
             for cl in checklists:
                 await db.execute(text("""
@@ -369,10 +465,10 @@ async def seed_database(db_url: str | None = None):
 
             # ── IntelliOps Exceptions ──
             exceptions = [
-                {"exception_type": "count_mismatch",        "location": "Cluster B-09",       "zone": "Zone B",             "root_cause": "ERP sync delay",   "description": "Physical count shows -5 bags vs ERP record.", "status": "open",         "severity": "high",   "sla_minutes": 60},
-                {"exception_type": "fifo_violation",        "location": "Zone B Cluster B2",  "zone": "Zone B",             "root_cause": "Manual override",   "description": "Batch B2025-1021 picked out of FIFO order.",  "status": "investigating","severity": "high",   "sla_minutes": 120},
-                {"exception_type": "damaged_goods",         "location": "Zone C Bay 4",       "zone": "Zone C",             "root_cause": "Handling error",    "description": "5 bags torn during unloading. Est. loss ₹4,200.", "status": "open",      "severity": "medium", "sla_minutes": 30},
-                {"exception_type": "missing_documentation", "location": "Gate Entry",         "zone": "Gate — North Entry", "root_cause": "Driver oversight", "description": "Delivery challan missing for TN-04-AB-1234.", "status": "open",       "severity": "low",    "sla_minutes": 240},
+                {"exception_type": "count_mismatch",        "location": "Cluster B-09",       "zone": "Zone-B", "root_cause": "ERP sync delay",   "description": "Physical count shows -5 bags vs ERP record.", "status": "open",         "severity": "high",   "sla_minutes": 60},
+                {"exception_type": "fifo_violation",        "location": "Zone B Cluster B2",  "zone": "Zone-B", "root_cause": "Manual override",   "description": "Batch B2026-1021 picked out of FIFO order.",  "status": "investigating","severity": "high",   "sla_minutes": 120},
+                {"exception_type": "damaged_goods",         "location": "Zone C Bay 4",       "zone": "Zone-C", "root_cause": "Handling error",    "description": "5 bags torn during unloading. Est. loss ₹4,200.", "status": "open",      "severity": "medium", "sla_minutes": 30},
+                {"exception_type": "missing_documentation", "location": "Gate Entry",         "zone": "Entry Gate", "root_cause": "Driver oversight", "description": "Delivery challan missing for TN-04-AB-1234.", "status": "open",       "severity": "low",    "sla_minutes": 240},
             ]
             for ex in exceptions:
                 await db.execute(text("""
@@ -422,12 +518,12 @@ async def seed_database(db_url: str | None = None):
 
             # ── Fleet Dock Slots ──
             dock_slots = [
-                {"dock_id": "DOCK-A1", "dock_name": "Dock A1", "zone": "Loading Dock", "dock_type": "standard", "capacity_tonnes": 25.0},
-                {"dock_id": "DOCK-A2", "dock_name": "Dock A2", "zone": "Loading Dock", "dock_type": "standard", "capacity_tonnes": 25.0},
-                {"dock_id": "DOCK-B1", "dock_name": "Dock B1", "zone": "Loading Dock", "dock_type": "refrigerated", "capacity_tonnes": 15.0},
-                {"dock_id": "DOCK-B2", "dock_name": "Dock B2", "zone": "Loading Dock", "dock_type": "refrigerated", "capacity_tonnes": 15.0},
-                {"dock_id": "DOCK-C1", "dock_name": "Dock C1", "zone": "Loading Dock", "dock_type": "heavy", "capacity_tonnes": 40.0},
-                {"dock_id": "DOCK-C2", "dock_name": "Dock C2", "zone": "Loading Dock", "dock_type": "standard", "capacity_tonnes": 25.0},
+                {"dock_id": "DOCK-A1", "dock_name": "Dock A1", "zone": "dock_area", "dock_type": "standard", "capacity_tonnes": 25.0},
+                {"dock_id": "DOCK-A2", "dock_name": "Dock A2", "zone": "dock_area", "dock_type": "standard", "capacity_tonnes": 25.0},
+                {"dock_id": "DOCK-B1", "dock_name": "Dock B1", "zone": "dock_area", "dock_type": "refrigerated", "capacity_tonnes": 15.0},
+                {"dock_id": "DOCK-B2", "dock_name": "Dock B2", "zone": "dock_area", "dock_type": "refrigerated", "capacity_tonnes": 15.0},
+                {"dock_id": "DOCK-C1", "dock_name": "Dock C1", "zone": "dock_area", "dock_type": "heavy", "capacity_tonnes": 40.0},
+                {"dock_id": "DOCK-C2", "dock_name": "Dock C2", "zone": "dock_area", "dock_type": "standard", "capacity_tonnes": 25.0},
             ]
             dock_ids = []
             for ds in dock_slots:
@@ -442,14 +538,14 @@ async def seed_database(db_url: str | None = None):
 
             # ── Fleet Vehicles (ops_vehicles — different from gate vehicles) ──
             fleet_vehicles = [
-                {"vehicle_id": "TN-04-AB-1234", "plate_number": "TN-04-AB-1234", "vehicle_type": "truck_20ft", "status": "at_dock", "current_zone": "Loading Dock", "assigned_dock": "DOCK-A1"},
-                {"vehicle_id": "MH-12-CD-5678", "plate_number": "MH-12-CD-5678", "vehicle_type": "truck_40ft", "status": "in_yard", "current_zone": "Zone B", "assigned_dock": None},
-                {"vehicle_id": "DL-01-EF-9012", "plate_number": "DL-01-EF-9012", "vehicle_type": "truck_20ft", "status": "at_dock", "current_zone": "Loading Dock", "assigned_dock": "DOCK-B1"},
-                {"vehicle_id": "KA-03-GH-3456", "plate_number": "KA-03-GH-3456", "vehicle_type": "refrigerated", "status": "in_yard", "current_zone": "Yard", "assigned_dock": None},
-                {"vehicle_id": "GJ-06-IJ-7890", "plate_number": "GJ-06-IJ-7890", "vehicle_type": "truck_40ft", "status": "at_gate", "current_zone": "Gate — North Entry", "assigned_dock": None},
-                {"vehicle_id": "RJ-14-KL-2345", "plate_number": "RJ-14-KL-2345", "vehicle_type": "truck_20ft", "status": "at_dock", "current_zone": "Loading Dock", "assigned_dock": "DOCK-C1"},
-                {"vehicle_id": "AP-09-MN-6789", "plate_number": "AP-09-MN-6789", "vehicle_type": "refrigerated", "status": "in_yard", "current_zone": "Zone C", "assigned_dock": None},
-                {"vehicle_id": "UP-32-OP-1234", "plate_number": "UP-32-OP-1234", "vehicle_type": "truck_20ft", "status": "departed", "current_zone": "Gate — South Exit", "assigned_dock": None},
+                {"vehicle_id": "TN-04-AB-1234", "plate_number": "TN-04-AB-1234", "vehicle_type": "truck_20ft", "status": "at_dock", "current_zone": "dock_area", "assigned_dock": "DOCK-A1"},
+                {"vehicle_id": "MH-12-CD-5678", "plate_number": "MH-12-CD-5678", "vehicle_type": "truck_40ft", "status": "in_yard", "current_zone": "staging_area", "assigned_dock": None},
+                {"vehicle_id": "DL-01-EF-9012", "plate_number": "DL-01-EF-9012", "vehicle_type": "truck_20ft", "status": "at_dock", "current_zone": "dock_area", "assigned_dock": "DOCK-B1"},
+                {"vehicle_id": "KA-03-GH-3456", "plate_number": "KA-03-GH-3456", "vehicle_type": "refrigerated", "status": "in_yard", "current_zone": "parking_yard", "assigned_dock": None},
+                {"vehicle_id": "GJ-06-IJ-7890", "plate_number": "GJ-06-IJ-7890", "vehicle_type": "truck_40ft", "status": "at_gate", "current_zone": "inbound_gate", "assigned_dock": None},
+                {"vehicle_id": "RJ-14-KL-2345", "plate_number": "RJ-14-KL-2345", "vehicle_type": "truck_20ft", "status": "at_dock", "current_zone": "dock_area", "assigned_dock": "DOCK-C1"},
+                {"vehicle_id": "AP-09-MN-6789", "plate_number": "AP-09-MN-6789", "vehicle_type": "refrigerated", "status": "in_yard", "current_zone": "cold_storage", "assigned_dock": None},
+                {"vehicle_id": "UP-32-OP-1234", "plate_number": "UP-32-OP-1234", "vehicle_type": "truck_20ft", "status": "departed", "current_zone": "outbound_gate", "assigned_dock": None},
             ]
             for idx_fv, fv in enumerate(fleet_vehicles):
                 yard_time = now - timedelta(minutes=[22, 45, 38, 67, 5, 55, 30, 2][idx_fv])
@@ -561,33 +657,7 @@ async def seed_database(db_url: str | None = None):
                 })
             logger.info("Seeded 5 monitoring alerts")
 
-            # ── Sequencing Batches (fixed columns) ──
-            try:
-                async with db.begin_nested():
-                    seq_batches = [
-                        {"sku_code": "CEM-53", "product_name": "OPC Cement 53 Grade", "zone": "A", "rack": "A-01", "bin_location": "A-01-L1", "quantity": 498, "rule": "FIFO", "days": 365},
-                        {"sku_code": "FERT-DAP", "product_name": "DAP Fertilizer 50kg", "zone": "A", "rack": "A-03", "bin_location": "A-03-L2", "quantity": 320, "rule": "FEFO", "days": 180},
-                        {"sku_code": "CHEM-H2SO4", "product_name": "Sulfuric Acid Drums", "zone": "C", "rack": "C-01", "bin_location": "C-01-L1", "quantity": 50, "rule": "FIFO", "days": 730},
-                        {"sku_code": "STEEL-TMT", "product_name": "TMT Steel Bars 12mm", "zone": "B", "rack": "B-05", "bin_location": "B-05-L3", "quantity": 1200, "rule": "FIFO", "days": 9999},
-                        {"sku_code": "RICE-BAS", "product_name": "Basmati Rice 25kg", "zone": "D", "rack": "D-02", "bin_location": "D-02-L1", "quantity": 800, "rule": "FEFO", "days": 365},
-                    ]
-                    for sb in seq_batches:
-                        mfg = (now - timedelta(days=30)).date()
-                        exp = (now + timedelta(days=sb["days"])).date()
-                        days_to = sb["days"]
-                        await db.execute(text("""
-                            INSERT INTO depot_inventory_batches (id, batch_code, sku_code, product_name, zone, rack, bin_location, quantity, original_quantity, manufacture_date, expiry_date, received_at, sequencing_rule, priority_score, status, is_near_expiry, days_to_expiry, created_at, updated_at)
-                            VALUES (:id, :batch_code, :sku, :name, :zone, :rack, :bin, :qty, :qty, :mfg, :exp, :now, :rule, 0.0, 'active', :near, :days, :now, :now)
-                            ON CONFLICT DO NOTHING
-                        """), {
-                            "id": new_id(), "batch_code": f"B2026-{sb['sku_code']}", "sku": sb["sku_code"], "name": sb["product_name"],
-                            "zone": sb["zone"], "rack": sb["rack"], "bin": sb["bin_location"],
-                            "qty": sb["quantity"], "mfg": mfg, "exp": exp,
-                            "rule": sb["rule"], "near": days_to < 60, "days": days_to, "now": now,
-                        })
-                logger.info(f"Seeded {len(seq_batches)} sequencing batches")
-            except Exception as e:
-                logger.warning(f"Skipped sequencing batches: {e}")
+
 
             # ── Scorecard Entries ──
             try:
@@ -619,7 +689,7 @@ async def seed_database(db_url: str | None = None):
             print(f"  - {len(GATES)} gates")
             print(f"  - {len(VEHICLES)} vehicles")
             print(f"  - {len(VISITORS)} visitors")
-            print(f"  - {len(PERIMETER_ZONES)} perimeter zones + 3 breaches")
+            print(f"  - {len(PERIMETER_ZONES)} perimeter zones + 5 breaches")
             print(f"  - {len(CLUSTER_ZONES)} cluster zones")
             print(f"  - 1 detection model (cement-bags-custom)")
             print(f"  - {len(MANIFESTS)} shipment manifests")

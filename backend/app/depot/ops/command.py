@@ -170,7 +170,6 @@ async def _select_gate_for_action(db: AsyncSession, gate_id: Optional[uuid.UUID]
 async def _publish_command_event(action: CommandActionLog) -> None:
     try:
         from app.core.gateway.realtime import realtime_hub
-
         await realtime_hub.publish(
             topic="depot.command",
             event_type=f"depot.command.{action.action_type}",
