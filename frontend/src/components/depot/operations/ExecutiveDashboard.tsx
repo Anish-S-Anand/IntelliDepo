@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getDepotCommandSnapshot, type CameraRecord } from "@/services/depotCommand";
+import { getZones, type ZoneResponse } from "@/services/depotCluster";
 import {
   ShieldAlert,
   CheckCircle2,
@@ -38,23 +40,11 @@ const WEEKLY_TOTALS = WEEKLY.reduce(
   { enter: 0, exit: 0 }
 );
 
-// ─── 6 Cameras ──────────────────────────────────────────────────────────────
-const CAMERAS = [
-  { id: "CAM-01", location: "Gate C – Entry",      status: "online"  as const, zone: "Zone A" },
-  { id: "CAM-02", location: "Dock B – Loading",    status: "online"  as const, zone: "Zone B" },
-  { id: "CAM-03", location: "Bay 7 – Staging",     status: "online"  as const, zone: "Zone B" },
-  { id: "CAM-04", location: "Zone C – Receiving",  status: "online"  as const, zone: "Zone C" },
-  { id: "CAM-05", location: "Exit E-2 – South",    status: "online"  as const, zone: "Zone D" },
-  { id: "CAM-06", location: "Zone B – Aisle 4",    status: "offline" as const, zone: "Zone B" },
-];
+// ─── 6 Cameras — replaced by live backend data ──────────────────────────────
+// (CAMERAS constant removed — now fetched from API)
 
-// ─── 4 Zones ─────────────────────────────────────────────────────────────────
-const ZONES = [
-  { id: "Z-A", name: "Zone A", pct: 91,  used: 1820, total: 2000 },
-  { id: "Z-B", name: "Zone B", pct: 74,  used: 1480, total: 2000 },
-  { id: "Z-C", name: "Zone C", pct: 97,  used: 1940, total: 2000 },
-  { id: "Z-D", name: "Zone D", pct: 63,  used: 1260, total: 2000 },
-];
+// ─── 4 Zones — replaced by live backend data ─────────────────────────────────
+// (ZONES constant removed — now fetched from API)
 
 // ─── Incidents ───────────────────────────────────────────────────────────────
 type Severity = "critical" | "high" | "medium";
@@ -230,10 +220,41 @@ function SectionHeading({ children, sub }: { children: React.ReactNode; sub?: st
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function ExecutiveDashboard() {
   const [, setTick] = useState(0);
+  const [cameras, setCameras] = useState<CameraRecord[]>([]);
+  const [zones, setZones] = useState<ZoneResponse[]>([]);
+
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    getDepotCommandSnapshot().then((snap) => {
+      if (snap.cameras.data.length > 0) setCameras(snap.cameras.data);
+    }).catch(() => {});
+    getZones().then((z) => { if (z.length > 0) setZones(z); }).catch(() => {});
+  }, []);
+
+  // Map backend cameras to the shape used in the UI
+  const CAMERAS = cameras.length > 0
+    ? cameras.map((c) => ({
+        id: c.id,
+        location: c.name,
+        status: c.status === "active" ? "online" as const : "offline" as const,
+        zone: c.zone ?? "—",
+      }))
+    : [] as { id: string; location: string; status: "online" | "offline"; zone: string }[];
+
+  // Map backend zones to the shape used in the UI
+  const ZONES = zones.length > 0
+    ? zones.map((z) => ({
+        id: z.id,
+        name: z.name,
+        pct: Math.round(z.utilization_pct),
+        used: z.current_occupancy,
+        total: z.max_capacity_units,
+      }))
+    : [] as { id: string; name: string; pct: number; used: number; total: number }[];
 
   const openCount     = INCIDENTS.filter((i) => i.status === "open" || i.status === "escalated").length;
   const critCount     = INCIDENTS.filter((i) => i.severity === "critical").length;
@@ -286,7 +307,6 @@ export default function ExecutiveDashboard() {
                                                                 sub={`${critCount} urgent · ${offlineCams} camera offline`} color={(critCount + offlineCams) > 0 ? "var(--color-warning)" : "var(--color-success)"} icon={AlertTriangle} cardStyle={cardStyle} />
         <KpiCard label="Problems to Fix" value={String(openCount)} sub={`${critCount} urgent right now`} color={openCount > 0 ? "var(--color-danger)" : "var(--color-success)"} icon={ShieldAlert}  cardStyle={cardStyle} />
         <KpiCard label="Storage Used"   value={`${avgOccupancy}%`} sub={`${atRiskZones} zones almost full`} color={avgOccupancy > 90 ? "var(--color-danger)" : avgOccupancy > 80 ? "var(--color-warning)" : "var(--color-success)"} icon={Package} cardStyle={cardStyle} />
-        <KpiCard label="Vehicles Today" value="127"             sub="Scanned at gate today"            color="var(--color-info)"    icon={Truck}        cardStyle={cardStyle} />
         <KpiCard label="Fixed Today"    value="4"               sub="Problems resolved"                color="var(--color-success)" icon={CheckCircle2} cardStyle={cardStyle} />
       </div>
 
