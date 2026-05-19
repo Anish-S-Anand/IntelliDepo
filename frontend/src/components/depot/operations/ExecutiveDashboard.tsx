@@ -263,7 +263,7 @@ export default function ExecutiveDashboard() {
   const avgOccupancy  = Math.round(ZONES.reduce((a, z) => a + z.pct, 0) / ZONES.length);
 
   const MAX_BAR = Math.max(...WEEKLY.flatMap((d) => [d.enter, d.exit]));
-  const CHART_H = 130;
+  const CHART_H = 220;
 
   const cardStyle: React.CSSProperties = {
     backgroundColor: "var(--bg-card)",
@@ -323,7 +323,7 @@ export default function ExecutiveDashboard() {
               <div key={cam.id} className="rounded-[12px] p-3" style={cardStyle}>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[11px] sm:text-[12px] font-black" style={{ color: "var(--text-primary)" }}>
-                    {cam.id}
+                    {cam.location}
                   </span>
                   <span
                     className="flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-full"
@@ -332,9 +332,6 @@ export default function ExecutiveDashboard() {
                     {online ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
                     {online ? "ON" : "OFF"}
                   </span>
-                </div>
-                <div className="text-[9px] sm:text-[10px] leading-snug" style={{ color: "var(--text-muted)" }}>
-                  {cam.location}
                 </div>
                 <div className="text-[9px] mt-1 font-bold" style={{ color: "var(--text-faint)" }}>
                   {cam.zone}
@@ -351,7 +348,7 @@ export default function ExecutiveDashboard() {
         <div className="flex flex-wrap justify-between items-start gap-2 mb-4">
           <div>
             <span className="text-[13px] font-black" style={{ color: "var(--text-primary)" }}>
-              📦 Bags In &amp; Out — This Week
+              📦 Daily Throughput — Bags
             </span>
             <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
               How many bags entered and left the depot each day
@@ -383,7 +380,7 @@ export default function ExecutiveDashboard() {
                   <div className="flex items-end gap-[3px]" style={{ height: CHART_H }}>
                     {/* In bar */}
                     <div className="flex flex-col items-center justify-end gap-[2px]" style={{ height: CHART_H }}>
-                      <span className="text-[7px] font-bold" style={{ color: peak ? "#E5521A" : "var(--text-muted)" }}>
+                      <span className="text-[9px] font-bold" style={{ color: peak ? "#E5521A" : "var(--text-muted)" }}>
                         {fmtK(day.enter)}
                       </span>
                       <div style={{
@@ -397,7 +394,7 @@ export default function ExecutiveDashboard() {
                     </div>
                     {/* Out bar */}
                     <div className="flex flex-col items-center justify-end gap-[2px]" style={{ height: CHART_H }}>
-                      <span className="text-[7px] font-bold" style={{ color: peak ? "var(--color-info)" : "var(--text-faint)" }}>
+                      <span className="text-[9px] font-bold" style={{ color: peak ? "var(--color-info)" : "var(--text-faint)" }}>
                         {fmtK(day.exit)}
                       </span>
                       <div style={{
