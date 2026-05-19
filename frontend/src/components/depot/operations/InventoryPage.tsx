@@ -175,6 +175,33 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
+function matchesSearch(query: string, values: Array<string | number | null | undefined>): boolean {
+  if (!query) return true;
+  return values.some((value) => String(value ?? "").toLowerCase().includes(query));
+}
+
+function isWithinDateRange(value: string | null | undefined, from: string, to: string): boolean {
+  if (!from && !to) return true;
+  if (!value) return false;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+
+  if (from) {
+    const fromDate = new Date(from);
+    fromDate.setHours(0, 0, 0, 0);
+    if (date < fromDate) return false;
+  }
+
+  if (to) {
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999);
+    if (date > toDate) return false;
+  }
+
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -236,31 +263,23 @@ export default function InventoryPage() {
     return () => clearInterval(interval);
   }, [fetchData]);
 
+  const normalizedSearch = search.trim().toLowerCase();
+  const hasActiveFilters = normalizedSearch !== "" || filter !== "all" || dateFrom !== "" || dateTo !== "";
+
+  const resetFilters = () => {
+    setSearch("");
+    setFilter("all");
+    setDateFrom("");
+    setDateTo("");
+  };
+
   // Filter clusters (for zones view - individual batches)
   const filtered = clusters.filter((c) => {
     const pct = c.capacity > 0 ? c.occupied / c.capacity : 0;
     if (filter === "full" && pct < 0.70) return false; // 70% threshold for Near Full
     if (filter === "empty" && c.occupied !== 0) return false; // Empty means occupied = 0
-    if (
-      search &&
-      !c.product.toLowerCase().includes(search.toLowerCase()) &&
-      !c.id.toLowerCase().includes(search.toLowerCase()) &&
-      !c.batch.toLowerCase().includes(search.toLowerCase())
-    )
-      return false;
-    // Date range filter on lastActivity
-    if (dateFrom) {
-      const activityDate = new Date(c.lastActivity);
-      const fromDate = new Date(dateFrom);
-      fromDate.setHours(0, 0, 0, 0);
-      if (activityDate < fromDate) return false;
-    }
-    if (dateTo) {
-      const activityDate = new Date(c.lastActivity);
-      const toDate = new Date(dateTo);
-      toDate.setHours(23, 59, 59, 999);
-      if (activityDate > toDate) return false;
-    }
+    if (!matchesSearch(normalizedSearch, [c.product, c.id, c.zone, c.batch, c.rack])) return false;
+    if (!isWithinDateRange(c.lastActivity, dateFrom, dateTo)) return false;
     return true;
   });
 
@@ -270,61 +289,24 @@ export default function InventoryPage() {
     if (filter === "full" && z.utilization_pct < 70) return false;
     if (filter === "empty" && z.current_occupancy !== 0) return false;
     // For search, check if any clusters in this zone match
-    if (search) {
+    if (normalizedSearch) {
       const zoneClusters = clusters.filter(c => c.zone === z.zone_code);
       const hasMatch = zoneClusters.some(c => 
-        c.product.toLowerCase().includes(search.toLowerCase()) ||
-        c.id.toLowerCase().includes(search.toLowerCase()) ||
-        c.batch.toLowerCase().includes(search.toLowerCase())
-      );
+        matchesSearch(normalizedSearch, [c.product, c.id, c.zone, `zone ${c.zone}`, c.batch, c.rack])
+      ) || matchesSearch(normalizedSearch, ["zone", z.zone_code, `zone ${z.zone_code}`, z.name, z.zone_type, z.status]);
       if (!hasMatch) return false;
     }
+    if ((dateFrom || dateTo) && !clusters.some((c) => c.zone === z.zone_code && isWithinDateRange(c.lastActivity, dateFrom, dateTo))) return false;
     return true;
   });
-
-  // Convert clusters to batches data
-  const BATCHES: BatchData[] = clusters.map((c) => ({
-    id: c.id,
-    batch_code: c.batch,
-    sku_code: c.id,
-    product_name: c.product,
-    zone: c.zone,
-    rack: c.rack,
-    bin_location: null,
-    quantity: c.occupied,
-    original_quantity: c.capacity,
-    sequencing_rule: c.fifo ? "FIFO" : "FEFO",
-    status: "active",
-    is_near_expiry: false,
-    days_to_expiry: null,
-    created_at: c.lastActivity,
-  }));
 
   // Filter batches using real API data
   const filteredBatches = batchesFromAPI.filter((b) => {
     const pct = b.original_quantity > 0 ? b.quantity / b.original_quantity : 0;
     if (filter === "full" && pct < 0.70) return false; // Changed to 70% threshold
     if (filter === "empty" && b.quantity !== 0) return false; // Fixed: empty means quantity = 0
-    if (
-      search &&
-      !b.batch_code.toLowerCase().includes(search.toLowerCase()) &&
-      !(b.product_name || "").toLowerCase().includes(search.toLowerCase()) &&
-      !(b.zone || "").toLowerCase().includes(search.toLowerCase())
-    )
-      return false;
-    // Date range filter on created_at
-    if (dateFrom) {
-      const createdDate = new Date(b.created_at);
-      const fromDate = new Date(dateFrom);
-      fromDate.setHours(0, 0, 0, 0);
-      if (createdDate < fromDate) return false;
-    }
-    if (dateTo) {
-      const createdDate = new Date(b.created_at);
-      const toDate = new Date(dateTo);
-      toDate.setHours(23, 59, 59, 999);
-      if (createdDate > toDate) return false;
-    }
+    if (!matchesSearch(normalizedSearch, [b.batch_code, b.product_name, b.sku_code, b.zone, b.rack, b.bin_location, b.status])) return false;
+    if (!isWithinDateRange(b.created_at, dateFrom, dateTo)) return false;
     return true;
   });
 
@@ -460,14 +442,16 @@ export default function InventoryPage() {
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
+            max={dateTo || undefined}
             className="bg-transparent text-[#E8EDF8] text-[11px] outline-none w-[110px]"
             title="From date"
           />
-          <span className="text-[#4E6090] text-[11px]">—</span>
+          <span className="text-[#4E6090] text-[11px]">-</span>
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
+            min={dateFrom || undefined}
             className="bg-transparent text-[#E8EDF8] text-[11px] outline-none w-[110px]"
             title="To date"
           />
@@ -485,6 +469,15 @@ export default function InventoryPage() {
             {f.label}
           </button>
         ))}
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="px-2.5 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-semibold hover:border-[#E5521A]/50 hover:text-[#E8EDF8] transition-colors"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {/* ── Clusters View ── */}

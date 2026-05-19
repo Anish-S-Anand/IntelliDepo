@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+<<<<<<< HEAD
 import {
   getZones,
   getHeatmap,
@@ -11,6 +12,19 @@ import {
   type DensityHistoryEntry,
   type ThresholdResponse,
 } from "@/services/depotCluster";
+=======
+import {
+  getZones,
+  getHeatmap,
+  getDensityAnalytics,
+  getDensityHistory,
+  getThresholds,
+  type DensityEntry,
+  type DensityHistoryEntry,
+  type ThresholdResponse,
+} from "@/services/depotCluster";
+import { ZONE_HISTORY } from "@/lib/depot-data";
+>>>>>>> cbb2bb1bbfe3e1ceca7d65935f81fb6c2222d136
 import {
   MapPin,
   Layers,
@@ -61,6 +75,55 @@ const DEMO_ZONES: MergedZone[] = [
   { id: "demo-c", code: "C", name: "JSW Cement — Zone C",        type: "storage", floor: "ground", areaSqm: 1600, maxCapacity: 800,  currentOccupancy: 595,  utilizationPct: 74, status: "normal",   polygon: [], densityPerSqm: 0.37 },
   { id: "demo-d", code: "D", name: "Ambuja Cement — Zone D",     type: "storage", floor: "ground", areaSqm: 3200, maxCapacity: 1200, currentOccupancy: 1092, utilizationPct: 91, status: "critical", polygon: [], densityPerSqm: 0.34 },
 ];
+
+function getStatusForUtilization(utilizationPct: number, thresholds: { warning: number; critical: number }) {
+  if (utilizationPct >= thresholds.critical) return "critical";
+  if (utilizationPct >= thresholds.warning) return "warning";
+  return "normal";
+}
+
+function getHistoryTimestamp(entry: DensityHistoryEntry) {
+  const timestamp = new Date(entry.recorded_at).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function findReplayEntry(entries: DensityHistoryEntry[], targetTime: number): DensityHistoryEntry | null {
+  if (entries.length === 0) return null;
+
+  const sorted = [...entries].sort((a, b) => getHistoryTimestamp(a) - getHistoryTimestamp(b));
+  const olderOrEqual = sorted.filter((entry) => getHistoryTimestamp(entry) <= targetTime);
+  if (olderOrEqual.length > 0) return olderOrEqual[olderOrEqual.length - 1];
+
+  return sorted.reduce((nearest, entry) => {
+    const nearestDelta = Math.abs(getHistoryTimestamp(nearest) - targetTime);
+    const entryDelta = Math.abs(getHistoryTimestamp(entry) - targetTime);
+    return entryDelta < nearestDelta ? entry : nearest;
+  }, sorted[0]);
+}
+
+function getFallbackReplayZone(
+  zone: MergedZone,
+  historyRange: number,
+  thresholds: { warning: number; critical: number }
+): MergedZone {
+  const records = ZONE_HISTORY[zone.code];
+  if (!records?.length) return zone;
+
+  const replayDepth = Math.round((historyRange / 30) * (records.length - 1));
+  const recordIndex = Math.max(0, records.length - 1 - replayDepth);
+  const record = records[recordIndex];
+  const utilizationPct = zone.maxCapacity > 0
+    ? Number(((record.occupancy / zone.maxCapacity) * 100).toFixed(1))
+    : record.utilization;
+
+  return {
+    ...zone,
+    currentOccupancy: record.occupancy,
+    utilizationPct,
+    status: getStatusForUtilization(utilizationPct, thresholds),
+    densityPerSqm: zone.areaSqm > 0 ? record.occupancy / zone.areaSqm : zone.densityPerSqm,
+  };
+}
 
 /* ------------------------------------------------------------------ */
 /* Component                                                           */
@@ -147,32 +210,48 @@ export default function HeatmapPage() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await getDensityHistory(undefined, 500);
+        const data = await getDensityHistory(undefined, 2000);
         if (!cancelled) {
-          const cutoff = new Date();
-          cutoff.setDate(cutoff.getDate() - historyRange);
-          const filtered = data.filter((d) => new Date(d.recorded_at) >= cutoff);
-          setHistoryData(filtered);
+          setHistoryData(data);
         }
       } catch (err) {
         console.error("HeatmapPage: failed to fetch density history", err);
+        if (!cancelled) setHistoryData([]);
       }
     })();
     return () => { cancelled = true; };
   }, [historyRange]);
 
   /* ---- apply historical overlay when slider > 0 ---- */
-  const displayZones: MergedZone[] = historyRange > 0 && historyData.length > 0
+  const displayZones: MergedZone[] = historyRange > 0
     ? zones.map((z) => {
-        // Average historical occupancy for this zone
-        const entries = historyData.filter((h) => h.zone_id === z.id);
-        if (entries.length === 0) return z;
-        const avgOcc = Math.round(entries.reduce((a, e) => a + e.occupancy, 0) / entries.length);
-        const util = z.maxCapacity > 0 ? Math.round((avgOcc / z.maxCapacity) * 100) : 0;
-        const status = util >= 95 ? "critical" : util >= 80 ? "warning" : "normal";
-        return { ...z, currentOccupancy: avgOcc, utilizationPct: util, status };
+        const target = new Date();
+        target.setDate(target.getDate() - historyRange);
+        const entries = historyData.filter((h) => h.zone_id === z.id || h.zone_code === z.code);
+        const replayEntry = findReplayEntry(entries, target.getTime());
+
+        if (!replayEntry) {
+          return getFallbackReplayZone(z, historyRange, thresholds);
+        }
+
+        const maxCapacity = replayEntry.capacity || z.maxCapacity;
+        const utilizationPct = maxCapacity > 0
+          ? Number(((replayEntry.occupancy / maxCapacity) * 100).toFixed(1))
+          : replayEntry.utilization_pct;
+
+        return {
+          ...z,
+          maxCapacity,
+          currentOccupancy: replayEntry.occupancy,
+          utilizationPct,
+          status: replayEntry.status ?? getStatusForUtilization(utilizationPct, thresholds),
+          densityPerSqm: z.areaSqm > 0 ? replayEntry.occupancy / z.areaSqm : z.densityPerSqm,
+        };
       })
     : zones;
+  const selectedDisplayZone = selectedZone
+    ? displayZones.find((z) => z.id === selectedZone.id) ?? null
+    : null;
 
   /* ---- derived KPIs ---- */
   const totalCap = displayZones.reduce((a, z) => a + z.maxCapacity, 0);
@@ -245,6 +324,7 @@ export default function HeatmapPage() {
             max={30}
             value={historyRange}
             onChange={(e) => setHistoryRange(Number(e.target.value))}
+            onInput={(e) => setHistoryRange(Number(e.currentTarget.value))}
             className="w-full h-1.5 accent-[#E5521A] cursor-pointer"
           />
           <div className="flex justify-between mt-1.5">
@@ -296,7 +376,7 @@ export default function HeatmapPage() {
           {/* 3D Warehouse Map */}
           <Warehouse3DMap
             zones={displayZones}
-            selectedZone={selectedZone?.code ?? null}
+            selectedZone={selectedDisplayZone?.code ?? null}
             onZoneClick={(code) => {
               const match = displayZones.find((z) => z.code === code);
               setSelectedZone(match && selectedZone?.id === match.id ? null : match ?? null);
@@ -322,26 +402,26 @@ export default function HeatmapPage() {
         {/* Zone Detail + Capacity Alerts */}
         <div className="space-y-4">
           {/* Selected zone detail */}
-          {selectedZone ? (
+          {selectedDisplayZone ? (
             <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px]">
               <div className="flex justify-between items-start mb-3">
                 <div>
                   <div className="text-[13px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
-                    {selectedZone.name}
+                    {selectedDisplayZone.name}
                   </div>
                   <div className="text-[10px] text-[#8A9BBF] mt-0.5">
-                    {selectedZone.type.toUpperCase()} · {selectedZone.floor} · {selectedZone.areaSqm} m²
+                    {selectedDisplayZone.type.toUpperCase()} · {selectedDisplayZone.floor} · {selectedDisplayZone.areaSqm} m²
                   </div>
                 </div>
                 <span
                   className="text-[9px] font-bold px-2 py-0.5 rounded-full border"
                   style={{
-                    background: `${statusColor(selectedZone.status)}15`,
-                    color: statusColor(selectedZone.status),
-                    borderColor: `${statusColor(selectedZone.status)}30`,
+                    background: `${statusColor(selectedDisplayZone.status)}15`,
+                    color: statusColor(selectedDisplayZone.status),
+                    borderColor: `${statusColor(selectedDisplayZone.status)}30`,
                   }}
                 >
-                  {STATUS_LABEL[selectedZone.status] ?? selectedZone.status.toUpperCase()}
+                  {STATUS_LABEL[selectedDisplayZone.status] ?? selectedDisplayZone.status.toUpperCase()}
                 </span>
               </div>
 
@@ -349,16 +429,16 @@ export default function HeatmapPage() {
               <div className="mb-3">
                 <div className="flex justify-between text-[10px] mb-1">
                   <span className="text-[#8A9BBF]">Utilization</span>
-                  <span className="font-bold" style={{ color: statusColor(selectedZone.status) }}>
-                    {selectedZone.utilizationPct}%
+                  <span className="font-bold" style={{ color: statusColor(selectedDisplayZone.status) }}>
+                    {selectedDisplayZone.utilizationPct}%
                   </span>
                 </div>
                 <div className="w-full h-2 bg-[#0F1A30] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{
-                      width: `${selectedZone.utilizationPct}%`,
-                      background: statusColor(selectedZone.status),
+                      width: `${selectedDisplayZone.utilizationPct}%`,
+                      background: statusColor(selectedDisplayZone.status),
                     }}
                   />
                 </div>
@@ -367,10 +447,10 @@ export default function HeatmapPage() {
               {/* Stats grid */}
               <div className="grid grid-cols-2 gap-2 mb-3">
                 {[
-                  { l: "Capacity", v: `${selectedZone.currentOccupancy} / ${selectedZone.maxCapacity}` },
-                  { l: "Density", v: `${selectedZone.densityPerSqm.toFixed(2)} /m²` },
-                  { l: "Area", v: `${selectedZone.areaSqm} m²` },
-                  { l: "Type", v: selectedZone.type },
+                  { l: "Capacity", v: `${selectedDisplayZone.currentOccupancy} / ${selectedDisplayZone.maxCapacity}` },
+                  { l: "Density", v: `${selectedDisplayZone.densityPerSqm.toFixed(2)} /m²` },
+                  { l: "Area", v: `${selectedDisplayZone.areaSqm} m²` },
+                  { l: "Type", v: selectedDisplayZone.type },
                 ].map((s) => (
                   <div key={s.l} className="bg-[#0F1A30] rounded-lg p-2.5">
                     <div className="text-[8px] text-[#4E6090] font-bold uppercase tracking-wide">{s.l}</div>
@@ -450,7 +530,7 @@ export default function HeatmapPage() {
                 <div
                   key={z.id}
                   className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
-                    selectedZone?.id === z.id ? "bg-[#E5521A]/10" : "hover:bg-[#0F1A30]"
+                    selectedDisplayZone?.id === z.id ? "bg-[#E5521A]/10" : "hover:bg-[#0F1A30]"
                   }`}
                   onClick={() => setSelectedZone(z)}
                 >

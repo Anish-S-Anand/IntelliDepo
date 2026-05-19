@@ -1,10 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+<<<<<<< HEAD
 import { useRouter } from "next/navigation";
 import { getDepotCommandSnapshot, type CameraRecord } from "@/services/depotCommand";
 import { getZones, type ZoneResponse } from "@/services/depotCluster";
 import { getIncidents, type IncidentResponse } from "@/services/depotPerimeter";
+=======
+import { getDepotCommandSnapshot, type CameraRecord } from "@/services/depotCommand";
+import { getZones, type ZoneResponse } from "@/services/depotCluster";
+>>>>>>> cbb2bb1bbfe3e1ceca7d65935f81fb6c2222d136
 import {
   ShieldAlert,
   CheckCircle2,
@@ -280,7 +285,10 @@ export default function ExecutiveDashboard() {
   const [, setTick] = useState(0);
   const [cameras, setCameras] = useState<CameraRecord[]>([]);
   const [zones, setZones] = useState<ZoneResponse[]>([]);
+<<<<<<< HEAD
   const [backendIncidents, setBackendIncidents] = useState<IncidentResponse[]>([]);
+=======
+>>>>>>> cbb2bb1bbfe3e1ceca7d65935f81fb6c2222d136
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
@@ -288,6 +296,7 @@ export default function ExecutiveDashboard() {
   }, []);
 
   useEffect(() => {
+<<<<<<< HEAD
     const loadDashboardData = () => {
       getDepotCommandSnapshot().then((snap) => {
         if (snap.cameras.data.length > 0) setCameras(snap.cameras.data);
@@ -299,6 +308,12 @@ export default function ExecutiveDashboard() {
     loadDashboardData();
     const id = setInterval(loadDashboardData, 20000);
     return () => clearInterval(id);
+=======
+    getDepotCommandSnapshot().then((snap) => {
+      if (snap.cameras.data.length > 0) setCameras(snap.cameras.data);
+    }).catch(() => {});
+    getZones().then((z) => { if (z.length > 0) setZones(z); }).catch(() => {});
+>>>>>>> cbb2bb1bbfe3e1ceca7d65935f81fb6c2222d136
   }, []);
 
   // Map backend cameras to the shape used in the UI
@@ -322,6 +337,7 @@ export default function ExecutiveDashboard() {
       }))
     : [] as { id: string; name: string; pct: number; used: number; total: number }[];
 
+<<<<<<< HEAD
   const activeIncidents: Incident[] = backendIncidents
     .filter((incident) => incident.status !== "resolved")
     .map((incident) => ({
@@ -342,6 +358,10 @@ export default function ExecutiveDashboard() {
 
   const openCount     = activeIncidents.filter((i) => i.status === "open" || i.status === "escalated").length;
   const critCount     = activeIncidents.filter((i) => i.severity === "critical").length;
+=======
+  const openCount     = INCIDENTS.filter((i) => i.status === "open" || i.status === "escalated").length;
+  const critCount     = INCIDENTS.filter((i) => i.severity === "critical").length;
+>>>>>>> cbb2bb1bbfe3e1ceca7d65935f81fb6c2222d136
   const offlineCams   = CAMERAS.filter((c) => c.status === "offline").length;
   const atRiskZones   = ZONES.filter((z) => z.pct >= 85).length;
   const avgOccupancy  = ZONES.length > 0 ? Math.round(ZONES.reduce((a, z) => a + z.pct, 0) / ZONES.length) : 0;

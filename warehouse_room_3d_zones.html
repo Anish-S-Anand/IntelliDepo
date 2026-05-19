@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+<title>Cement Warehouse 3D</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+
+<style>
+
+body{
+    margin:0;
+    overflow:hidden;
+    background:#0f172a;
+    font-family:Arial,sans-serif;
+}
+
+#warehouse-wrap{
+    width:100vw;
+    height:100vh;
+    position:relative;
+}
+
+#tooltip{
+    position:absolute;
+    display:none;
+    background:rgba(15,23,42,0.95);
+    color:white;
+    padding:12px;
+    border-radius:10px;
+    font-size:13px;
+    pointer-events:none;
+    min-width:180px;
+    border:1px solid rgba(255,255,255,0.1);
+    backdrop-filter:blur(8px);
+}
+
+#title{
+    position:absolute;
+    top:15px;
+    left:15px;
+    color:white;
+    font-size:18px;
+    font-weight:600;
+    z-index:10;
+}
+
+#legend{
+    position:absolute;
+    bottom:20px;
+    left:20px;
+    color:white;
+    background:rgba(15,23,42,0.85);
+    padding:12px;
+    border-radius:10px;
+    font-size:12px;
+    line-height:22px;
+    z-index:10;
+}
+
+.legend-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+
+.legend-color{
+    width:12px;
+    height:12px;
+    border-radius:3px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="warehouse-wrap">
+
+    <div id="title">
+        Cement Warehouse Monitoring
+    </div>
+
+    <canvas id="warehouseCanvas"></canvas>
+
+    <div id="tooltip"></div>
+
+    <div id="legend">
+
+        <div class="legend-item">
+            <div class="legend-color" style="background:#ef4444;"></div>
+            Near Full
+        </div>
+
+        <div class="legend-item">
+            <div class="legend-color" style="background:#f59e0b;"></div>
+            Medium
+        </div>
+
+        <div class="legend-item">
+            <div class="legend-color" style="background:#22c55e;"></div>
+            Normal
+        </div>
+
+        <div class="legend-item">
+            <div class="legend-color" style="background:#3b82f6;"></div>
+            Low Stock
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+// SCENE
+
+const scene = new THREE.Scene();
+
+scene.background = new THREE.Color(0x0f172a);
+
+// CAMERA
+
+const camera = new THREE.PerspectiveCamera(
+    55,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+);
+
+camera.position.set(0,35,40);
+
+// RENDERER
+
+const canvas = document.getElementById("warehouseCanvas");
+
+const renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias:true
+});
+
+renderer.setSize(window.innerWidth,window.innerHeight);
+
+renderer.shadowMap.enabled = true;
+
+// CONTROLS
+
+const controls = new THREE.OrbitControls(
+    camera,
+    renderer.domElement
+);
+
+controls.enableDamping = true;
+
+controls.dampingFactor = 0.05;
+
+controls.screenSpacePanning = true;
+
+controls.minDistance = 15;
+
+controls.maxDistance = 100;
+
+controls.maxPolarAngle = Math.PI / 2.1;
+
+// LIGHTS
+
+const ambient = new THREE.AmbientLight(0xffffff,0.7);
+
+scene.add(ambient);
+
+const directional = new THREE.DirectionalLight(0xffffff,1);
+
+directional.position.set(20,40,20);
+
+directional.castShadow = true;
+
+scene.add(directional);
+
+// FLOOR
+
+const floorGeometry = new THREE.PlaneGeometry(70,70);
+
+const floorMaterial = new THREE.MeshStandardMaterial({
+    color:0x1e293b
+});
+
+const floor = new THREE.Mesh(
+    floorGeometry,
+    floorMaterial
+);
+
+floor.rotation.x = -Math.PI / 2;
+
+floor.receiveShadow = true;
+
+scene.add(floor);
+
+// GRID
+
+const grid = new THREE.GridHelper(
+    70,
+    70,
+    0x334155,
+    0x334155
+);
+
+scene.add(grid);
+
+// ROAD
+
+const roadGeometry = new THREE.PlaneGeometry(10,60);
+
+const roadMaterial = new THREE.MeshStandardMaterial({
+    color:0x374151
+});
+
+const road = new THREE.Mesh(
+    roadGeometry,
+    roadMaterial
+);
+
+road.rotation.x = -Math.PI / 2;
+
+road.position.z = 5;
+
+road.position.y = 0.02;
+
+scene.add(road);
+
+// ZONES
+
+const zones = [
+
+    {
+        name:"Zone A - OPC Cement",
+        x:-20,
+        z:-12,
+        color:0xef4444,
+        stock:"92%"
+    },
+
+    {
+        name:"Zone B - PPC Cement",
+        x:0,
+        z:-12,
+        color:0xf59e0b,
+        stock:"68%"
+    },
+
+    {
+        name:"Zone C - Clinker",
+        x:20,
+        z:-12,
+        color:0x22c55e,
+        stock:"45%"
+    },
+
+    {
+        name:"Zone D - Dispatch",
+        x:-10,
+        z:15,
+        color:0x3b82f6,
+        stock:"18%"
+    },
+
+    {
+        name:"Zone E - Damaged Bags",
+        x:15,
+        z:15,
+        color:0xa855f7,
+        stock:"10%"
+    }
+
+];
+
+const zoneMeshes = [];
+
+// CREATE ZONES
+
+zones.forEach(zone=>{
+
+    const geometry = new THREE.BoxGeometry(
+        12,
+        5,
+        10
+    );
+
+    const material = new THREE.MeshStandardMaterial({
+        color:zone.color
+    });
+
+    const mesh = new THREE.Mesh(
+        geometry,
+        material
+    );
+
+    mesh.position.set(
+        zone.x,
+        2.5,
+        zone.z
+    );
+
+    mesh.castShadow = true;
+
+    mesh.receiveShadow = true;
+
+    mesh.userData = zone;
+
+    scene.add(mesh);
+
+    zoneMeshes.push(mesh);
+
+});
+
+// ENTRY GATE
+
+const entryGate = new THREE.Mesh(
+
+    new THREE.BoxGeometry(10,6,1),
+
+    new THREE.MeshStandardMaterial({
+        color:0x22c55e
+    })
+
+);
+
+entryGate.position.set(
+    -15,
+    3,
+    30
+);
+
+scene.add(entryGate);
+
+// EXIT GATE
+
+const exitGate = new THREE.Mesh(
+
+    new THREE.BoxGeometry(10,6,1),
+
+    new THREE.MeshStandardMaterial({
+        color:0xef4444
+    })
+
+);
+
+exitGate.position.set(
+    15,
+    3,
+    30
+);
+
+scene.add(exitGate);
+
+// CAMERA TOWERS
+
+function createCameraTower(x,z){
+
+    const pole = new THREE.Mesh(
+
+        new THREE.CylinderGeometry(0.4,0.4,8),
+
+        new THREE.MeshStandardMaterial({
+            color:0x94a3b8
+        })
+
+    );
+
+    pole.position.set(
+        x,
+        4,
+        z
+    );
+
+    scene.add(pole);
+
+    const cameraBox = new THREE.Mesh(
+
+        new THREE.BoxGeometry(1.5,1,2),
+
+        new THREE.MeshStandardMaterial({
+            color:0xffffff
+        })
+
+    );
+
+    cameraBox.position.set(
+        x,
+        8.5,
+        z
+    );
+
+    scene.add(cameraBox);
+
+}
+
+// 4 CORNERS
+
+createCameraTower(-30,-30);
+
+createCameraTower(30,-30);
+
+createCameraTower(-30,30);
+
+createCameraTower(30,30);
+
+// LABELS
+
+function createLabel(text,x,y,z){
+
+    const labelCanvas = document.createElement("canvas");
+
+    labelCanvas.width = 512;
+
+    labelCanvas.height = 128;
+
+    const ctx = labelCanvas.getContext("2d");
+
+    ctx.fillStyle = "white";
+
+    ctx.font = "32px Arial";
+
+    ctx.fillText(text,20,64);
+
+    const texture = new THREE.CanvasTexture(labelCanvas);
+
+    const material = new THREE.SpriteMaterial({
+        map:texture
+    });
+
+    const sprite = new THREE.Sprite(material);
+
+    sprite.scale.set(12,3,1);
+
+    sprite.position.set(x,y,z);
+
+    scene.add(sprite);
+
+}
+
+// ZONE LABELS
+
+zones.forEach(zone=>{
+
+    createLabel(
+        zone.name,
+        zone.x,
+        7,
+        zone.z
+    );
+
+});
+
+// GATE LABELS
+
+createLabel(
+    "ENTRY",
+    -15,
+    8,
+    30
+);
+
+createLabel(
+    "EXIT",
+    15,
+    8,
+    30
+);
+
+// TOOLTIP
+
+const tooltip = document.getElementById("tooltip");
+
+const raycaster = new THREE.Raycaster();
+
+const mouse = new THREE.Vector2();
+
+window.addEventListener("mousemove",(event)=>{
+
+    mouse.x = (
+        event.clientX / window.innerWidth
+    ) * 2 - 1;
+
+    mouse.y = -(
+        event.clientY / window.innerHeight
+    ) * 2 + 1;
+
+    raycaster.setFromCamera(
+        mouse,
+        camera
+    );
+
+    const intersects = raycaster.intersectObjects(
+        zoneMeshes
+    );
+
+    if(intersects.length > 0){
+
+        const zone = intersects[0].object.userData;
+
+        tooltip.style.display = "block";
+
+        tooltip.style.left =
+            event.clientX + 15 + "px";
+
+        tooltip.style.top =
+            event.clientY + 15 + "px";
+
+        tooltip.innerHTML = `
+
+            <div style="
+                font-size:15px;
+                font-weight:600;
+                margin-bottom:8px;
+            ">
+                ${zone.name}
+            </div>
+
+            <div>
+                Current Stock :
+                <b>${zone.stock}</b>
+            </div>
+
+        `;
+
+    }else{
+
+        tooltip.style.display = "none";
+
+    }
+
+});
+
+// ANIMATION
+
+function animate(){
+
+    requestAnimationFrame(animate);
+
+    controls.update();
+
+    renderer.render(scene,camera);
+
+}
+
+animate();
+
+// RESPONSIVE
+
+window.addEventListener("resize",()=>{
+
+    camera.aspect =
+        window.innerWidth /
+        window.innerHeight;
+
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+    );
+
+});
+
+</script>
+
+</body>
+</html>
