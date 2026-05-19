@@ -56,6 +56,10 @@ function decisionColor(d: string): string {
   return DECISION_COLORS[d.toLowerCase()] || "#8A9BBF";
 }
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 // ---------------------------------------------------------------------------
 // Vehicle status badge config
 // ---------------------------------------------------------------------------
@@ -378,6 +382,7 @@ export default function GateConsolePage() {
   const [scanDirection, setScanDirection] = useState<"entry" | "exit">("entry");
   const [scanResult, setScanResult] = useState<AccessLogResponse | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState("");
 
   // Access log filters
   const [logSearch, setLogSearch] = useState("");
@@ -1017,21 +1022,67 @@ export default function GateConsolePage() {
     }
   };
 
-  const handleScan = async () => {
-    if (!scanPlate.trim() || !scanGateId) return;
+  const buildLocalScanResult = (plate: string, direction: "entry" | "exit"): AccessLogResponse => {
+    const selectedGate = gates.find((gate) => gate.id === scanGateId);
+    const vehicle = vehicles.find((item) => item.plate_number.replace(/[^A-Z0-9]/gi, "").toUpperCase() === plate);
+    const isBlacklisted = vehicle?.status === "blacklisted";
+    const decision = isBlacklisted ? "blacklisted" : vehicle ? "granted" : "denied";
+    const now = new Date().toISOString();
+
+    return {
+      id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `local-${Date.now()}`,
+      gate_id: scanGateId,
+      gate_code: selectedGate?.gate_code ?? null,
+      plate_number: plate,
+      plate_confidence: 0.95,
+      vehicle_id: vehicle?.id ?? null,
+      decision,
+      direction,
+      denied_reason: decision === "denied" ? "Vehicle not registered" : isBlacklisted ? vehicle?.blacklist_reason || "Vehicle blacklisted" : null,
+      processed_at: now,
+      created_at: now,
+    };
+  };
+
+  const handleScan = async (direction: "entry" | "exit" = scanDirection) => {
+    const plate = scanPlate.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+    setScanDirection(direction);
+    setScanError("");
+
+    if (!plate) {
+      setScanError("Enter a plate number before scanning.");
+      return;
+    }
+    if (!scanGateId) {
+      setScanError("Select a gate before scanning.");
+      return;
+    }
+
     setScanning(true);
     setScanResult(null);
+    setScanPlate(plate);
     try {
+      if (!isUuid(scanGateId)) {
+        const localResult = buildLocalScanResult(plate, direction);
+        setScanResult(localResult);
+        setAccessLogs((prev) => [localResult, ...prev].slice(0, 20));
+        return;
+      }
+
       const result = await processLprScan({
         gate_id: scanGateId,
-        plate_number: scanPlate.toUpperCase(),
+        plate_number: plate,
         confidence: 0.95,
-        direction: scanDirection,
+        direction,
       });
       setScanResult(result);
       void loadLogs();
-    } catch {
-      // scan failed
+    } catch (error) {
+      const localResult = buildLocalScanResult(plate, direction);
+      setScanResult(localResult);
+      setAccessLogs((prev) => [localResult, ...prev].slice(0, 20));
+      setScanError(error instanceof Error ? `Backend scan unavailable, showing demo result. ${error.message}` : "Backend scan unavailable, showing demo result.");
     } finally {
       setScanning(false);
     }
@@ -1296,7 +1347,7 @@ export default function GateConsolePage() {
               placeholder="Enter plate number..."
               value={scanPlate}
               onChange={(e) => setScanPlate(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === "Enter" && handleScan()}
+              onKeyDown={(e) => e.key === "Enter" && void handleScan()}
             />
             <select
               className="w-full bg-[#0D1526] border border-[#1E2F50] rounded-lg px-3 py-2 text-[12px] text-[#E8EDF8] focus:outline-none focus:border-[#E5521A]/50"
@@ -1310,28 +1361,37 @@ export default function GateConsolePage() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setScanDirection("entry")}
+                onClick={() => void handleScan("entry")}
+                disabled={scanning}
                 className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
                   scanDirection === "entry"
                     ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
                     : "border-[#1E2F50] text-[#4E6090] hover:border-[#2A3F68]"
-                }`}
+                } ${scanning ? "opacity-60 cursor-wait" : ""}`}
               >
-                <ArrowDownUp className="w-3 h-3 inline mr-1" />Entry
+                <ArrowDownUp className="w-3 h-3 inline mr-1" />
+                {scanning && scanDirection === "entry" ? "Processing..." : "Entry"}
               </button>
               <button
                 type="button"
-                onClick={() => setScanDirection("exit")}
+                onClick={() => void handleScan("exit")}
+                disabled={scanning}
                 className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
                   scanDirection === "exit"
                     ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
                     : "border-[#1E2F50] text-[#4E6090] hover:border-[#2A3F68]"
-                }`}
+                } ${scanning ? "opacity-60 cursor-wait" : ""}`}
               >
-                <ArrowRightLeft className="w-3 h-3 inline mr-1" />Exit
+                <ArrowRightLeft className="w-3 h-3 inline mr-1" />
+                {scanning && scanDirection === "exit" ? "Processing..." : "Exit"}
               </button>
             </div>
           </div>
+          {scanError && (
+            <div className="mt-3 rounded-lg border border-[#F04A4A]/25 bg-[#F04A4A]/10 px-3 py-2 text-[11px] font-semibold text-[#F04A4A]">
+              {scanError}
+            </div>
+          )}
           {/* Scan Result */}
           {scanResult && (
             <div

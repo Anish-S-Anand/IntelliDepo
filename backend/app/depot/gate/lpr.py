@@ -249,6 +249,145 @@ async def _get_active_gate(db: AsyncSession, gate_id: uuid.UUID) -> Optional[Gat
     return None
 
 
+def _is_sqlite_session(db: AsyncSession) -> bool:
+    return db.get_bind().dialect.name == "sqlite"
+
+
+def _normalize_plate(value: str) -> str:
+    return "".join(ch for ch in value.upper() if ch.isalnum())
+
+
+async def _get_active_gate_row(db: AsyncSession, gate_id: uuid.UUID):
+    result = await db.execute(
+        text(
+            """
+            SELECT id, gate_code, name, gate_type, camera_id, status, is_active,
+                   last_opened, last_closed, total_entries_today, created_at
+            FROM depot_gates
+            WHERE id = :gate_id
+              AND is_active = 1
+            LIMIT 1
+            """
+        ),
+        {"gate_id": str(gate_id)},
+    )
+    return result.mappings().one_or_none()
+
+
+async def _process_lpr_scan_sqlite(payload: LPRScanRequest, db: AsyncSession) -> dict:
+    gate = await _get_active_gate_row(db, payload.gate_id)
+    if not gate:
+        raise HTTPException(status_code=404, detail="Gate not found")
+
+    vehicle_rows = await db.execute(
+        text(
+            """
+            SELECT id, plate_number, status, blacklist_reason
+            FROM depot_vehicle_registry
+            WHERE is_active = 1
+            """
+        )
+    )
+    normalized_payload_plate = _normalize_plate(payload.plate_number)
+    vehicle = next(
+        (
+            row
+            for row in vehicle_rows.mappings().all()
+            if _normalize_plate(str(row["plate_number"])) == normalized_payload_plate
+        ),
+        None,
+    )
+
+    decision = AccessDecision.GRANTED.value
+    denied_reason = None
+    vehicle_id = None
+
+    if vehicle:
+        vehicle_id = str(vehicle["id"])
+        if vehicle["status"] == VehicleStatus.BLACKLISTED.value:
+            decision = AccessDecision.BLACKLISTED.value
+            denied_reason = f"Blacklisted: {vehicle['blacklist_reason']}"
+        elif vehicle["status"] == VehicleStatus.EXPIRED.value:
+            decision = AccessDecision.DENIED.value
+            denied_reason = "Vehicle registration expired"
+    else:
+        decision = AccessDecision.DENIED.value
+        denied_reason = "Vehicle not registered"
+
+    if payload.confidence < 0.85:
+        decision = AccessDecision.PENDING.value
+        denied_reason = f"Low OCR confidence: {payload.confidence}"
+
+    now = datetime.now(timezone.utc)
+    log_id = str(uuid.uuid4())
+    await db.execute(
+        text(
+            """
+            INSERT INTO depot_gate_access_logs
+              (id, gate_id, gate_code, plate_number, plate_confidence, vehicle_id,
+               decision, direction, snapshot_ref, denied_reason, processed_at,
+               created_at, updated_at)
+            VALUES
+              (:id, :gate_id, :gate_code, :plate_number, :plate_confidence, :vehicle_id,
+               :decision, :direction, :snapshot_ref, :denied_reason, :processed_at,
+               :created_at, :updated_at)
+            """
+        ),
+        {
+            "id": log_id,
+            "gate_id": str(payload.gate_id),
+            "gate_code": gate["gate_code"],
+            "plate_number": payload.plate_number,
+            "plate_confidence": payload.confidence,
+            "vehicle_id": vehicle_id,
+            "decision": decision,
+            "direction": payload.direction,
+            "snapshot_ref": payload.snapshot_ref,
+            "denied_reason": denied_reason,
+            "processed_at": now,
+            "created_at": now,
+            "updated_at": now,
+        },
+    )
+
+    if decision == AccessDecision.GRANTED.value:
+        await db.execute(
+            text(
+                """
+                UPDATE depot_gates
+                SET status = :status,
+                    last_opened = :last_opened,
+                    total_entries_today = COALESCE(total_entries_today, 0) + 1,
+                    updated_at = :updated_at
+                WHERE id = :gate_id
+                """
+            ),
+            {
+                "status": GateStatus.OPEN.value,
+                "last_opened": now,
+                "updated_at": now,
+                "gate_id": str(payload.gate_id),
+            },
+        )
+
+    await db.commit()
+    logger.info(f"LPR scan at {gate['gate_code']}: {payload.plate_number} -> {decision}")
+
+    return {
+        "id": log_id,
+        "gate_id": str(payload.gate_id),
+        "gate_code": gate["gate_code"],
+        "plate_number": payload.plate_number,
+        "plate_confidence": payload.confidence,
+        "vehicle_id": vehicle_id,
+        "decision": decision,
+        "direction": payload.direction,
+        "denied_reason": denied_reason,
+        "processed_at": now,
+        "created_at": now,
+    }
+
+
 def _extract_plate_from_frame(frame: np.ndarray) -> tuple[str, float]:
     """
     Extract license plate text from a camera frame using OpenCV + Tesseract.
@@ -337,6 +476,48 @@ async def gate_action(
     current_user: User = Depends(get_current_user),
 ):
     """Open or close a gate."""
+    if _is_sqlite_session(db):
+        gate = await _get_active_gate_row(db, gate_id)
+        if not gate:
+            raise HTTPException(status_code=404, detail="Gate not found")
+
+        now = datetime.now(timezone.utc)
+        if payload.action == "open":
+            status_value = GateStatus.OPEN.value
+            last_opened = now
+            last_closed = gate["last_closed"]
+        elif payload.action == "close":
+            status_value = GateStatus.CLOSED.value
+            last_opened = gate["last_opened"]
+            last_closed = now
+        else:
+            raise HTTPException(status_code=400, detail="Action must be 'open' or 'close'")
+
+        await db.execute(
+            text(
+                """
+                UPDATE depot_gates
+                SET status = :status,
+                    last_opened = :last_opened,
+                    last_closed = :last_closed,
+                    updated_at = :updated_at
+                WHERE id = :gate_id
+                """
+            ),
+            {
+                "status": status_value,
+                "last_opened": last_opened,
+                "last_closed": last_closed,
+                "updated_at": now,
+                "gate_id": str(gate_id),
+            },
+        )
+        await db.commit()
+
+        updated = await _get_active_gate_row(db, gate_id)
+        logger.info(f"Gate {gate['gate_code']}: {payload.action}")
+        return dict(updated)
+
     gate = await _get_active_gate(db, gate_id)
     if not gate:
         raise HTTPException(status_code=404, detail="Gate not found")
@@ -424,6 +605,9 @@ async def process_lpr_scan(
     Checks the vehicle registry, applies blacklist matching, and triggers
     gate open/close based on the access decision.
     """
+    if _is_sqlite_session(db):
+        return await _process_lpr_scan_sqlite(payload, db)
+
     gate = await _get_active_gate(db, payload.gate_id)
     if not gate:
         raise HTTPException(status_code=404, detail="Gate not found")
