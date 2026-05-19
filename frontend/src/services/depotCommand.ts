@@ -232,3 +232,125 @@ export function getRtspProxyUrl(rtspUrl: string): string {
     : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
   return `${base}/depot/vision/cameras/rtsp-proxy/stream?url=${encodeURIComponent(rtspUrl)}`;
 }
+
+// ---------------------------------------------------------------------------
+// Quick Action types & functions
+// ---------------------------------------------------------------------------
+
+export interface CommandActionResponse {
+  id: string;
+  action_type: string;
+  status: string;
+  target_type: string | null;
+  target_id: string | null;
+  target_name: string | null;
+  zone: string | null;
+  message: string;
+}
+
+export type CommandActionErrorKind = "auth" | "offline" | "server";
+
+export class CommandActionError extends Error {
+  kind: CommandActionErrorKind;
+  status?: number;
+  constructor(kind: CommandActionErrorKind, message: string, status?: number) {
+    super(message);
+    this.name = "CommandActionError";
+    this.kind = kind;
+    this.status = status;
+  }
+}
+
+function getHttpStatus(error: unknown): number | undefined {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    return (error as { response?: { status?: number } }).response?.status;
+  }
+  return undefined;
+}
+
+function toCommandActionError(error: unknown): CommandActionError {
+  const status = getHttpStatus(error);
+  if (status === 401 || status === 403)
+    return new CommandActionError("auth", "Please sign in to run Command Center actions.", status);
+  if (status)
+    return new CommandActionError("server", `Command action failed (HTTP ${status}).`, status);
+  return new CommandActionError("offline", "Command action service is unavailable.");
+}
+
+function isDemoSession(): boolean {
+  return typeof window !== "undefined" && localStorage.getItem("token")?.startsWith("demo-token-") === true;
+}
+
+const DEMO_GATES = [
+  { id: "gate-a", name: "Gate A — North Entry" },
+  { id: "gate-b", name: "Gate B — South Exit" },
+  { id: "gate-c", name: "Gate C — Loading Bay" },
+];
+
+function demoCommandAction(url: string, payload: Record<string, unknown>): CommandActionResponse {
+  const now = new Date().toISOString();
+  const actionType = url.split("/").pop()?.replaceAll("-", "_") || "command_action";
+  const gateId = typeof payload.gate_id === "string" ? payload.gate_id : undefined;
+  const gate = gateId ? DEMO_GATES.find((g) => g.id === gateId) : undefined;
+  const zone = typeof payload.zone === "string" ? payload.zone : null;
+  const messages: Record<string, string> = {
+    open_gate: `${gate?.name || "Selected gate"} opened in demo mode`,
+    close_gate: `${gate?.name || "Selected gate"} closed in demo mode`,
+    lock_zone: `Zone ${zone || "perimeter"} locked in demo mode`,
+    trigger_alert: "Manual alert triggered in demo mode",
+    contact_operator: "Operator paged in demo mode",
+  };
+  return {
+    id: `demo-${Date.now()}`,
+    action_type: actionType,
+    status: "success",
+    target_type: gate ? "gate" : zone ? "zone" : null,
+    target_id: gate?.id ?? null,
+    target_name: gate?.name ?? null,
+    zone,
+    message: messages[actionType] ?? "Action completed in demo mode",
+  };
+}
+
+async function postCommandAction(url: string, payload: Record<string, unknown>): Promise<CommandActionResponse> {
+  try {
+    const res = await api.post<CommandActionResponse>(url, payload);
+    return res.data;
+  } catch (error) {
+    if (isDemoSession() && (getHttpStatus(error) === 401 || getHttpStatus(error) === 403)) {
+      return demoCommandAction(url, payload);
+    }
+    throw toCommandActionError(error);
+  }
+}
+
+export async function openCommandGate(gateId?: string): Promise<CommandActionResponse> {
+  return postCommandAction("/depot/command/actions/open-gate", { gate_id: gateId });
+}
+
+export async function closeCommandGate(gateId?: string): Promise<CommandActionResponse> {
+  return postCommandAction("/depot/command/actions/close-gate", { gate_id: gateId });
+}
+
+export async function lockCommandZone(zone = "Depot perimeter"): Promise<CommandActionResponse> {
+  return postCommandAction("/depot/command/actions/lock-zone", {
+    zone,
+    reason: "Manual lockdown from Command Center quick action",
+  });
+}
+
+export async function triggerCommandAlert(): Promise<CommandActionResponse> {
+  return postCommandAction("/depot/command/actions/trigger-alert", {
+    title: "Manual Command Center alert",
+    message: "All operators notified from Command Center quick action",
+    priority: "P2",
+  });
+}
+
+export async function contactCommandOperator(): Promise<CommandActionResponse> {
+  return postCommandAction("/depot/command/actions/contact-operator", {
+    operator: "Shift Supervisor",
+    channel: "intercom",
+    message: "Please contact Command Center",
+  });
+}

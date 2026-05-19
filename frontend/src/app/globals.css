@@ -527,6 +527,15 @@ html:not(.dark) [class*="text-white"] {
   color: #0D1117 !important;
 }
 
+/* Camera feed labels — theme-aware */
+.camera-label-text {
+  color: #ffffff !important;
+}
+
+html:not(.dark) .camera-label-text {
+  color: #000000 !important;
+}
+
 /* Muted blue-gray → readable dark gray */
 html:not(.dark) [class*="text-[#8A9BBF]"],
 html:not(.dark) [class*="text-[#8a9bbf]"],
