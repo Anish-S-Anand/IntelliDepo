@@ -624,27 +624,45 @@ ESCALATION_CHAIN = ["Security Supervisor", "Facility Head", "Site Director"]
 BREACH_VIDEO_MAP = {
     "unauthorized_entry": "Perimeter_Detection.mp4",
     "loitering": "Theft Camera .mp4",
-    "forced_entry": "Perimeter_Detection.mp4",
-    "after_hours": "Recording 2025-07-30 115417.mp4",
-    "object_left": "Theft Camera .mp4",
-    "unknown": "LPR_RECOGNITION.mp4",
 }
 SEED_EVIDENCE_VIDEO_MAP = {
     "seed://breach-0": "Perimeter_Detection.mp4",
-    "seed://breach-cold-storage": "Recording 2025-07-30 115417.mp4",
-    "seed://breach-inbound-gate": "Screen Recording 2025-05-22 164244.mp4",
+    "seed://breach-inbound-gate": "Perimeter_Detection.mp4",
     "seed://breach-staging-area": "Theft Camera .mp4",
-    "seed://breach-dispatch-bay": "Recording 2025-07-30 120521.mp4",
 }
 
 
 def resolve_video_archive_ref(snapshot_ref: Optional[str], breach_type: str) -> str:
     """Return a streamable CCTV MP4 filename for an incident."""
-    if snapshot_ref and snapshot_ref.lower().endswith(".mp4"):
+    if snapshot_ref in {"Perimeter_Detection.mp4", "Theft Camera .mp4"}:
         return snapshot_ref
     if snapshot_ref and snapshot_ref in SEED_EVIDENCE_VIDEO_MAP:
         return SEED_EVIDENCE_VIDEO_MAP[snapshot_ref]
     return BREACH_VIDEO_MAP.get(breach_type, "Perimeter_Detection.mp4")
+
+
+def dedupe_incidents(incidents: list[PerimeterIncident]) -> list[PerimeterIncident]:
+    """Collapse duplicate seeded incident rows while preserving newest first."""
+    seen: set[str] = set()
+    unique: list[PerimeterIncident] = []
+
+    for incident in incidents:
+        base_description = (incident.description or "").split("Acknowledged:")[0]
+        normalized_description = " ".join(base_description.lower().split())
+        key = "|".join(
+            [
+                incident.title.strip().lower(),
+                normalized_description,
+                incident.severity,
+                incident.video_archive_ref or "",
+            ]
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(incident)
+
+    return unique
 
 
 @router.post("/incidents/from-breach/{breach_id}", response_model=IncidentResponse, status_code=201)
@@ -712,7 +730,7 @@ async def list_incidents(
     if severity:
         query = query.where(PerimeterIncident.severity == severity)
     result = await db.execute(query.order_by(PerimeterIncident.created_at.desc()))
-    return result.scalars().all()
+    return dedupe_incidents(list(result.scalars().all()))
 
 
 @router.get("/incidents/active", response_model=list[IncidentResponse])
@@ -726,7 +744,7 @@ async def get_active_incidents(
         .where(PerimeterIncident.status.in_([IncidentStatus.OPEN, IncidentStatus.ACKNOWLEDGED, IncidentStatus.ESCALATED]))
         .order_by(PerimeterIncident.created_at.desc())
     )
-    return result.scalars().all()
+    return dedupe_incidents(list(result.scalars().all()))
 
 
 @router.patch("/incidents/{incident_id}/acknowledge", response_model=IncidentResponse)

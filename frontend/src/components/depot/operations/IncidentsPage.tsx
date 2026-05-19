@@ -24,7 +24,9 @@ type SelectedVideo = {
   title: string;
 };
 
-const EMPTY_VALUE = "—";
+const EMPTY_VALUE = "-";
+const ALLOWED_EVIDENCE_TYPES = new Set(["unauthorized_entry", "loitering"]);
+const ALLOWED_EVIDENCE_VIDEOS = new Set(["Perimeter_Detection.mp4", "Theft Camera .mp4"]);
 
 const BREACH_TYPE_LABELS: Record<string, string> = {
   unauthorized_entry: "Unauthorized Entry",
@@ -38,25 +40,23 @@ const BREACH_TYPE_LABELS: Record<string, string> = {
 const BREACH_VIDEO_MAP: Record<string, string> = {
   unauthorized_entry: "Perimeter_Detection.mp4",
   loitering: "Theft Camera .mp4",
-  forced_entry: "Perimeter_Detection.mp4",
-  after_hours: "Recording 2025-07-30 115417.mp4",
-  object_left: "Theft Camera .mp4",
-  unknown: "LPR_RECOGNITION.mp4",
 };
 
 const SEED_EVIDENCE_VIDEO_MAP: Record<string, string> = {
   "seed://breach-0": "Perimeter_Detection.mp4",
-  "seed://breach-cold-storage": "Recording 2025-07-30 115417.mp4",
-  "seed://breach-inbound-gate": "Screen Recording 2025-05-22 164244.mp4",
+  "seed://breach-inbound-gate": "Perimeter_Detection.mp4",
   "seed://breach-staging-area": "Theft Camera .mp4",
-  "seed://breach-dispatch-bay": "Recording 2025-07-30 120521.mp4",
 };
 
 function resolveEvidenceVideo(ref?: string | null, breachType?: string | null): string | null {
-  if (ref?.toLowerCase().endsWith(".mp4")) return ref;
-  if (ref && SEED_EVIDENCE_VIDEO_MAP[ref]) return SEED_EVIDENCE_VIDEO_MAP[ref];
+  if (ref && ALLOWED_EVIDENCE_VIDEOS.has(ref)) return ref;
   if (breachType && BREACH_VIDEO_MAP[breachType]) return BREACH_VIDEO_MAP[breachType];
-  return ref?.startsWith("seed://") ? "Perimeter_Detection.mp4" : null;
+  if (ref && SEED_EVIDENCE_VIDEO_MAP[ref]) return SEED_EVIDENCE_VIDEO_MAP[ref];
+  return null;
+}
+
+function hasAllowedEvidence(incident: IncidentResponse): boolean {
+  return ALLOWED_EVIDENCE_VIDEOS.has(resolveEvidenceVideo(incident.video_archive_ref) || "");
 }
 
 function dedupeIncidents(backendIncidents: IncidentResponse[]): IncidentResponse[] {
@@ -123,13 +123,14 @@ export default function IncidentsPage() {
   const [ackError, setAckError] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<SelectedVideo | null>(null);
+  const [videoLoadError, setVideoLoadError] = useState<string | null>(null);
   const selectedIncidentId = searchParams.get("incident");
 
   // Fetch real incidents from backend
   const fetchIncidents = useCallback(async () => {
     try {
       const backendIncidents = await getIncidents();
-      const uniqueIncidents = dedupeIncidents(backendIncidents);
+      const uniqueIncidents = dedupeIncidents(backendIncidents.filter(hasAllowedEvidence));
       setRawIncidents(uniqueIncidents);
       setIncidents(uniqueIncidents.map(mapBackendIncident));
     } catch {
@@ -140,7 +141,11 @@ export default function IncidentsPage() {
   const fetchBreaches = useCallback(async () => {
     try {
       const data = await getActiveBreaches();
-      setBreaches(data);
+      setBreaches(
+        data
+          .filter((breach) => ALLOWED_EVIDENCE_TYPES.has(breach.breach_type))
+          .filter((breach, index, all) => all.findIndex((item) => item.breach_type === breach.breach_type) === index),
+      );
     } catch {
       // Keep the current real breach data instead of substituting demo records.
     }
@@ -258,6 +263,7 @@ export default function IncidentsPage() {
   const handleBreachAnalysisClick = (breach: BreachResponse) => {
     const linkedIncident = incidentByBreachId.get(breach.id);
     const videoFile = resolveEvidenceVideo(linkedIncident?.video_archive_ref, breach.breach_type) || "Perimeter_Detection.mp4";
+    setVideoLoadError(null);
     setSelectedVideo({
       evidenceId: breach.id,
       videoFile,
@@ -271,6 +277,7 @@ export default function IncidentsPage() {
     const videoFile = resolveEvidenceVideo(rawIncident?.video_archive_ref, linkedBreach?.breach_type);
     if (!videoFile) return;
 
+    setVideoLoadError(null);
     setSelectedVideo({
       evidenceId: incident.id,
       videoFile,
@@ -375,7 +382,7 @@ export default function IncidentsPage() {
               </div>
               <div className="text-right">
                 <div className="text-[10px] text-[#4E6090]">{i.t}</div>
-                <div className="text-[10px] text-[#8A9BBF] mt-0.5">{i.cam !== "—" ? `📷 ${i.cam}` : ""}</div>
+                <div className="text-[10px] text-[#8A9BBF] mt-0.5">{i.cam !== EMPTY_VALUE ? `Camera: ${i.cam}` : ""}</div>
               </div>
             </div>
             <div className="text-[12px] text-[#8A9BBF] mb-2 leading-relaxed">{i.desc}</div>
@@ -498,8 +505,8 @@ export default function IncidentsPage() {
 
       {/* Video Analysis Modal */}
       {selectedVideo && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-3 sm:p-4" onClick={() => setSelectedVideo(null)}>
-          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-3 sm:p-5 w-full max-w-4xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/80 z-[10000] flex items-center justify-center p-3 sm:p-4" onClick={() => setSelectedVideo(null)}>
+          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-3 sm:p-5 w-full max-w-4xl max-h-[92dvh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center gap-3 mb-4">
               <h3 className="text-[16px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
                 {selectedVideo.title}
@@ -515,21 +522,24 @@ export default function IncidentsPage() {
             <div className="bg-[#0F1A30] rounded-lg overflow-hidden aspect-video">
               <video
                 key={`${selectedVideo.evidenceId}-${selectedVideo.videoFile}`}
+                src={getVideoUrl(selectedVideo.videoFile)}
                 controls
                 autoPlay
                 playsInline
                 preload="metadata"
                 className="w-full h-full object-contain bg-black"
+                onError={() => setVideoLoadError(`Unable to load ${selectedVideo.videoFile}`)}
+                onLoadedData={() => setVideoLoadError(null)}
               >
-                <source
-                  src={getVideoUrl(selectedVideo.videoFile)}
-                  type="video/mp4"
-                />
                 Your browser does not support the video tag.
               </video>
             </div>
-            <div className="mt-3 text-[11px] text-[#8A9BBF]">
-              Video evidence ID: {selectedVideo.evidenceId}
+            <div className="mt-3 flex flex-col gap-1 text-[11px] text-[#8A9BBF]">
+              <span>Video: {selectedVideo.videoFile}</span>
+              <span>Evidence ID: {selectedVideo.evidenceId}</span>
+              {videoLoadError && (
+                <span className="font-bold text-[#F04A4A]">{videoLoadError}</span>
+              )}
             </div>
           </div>
         </div>

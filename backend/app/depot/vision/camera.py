@@ -1,7 +1,4 @@
 """
-Intelli Depot — Camera Feed Integration
-Feature: DEPOT-V1
-
 RTSP/IP camera stream ingestion, frame extraction, and multi-camera management.
 Uses OpenCV (cv2.VideoCapture) for real RTSP/HTTP stream decoding.
 Falls back to simulation when OpenCV is unavailable or the stream URL
@@ -309,6 +306,62 @@ _ZONE_SCENE_MAP: dict[str, int] = {
 _scene_counter: dict[str, int] = {}
 _scene_counter_next = 0
 
+def _generate_simulated_frame(entry: _StreamEntry, theme: str = "dark") -> np.ndarray:
+    """Generate a deterministic simulated frame when real video is unavailable."""
+    import time
+    scene_idx = _get_scene_idx(entry.camera_id)
+    label = _SCENE_LABELS[scene_idx]
+    h, w = 480, 854
+
+    # Base frame
+    frame = np.zeros((h, w, 3), dtype=np.uint8)
+    if _HAS_CV2:
+        if theme == "light":
+            frame[:] = (232, 236, 240)
+            frame = np.clip(frame.astype(np.int16) + 10, 0, 255).astype(np.uint8)
+        else:
+            frame[:] = (28, 30, 34)
+            noise = np.random.randint(0, 10, (h, w, 1), dtype=np.uint8)
+            frame = np.clip(frame.astype(np.int16) + np.repeat(noise, 3, axis=2) - 5, 0, 255).astype(np.uint8)
+
+        # Add simple gradients and overlay elements for a CCTV-like look.
+        if theme == "light":
+            grad = np.linspace(0, 18, w, dtype=np.uint8)[None, :, None]
+        else:
+            grad = np.linspace(20, 0, w, dtype=np.uint8)[None, :, None]
+        frame = np.clip(frame.astype(np.int16) + np.repeat(grad, h, axis=0), 0, 255).astype(np.uint8)
+
+        # Scene title and metadata.
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        cv2.putText(frame, label, (16, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 220, 180), 2, cv2.LINE_AA)
+        cv2.putText(frame, now_str, (16, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (220, 220, 220), 1, cv2.LINE_AA)
+        cv2.putText(frame, f"CAM {entry.camera_id[:8]}  •  SIMULATED", (16, h - 18),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (180, 180, 180), 1, cv2.LINE_AA)
+
+        # Draw scene-specific detection boxes.
+        for idx, det in enumerate(_SCENE_DETECTIONS[scene_idx]):
+            det_label, color, rx, ry, rw, rh = det
+            x1 = int(rx * w)
+            y1 = int(ry * h)
+            x2 = int((rx + rw) * w)
+            y2 = int((ry + rh) * h)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+            _cv_corner_marks(frame, x1, y1, x2, y2, color)
+            tag_w = min(w - x1 - 4, max(72, len(det_label) * 8 + 28))
+            cv2.rectangle(frame, (x1, max(0, y1 - 18)), (x1 + tag_w, y1 - 4), color, -1)
+            cv2.putText(frame, f"{det_label} {95 - idx}%", (x1 + 4, y1 - 6),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.32, (255, 255, 255), 1, cv2.LINE_AA)
+
+        # Motion line for realism.
+        y_scan = int((time.time() * 40) % h)
+        frame[y_scan:y_scan + 1] = np.clip(frame[y_scan:y_scan + 1].astype(np.int16) + 12, 0, 255).astype(np.uint8)
+        return frame
+
+    # Pillow fallback if OpenCV is unavailable.
+    base = (238, 242, 245) if theme == "light" else (25, 28, 33)
+    frame[:] = base
+    return frame
+
 
 def _get_scene_idx(camera_id: str) -> int:
     """Return a unique scene index (0-5) for this camera, assigned on first call."""
@@ -370,84 +423,6 @@ def _apply_cctv_overlay(frame: np.ndarray, entry: _StreamEntry, scene_idx: int, 
     detections = _SCENE_DETECTIONS[scene_idx]
     for i, det in enumerate(detections):
         label, color, rx, ry, rw, rh = det
-        drift_x = int(w * 0.015 * math.sin(t * 0.4 + i * 1.3))
-        drift_y = int(h * 0.010 * math.sin(t * 0.3 + i * 0.9))
-        x1 = max(0, int(rx * w) + drift_x)
-        y1 = max(0, int(ry * h) + drift_y)
-        x2 = min(w - 1, x1 + int(rw * w))
-        y2 = min(h - 1, y1 + int(rh * h))
-        conf = 88 + (i * 3 + scene_idx) % 10
-        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-        cl = 10
-        for cx, cy in [(x1, y1), (x2, y1), (x1, y2), (x2, y2)]:
-            sx = 1 if cx == x1 else -1
-            sy = 1 if cy == y1 else -1
-            cv2.line(frame, (cx, cy), (cx + sx * cl, cy), color, 2)
-            cv2.line(frame, (cx, cy), (cx, cy + sy * cl), color, 2)
-        lbl = f"{label} {conf}%"
-        lw = len(lbl) * 8 + 6
-        if y1 >= 16:
-            cv2.rectangle(frame, (x1, y1 - 16), (x1 + lw, y1), color, -1)
-            cv2.putText(frame, lbl, (x1 + 3, y1 - 4), font, 0.38, (255, 255, 255), 1, cv2.LINE_AA)
-
-    # ── Camera name — top left ────────────────────────────────────────────────
-    cam_name = _SCENE_LABELS[scene_idx]
-    cv2.rectangle(frame, (0, 0), (len(cam_name) * 9 + 14, 22), hud_bg, -1)
-    cv2.putText(frame, cam_name, (6, 15), font, 0.45, hud_accent, 1, cv2.LINE_AA)
-
-    # ── Timestamp — bottom left ───────────────────────────────────────────────
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d  %H:%M:%S UTC")
-    cv2.rectangle(frame, (0, h - 22), (270, h), hud_bg, -1)
-    cv2.putText(frame, now_str, (6, h - 7), font, 0.40, ts_color, 1, cv2.LINE_AA)
-
-    # ── REC dot — top right ───────────────────────────────────────────────────
-    if int(t * 2) % 2 == 0:
-        cv2.circle(frame, (w - 18, 12), 6, rec_color, -1)
-    cv2.putText(frame, "REC", (w - 52, 16), font, 0.42, rec_color, 1, cv2.LINE_AA)
-
-    # ── Frame counter — bottom right ──────────────────────────────────────────
-    cv2.rectangle(frame, (w - 115, h - 22), (w, h), hud_bg, -1)
-    cv2.putText(frame, f"F:{entry.frames_captured:06d}", (w - 110, h - 7), font, 0.38, hud_text, 1, cv2.LINE_AA)
-
-    return frame
-
-
-def _generate_simulated_frame(entry: _StreamEntry, theme: str = "dark") -> np.ndarray:
-    """
-    Generate a CCTV frame: tries real video first, falls back to solid scene.
-    Each camera gets a unique scene based on its ID.
-    theme: "dark" = classic CCTV look, "light" = bright daylight warehouse
-    """
-    scene_idx = _get_scene_idx(entry.camera_id)
-
-    try:
-        from app.depot.vision.video_library import get_video_frame
-        frame = get_video_frame(scene_idx, theme=theme)
-        if frame is not None:
-            return _apply_cctv_overlay(frame, entry, scene_idx, theme=theme)
-    except Exception:
-        pass
-
-    import time
-    h, w = 480, 854
-    if theme == "light":
-        palettes = [
-            (180, 185, 175), (175, 178, 172), (178, 175, 165),
-            (160, 175, 160), (175, 172, 180), (178, 175, 168),
-        ]
-    else:
-        palettes = [
-            (28, 32, 28), (20, 20, 25), (30, 28, 22),
-            (8, 18, 8),   (28, 26, 32), (32, 30, 25),
-        ]
-    bg = palettes[scene_idx]
-    frame = np.full((h, w, 3), bg, dtype=np.uint8)
-    for y in range(h):
-        frame[y] = np.clip(np.array(bg) * (1 - y/h * 0.3), 0, 255).astype(np.uint8)
-
-    return _apply_cctv_overlay(frame, entry, scene_idx, theme=theme)
-
-
 async def stream_read_frame(camera_id: str, theme: str = "dark") -> Optional[np.ndarray]:
     """Read a single frame from a connected camera stream."""
     entry = _active_streams.get(camera_id)
@@ -603,7 +578,6 @@ async def get_latest_frame(camera_id: uuid.UUID, db: AsyncSession = Depends(get_
     )
 
 
-@router.get("/{camera_id}/snapshot")
 @router.get("/{camera_id}/snapshot")
 async def get_camera_snapshot(camera_id: str, theme: str = "light", seek: float = 0.0, db: AsyncSession = Depends(get_db)):
     """
@@ -886,20 +860,29 @@ async def rtsp_proxy_stream(url: str):
     )
 
 
+
 def _cv_corner_marks(frame: np.ndarray, x1: int, y1: int, x2: int, y2: int,
                      color: tuple, length: int = 10) -> None:
-    """Draw corner tick marks on a bounding box using cv2."""
-    cv2.line(frame, (x1, y1), (x1 + length, y1), color, 2)
-    cv2.line(frame, (x1, y1), (x1, y1 + length), color, 2)
-    cv2.line(frame, (x2, y1), (x2 - length, y1), color, 2)
-    cv2.line(frame, (x2, y1), (x2, y1 + length), color, 2)
-    cv2.line(frame, (x1, y2), (x1 + length, y2), color, 2)
-    cv2.line(frame, (x1, y2), (x1, y2 - length), color, 2)
-    cv2.line(frame, (x2, y2), (x2 - length, y2), color, 2)
-    cv2.line(frame, (x2, y2), (x2, y2 - length), color, 2)
+    """Draw corner-only box marks to match a CCTV detection overlay."""
+    if not _HAS_CV2:
+        return
+
+    thickness = 2
+    # Top-left
+    cv2.line(frame, (x1, y1), (min(x1 + length, x2), y1), color, thickness)
+    cv2.line(frame, (x1, y1), (x1, min(y1 + length, y2)), color, thickness)
+    # Top-right
+    cv2.line(frame, (x2, y1), (max(x2 - length, x1), y1), color, thickness)
+    cv2.line(frame, (x2, y1), (x2, min(y1 + length, y2)), color, thickness)
+    # Bottom-left
+    cv2.line(frame, (x1, y2), (min(x1 + length, x2), y2), color, thickness)
+    cv2.line(frame, (x1, y2), (x1, max(y2 - length, y1)), color, thickness)
+    # Bottom-right
+    cv2.line(frame, (x2, y2), (max(x2 - length, x1), y2), color, thickness)
+    cv2.line(frame, (x2, y2), (x2, max(y2 - length, y1)), color, thickness)
 
 
-@router.delete("/{camera_id}", status_code=204)
+@router.delete("/{camera_id}")
 async def deactivate_camera(camera_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """Soft-delete a camera (mark inactive and disconnect stream)."""
     camera = await db.get(Camera, camera_id)
@@ -914,6 +897,7 @@ async def deactivate_camera(camera_id: uuid.UUID, db: AsyncSession = Depends(get
 
 
 @router.get("/streams/active")
+
 async def list_active_streams():
     """Return all currently connected streams."""
     return {

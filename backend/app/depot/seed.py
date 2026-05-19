@@ -313,15 +313,6 @@ async def seed_database(db_url: str | None = None):
             
             sample_breaches = [
                 {
-                    "zone_name": "Cold Storage",
-                    "breach_type": "after_hours",  # sla_breach source
-                    "severity": "critical",  # P1 priority
-                    "confidence": 0.95,
-                    "video_ref": "Recording 2025-07-30 115417.mp4",
-                    "notes": "Temperature compliance SLA violated for ColdChain Inc shipment.",
-                    "detected_minutes_ago": 8
-                },
-                {
                     "zone_name": "Inbound Gate",
                     "breach_type": "unauthorized_entry",  # perimeter source
                     "severity": "high",  # default (no priority specified)
@@ -338,24 +329,6 @@ async def seed_database(db_url: str | None = None):
                     "video_ref": "Theft Camera .mp4",
                     "notes": "Vehicle in staging area for 4h 30m. SLA threshold: 3h.",
                     "detected_minutes_ago": 62
-                },
-                {
-                    "zone_name": "Dispatch Bay",
-                    "breach_type": "unknown",  # sensor source
-                    "severity": "medium",  # P3 priority
-                    "confidence": 0.78,
-                    "video_ref": "Recording 2025-07-30 120521.mp4",
-                    "notes": "Hydraulic pressure below threshold.",
-                    "detected_minutes_ago": 15
-                },
-                {
-                    "zone_name": "Cold Storage",
-                    "breach_type": "unknown",  # sensor source
-                    "severity": "low",  # default (no priority specified)
-                    "confidence": 0.85,
-                    "video_ref": "LPR_RECOGNITION.mp4",
-                    "notes": "Smoke detector activated in section B.",
-                    "detected_minutes_ago": 45
                 }
             ]
             

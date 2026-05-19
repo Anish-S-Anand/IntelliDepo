@@ -79,10 +79,6 @@ class PerimeterIncident(DBBaseModel):
 BREACH_VIDEO_MAP = {
     "unauthorized_entry": "Perimeter_Detection.mp4",
     "loitering": "Theft Camera .mp4",
-    "forced_entry": "Perimeter_Detection.mp4",
-    "after_hours": "Recording 2025-07-30 115417.mp4",
-    "object_left": "Theft Camera .mp4",
-    "unknown": "LPR_RECOGNITION.mp4",
 }
 
 
