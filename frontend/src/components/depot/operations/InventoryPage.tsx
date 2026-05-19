@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, X, Calendar, Package, Layers } from "lucide-react";
 import { occColor } from "@/lib/depot-data";
-import InventorySkeleton from "@/components/depot/skeletons/InventorySkeleton";
 
 // ---------------------------------------------------------------------------
 // Types matching backend responses
@@ -283,6 +282,24 @@ export default function InventoryPage() {
     return true;
   });
 
+  // Convert clusters to batches data
+  const BATCHES: BatchData[] = clusters.map((c) => ({
+    id: c.id,
+    batch_code: c.batch,
+    sku_code: c.id,
+    product_name: c.product,
+    zone: c.zone,
+    rack: c.rack,
+    bin_location: null,
+    quantity: c.occupied,
+    original_quantity: c.capacity,
+    sequencing_rule: c.fifo ? "FIFO" : "FEFO",
+    status: "active",
+    is_near_expiry: false,
+    days_to_expiry: null,
+    created_at: c.lastActivity,
+  }));
+
   // Filter batches using real API data
   const filteredBatches = batchesFromAPI.filter((b) => {
     const pct = b.original_quantity > 0 ? b.quantity / b.original_quantity : 0;
@@ -318,7 +335,11 @@ export default function InventoryPage() {
   ];
 
   if (loading) {
-    return <InventorySkeleton />;
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#e5521a] border-t-transparent" />
+      </div>
+    );
   }
 
   return (
@@ -487,9 +508,10 @@ export default function InventoryPage() {
                     style={{ borderColor: "#1E2F50" }}
                   >
                     <div className="flex justify-between mb-2.5">
-                      <div>
-                        <div className="text-[15px] font-bold text-[#E8EDF8]">Zone {c.id}</div>
+                  <div>
+                        <div className="text-[15px] font-bold text-[#E8EDF8]">Zone {c.zone}</div>
                         <div className="text-[11px] text-[#8A9BBF] mt-0.5">{c.product}</div>
+                        <div className="text-[10px] text-[#4E6090] mt-0.5">Rack: {c.rack}</div>
                       </div>
                       <div className="flex flex-col gap-1 items-end">
                         <span
