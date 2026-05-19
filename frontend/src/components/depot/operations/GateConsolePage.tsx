@@ -60,6 +60,11 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function getBackendBaseUrl(): string {
+  if (typeof window === "undefined") return "http://localhost:8000";
+  return `${window.location.protocol}//${window.location.hostname}:8000`;
+}
+
 // ---------------------------------------------------------------------------
 // Vehicle status badge config
 // ---------------------------------------------------------------------------
@@ -399,6 +404,7 @@ export default function GateConsolePage() {
   const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [showAnalysisImage, setShowAnalysisImage] = useState(false);
   const [selectedPlateNumber, setSelectedPlateNumber] = useState<string>("");
+  const [footageMissing, setFootageMissing] = useState(false);
   const [showLicenseCard, setShowLicenseCard] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleResponse | null>(null);
 
@@ -1125,10 +1131,71 @@ export default function GateConsolePage() {
   };
 
   // --- Filtered logs ---
-  const filteredLogs = useMemo(() => accessLogs.filter((log) => {
-    if (logSearch && !log.plate_number.toLowerCase().includes(logSearch.toLowerCase())) return false;
-    return true;
-  }), [accessLogs, logSearch]);
+  const filteredLogs = useMemo(() => {
+    const latestByPlate = new Map<string, AccessLogResponse>();
+
+    for (const log of accessLogs) {
+      const normalizedPlate = log.plate_number.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+      if (logSearch && !normalizedPlate.includes(logSearch.replace(/[^A-Z0-9]/gi, "").toUpperCase())) {
+        continue;
+      }
+
+      const current = latestByPlate.get(normalizedPlate);
+      const currentTime = current ? new Date(current.processed_at || current.created_at).getTime() : 0;
+      const nextTime = new Date(log.processed_at || log.created_at).getTime();
+      if (!current || nextTime > currentTime) {
+        latestByPlate.set(normalizedPlate, log);
+      }
+    }
+
+    return Array.from(latestByPlate.values()).sort(
+      (a, b) =>
+        new Date(b.processed_at || b.created_at).getTime() -
+        new Date(a.processed_at || a.created_at).getTime(),
+    );
+  }, [accessLogs, logSearch]);
+
+  const filteredVisitors = useMemo(() => {
+    const latestByVisitor = new Map<string, VisitorResponse>();
+    const search = logSearch.trim().toLowerCase();
+
+    for (const visitor of visitors) {
+      if (visitorDate) {
+        const visitorDateStr = new Date(visitor.checked_in_at).toISOString().split("T")[0];
+        if (visitorDateStr !== visitorDate) continue;
+      }
+
+      const searchable = [
+        visitor.name,
+        visitor.company,
+        visitor.purpose,
+        visitor.vehicle_plate,
+        visitor.host_name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      if (search && !searchable.includes(search)) continue;
+
+      const key = [
+        visitor.name,
+        visitor.company ?? "",
+        visitor.purpose ?? "",
+        visitor.vehicle_plate ?? "",
+      ].join("|").toLowerCase();
+      const current = latestByVisitor.get(key);
+      const currentTime = current ? new Date(current.checked_in_at).getTime() : 0;
+      const nextTime = new Date(visitor.checked_in_at).getTime();
+      if (!current || nextTime > currentTime) {
+        latestByVisitor.set(key, visitor);
+      }
+    }
+
+    return Array.from(latestByVisitor.values()).sort(
+      (a, b) => new Date(b.checked_in_at).getTime() - new Date(a.checked_in_at).getTime(),
+    );
+  }, [logSearch, visitorDate, visitors]);
 
   // --- Render ---
   if (loading) {
@@ -1509,6 +1576,7 @@ export default function GateConsolePage() {
                       type="button"
                       onClick={() => {
                         setSelectedPlateNumber(log.plate_number);
+                        setFootageMissing(false);
                         setShowAnalysisImage(true);
                       }}
                       className="text-[11px] font-bold px-3 py-1 rounded-full border border-[#5B9BF5] text-[#5B9BF5] hover:bg-[#5B9BF5]/10 transition-colors cursor-pointer"
@@ -1691,21 +1759,7 @@ export default function GateConsolePage() {
                 </tr>
               </thead>
               <tbody>
-                {visitors
-                  .filter((visitor) => {
-                    // Filter by date if selected
-                    if (visitorDate) {
-                      const visitorDateStr = new Date(visitor.checked_in_at).toISOString().split('T')[0];
-                      if (visitorDateStr !== visitorDate) return false;
-                    }
-                    // Filter by search
-                    if (logSearch && !visitor.name.toLowerCase().includes(logSearch.toLowerCase()) && 
-                        !visitor.vehicle_plate?.toLowerCase().includes(logSearch.toLowerCase())) {
-                      return false;
-                    }
-                    return true;
-                  })
-                  .map((visitor) => (
+                {filteredVisitors.map((visitor) => (
                     <tr key={visitor.id} className="border-b border-[#1E2F50]/50 hover:bg-[#0D1526]/50">
                       <td className="py-2 pr-3">
                         <div className="text-[11px] font-bold text-[#E8EDF8]">{visitor.name}</div>
@@ -1716,15 +1770,13 @@ export default function GateConsolePage() {
                         })}
                       </td>
                       <td className="py-2">
-                        {visitor.vehicle_plate && (
-                          <div className="text-[10px] font-mono font-semibold text-[#E8EDF8]">
-                            {visitor.vehicle_plate}
-                          </div>
-                        )}
+                        <div className="text-[10px] font-mono font-semibold text-[#E8EDF8]">
+                          {visitor.vehicle_plate || "—"}
+                        </div>
                       </td>
                     </tr>
                   ))}
-                {visitors.length === 0 && (
+                {filteredVisitors.length === 0 && (
                   <tr>
                     <td colSpan={3} className="py-6 text-center text-[11px] text-[#4E6090]">
                       No active visitors
@@ -1773,19 +1825,30 @@ export default function GateConsolePage() {
               </button>
             </div>
             <div className="bg-[#0F1A30] rounded-lg overflow-hidden">
-              <img
-                src={`http://localhost:8000/tmp/${selectedPlateNumber}.png`}
-                alt={`LPR Analysis for ${selectedPlateNumber}`}
-                className="w-full h-auto"
-                style={{ maxHeight: '75vh', objectFit: 'contain' }}
-                onError={(e) => {
-                  // Fallback to .jpg if .png doesn't exist
-                  const target = e.target as HTMLImageElement;
-                  if (target.src.includes('.png')) {
-                    target.src = `http://localhost:8000/tmp/${selectedPlateNumber}.jpg`;
-                  }
-                }}
-              />
+              {footageMissing ? (
+                <div className="flex min-h-[280px] flex-col items-center justify-center gap-2 px-6 text-center">
+                  <Camera className="h-8 w-8 text-[#4E6090]" />
+                  <p className="text-[13px] font-semibold text-[#E8EDF8]">Footage unavailable</p>
+                  <p className="max-w-md text-[11px] text-[#8A9BBF]">
+                    No saved LPR image was found for {selectedPlateNumber}. Capture a new scan or add the footage file in backend/tmp.
+                  </p>
+                </div>
+              ) : (
+                <img
+                  src={`${getBackendBaseUrl()}/tmp/${selectedPlateNumber}.png`}
+                  alt={`LPR Analysis for ${selectedPlateNumber}`}
+                  className="w-full h-auto"
+                  style={{ maxHeight: '75vh', objectFit: 'contain' }}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    if (target.src.endsWith(".png")) {
+                      target.src = `${getBackendBaseUrl()}/tmp/${selectedPlateNumber}.jpg`;
+                      return;
+                    }
+                    setFootageMissing(true);
+                  }}
+                />
+              )}
             </div>
             <div className="mt-3 text-[11px] text-[#8A9BBF]">
               License Plate Recognition analysis with vehicle detection and tracking

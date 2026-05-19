@@ -60,14 +60,25 @@ VEHICLES = [
     {"plate_number": "UP-80-OP-0123", "vehicle_type": "truck", "owner_name": "Anil Gupta", "company": "UP Movers", "status": "pending"},
     {"plate_number": "MH-01-QR-4567", "vehicle_type": "van", "owner_name": "Unknown", "company": "Unregistered", "status": "blacklisted"},
     {"plate_number": "DL-10-ST-8901", "vehicle_type": "truck", "owner_name": "Suspicious", "company": "N/A", "status": "blacklisted"},
+    {"plate_number": "KA01AB1234", "vehicle_type": "truck", "owner_name": "Gate Demo Operator", "company": "Cement Depot Fleet", "status": "registered"},
+    {"plate_number": "DL03EF9012", "vehicle_type": "truck", "owner_name": "Gate Demo Operator", "company": "Cement Depot Fleet", "status": "registered"},
+    {"plate_number": "MH02CD5678", "vehicle_type": "truck", "owner_name": "Gate Demo Operator", "company": "Cement Depot Fleet", "status": "registered"},
+    {"plate_number": "TN04GH3456", "vehicle_type": "truck", "owner_name": "Gate Demo Operator", "company": "Cement Depot Fleet", "status": "registered"},
+]
+
+GATE_ACCESS_LOGS = [
+    {"gate_code": "GATE-A", "plate_number": "KA01AB1234", "direction": "entry", "decision": "granted", "denied_reason": None, "minutes_ago": 260},
+    {"gate_code": "GATE-A", "plate_number": "DL03EF9012", "direction": "entry", "decision": "granted", "denied_reason": None, "minutes_ago": 256},
+    {"gate_code": "GATE-A", "plate_number": "MH02CD5678", "direction": "entry", "decision": "granted", "denied_reason": None, "minutes_ago": 256},
+    {"gate_code": "GATE-C", "plate_number": "TN04GH3456", "direction": "exit", "decision": "granted", "denied_reason": None, "minutes_ago": 243},
 ]
 
 VISITORS = [
-    {"name": "Ananya Sharma", "company": "Deloitte India", "purpose": "Audit inspection", "contact_number": "+91-9876543210", "host_name": "Site Manager"},
-    {"name": "Karthik Reddy", "company": "Fidelis Technology", "purpose": "System maintenance", "contact_number": "+91-9123456789", "host_name": "IT Lead"},
-    {"name": "Priya Nair", "company": "SafeGuard Consulting", "purpose": "Safety audit", "contact_number": "+91-9988776655", "host_name": "HSE Manager"},
-    {"name": "Rahul Verma", "company": "CementCo Supplier", "purpose": "Delivery coordination", "contact_number": "+91-9112233445", "host_name": "Dispatch Head"},
-    {"name": "Deepika Jain", "company": "InsureMax Ltd", "purpose": "Insurance assessment", "contact_number": "+91-9556677889", "host_name": "Operations Director"},
+    {"name": "Rajesh Kumar", "company": "Tech Solutions Pvt Ltd", "purpose": "Client meeting", "contact_number": "+91-9876543210", "host_name": "Priya Sharma", "vehicle_plate": "KA01AB1234"},
+    {"name": "Ananya Reddy", "company": "Logistics Express", "purpose": "Delivery coordination", "contact_number": "+91-9123456789", "host_name": "Amit Patel", "vehicle_plate": "MH02CD5678"},
+    {"name": "Vikram Singh", "company": "Safety Audit Services", "purpose": "Safety inspection", "contact_number": "+91-9988776655", "host_name": "Site Manager", "vehicle_plate": "DL03EF9012"},
+    {"name": "Sunita Joshi", "company": "Consulting Group", "purpose": "Business consultation", "contact_number": "+91-9112233445", "host_name": "Operations Director", "vehicle_plate": "AP06KL2345"},
+    {"name": "Karthik Menon", "company": "Equipment Maintenance Co", "purpose": "Equipment servicing", "contact_number": "+91-9556677889", "host_name": "Facility Manager", "vehicle_plate": "KA05IJ7890"},
 ]
 
 PERIMETER_ZONES = [
@@ -210,12 +221,74 @@ async def seed_database(db_url: str | None = None):
             except Exception as e:
                 logger.warning(f"Skipped vehicles: {e}")
 
+            for log in GATE_ACCESS_LOGS:
+                gate_row = await db.execute(text("""
+                    SELECT id
+                    FROM depot_gates
+                    WHERE gate_code = :gate_code
+                    LIMIT 1
+                """), {"gate_code": log["gate_code"]})
+                gate_id = gate_row.scalar_one_or_none()
+
+                vehicle_row = await db.execute(text("""
+                    SELECT id
+                    FROM depot_vehicle_registry
+                    WHERE plate_number = :plate_number
+                    LIMIT 1
+                """), {"plate_number": log["plate_number"]})
+                vehicle_id = vehicle_row.scalar_one_or_none()
+
+                if not gate_id:
+                    continue
+
+                event_time = now - timedelta(minutes=log["minutes_ago"])
+                await db.execute(text("""
+                    INSERT INTO depot_gate_access_logs
+                      (id, gate_id, gate_code, plate_number, plate_confidence, vehicle_id,
+                       decision, direction, snapshot_ref, denied_reason, processed_at,
+                       created_at, updated_at)
+                    SELECT :id, :gate_id, :gate_code, :plate_number, :plate_confidence, :vehicle_id,
+                           :decision, :direction, :snapshot_ref, :denied_reason, :processed_at,
+                           :created_at, :updated_at
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM depot_gate_access_logs
+                        WHERE plate_number = :plate_number
+                          AND gate_code = :gate_code
+                          AND direction = :direction
+                    )
+                """), {
+                    "id": new_id(),
+                    "gate_id": gate_id,
+                    "gate_code": log["gate_code"],
+                    "plate_number": log["plate_number"],
+                    "plate_confidence": 0.95,
+                    "vehicle_id": vehicle_id,
+                    "decision": log["decision"],
+                    "direction": log["direction"],
+                    "snapshot_ref": f"seed://gate/{log['plate_number']}",
+                    "denied_reason": log["denied_reason"],
+                    "processed_at": event_time,
+                    "created_at": event_time,
+                    "updated_at": event_time,
+                })
+            logger.info(f"Seeded {len(GATE_ACCESS_LOGS)} gate access logs")
+
             # ── Visitors ──
             for vis in VISITORS:
                 await db.execute(text("""
-                    INSERT INTO depot_visitors (id, name, company, purpose, contact_number, host_name, status, checked_in_at, pass_valid_until, registered_by, created_at, updated_at)
-                    VALUES (:id, :name, :company, :purpose, :contact_number, :host_name, 'checked_in', :now, :expiry, :user, :now, :now)
-                    ON CONFLICT DO NOTHING
+                    INSERT INTO depot_visitors
+                      (id, name, company, purpose, contact_number, host_name, vehicle_plate,
+                       status, checked_in_at, pass_valid_until, registered_by, created_at, updated_at)
+                    SELECT :id, :name, :company, :purpose, :contact_number, :host_name, :vehicle_plate,
+                           'checked_in', :now, :expiry, :user, :now, :now
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM depot_visitors
+                        WHERE name = :name
+                          AND company = :company
+                          AND status = 'checked_in'
+                    )
                 """), {**vis, "id": new_id(), "now": now, "expiry": now + timedelta(hours=8), "user": seed_user})
             logger.info(f"Seeded {len(VISITORS)} visitors")
 
