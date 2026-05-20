@@ -20,7 +20,7 @@ from enum import Enum
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -602,6 +602,14 @@ class IncidentResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @field_serializer("escalation_deadline", "acknowledged_at", "resolved_at", "created_at")
+    def serialize_datetime(self, value: Optional[datetime]):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.isoformat()
+
 
 class IncidentAcknowledge(BaseModel):
     reason: str = Field(..., min_length=5, json_schema_extra={"example": "Security team dispatched to Zone A"})
@@ -613,6 +621,48 @@ class IncidentResolve(BaseModel):
 
 ESCALATION_MINUTES = 5
 ESCALATION_CHAIN = ["Security Supervisor", "Facility Head", "Site Director"]
+BREACH_VIDEO_MAP = {
+    "unauthorized_entry": "Perimeter_Detection.mp4",
+    "loitering": "Theft Camera .mp4",
+}
+SEED_EVIDENCE_VIDEO_MAP = {
+    "seed://breach-0": "Perimeter_Detection.mp4",
+    "seed://breach-inbound-gate": "Perimeter_Detection.mp4",
+    "seed://breach-staging-area": "Theft Camera .mp4",
+}
+
+
+def resolve_video_archive_ref(snapshot_ref: Optional[str], breach_type: str) -> str:
+    """Return a streamable CCTV MP4 filename for an incident."""
+    if snapshot_ref in {"Perimeter_Detection.mp4", "Theft Camera .mp4"}:
+        return snapshot_ref
+    if snapshot_ref and snapshot_ref in SEED_EVIDENCE_VIDEO_MAP:
+        return SEED_EVIDENCE_VIDEO_MAP[snapshot_ref]
+    return BREACH_VIDEO_MAP.get(breach_type, "Perimeter_Detection.mp4")
+
+
+def dedupe_incidents(incidents: list[PerimeterIncident]) -> list[PerimeterIncident]:
+    """Collapse duplicate seeded incident rows while preserving newest first."""
+    seen: set[str] = set()
+    unique: list[PerimeterIncident] = []
+
+    for incident in incidents:
+        base_description = (incident.description or "").split("Acknowledged:")[0]
+        normalized_description = " ".join(base_description.lower().split())
+        key = "|".join(
+            [
+                incident.title.strip().lower(),
+                normalized_description,
+                incident.severity,
+                incident.video_archive_ref or "",
+            ]
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(incident)
+
+    return unique
 
 
 @router.post("/incidents/from-breach/{breach_id}", response_model=IncidentResponse, status_code=201)
@@ -632,8 +682,16 @@ async def create_incident_from_breach(
     if not breach:
         raise HTTPException(status_code=404, detail="Breach not found")
 
+    existing_result = await db.execute(
+        select(PerimeterIncident).where(PerimeterIncident.breach_id == breach.id)
+    )
+    existing_incident = existing_result.scalar_one_or_none()
+    if existing_incident:
+        return existing_incident
+
     zone = await db.get(PerimeterZone, breach.zone_id)
     zone_name = zone.name if zone else "Unknown Zone"
+    confidence_text = f"Confidence: {breach.confidence:.0%}. " if breach.confidence is not None else ""
 
     incident = PerimeterIncident(
         breach_id=breach.id,
@@ -642,14 +700,14 @@ async def create_incident_from_breach(
         title=f"Security Incident — {zone_name}",
         description=(
             f"{breach.breach_type.replace('_', ' ').title()} detected in {zone_name}. "
-            f"Confidence: {breach.confidence:.0%}. "
+            f"{confidence_text}"
             f"Night vision: {'enabled' if zone and zone.night_vision_enabled else 'off'}."
         ),
         escalation_level=0,
         escalation_deadline=datetime.now(timezone.utc) + timedelta(minutes=ESCALATION_MINUTES),
         escalated_to=ESCALATION_CHAIN[0],
         status=IncidentStatus.OPEN,
-        video_archive_ref=breach.snapshot_ref,
+        video_archive_ref=resolve_video_archive_ref(breach.snapshot_ref, breach.breach_type),
     )
     db.add(incident)
     await db.commit()
@@ -672,7 +730,7 @@ async def list_incidents(
     if severity:
         query = query.where(PerimeterIncident.severity == severity)
     result = await db.execute(query.order_by(PerimeterIncident.created_at.desc()))
-    return result.scalars().all()
+    return dedupe_incidents(list(result.scalars().all()))
 
 
 @router.get("/incidents/active", response_model=list[IncidentResponse])
@@ -686,7 +744,7 @@ async def get_active_incidents(
         .where(PerimeterIncident.status.in_([IncidentStatus.OPEN, IncidentStatus.ACKNOWLEDGED, IncidentStatus.ESCALATED]))
         .order_by(PerimeterIncident.created_at.desc())
     )
-    return result.scalars().all()
+    return dedupe_incidents(list(result.scalars().all()))
 
 
 @router.patch("/incidents/{incident_id}/acknowledge", response_model=IncidentResponse)

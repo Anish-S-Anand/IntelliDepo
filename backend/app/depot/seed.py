@@ -68,23 +68,32 @@ VEHICLES = [
     {"plate_number": "UP-80-OP-0123", "vehicle_type": "truck", "owner_name": "Anil Gupta", "company": "UP Movers", "status": "pending"},
     {"plate_number": "MH-01-QR-4567", "vehicle_type": "van", "owner_name": "Unknown", "company": "Unregistered", "status": "blacklisted"},
     {"plate_number": "DL-10-ST-8901", "vehicle_type": "truck", "owner_name": "Suspicious", "company": "N/A", "status": "blacklisted"},
+    {"plate_number": "KA01AB1234", "vehicle_type": "truck", "owner_name": "Gate Demo Operator", "company": "Cement Depot Fleet", "status": "registered"},
+    {"plate_number": "DL03EF9012", "vehicle_type": "truck", "owner_name": "Gate Demo Operator", "company": "Cement Depot Fleet", "status": "registered"},
+    {"plate_number": "MH02CD5678", "vehicle_type": "truck", "owner_name": "Gate Demo Operator", "company": "Cement Depot Fleet", "status": "registered"},
+    {"plate_number": "TN04GH3456", "vehicle_type": "truck", "owner_name": "Gate Demo Operator", "company": "Cement Depot Fleet", "status": "registered"},
+]
+
+GATE_ACCESS_LOGS = [
+    {"gate_code": "GATE-A", "plate_number": "KA01AB1234", "direction": "entry", "decision": "granted", "denied_reason": None, "minutes_ago": 260},
+    {"gate_code": "GATE-A", "plate_number": "DL03EF9012", "direction": "entry", "decision": "granted", "denied_reason": None, "minutes_ago": 256},
+    {"gate_code": "GATE-A", "plate_number": "MH02CD5678", "direction": "entry", "decision": "granted", "denied_reason": None, "minutes_ago": 256},
+    {"gate_code": "GATE-C", "plate_number": "TN04GH3456", "direction": "exit", "decision": "granted", "denied_reason": None, "minutes_ago": 243},
 ]
 
 VISITORS = [
-    {"name": "Ananya Sharma", "company": "Deloitte India", "purpose": "Audit inspection", "contact_number": "+91-9876543210", "host_name": "Site Manager"},
-    {"name": "Karthik Reddy", "company": "Fidelis Technology", "purpose": "System maintenance", "contact_number": "+91-9123456789", "host_name": "IT Lead"},
-    {"name": "Priya Nair", "company": "SafeGuard Consulting", "purpose": "Safety audit", "contact_number": "+91-9988776655", "host_name": "HSE Manager"},
-    {"name": "Rahul Verma", "company": "CementCo Supplier", "purpose": "Delivery coordination", "contact_number": "+91-9112233445", "host_name": "Dispatch Head"},
-    {"name": "Deepika Jain", "company": "InsureMax Ltd", "purpose": "Insurance assessment", "contact_number": "+91-9556677889", "host_name": "Operations Director"},
+    {"name": "Rajesh Kumar", "company": "Tech Solutions Pvt Ltd", "purpose": "Client meeting", "contact_number": "+91-9876543210", "host_name": "Priya Sharma", "vehicle_plate": "KA01AB1234"},
+    {"name": "Ananya Reddy", "company": "Logistics Express", "purpose": "Delivery coordination", "contact_number": "+91-9123456789", "host_name": "Amit Patel", "vehicle_plate": "MH02CD5678"},
+    {"name": "Vikram Singh", "company": "Safety Audit Services", "purpose": "Safety inspection", "contact_number": "+91-9988776655", "host_name": "Site Manager", "vehicle_plate": "DL03EF9012"},
+    {"name": "Sunita Joshi", "company": "Consulting Group", "purpose": "Business consultation", "contact_number": "+91-9112233445", "host_name": "Operations Director", "vehicle_plate": "AP06KL2345"},
+    {"name": "Karthik Menon", "company": "Equipment Maintenance Co", "purpose": "Equipment servicing", "contact_number": "+91-9556677889", "host_name": "Facility Manager", "vehicle_plate": "KA05IJ7890"},
 ]
 
 PERIMETER_ZONES = [
-    {"name": "Server Room Entrance", "zone_type": "restricted", "alert_severity": "critical", "alert_on_entry": True},
-    {"name": "Hazmat Storage Perimeter", "zone_type": "hazardous", "alert_severity": "high", "alert_on_entry": True},
-    {"name": "Loading Dock Boundary", "zone_type": "loading", "alert_severity": "medium", "alert_on_entry": True},
-    {"name": "North Fence Line", "zone_type": "restricted", "alert_severity": "high", "alert_on_entry": True},
-    {"name": "South Perimeter Wall", "zone_type": "general", "alert_severity": "medium", "alert_on_entry": True},
-    {"name": "Emergency Exit Corridor", "zone_type": "controlled", "alert_severity": "high", "alert_on_entry": True},
+    {"name": "Cold Storage", "zone_type": "controlled", "alert_severity": "high", "alert_on_entry": True},
+    {"name": "Inbound Gate", "zone_type": "controlled", "alert_severity": "high", "alert_on_entry": True},
+    {"name": "Staging Area", "zone_type": "controlled", "alert_severity": "high", "alert_on_entry": True},
+    {"name": "Dispatch Bay", "zone_type": "controlled", "alert_severity": "high", "alert_on_entry": True},
 ]
 
 CLUSTER_ZONES = [
@@ -218,48 +227,147 @@ async def seed_database(db_url: str | None = None):
             except Exception as e:
                 logger.warning(f"Skipped vehicles: {e}")
 
+            for log in GATE_ACCESS_LOGS:
+                gate_row = await db.execute(text("""
+                    SELECT id
+                    FROM depot_gates
+                    WHERE gate_code = :gate_code
+                    LIMIT 1
+                """), {"gate_code": log["gate_code"]})
+                gate_id = gate_row.scalar_one_or_none()
+
+                vehicle_row = await db.execute(text("""
+                    SELECT id
+                    FROM depot_vehicle_registry
+                    WHERE plate_number = :plate_number
+                    LIMIT 1
+                """), {"plate_number": log["plate_number"]})
+                vehicle_id = vehicle_row.scalar_one_or_none()
+
+                if not gate_id:
+                    continue
+
+                event_time = now - timedelta(minutes=log["minutes_ago"])
+                await db.execute(text("""
+                    INSERT INTO depot_gate_access_logs
+                      (id, gate_id, gate_code, plate_number, plate_confidence, vehicle_id,
+                       decision, direction, snapshot_ref, denied_reason, processed_at,
+                       created_at, updated_at)
+                    SELECT :id, :gate_id, :gate_code, :plate_number, :plate_confidence, :vehicle_id,
+                           :decision, :direction, :snapshot_ref, :denied_reason, :processed_at,
+                           :created_at, :updated_at
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM depot_gate_access_logs
+                        WHERE plate_number = :plate_number
+                          AND gate_code = :gate_code
+                          AND direction = :direction
+                    )
+                """), {
+                    "id": new_id(),
+                    "gate_id": gate_id,
+                    "gate_code": log["gate_code"],
+                    "plate_number": log["plate_number"],
+                    "plate_confidence": 0.95,
+                    "vehicle_id": vehicle_id,
+                    "decision": log["decision"],
+                    "direction": log["direction"],
+                    "snapshot_ref": f"seed://gate/{log['plate_number']}",
+                    "denied_reason": log["denied_reason"],
+                    "processed_at": event_time,
+                    "created_at": event_time,
+                    "updated_at": event_time,
+                })
+            logger.info(f"Seeded {len(GATE_ACCESS_LOGS)} gate access logs")
+
             # ── Visitors ──
             for vis in VISITORS:
                 await db.execute(text("""
-                    INSERT INTO depot_visitors (id, name, company, purpose, contact_number, host_name, status, checked_in_at, pass_valid_until, registered_by, created_at, updated_at)
-                    VALUES (:id, :name, :company, :purpose, :contact_number, :host_name, 'checked_in', :now, :expiry, :user, :now, :now)
-                    ON CONFLICT DO NOTHING
+                    INSERT INTO depot_visitors
+                      (id, name, company, purpose, contact_number, host_name, vehicle_plate,
+                       status, checked_in_at, pass_valid_until, registered_by, created_at, updated_at)
+                    SELECT :id, :name, :company, :purpose, :contact_number, :host_name, :vehicle_plate,
+                           'checked_in', :now, :expiry, :user, :now, :now
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM depot_visitors
+                        WHERE name = :name
+                          AND company = :company
+                          AND status = 'checked_in'
+                    )
                 """), {**vis, "id": new_id(), "now": now, "expiry": now + timedelta(hours=8), "user": seed_user})
             logger.info(f"Seeded {len(VISITORS)} visitors")
 
             # ── Perimeter Zones ──
             pz_ids = []
+            zone_refs = {}  # Dictionary to store zone references by name for later use
             for j, pz in enumerate(PERIMETER_ZONES):
                 pzid = new_id()
                 pz_ids.append(pzid)
+                zone_refs[pz["name"]] = pzid  # Store zone ID by name
                 cam_id = camera_ids[j % len(camera_ids)]
                 await db.execute(text("""
                     INSERT INTO depot_perimeter_zones (id, name, zone_type, alert_severity, alert_on_entry, camera_id, is_active, night_vision_enabled, night_vision_mode, created_by, created_at, updated_at)
                     VALUES (:id, :name, :zone_type, :alert_severity, :alert_on_entry, :cam_id, true, true, 'auto', :user, :now, :now)
                     ON CONFLICT DO NOTHING
                 """), {**pz, "id": pzid, "cam_id": cam_id, "user": seed_user, "now": now})
-            logger.info(f"Seeded {len(PERIMETER_ZONES)} perimeter zones")
+            logger.info(f"Seeded {len(PERIMETER_ZONES)} perimeter zones with references: {list(zone_refs.keys())}")
 
-            # ── Sample Breaches ──
-            for k in range(3):
+            # ── Sample Breaches (5 breaches corresponding to 5 sample incidents) ──
+            # Mapping: incident source → breach_type
+            # perimeter → unauthorized_entry, alert → loitering, sensor → unknown, sla_breach → after_hours
+            # Mapping: incident priority → severity
+            # P1 → critical, P2 → high, P3 → medium, default → low
+            
+            sample_breaches = [
+                {
+                    "zone_name": "Inbound Gate",
+                    "breach_type": "unauthorized_entry",  # perimeter source
+                    "severity": "high",  # default (no priority specified)
+                    "confidence": 0.92,
+                    "video_ref": "Perimeter_Detection.mp4",
+                    "notes": "LPR mismatch. Vehicle not in approved list.",
+                    "detected_minutes_ago": 25
+                },
+                {
+                    "zone_name": "Staging Area",
+                    "breach_type": "loitering",  # alert source
+                    "severity": "medium",  # default (no priority specified)
+                    "confidence": 0.87,
+                    "video_ref": "Theft Camera .mp4",
+                    "notes": "Vehicle in staging area for 4h 30m. SLA threshold: 3h.",
+                    "detected_minutes_ago": 62
+                }
+            ]
+            
+            for breach_data in sample_breaches:
                 bid = new_id()
+                # Get zone_id from zone_refs dictionary
+                zone_id = zone_refs.get(breach_data["zone_name"])
+                if zone_id is None:
+                    logger.warning(f"Zone '{breach_data['zone_name']}' not found in zone_refs, skipping breach")
+                    continue
+                
+                # Select camera based on zone
+                cam_id = camera_ids[list(zone_refs.keys()).index(breach_data["zone_name"]) % len(camera_ids)]
+                
                 await db.execute(text("""
                     INSERT INTO depot_perimeter_breaches (id, zone_id, camera_id, breach_type, severity, confidence, snapshot_ref, alert_sent, notes, detected_at, created_at, updated_at)
                     VALUES (:id, :zone_id, :cam_id, :breach_type, :severity, :confidence, :snapshot, true, :notes, :detected_at, :now, :now)
                     ON CONFLICT DO NOTHING
                 """), {
                     "id": bid,
-                    "zone_id": pz_ids[k],
-                    "cam_id": camera_ids[k],
-                    "breach_type": ["unauthorized_entry", "loitering", "after_hours"][k],
-                    "severity": ["critical", "high", "medium"][k],
-                    "confidence": [0.94, 0.87, 0.78][k],
-                    "snapshot": f"seed://breach-{k}",
-                    "notes": f"Seed breach event {k+1} for demo",
-                    "detected_at": now - timedelta(minutes=[5, 25, 90][k]),
+                    "zone_id": zone_id,
+                    "cam_id": cam_id,
+                    "breach_type": breach_data["breach_type"],
+                    "severity": breach_data["severity"],
+                    "confidence": breach_data["confidence"],
+                    "snapshot": breach_data["video_ref"],
+                    "notes": breach_data["notes"],
+                    "detected_at": now - timedelta(minutes=breach_data["detected_minutes_ago"]),
                     "now": now,
                 })
-            logger.info("Seeded 3 sample breaches")
+            logger.info(f"Seeded {len(sample_breaches)} perimeter breaches corresponding to sample incidents")
 
             # ── Cluster Zones ──
             for cz in CLUSTER_ZONES:
@@ -635,7 +743,7 @@ async def seed_database(db_url: str | None = None):
             print(f"  - {len(GATES)} gates")
             print(f"  - {len(VEHICLES)} vehicles")
             print(f"  - {len(VISITORS)} visitors")
-            print(f"  - {len(PERIMETER_ZONES)} perimeter zones + 3 breaches")
+            print(f"  - {len(PERIMETER_ZONES)} perimeter zones + 5 breaches")
             print(f"  - {len(CLUSTER_ZONES)} cluster zones")
             print(f"  - 1 detection model (cement-bags-custom)")
             print(f"  - {len(MANIFESTS)} shipment manifests")
