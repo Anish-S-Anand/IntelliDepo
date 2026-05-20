@@ -350,7 +350,6 @@ async def update_occupancy(
 @router.get("/heatmap", response_model=list[HeatmapEntry])
 async def get_heatmap(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Get spatial heatmap data — utilization across all active zones."""
     result = await db.execute(

@@ -125,6 +125,18 @@ export default function CommandPage() {
               successMsg: `${gates.find((g) => g.status === "open")?.name ?? "Gate"} closed`,
             },
             {
+<<<<<<< HEAD
+=======
+              key: "lock-zone",
+              icon: Lock,
+              label: "Lock Zone",
+              sub: "Initiate lockdown",
+              color: "#F04A4A",
+              fn: () => lockCommandZone(openIncidents[0]?.zone_id ?? "Depot perimeter"),
+              successMsg: "Zone lockdown initiated",
+            },
+            {
+>>>>>>> e424b85a2d0a280b5c3ec0f0a7eb1c465f2fcf25
               key: "trigger-alert",
               icon: BellRing,
               label: "Trigger Alert",
