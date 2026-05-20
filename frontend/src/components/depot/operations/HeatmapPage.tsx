@@ -59,8 +59,8 @@ const STATUS_LABEL: Record<string, string> = { normal: "NORMAL", warning: "WARNI
 const DEMO_ZONES: MergedZone[] = [
   { id: "demo-a", code: "A", name: "UltraTech Cement — Zone A",  type: "storage", floor: "ground", areaSqm: 2400, maxCapacity: 1000, currentOccupancy: 810,  utilizationPct: 81, status: "warning",  polygon: [], densityPerSqm: 0.34 },
   { id: "demo-b", code: "B", name: "ACC Cement — Zone B",        type: "storage", floor: "ground", areaSqm: 2800, maxCapacity: 1000, currentOccupancy: 450,  utilizationPct: 45, status: "normal",   polygon: [], densityPerSqm: 0.16 },
-  { id: "demo-c", code: "C", name: "JSW Cement — Zone C",        type: "storage", floor: "ground", areaSqm: 1600, maxCapacity: 800,  currentOccupancy: 595,  utilizationPct: 74, status: "normal",   polygon: [], densityPerSqm: 0.37 },
-  { id: "demo-d", code: "D", name: "Ambuja Cement — Zone D",     type: "storage", floor: "ground", areaSqm: 3200, maxCapacity: 1200, currentOccupancy: 1092, utilizationPct: 91, status: "critical", polygon: [], densityPerSqm: 0.34 },
+  { id: "demo-c", code: "C", name: "JSW Cement — Zone C",        type: "storage", floor: "ground", areaSqm: 1600, maxCapacity: 1000, currentOccupancy: 595,  utilizationPct: 60, status: "normal",   polygon: [], densityPerSqm: 0.37 },
+  { id: "demo-d", code: "D", name: "Ambuja Cement — Zone D",     type: "storage", floor: "ground", areaSqm: 3200, maxCapacity: 1000, currentOccupancy: 910,  utilizationPct: 91, status: "critical", polygon: [], densityPerSqm: 0.28 },
 ];
 
 function getStatusForUtilization(utilizationPct: number, thresholds: { warning: number; critical: number }) {

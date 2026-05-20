@@ -28,6 +28,14 @@ from sqlalchemy import text
 logger = logging.getLogger("intelli.depot.seed")
 
 
+def add_months(value: date, months: int) -> date:
+    month = value.month - 1 + months
+    year = value.year + month // 12
+    month = month % 12 + 1
+    days_in_month = [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    return date(year, month, min(value.day, days_in_month[month - 1]))
+
+
 # ---------------------------------------------------------------------------
 # Seed data definitions
 # ---------------------------------------------------------------------------
@@ -91,8 +99,8 @@ PERIMETER_ZONES = [
 CLUSTER_ZONES = [
     {"zone_code": "A", "name": "UltraTech Cement — Zone A", "zone_type": "storage", "floor": "ground", "area_sqm": 2400, "max_capacity_units": 1000, "current_occupancy": 810},
     {"zone_code": "B", "name": "ACC Cement — Zone B",       "zone_type": "storage", "floor": "ground", "area_sqm": 2800, "max_capacity_units": 1000, "current_occupancy": 450},
-    {"zone_code": "C", "name": "JSW Cement — Zone C",       "zone_type": "storage", "floor": "ground", "area_sqm": 1600, "max_capacity_units": 800, "current_occupancy": 595},
-    {"zone_code": "D", "name": "Ambuja Cement — Zone D",    "zone_type": "storage", "floor": "ground", "area_sqm": 3200, "max_capacity_units": 1200, "current_occupancy": 1092},
+    {"zone_code": "C", "name": "JSW Cement — Zone C",       "zone_type": "storage", "floor": "ground", "area_sqm": 1600, "max_capacity_units": 1000, "current_occupancy": 595},
+    {"zone_code": "D", "name": "Ambuja Cement — Zone D",    "zone_type": "storage", "floor": "ground", "area_sqm": 3200, "max_capacity_units": 1000, "current_occupancy": 910},
 ]
 
 MANIFESTS = [
@@ -119,20 +127,20 @@ BATCHES = [
     {"sku_id": "SKU-CEM-01", "product_name": "UltraTech Cement", "batch_number": "B2026-1022", "quantity": 490, "zone": "A", "rack": "A-01", "bin_location": "A-01-L1", "manufacturing_date": date(2026, 1, 15), "expiry_date": date(2026, 4, 15), "rule_type": "FIFO"},
     {"sku_id": "SKU-CEM-02", "product_name": "ACC Cement", "batch_number": "B2026-1019", "quantity": 320, "zone": "A", "rack": "A-02", "bin_location": "A-02-L1", "manufacturing_date": date(2026, 2, 1), "expiry_date": date(2026, 5, 1), "rule_type": "FIFO"},
     # Zone B batches (should total 450 bags to match CLUSTER_ZONES occupancy)
-    {"sku_id": "SKU-CEM-03", "product_name": "UltraTech Cement", "batch_number": "B2026-1021", "quantity": 450, "zone": "B", "rack": "B-02", "bin_location": "B-02-L2", "manufacturing_date": date(2026, 1, 10), "expiry_date": date(2026, 4, 10), "rule_type": "FEFO"},
+    {"sku_id": "SKU-CEM-03", "product_name": "ACC Cement", "batch_number": "B2026-1021", "quantity": 450, "zone": "B", "rack": "B-02", "bin_location": "B-02-L2", "manufacturing_date": date(2026, 1, 10), "expiry_date": date(2026, 4, 10), "rule_type": "FEFO"},
     # Zone C batches (should total 595 bags to match CLUSTER_ZONES occupancy)
-    {"sku_id": "SKU-CEM-04", "product_name": "ACC Cement", "batch_number": "B2026-1018", "quantity": 595, "zone": "C", "rack": "C-01", "bin_location": "C-01-L1", "manufacturing_date": date(2026, 1, 5), "expiry_date": date(2026, 4, 5), "rule_type": "FEFO"},
-    # Zone D batches (should total 1092 bags to match CLUSTER_ZONES occupancy)
-    {"sku_id": "SKU-CEM-05", "product_name": "UltraTech Cement", "batch_number": "B2026-1023", "quantity": 1092, "zone": "D", "rack": "D-01", "bin_location": "D-01-L1", "manufacturing_date": date(2026, 3, 1), "expiry_date": date(2026, 6, 1), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-04", "product_name": "JSW Cement", "batch_number": "B2026-1018", "quantity": 595, "zone": "C", "rack": "C-01", "bin_location": "C-01-L1", "manufacturing_date": date(2026, 1, 5), "expiry_date": date(2026, 4, 5), "rule_type": "FEFO"},
+    # Zone D batches (should total 910 bags to match CLUSTER_ZONES occupancy)
+    {"sku_id": "SKU-CEM-05", "product_name": "Ambuja Cement", "batch_number": "B2026-1023", "quantity": 910, "zone": "D", "rack": "D-01", "bin_location": "D-01-L1", "manufacturing_date": date(2026, 3, 1), "expiry_date": date(2026, 6, 1), "rule_type": "FIFO"},
     # Additional batches for more data
     {"sku_id": "SKU-CEM-06", "product_name": "UltraTech Cement", "batch_number": "B2026-1024", "quantity": 250, "zone": "A", "rack": "A-03", "bin_location": "A-03-L1", "manufacturing_date": date(2026, 1, 20), "expiry_date": date(2026, 4, 20), "rule_type": "FIFO"},
     {"sku_id": "SKU-CEM-07", "product_name": "ACC Cement", "batch_number": "B2026-1025", "quantity": 180, "zone": "B", "rack": "B-03", "bin_location": "B-03-L1", "manufacturing_date": date(2026, 1, 8), "expiry_date": date(2026, 4, 8), "rule_type": "FEFO"},
-    {"sku_id": "SKU-CEM-08", "product_name": "UltraTech Cement", "batch_number": "B2026-1026", "quantity": 420, "zone": "C", "rack": "C-02", "bin_location": "C-02-L1", "manufacturing_date": date(2026, 1, 3), "expiry_date": date(2026, 4, 3), "rule_type": "FIFO"},
-    {"sku_id": "SKU-CEM-09", "product_name": "ACC Cement", "batch_number": "B2026-1027", "quantity": 350, "zone": "D", "rack": "D-02", "bin_location": "D-02-L1", "manufacturing_date": date(2026, 2, 15), "expiry_date": date(2026, 5, 15), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-08", "product_name": "JSW Cement", "batch_number": "B2026-1026", "quantity": 420, "zone": "C", "rack": "C-02", "bin_location": "C-02-L1", "manufacturing_date": date(2026, 1, 3), "expiry_date": date(2026, 4, 3), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-09", "product_name": "Ambuja Cement", "batch_number": "B2026-1027", "quantity": 350, "zone": "D", "rack": "D-02", "bin_location": "D-02-L1", "manufacturing_date": date(2026, 2, 15), "expiry_date": date(2026, 5, 15), "rule_type": "FIFO"},
     {"sku_id": "SKU-CEM-10", "product_name": "UltraTech Cement", "batch_number": "B2026-1028", "quantity": 290, "zone": "A", "rack": "A-04", "bin_location": "A-04-L1", "manufacturing_date": date(2026, 1, 5), "expiry_date": date(2026, 4, 5), "rule_type": "FIFO"},
     {"sku_id": "SKU-CEM-11", "product_name": "ACC Cement", "batch_number": "B2026-1029", "quantity": 220, "zone": "B", "rack": "B-04", "bin_location": "B-04-L1", "manufacturing_date": date(2026, 1, 12), "expiry_date": date(2026, 4, 12), "rule_type": "FEFO"},
-    {"sku_id": "SKU-CEM-12", "product_name": "UltraTech Cement", "batch_number": "B2026-1030", "quantity": 380, "zone": "C", "rack": "C-03", "bin_location": "C-03-L1", "manufacturing_date": date(2026, 1, 7), "expiry_date": date(2026, 4, 7), "rule_type": "FEFO"},
-    {"sku_id": "SKU-CEM-13", "product_name": "ACC Cement", "batch_number": "B2026-1031", "quantity": 460, "zone": "D", "rack": "D-03", "bin_location": "D-03-L1", "manufacturing_date": date(2026, 3, 10), "expiry_date": date(2026, 6, 10), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-12", "product_name": "JSW Cement", "batch_number": "B2026-1030", "quantity": 380, "zone": "C", "rack": "C-03", "bin_location": "C-03-L1", "manufacturing_date": date(2026, 1, 7), "expiry_date": date(2026, 4, 7), "rule_type": "FEFO"},
+    {"sku_id": "SKU-CEM-13", "product_name": "Ambuja Cement", "batch_number": "B2026-1031", "quantity": 460, "zone": "D", "rack": "D-03", "bin_location": "D-03-L1", "manufacturing_date": date(2026, 3, 10), "expiry_date": date(2026, 6, 10), "rule_type": "FIFO"},
     {"sku_id": "SKU-CEM-14", "product_name": "UltraTech Cement", "batch_number": "B2026-1032", "quantity": 310, "zone": "A", "rack": "A-05", "bin_location": "A-05-L1", "manufacturing_date": date(2026, 1, 25), "expiry_date": date(2026, 4, 25), "rule_type": "FIFO"},
     {"sku_id": "SKU-CEM-15", "product_name": "ACC Cement", "batch_number": "B2026-1033", "quantity": 270, "zone": "B", "rack": "B-05", "bin_location": "B-05-L1", "manufacturing_date": date(2026, 1, 9), "expiry_date": date(2026, 4, 9), "rule_type": "FEFO"},
 ]
@@ -471,7 +479,7 @@ async def seed_database(db_url: str | None = None):
                             "sku_code": batch.get("sku_id", batch["batch_number"]),
                             "quantity": batch["quantity"],
                             "zone": batch["zone"], "rack": batch["rack"], "bin_location": batch["bin_location"],
-                            "mfg": batch["manufacturing_date"], "exp": batch["expiry_date"],
+                            "mfg": batch_time.date(), "exp": add_months(batch_time.date(), 6),
                             "sequencing_rule": batch["rule_type"], "batch_time": batch_time,
                         })
                 logger.info(f"Seeded {len(BATCHES)} inventory batches")

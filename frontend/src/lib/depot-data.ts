@@ -112,9 +112,9 @@ export function occColor(pct: number) {
 
 export const ZONES = [
   { name: "ZONE A", pct: 81, bags: 810, cap: 1000, color: "#F59E0B" },
-  { name: "ZONE B", pct: 62, bags: 450, cap: 1000, color: "#22D3A1" },
-  { name: "ZONE C", pct: 74, bags: 595, cap: 800, color: "#F59E0B" },
-  { name: "ZONE D", pct: 91, bags: 1092, cap: 1200, color: "#F04A4A" },
+  { name: "ZONE B", pct: 45, bags: 450, cap: 1000, color: "#22D3A1" },
+  { name: "ZONE C", pct: 60, bags: 595, cap: 1000, color: "#22D3A1" },
+  { name: "ZONE D", pct: 91, bags: 910, cap: 1000, color: "#F04A4A" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -218,8 +218,8 @@ export const COUNT_TIMESERIES: CountTimeSeries[] = [
 export const ZONE_DETAILS: ZoneDetail[] = [
   { id: "Z-A01", code: "A", name: "Storage Bay A — Cement", type: "storage", floor: "ground", areaSqm: 2400, maxCapacity: 1000, currentOccupancy: 810, utilizationPct: 81, status: "warning", polygon: [[50, 50], [350, 50], [350, 250], [50, 250]], densityPerSqm: 0.34, products: ["OPC Cement 53", "PPC Cement 33"], lastUpdated: "2m ago" },
   { id: "Z-B01", code: "B", name: "Storage Bay B — Fertilizers", type: "storage", floor: "ground", areaSqm: 2800, maxCapacity: 1000, currentOccupancy: 450, utilizationPct: 45, status: "normal", polygon: [[400, 50], [700, 50], [700, 250], [400, 250]], densityPerSqm: 0.16, products: ["Fertilizer Grade A", "Fertilizer Grade B"], lastUpdated: "15m ago" },
-  { id: "Z-C01", code: "C", name: "Hazmat Storage C", type: "hazmat", floor: "ground", areaSqm: 1600, maxCapacity: 800, currentOccupancy: 595, utilizationPct: 74.4, status: "normal", polygon: [[50, 300], [350, 300], [350, 500], [50, 500]], densityPerSqm: 0.37, products: ["Chemicals HAZ-3", "OPC Cement 43"], lastUpdated: "8m ago" },
-  { id: "Z-D01", code: "D", name: "Heavy Materials D", type: "storage", floor: "ground", areaSqm: 3200, maxCapacity: 1200, currentOccupancy: 1092, utilizationPct: 91, status: "critical", polygon: [[400, 300], [700, 300], [700, 500], [400, 500]], densityPerSqm: 0.34, products: ["Steel Coils Grade 2", "Staging"], lastUpdated: "1m ago" },
+  { id: "Z-C01", code: "C", name: "Hazmat Storage C", type: "hazmat", floor: "ground", areaSqm: 1600, maxCapacity: 1000, currentOccupancy: 595, utilizationPct: 59.5, status: "normal", polygon: [[50, 300], [350, 300], [350, 500], [50, 500]], densityPerSqm: 0.37, products: ["Chemicals HAZ-3", "OPC Cement 43"], lastUpdated: "8m ago" },
+  { id: "Z-D01", code: "D", name: "Heavy Materials D", type: "storage", floor: "ground", areaSqm: 3200, maxCapacity: 1000, currentOccupancy: 910, utilizationPct: 91, status: "critical", polygon: [[400, 300], [700, 300], [700, 500], [400, 500]], densityPerSqm: 0.28, products: ["Steel Coils Grade 2", "Staging"], lastUpdated: "1m ago" },
   { id: "Z-L01", code: "L", name: "Loading Dock", type: "loading", floor: "ground", areaSqm: 1200, maxCapacity: 200, currentOccupancy: 45, utilizationPct: 22.5, status: "normal", polygon: [[750, 50], [950, 50], [950, 250], [750, 250]], densityPerSqm: 0.04, products: [], lastUpdated: "5m ago" },
   { id: "Z-S01", code: "S", name: "Staging Area", type: "staging", floor: "ground", areaSqm: 1800, maxCapacity: 400, currentOccupancy: 150, utilizationPct: 37.5, status: "normal", polygon: [[750, 300], [950, 300], [950, 500], [750, 500]], densityPerSqm: 0.08, products: [], lastUpdated: "45m ago" },
 ];
@@ -267,7 +267,7 @@ export const ZONE_HISTORY: Record<string, ZoneHistory[]> = {
     { timestamp: "Dec", utilization: 82, occupancy: 656 },
     { timestamp: "Jan", utilization: 71, occupancy: 568 },
     { timestamp: "Feb", utilization: 69, occupancy: 552 },
-    { timestamp: "Mar", utilization: 74, occupancy: 595 },
+    { timestamp: "Mar", utilization: 60, occupancy: 595 },
   ],
   D: [
     { timestamp: "Apr", utilization: 82, occupancy: 984 },
@@ -281,7 +281,7 @@ export const ZONE_HISTORY: Record<string, ZoneHistory[]> = {
     { timestamp: "Dec", utilization: 96, occupancy: 1152 },
     { timestamp: "Jan", utilization: 88, occupancy: 1056 },
     { timestamp: "Feb", utilization: 85, occupancy: 1020 },
-    { timestamp: "Mar", utilization: 91, occupancy: 1092 },
+    { timestamp: "Mar", utilization: 91, occupancy: 910 },
   ],
 };
 
