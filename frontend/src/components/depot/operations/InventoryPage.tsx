@@ -299,15 +299,51 @@ export default function InventoryPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [zonesRes, batchesRes] = await Promise.allSettled([
+      const [zonesRes, batchesRes, heatmapRes] = await Promise.allSettled([
         fetch("/backend/depot/vision/cluster/zones"),
         fetch("/backend/depot/vision/sequencing/batches?status=active"),
+        fetch("/backend/depot/vision/cluster/heatmap"),
       ]);
+
+      // Heatmap data (for accurate zone utilization)
+      let heatmapData: Record<string, { utilization_pct: number; current_occupancy: number; max_capacity_units: number }> = {};
+      if (heatmapRes.status === "fulfilled" && heatmapRes.value.ok) {
+        const hData: Array<{
+          zone_code: string;
+          name: string;
+          utilization_pct: number;
+          status: string;
+          current_occupancy: number;
+          max_capacity_units: number;
+        }> = await heatmapRes.value.json();
+        // Create a map of zone_code -> utilization data
+        heatmapData = hData.reduce((acc, zone) => {
+          acc[zone.zone_code] = {
+            utilization_pct: zone.utilization_pct,
+            current_occupancy: zone.current_occupancy,
+            max_capacity_units: zone.max_capacity_units,
+          };
+          return acc;
+        }, {} as Record<string, { utilization_pct: number; current_occupancy: number; max_capacity_units: number }>);
+      }
 
       // Zones
       if (zonesRes.status === "fulfilled" && zonesRes.value.ok) {
         const zData: ZoneData[] = await zonesRes.value.json();
-        setZones(zData.sort((a, b) => a.zone_code.localeCompare(b.zone_code)));
+        // Update zones with heatmap data if available
+        const updatedZones = zData.map(zone => {
+          const heatmap = heatmapData[zone.zone_code];
+          if (heatmap) {
+            return {
+              ...zone,
+              utilization_pct: heatmap.utilization_pct,
+              current_occupancy: heatmap.current_occupancy,
+              max_capacity_units: heatmap.max_capacity_units,
+            };
+          }
+          return zone;
+        });
+        setZones(updatedZones.sort((a, b) => a.zone_code.localeCompare(b.zone_code)));
       }
 
       // Batches → cluster cards AND store raw batch data
