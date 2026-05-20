@@ -721,7 +721,6 @@ async def list_incidents(
     status: Optional[str] = None,
     severity: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """List perimeter incidents with optional filters."""
     query = select(PerimeterIncident)

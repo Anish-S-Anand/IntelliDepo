@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, X, Calendar, Package, Layers } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, X, Calendar, Package, Layers, Trash2 } from "lucide-react";
 import { createPortal } from "react-dom";
 
 // ---------------------------------------------------------------------------
@@ -53,6 +54,7 @@ interface ClusterCard {
 
 type FilterType = "all" | "full" | "empty" | "fifo";
 type ViewTab = "clusters" | "batches";
+type SortOrder = "newest" | "oldest";
 
 const CEMENT_COMPANIES = ["UltraTech Cement", "ACC Cement", "JSW Cement", "Ambuja Cement"];
 
@@ -62,7 +64,7 @@ const CEMENT_COMPANIES = ["UltraTech Cement", "ACC Cement", "JSW Cement", "Ambuj
 
 interface AddClusterModalProps {
   onClose: () => void;
-  onAdd: (cluster: ClusterCard) => void;
+  onAdd: (batch: BatchData) => void;
   onRefresh: () => void;
 }
 
@@ -72,7 +74,6 @@ function AddClusterModal({ onClose, onAdd, onRefresh }: AddClusterModalProps) {
     product: CEMENT_COMPANIES[0],
     batch: "",
     quantity: "500",
-    rack: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -96,34 +97,21 @@ function AddClusterModal({ onClose, onAdd, onRefresh }: AddClusterModalProps) {
           sku_code: `SKU-${form.zone}-${Date.now()}`,
           product_name: form.product,
           zone: form.zone,
-          rack: form.rack || `${form.zone}-01`,
-          bin_location: `${form.zone}-01-L1`,
           quantity: parseInt(form.quantity) || 500,
           sequencing_rule: "FIFO",
         }),
       });
 
       if (res.ok) {
-        // Also add to local state immediately for instant feedback
-        const newCluster: ClusterCard = {
-          id: `${form.zone}-${form.batch}`,
-          zone: form.zone,
-          product: form.product,
-          capacity: parseInt(form.quantity) || 500,
-          occupied: parseInt(form.quantity) || 500,
-          batch: form.batch,
-          fifo: true,
-          lastActivity: new Date().toISOString(),
-          rack: form.rack || `${form.zone}-01`,
-        };
-        onAdd(newCluster);
+        const createdBatch: BatchData = await res.json();
+        onAdd(createdBatch);
         onRefresh();
         onClose();
       } else {
         const errData = await res.json().catch(() => ({}));
         setError(errData.detail || `Failed (HTTP ${res.status})`);
       }
-    } catch (err) {
+    } catch {
       setError("Network error — could not reach server");
     } finally {
       setSubmitting(false);
@@ -180,7 +168,7 @@ function AddClusterModal({ onClose, onAdd, onRefresh }: AddClusterModalProps) {
               className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40 placeholder:text-[#4E6090]"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div>
             <div>
               <label className="text-[10px] text-[#4E6090] font-semibold uppercase tracking-wider block mb-1.5">Quantity</label>
               <input
@@ -189,15 +177,6 @@ function AddClusterModal({ onClose, onAdd, onRefresh }: AddClusterModalProps) {
                 value={form.quantity}
                 onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
                 placeholder="500"
-                className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40 placeholder:text-[#4E6090]"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-[#4E6090] font-semibold uppercase tracking-wider block mb-1.5">Rack</label>
-              <input
-                value={form.rack}
-                onChange={(e) => setForm((f) => ({ ...f, rack: e.target.value }))}
-                placeholder="e.g. A-01"
                 className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40 placeholder:text-[#4E6090]"
               />
             </div>
@@ -243,20 +222,28 @@ function displayZoneName(zone: ZoneData): string {
     .trim();
 }
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
-
 function matchesSearch(query: string, values: Array<string | number | null | undefined>): boolean {
   if (!query) return true;
   return values.some((value) => String(value ?? "").toLowerCase().includes(query));
+}
+
+function batchCapacity(batch: BatchData): number {
+  return batch.original_quantity > 0 ? batch.original_quantity : batch.quantity;
+}
+
+function batchOccupied(batch: BatchData): number {
+  return Math.min(batch.quantity, batchCapacity(batch));
+}
+
+function newestBatchesFirst(batches: BatchData[]): BatchData[] {
+  return [...batches].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+function sortBatchesByCreatedAt(batches: BatchData[], sortOrder: SortOrder): BatchData[] {
+  return [...batches].sort((a, b) => {
+    const newestFirst = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    return sortOrder === "newest" ? newestFirst : -newestFirst;
+  });
 }
 
 function isWithinDateRange(value: string | null | undefined, from: string, to: string): boolean {
@@ -282,10 +269,165 @@ function isWithinDateRange(value: string | null | undefined, from: string, to: s
 }
 
 // ---------------------------------------------------------------------------
+// BatchesTable — paginated table with Bootstrap5-style pagination
+// ---------------------------------------------------------------------------
+
+const PAGE_SIZE = 10;
+
+function BatchesTable({
+  batches,
+  batchesFromAPI,
+  onDelete,
+}: {
+  batches: BatchData[];
+  batchesFromAPI: BatchData[];
+  onDelete: (batch: BatchData) => void;
+}) {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(batches.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = batches.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // Reset to page 1 when filter changes
+  useEffect(() => { setPage(1); }, [batches.length]);
+
+  const pageNums: (number | "...")[] = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pageNums.push(i);
+  } else {
+    pageNums.push(1);
+    if (safePage > 3) pageNums.push("...");
+    for (let i = Math.max(2, safePage - 1); i <= Math.min(totalPages - 1, safePage + 1); i++) pageNums.push(i);
+    if (safePage < totalPages - 2) pageNums.push("...");
+    pageNums.push(totalPages);
+  }
+
+  return (
+    <div>
+      {/* Table */}
+      <div className="overflow-x-auto rounded-[12px] border border-[#1E2F50]">
+        <table className="w-full text-[12px]">
+          <thead>
+            <tr className="bg-[#0F1A30] border-b border-[#1E2F50]">
+              {["Batch Code", "Product", "Zone", "Stock / Capacity", "Created", "Status", "Expiry", ""].map((h) => (
+                <th key={h} className="text-left py-3 px-4 text-[10px] font-bold text-[#4E6090] uppercase tracking-wider whitespace-nowrap">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {paginated.map((b, idx) => {
+              const expiryStr = b.expiry_date
+                ? new Date(b.expiry_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                : "—";
+              const createdStr = new Date(b.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+              const isNearExpiry = b.is_near_expiry;
+              const capacity = batchCapacity(b);
+              const occupied = batchOccupied(b);
+              return (
+                <tr key={b.id} className={`border-b border-[#1E2F50]/40 transition-colors ${idx % 2 === 0 ? "bg-[#0A0E1A]" : "bg-[#0D1525]"} hover:bg-[#14203A]`}>
+                  <td className="py-3 px-4 font-bold text-[#E8EDF8] whitespace-nowrap">{b.batch_code}</td>
+                  <td className="py-3 px-4 text-[#8A9BBF]">{b.product_name || b.sku_code}</td>
+                  <td className="py-3 px-4">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#1E2F50] text-[#5B9BF5]">
+                      Zone {b.zone || "—"}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 font-semibold text-[#E8EDF8]">{occupied.toLocaleString()}/{capacity.toLocaleString()}</td>
+                  <td className="py-3 px-4 text-[#8A9BBF] whitespace-nowrap">{createdStr}</td>
+                  <td className="py-3 px-4">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      b.status === "active" ? "bg-[#22D3A1]/15 text-[#22D3A1]" :
+                      b.status === "expired" ? "bg-[#F04A4A]/15 text-[#F04A4A]" :
+                      "bg-[#4E6090]/20 text-[#4E6090]"
+                    }`}>
+                      {b.status.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-[#8A9BBF] whitespace-nowrap">
+                    <span className={isNearExpiry ? "text-[#F04A4A]" : ""}>
+                      {expiryStr}
+                      {isNearExpiry && <span className="ml-1 text-[9px] bg-[#F04A4A]/15 text-[#F04A4A] px-1.5 py-0.5 rounded-full">Near Expiry</span>}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onDelete(b)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#1E2F50] text-[#8A9BBF] transition hover:border-[#F04A4A]/40 hover:bg-[#F04A4A]/10 hover:text-[#F04A4A]"
+                      title={`Delete ${b.batch_code}`}
+                      aria-label={`Delete ${b.batch_code}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {paginated.length === 0 && (
+          <div className="text-center text-[#4E6090] text-[13px] py-16">
+            {batchesFromAPI.length === 0 ? "No batches found. Add a batch to get started." : "No batches match the current filter."}
+          </div>
+        )}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
+          <span className="text-[11px] text-[#4E6090]">
+            Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, batches.length)} of {batches.length} batches
+          </span>
+          <div className="flex items-center gap-1">
+            {/* Prev */}
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+              className="px-3 py-1.5 rounded-lg text-[11px] font-bold border border-[#1E2F50] text-[#8A9BBF] hover:border-[#E5521A]/40 hover:text-[#E5521A] disabled:opacity-30 disabled:cursor-not-allowed transition"
+            >
+              ‹ Prev
+            </button>
+            {/* Page numbers */}
+            {pageNums.map((n, i) =>
+              n === "..." ? (
+                <span key={`ellipsis-${i}`} className="px-2 text-[#4E6090] text-[11px]">…</span>
+              ) : (
+                <button
+                  key={n}
+                  onClick={() => setPage(n as number)}
+                  className={`w-8 h-8 rounded-lg text-[11px] font-bold border transition ${
+                    safePage === n
+                      ? "bg-[#E5521A] border-[#E5521A] text-white"
+                      : "border-[#1E2F50] text-[#8A9BBF] hover:border-[#E5521A]/40 hover:text-[#E5521A]"
+                  }`}
+                >
+                  {n}
+                </button>
+              )
+            )}
+            {/* Next */}
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+              className="px-3 py-1.5 rounded-lg text-[11px] font-bold border border-[#1E2F50] text-[#8A9BBF] hover:border-[#E5521A]/40 hover:text-[#E5521A] disabled:opacity-30 disabled:cursor-not-allowed transition"
+            >
+              Next ›
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export default function InventoryPage() {
+  const router = useRouter();
   const [zones, setZones] = useState<ZoneData[]>([]);
   const [clusters, setClusters] = useState<ClusterCard[]>([]);
   const [batchesFromAPI, setBatchesFromAPI] = useState<BatchData[]>([]);
@@ -296,6 +438,8 @@ export default function InventoryPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const fetchData = useCallback(async () => {
     try {
@@ -312,7 +456,7 @@ export default function InventoryPage() {
 
       // Batches → cluster cards AND store raw batch data
       if (batchesRes.status === "fulfilled" && batchesRes.value.ok) {
-        const bData: BatchData[] = await batchesRes.value.json();
+        const bData: BatchData[] = newestBatchesFirst(await batchesRes.value.json());
         setBatchesFromAPI(bData); // Store raw API data
         const cards: ClusterCard[] = bData
           .filter((b) => b.status === "active")
@@ -320,8 +464,8 @@ export default function InventoryPage() {
             id: b.id,
             zone: b.zone || "—",
             product: b.product_name || b.sku_code,
-            capacity: b.original_quantity > 0 ? b.original_quantity : b.quantity,
-            occupied: b.quantity,
+            capacity: batchCapacity(b),
+            occupied: batchOccupied(b),
             batch: b.batch_code,
             fifo: b.sequencing_rule === "FIFO",
             lastActivity: b.created_at,
@@ -343,18 +487,43 @@ export default function InventoryPage() {
   }, [fetchData]);
 
   const normalizedSearch = search.trim().toLowerCase();
-  const hasActiveFilters = normalizedSearch !== "" || filter !== "all" || dateFrom !== "" || dateTo !== "";
+  const hasActiveFilters = normalizedSearch !== "" || filter !== "all" || dateFrom !== "" || dateTo !== "" || sortOrder !== "newest";
 
   const resetFilters = () => {
     setSearch("");
     setFilter("all");
     setDateFrom("");
     setDateTo("");
+    setSortOrder("newest");
   };
 
-  // Filter zones based on zone-level utilization (not individual cluster occupancy)
+  const deleteBatch = async (batch: BatchData) => {
+    const confirmed = window.confirm(`Delete batch ${batch.batch_code}?`);
+    if (!confirmed) return;
+
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await fetch(`/backend/depot/vision/sequencing/batches/${batch.id}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Failed to delete batch (HTTP ${res.status})`);
+      }
+
+      setBatchesFromAPI((prev) => prev.filter((b) => b.id !== batch.id));
+      setClusters((prev) => prev.filter((c) => c.id !== batch.id));
+      setSuccessMessage(`Batch ${batch.batch_code} deleted`);
+      window.setTimeout(() => setSuccessMessage(""), 3500);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Could not delete batch");
+    }
+  };
+
+  // Filter zones using backend-synchronized capacity totals.
   const displayZones = zones.filter(z => {
-    // Apply filter to zones based on their overall utilization_pct
     if (filter === "full" && z.utilization_pct < 70) return false;
     if (filter === "empty" && z.current_occupancy !== 0) return false;
     // For search, check if any clusters in this zone match
@@ -370,14 +539,16 @@ export default function InventoryPage() {
   });
 
   // Filter batches using real API data
-  const filteredBatches = batchesFromAPI.filter((b) => {
-    const pct = b.original_quantity > 0 ? b.quantity / b.original_quantity : 0;
+  const filteredBatches = sortBatchesByCreatedAt(batchesFromAPI.filter((b) => {
+    const capacity = batchCapacity(b);
+    const occupied = batchOccupied(b);
+    const pct = capacity > 0 ? occupied / capacity : 0;
     if (filter === "full" && pct < 0.70) return false; // Changed to 70% threshold
-    if (filter === "empty" && b.quantity !== 0) return false; // Fixed: empty means quantity = 0
+    if (filter === "empty" && occupied !== 0) return false; // Fixed: empty means occupied = 0
     if (!matchesSearch(normalizedSearch, [b.batch_code, b.product_name, b.sku_code, b.zone, b.rack, b.bin_location, b.status])) return false;
     if (!isWithinDateRange(b.created_at, dateFrom, dateTo)) return false;
     return true;
-  });
+  }), sortOrder);
 
   const filters: { label: string; value: FilterType }[] = [
     { label: "All", value: "all" },
@@ -395,11 +566,35 @@ export default function InventoryPage() {
 
   return (
     <div className="p-5 animate-[fadeIn_0.3s_ease]">
+      {successMessage && (
+        <div className="fixed right-5 top-5 z-[10000] rounded-xl border border-[#22D3A1]/30 bg-[#0F1A30] px-4 py-3 text-[12px] font-bold text-[#22D3A1] shadow-2xl">
+          {successMessage}
+        </div>
+      )}
+
       {/* Add Cluster Modal */}
       {showAddModal && (
         <AddClusterModal
           onClose={() => setShowAddModal(false)}
-          onAdd={(newCluster) => setClusters((prev) => [newCluster, ...prev])}
+          onAdd={(newBatch) => {
+            setBatchesFromAPI((prev) => newestBatchesFirst([newBatch, ...prev]));
+            setClusters((prev) => [
+              {
+                id: newBatch.id,
+                zone: newBatch.zone || "—",
+                product: newBatch.product_name || newBatch.sku_code,
+                capacity: batchCapacity(newBatch),
+                occupied: batchOccupied(newBatch),
+                batch: newBatch.batch_code,
+                fifo: newBatch.sequencing_rule === "FIFO",
+                lastActivity: newBatch.created_at,
+                rack: newBatch.rack || "—",
+              },
+              ...prev,
+            ]);
+            setSuccessMessage(`Batch ${newBatch.batch_code} created`);
+            window.setTimeout(() => setSuccessMessage(""), 3500);
+          }}
           onRefresh={() => { fetchData(); setViewTab("batches"); }}
         />
       )}
@@ -416,16 +611,17 @@ export default function InventoryPage() {
             onClick={() => {
               // Build CSV from zones + batches
               const rows = [
-                ["Zone", "Product", "Batch", "Quantity", "Capacity", "Utilization %", "Status", "Rack", "Expiry Date"],
+                ["Zone", "Product", "Batch", "Occupied", "Capacity", "Utilization %", "Status", "Rack", "Expiry Date"],
                 ...batchesFromAPI.map((b) => {
-                  const zone = zones.find((z) => z.zone_code === b.zone);
+                  const capacity = batchCapacity(b);
+                  const occupied = batchOccupied(b);
                   return [
                     b.zone ?? "",
                     b.product_name ?? b.sku_code,
                     b.batch_code,
-                    b.quantity,
-                    zone?.max_capacity_units ?? "",
-                    zone ? zone.utilization_pct.toFixed(1) + "%" : "",
+                    occupied,
+                    capacity,
+                    capacity > 0 ? ((occupied / capacity) * 100).toFixed(1) + "%" : "",
                     b.status,
                     b.rack ?? "",
                     b.expiry_date ?? "",
@@ -450,14 +646,15 @@ export default function InventoryPage() {
             onClick={() => {
               const now = new Date().toLocaleString();
               const rows = batchesFromAPI.map((b) => {
-                const zone = zones.find((z) => z.zone_code === b.zone);
+                const capacity = batchCapacity(b);
+                const occupied = batchOccupied(b);
                 return `<tr>
                   <td>${b.zone ?? ""}</td>
                   <td>${b.product_name ?? b.sku_code}</td>
                   <td>${b.batch_code}</td>
-                  <td>${b.quantity}</td>
-                  <td>${zone?.max_capacity_units ?? ""}</td>
-                  <td>${zone ? zone.utilization_pct.toFixed(1) + "%" : ""}</td>
+                  <td>${occupied}</td>
+                  <td>${capacity}</td>
+                  <td>${capacity > 0 ? ((occupied / capacity) * 100).toFixed(1) + "%" : ""}</td>
                   <td>${b.status}</td>
                   <td>${b.rack ?? ""}</td>
                   <td>${b.expiry_date ?? ""}</td>
@@ -515,7 +712,8 @@ export default function InventoryPage() {
           return (
             <div
               key={z.id}
-              className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 text-center relative overflow-hidden transition-all hover:border-[#E5521A]/30 hover:shadow-[0_6px_24px_rgba(229,82,26,0.08)]"
+              onClick={() => router.push(`/depot/heatmap?zone=${z.zone_code}`)}
+              className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 text-center relative overflow-hidden transition-all hover:border-[#E5521A]/30 hover:shadow-[0_6px_24px_rgba(229,82,26,0.08)] cursor-pointer"
             >
               <div
                 className="absolute top-0 left-0 right-0 h-[3px]"
@@ -568,56 +766,101 @@ export default function InventoryPage() {
       </div>
 
       {/* ── Search + Filters + Date Range ── */}
-      <div className="flex gap-1.5 mb-4 flex-wrap items-center">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search product, zone, batch…"
-          className="flex-1 min-w-[180px] px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-[9px] text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40 placeholder:text-[#4E6090]"
-        />
-        {/* Date range */}
-        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-[#0F1A30] border border-[#1E2F50] rounded-[9px]">
-          <Calendar className="w-3.5 h-3.5 text-[#4E6090]" />
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            max={dateTo || undefined}
-            className="bg-transparent text-[#E8EDF8] text-[11px] outline-none w-[110px]"
-            title="From date"
-          />
-          <span className="text-[#4E6090] text-[11px]">-</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            min={dateFrom || undefined}
-            className="bg-transparent text-[#E8EDF8] text-[11px] outline-none w-[110px]"
-            title="To date"
-          />
+      <div className="bg-[#0F1A30] border border-[#1E2F50] rounded-[14px] p-3 mb-4">
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Search */}
+          <div className="flex items-center gap-2 flex-1 min-w-[200px] px-3 py-2 bg-[#14203A] border border-[#1E2F50] rounded-[10px] focus-within:border-[#E5521A]/40">
+            <svg className="w-3.5 h-3.5 text-[#4E6090] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search product, zone, batch…"
+              className="flex-1 bg-transparent text-[#E8EDF8] text-[12px] outline-none placeholder:text-[#4E6090]"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="text-[#4E6090] hover:text-[#E8EDF8]">
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Date range */}
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-[#14203A] border border-[#1E2F50] rounded-[10px] focus-within:border-[#E5521A]/40">
+            <Calendar className="w-3.5 h-3.5 text-[#4E6090] shrink-0" />
+            <span className="text-[10px] text-[#4E6090] font-semibold uppercase tracking-wide">From</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              max={dateTo || undefined}
+              className="bg-transparent text-[#E8EDF8] text-[11px] outline-none w-[120px]"
+            />
+            <span className="text-[#1E2F50]">|</span>
+            <span className="text-[10px] text-[#4E6090] font-semibold uppercase tracking-wide">To</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              min={dateFrom || undefined}
+              className="bg-transparent text-[#E8EDF8] text-[11px] outline-none w-[120px]"
+            />
+            {(dateFrom || dateTo) && (
+              <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="text-[#4E6090] hover:text-[#E8EDF8] ml-1">
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Status filters */}
+          <div className="flex items-center gap-1 bg-[#14203A] border border-[#1E2F50] rounded-[10px] p-1">
+            {filters.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => setFilter(f.value)}
+                className={`px-3 py-1.5 rounded-[8px] text-[11px] font-bold transition-all ${
+                  filter === f.value
+                    ? "bg-[#E5521A] text-white shadow-sm"
+                    : "text-[#8A9BBF] hover:text-[#E8EDF8] hover:bg-[#1E2F50]"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort */}
+          <label className="flex items-center gap-2 px-3 py-2 bg-[#14203A] border border-[#1E2F50] rounded-[10px]">
+            <span className="text-[10px] text-[#4E6090] font-semibold uppercase tracking-wide">Sort</span>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+              className="bg-transparent text-[#E8EDF8] text-[11px] font-semibold outline-none"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+          </label>
+
+          {/* Clear all */}
+          {hasActiveFilters && (
+            <button
+              onClick={resetFilters}
+              className="px-3 py-2 rounded-[10px] border border-[#E5521A]/30 text-[#E5521A] text-[11px] font-bold hover:bg-[#E5521A]/10 transition"
+            >
+              Clear All
+            </button>
+          )}
         </div>
-        {filters.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setFilter(f.value)}
-            className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${
-              filter === f.value
-                ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
-                : "border-[#1E2F50] text-[#8A9BBF] hover:border-[#2A3F68] hover:text-[#E8EDF8]"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+
+        {/* Active filter summary */}
         {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="px-2.5 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-semibold hover:border-[#E5521A]/50 hover:text-[#E8EDF8] transition-colors"
-          >
-            Clear
-          </button>
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#1E2F50]">
+            <span className="text-[10px] text-[#4E6090]">Active filters:</span>
+            {search && <span className="text-[10px] bg-[#E5521A]/10 text-[#E5521A] px-2 py-0.5 rounded-full border border-[#E5521A]/20">Search: &quot;{search}&quot;</span>}
+            {filter !== "all" && <span className="text-[10px] bg-[#5B9BF5]/10 text-[#5B9BF5] px-2 py-0.5 rounded-full border border-[#5B9BF5]/20">{filter === "full" ? "Near Full" : "Empty"}</span>}
+            {(dateFrom || dateTo) && <span className="text-[10px] bg-[#22D3A1]/10 text-[#22D3A1] px-2 py-0.5 rounded-full border border-[#22D3A1]/20">{dateFrom || "…"} → {dateTo || "…"}</span>}
+          </div>
         )}
       </div>
 
@@ -638,7 +881,8 @@ export default function InventoryPage() {
                 return (
                   <div
                     key={z.id}
-                    className="bg-[#14203A] border rounded-[14px] p-[15px] transition-all hover:border-[#2A3F68] hover:-translate-y-px"
+                    onClick={() => router.push(`/depot/heatmap?zone=${z.zone_code}`)}
+                    className="bg-[#14203A] border rounded-[14px] p-[15px] transition-all hover:border-[#E5521A]/40 hover:-translate-y-px cursor-pointer"
                     style={{ borderColor: "#1E2F50" }}
                   >
                     <div className="flex justify-between mb-2.5">
@@ -654,6 +898,7 @@ export default function InventoryPage() {
                         >
                           {pct}%
                         </span>
+                        <span className="text-[9px] text-[#4E6090] mt-0.5">View map →</span>
                       </div>
                     </div>
                     <div className="w-full h-1 bg-[#1E2F50] rounded-full overflow-hidden">
@@ -679,50 +924,7 @@ export default function InventoryPage() {
 
       {/* ── Batches View ── */}
       {viewTab === "batches" && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-[12px]">
-            <thead>
-              <tr className="border-b border-[#1E2F50]">
-                {["Batch Code", "Product", "Zone", "Qty", "Expiry", "Status", "Created"].map((h) => (
-                  <th key={h} className="text-left py-2.5 px-3 text-[10px] font-bold text-[#4E6090] uppercase tracking-wider">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredBatches.map((b) => {
-                // Format expiry date from API
-                const expiryStr = b.expiry_date 
-                  ? new Date(b.expiry_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-                  : '—';
-                
-                return (
-                  <tr key={b.id} className="border-b border-[#1E2F50]/50 hover:bg-[#14203A] transition-colors">
-                    <td className="py-2.5 px-3 font-bold text-[#E8EDF8]">{b.batch_code}</td>
-                    <td className="py-2.5 px-3 text-[#8A9BBF]">{b.product_name || b.sku_code}</td>
-                    <td className="py-2.5 px-3 text-[#8A9BBF]">{b.zone || "—"}</td>
-                    <td className="py-2.5 px-3 font-semibold text-[#E8EDF8]">{b.quantity.toLocaleString()}</td>
-                    <td className="py-2.5 px-3 text-[#8A9BBF]">{expiryStr}</td>
-                    <td className="py-2.5 px-3">
-                      <span className="text-[10px] font-semibold text-[#E8EDF8]">
-                        {b.quantity.toLocaleString()}/{b.original_quantity.toLocaleString()} bags
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-[#4E6090]">{timeAgo(b.created_at)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {filteredBatches.length === 0 && (
-            <div className="text-center text-[#4E6090] text-[13px] py-16">
-              {batchesFromAPI.length === 0
-                ? "No batches found. Add zones to see batch data."
-                : "No batches match the current filter."}
-            </div>
-          )}
-        </div>
+        <BatchesTable batches={filteredBatches} batchesFromAPI={batchesFromAPI} onDelete={deleteBatch} />
       )}
     </div>
   );

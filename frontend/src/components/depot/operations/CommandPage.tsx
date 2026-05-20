@@ -1,14 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Activity, AlertTriangle, Camera, Shield, Truck, BellRing, DoorOpen, DoorClosed, Lock, Phone } from "lucide-react";
-import { SEV_COL } from "@/lib/depot-data";
+import { Activity, AlertTriangle, Camera, Shield, BellRing, DoorOpen, DoorClosed, Phone } from "lucide-react";
 import { getActiveIncidents, type IncidentResponse } from "@/services/depotPerimeter";
 import {
   getDepotCommandSnapshot,
   openCommandGate,
   closeCommandGate,
-  lockCommandZone,
   triggerCommandAlert,
   contactCommandOperator,
   type CameraRecord,
@@ -106,7 +104,7 @@ export default function CommandPage() {
             </span>
           )}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             {
               key: "open-gate",
@@ -125,15 +123,6 @@ export default function CommandPage() {
               color: "#F5A623",
               fn: () => closeCommandGate(gates.find((g) => g.status === "open")?.id),
               successMsg: `${gates.find((g) => g.status === "open")?.name ?? "Gate"} closed`,
-            },
-            {
-              key: "lock-zone",
-              icon: Lock,
-              label: "Lock Zone",
-              sub: "Initiate lockdown",
-              color: "#F04A4A",
-              fn: () => lockCommandZone(openIncidents[0]?.zone ?? "Depot perimeter"),
-              successMsg: "Zone lockdown initiated",
             },
             {
               key: "trigger-alert",
@@ -161,18 +150,18 @@ export default function CommandPage() {
                 key={action.key}
                 onClick={() => runAction(action.key, action.fn, action.successMsg)}
                 disabled={!!actionLoading}
-                className="flex flex-col items-center gap-2 p-4 rounded-[12px] border border-[#1E2F50] bg-[#0F1A30] hover:bg-[#1A2A45] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex min-h-[112px] flex-col items-center justify-center gap-2.5 rounded-[12px] border-2 border-[#33476C] bg-[#101D34] px-4 py-5 shadow-[0_8px_22px_rgba(2,8,23,0.18)] transition-all hover:border-[#4A628E] hover:bg-[#1A2A45] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${action.color}15`, border: `1px solid ${action.color}30` }}>
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: `${action.color}20`, border: `1.5px solid ${action.color}55` }}>
                   {isLoading ? (
                     <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: action.color, borderTopColor: "transparent" }} />
                   ) : (
-                    <Icon className="w-4 h-4" style={{ color: action.color }} />
+                    <Icon className="h-5 w-5 stroke-[2.75]" style={{ color: action.color }} />
                   )}
                 </div>
                 <div className="text-center">
-                  <div className="text-[11px] font-bold" style={{ color: action.color }}>{action.label}</div>
-                  <div className="text-[9px] text-[#4E6090] mt-0.5">{action.sub}</div>
+                  <div className="text-[12px] font-extrabold" style={{ color: action.color }}>{action.label}</div>
+                  <div className="mt-1 text-[10px] font-bold text-[#8B9BC1]">{action.sub}</div>
                 </div>
               </button>
             );

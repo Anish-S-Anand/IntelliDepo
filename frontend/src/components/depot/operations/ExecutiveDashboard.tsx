@@ -28,18 +28,23 @@ import {
 // ─── Throughput data ────────────────────────────────────────────────────────
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const WEEKLY = [
-  { enter: 12400, exit: 11800 },
-  { enter: 14150, exit: 13600 },
-  { enter: 10300, exit:  9800 },
-  { enter: 14800, exit: 14200 },
-  { enter: 16200, exit: 15400 }, // Friday — peak
-  { enter: 13100, exit: 12500 },
-  { enter:  8600, exit:  8100 },
+  { enter: 320, exit: 290 },
+  { enter: 380, exit: 350 },
+  { enter: 290, exit: 265 },
+  { enter: 410, exit: 385 },
+  { enter: 450, exit: 420 }, // Friday — peak
+  { enter: 360, exit: 330 },
+  { enter: 240, exit: 215 },
 ];
 const WEEKLY_TOTALS = WEEKLY.reduce(
   (a, d) => ({ enter: a.enter + d.enter, exit: a.exit + d.exit }),
   { enter: 0, exit: 0 }
 );
+
+function zoneDisplayName(zone: ZoneResponse) {
+  const code = zone.zone_code?.trim();
+  return code ? `Zone ${code}` : "Zone";
+}
 
 // ─── 6 Cameras — replaced by live backend data ──────────────────────────────
 // (CAMERAS constant removed — now fetched from API)
@@ -174,7 +179,7 @@ function statusBg(s: Status): { bg: string; text: string; border: string; label:
   return                         { bg: "rgba(91,155,245,0.10)",  text: "var(--color-info)",    border: "rgba(91,155,245,0.25)",  label: "👁 Watching" };
 }
 function fmtK(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+  return String(n);
 }
 function relativeTime(value: string): string {
   const diffMs = Date.now() - new Date(value).getTime();
@@ -304,7 +309,7 @@ export default function ExecutiveDashboard() {
       }).catch(() => {});
       getZones().then((z) => { if (z.length > 0) setZones(z); }).catch(() => {});
       getIncidents()
-        .then((items) => setBackendIncidents(dedupeIncidentResponses(items.filter(hasSupportedIncidentVideo))))
+        .then((items) => setBackendIncidents(dedupeIncidentResponses(items)))
         .catch(() => {});
     };
 
@@ -327,7 +332,7 @@ export default function ExecutiveDashboard() {
   const ZONES = zones.length > 0
     ? zones.map((z) => ({
         id: z.id,
-        name: z.name,
+        name: zoneDisplayName(z),
         pct: Math.round(z.utilization_pct),
         used: z.current_occupancy,
         total: z.max_capacity_units,
@@ -397,13 +402,12 @@ export default function ExecutiveDashboard() {
       </div>
 
       {/* ── KPI Strip ──────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3 mb-5">
-        
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-5">
         <KpiCard label="Alerts Right Now" value={String(critCount + offlineCams + atRiskZones)}
                                                                 sub={`${critCount} urgent · ${offlineCams} camera offline`} color={(critCount + offlineCams) > 0 ? "var(--color-warning)" : "var(--color-success)"} icon={AlertTriangle} cardStyle={cardStyle} />
-        <KpiCard label="Problems to Fix" value={String(openCount)} sub={`${critCount} urgent right now`} color={openCount > 0 ? "var(--color-danger)" : "var(--color-success)"} icon={ShieldAlert}  cardStyle={cardStyle} />
+        <KpiCard label="Problems to Fix" value={String(openCount)} sub={openCount > 0 ? `${openCount} open incident${openCount !== 1 ? "s" : ""}` : "All clear"} color={openCount > 0 ? "var(--color-danger)" : "var(--color-success)"} icon={ShieldAlert} cardStyle={cardStyle} />
         <KpiCard label="Storage Used"   value={`${avgOccupancy}%`} sub={`${atRiskZones} zones almost full`} color={avgOccupancy > 90 ? "var(--color-danger)" : avgOccupancy > 80 ? "var(--color-warning)" : "var(--color-success)"} icon={Package} cardStyle={cardStyle} />
-        <KpiCard label="Fixed Today"    value="4"               sub="Problems resolved"                color="var(--color-success)" icon={CheckCircle2} cardStyle={cardStyle} />
+        <KpiCard label="Fixed"          value={String(INCIDENTS.filter(i => i.status !== "open" && i.status !== "escalated").length)} sub="Incidents resolved" color="var(--color-success)" icon={CheckCircle2} cardStyle={cardStyle} />
       </div>
 
       <div className="h-px mb-5" style={{ background: "linear-gradient(90deg, transparent, rgba(229,82,26,0.35), transparent)" }} />
@@ -466,44 +470,44 @@ export default function ExecutiveDashboard() {
 
         {/* Grouped bars */}
         <div className="w-full overflow-x-auto">
-          <div className="flex items-end gap-1.5 sm:gap-2.5" style={{ minWidth: 300, minHeight: CHART_H + 52 }}>
+          <div className="flex items-end gap-3 sm:gap-5" style={{ minWidth: 300, minHeight: CHART_H + 52 }}>
             {WEEKLY.map((day, i) => {
-              const eH   = Math.max(6, Math.round((day.enter / MAX_BAR) * CHART_H));
-              const xH   = Math.max(6, Math.round((day.exit  / MAX_BAR) * CHART_H));
+              const eH   = Math.max(8, Math.round((day.enter / MAX_BAR) * CHART_H));
+              const xH   = Math.max(8, Math.round((day.exit  / MAX_BAR) * CHART_H));
               const peak = i === 4;
               return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1" style={{ minWidth: 32 }}>
-                  <div className="flex items-end gap-[3px]" style={{ height: CHART_H }}>
+                <div key={i} className="flex-1 flex flex-col items-center gap-1" style={{ minWidth: 40 }}>
+                  <div className="flex items-end gap-[5px]" style={{ height: CHART_H }}>
                     {/* In bar */}
-                    <div className="flex flex-col items-center justify-end gap-[2px]" style={{ height: CHART_H }}>
-                      <span className="text-[9px] font-bold" style={{ color: peak ? "#E5521A" : "var(--text-muted)" }}>
-                        {fmtK(day.enter)}
+                    <div className="flex flex-col items-center justify-end gap-[3px]" style={{ height: CHART_H }}>
+                      <span className="text-[10px] font-bold" style={{ color: peak ? "#E5521A" : "var(--text-muted)" }}>
+                        {day.enter}
                       </span>
                       <div style={{
-                        width: "clamp(9px,1.8vw,17px)", height: eH,
-                        borderRadius: "3px 3px 0 0",
+                        width: "clamp(16px,2.4vw,28px)", height: eH,
+                        borderRadius: "4px 4px 0 0",
                         background: peak
-                          ? "linear-gradient(to bottom,#FF7A42,rgba(255,122,66,0.45))"
-                          : "linear-gradient(to bottom,rgba(229,82,26,0.92),rgba(229,82,26,0.32))",
-                        filter: peak ? "drop-shadow(0 0 5px rgba(229,82,26,0.5))" : undefined,
+                          ? "linear-gradient(to bottom,#FF7A42,rgba(255,122,66,0.55))"
+                          : "linear-gradient(to bottom,rgba(229,82,26,0.92),rgba(229,82,26,0.38))",
+                        filter: peak ? "drop-shadow(0 0 6px rgba(229,82,26,0.55))" : undefined,
                       }} />
                     </div>
                     {/* Out bar */}
-                    <div className="flex flex-col items-center justify-end gap-[2px]" style={{ height: CHART_H }}>
-                      <span className="text-[9px] font-bold" style={{ color: peak ? "var(--color-info)" : "var(--text-faint)" }}>
-                        {fmtK(day.exit)}
+                    <div className="flex flex-col items-center justify-end gap-[3px]" style={{ height: CHART_H }}>
+                      <span className="text-[10px] font-bold" style={{ color: peak ? "var(--color-info)" : "var(--text-faint)" }}>
+                        {day.exit}
                       </span>
                       <div style={{
-                        width: "clamp(9px,1.8vw,17px)", height: xH,
-                        borderRadius: "3px 3px 0 0",
+                        width: "clamp(16px,2.4vw,28px)", height: xH,
+                        borderRadius: "4px 4px 0 0",
                         background: peak
-                          ? "linear-gradient(to bottom,rgba(91,155,245,1),rgba(91,155,245,0.4))"
-                          : "linear-gradient(to bottom,rgba(91,155,245,0.8),rgba(91,155,245,0.22))",
+                          ? "linear-gradient(to bottom,rgba(91,155,245,1),rgba(91,155,245,0.5))"
+                          : "linear-gradient(to bottom,rgba(91,155,245,0.85),rgba(91,155,245,0.28))",
                       }} />
                     </div>
                   </div>
-                  <span className="text-[9px] sm:text-[10px]"
-                    style={{ color: peak ? "#E5521A" : "var(--text-faint)", fontWeight: peak ? 900 : 400 }}>
+                  <span className="text-[10px] sm:text-[11px]"
+                    style={{ color: peak ? "#E5521A" : "var(--text-faint)", fontWeight: peak ? 900 : 600 }}>
                     {DAYS[i]}
                   </span>
                 </div>
@@ -521,7 +525,7 @@ export default function ExecutiveDashboard() {
             <div>
               <div className="text-[9px] font-black uppercase" style={{ color: "var(--text-faint)" }}>Total Bags In</div>
               <div className="text-[14px] sm:text-[15px] font-extrabold" style={{ color: "#E5521A" }}>
-                {(WEEKLY_TOTALS.enter / 1000).toFixed(1)}k this week
+                {WEEKLY_TOTALS.enter} this week
               </div>
             </div>
           </div>
@@ -531,7 +535,7 @@ export default function ExecutiveDashboard() {
             <div>
               <div className="text-[9px] font-black uppercase" style={{ color: "var(--text-faint)" }}>Total Bags Out</div>
               <div className="text-[14px] sm:text-[15px] font-extrabold" style={{ color: "var(--color-info)" }}>
-                {(WEEKLY_TOTALS.exit / 1000).toFixed(1)}k this week
+                {WEEKLY_TOTALS.exit} this week
               </div>
             </div>
           </div>

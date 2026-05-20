@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Date, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.database import BaseModel as DBBaseModel, get_db
 from app.core.auth.dependencies import get_current_user
@@ -200,6 +200,55 @@ class GeneratePickRequest(BaseModel):
 # Batch Endpoints
 # ---------------------------------------------------------------------------
 
+def _normalize_zone_code(value: Optional[str]) -> str:
+    return (value or "").strip().removeprefix("Zone ").removeprefix("zone ").upper()
+
+
+def _zone_status(utilization_pct: float) -> str:
+    if utilization_pct >= 95:
+        return "critical"
+    if utilization_pct >= 80:
+        return "warning"
+    return "normal"
+
+
+async def sync_zone_capacity_from_batches(db: AsyncSession, zone_code: Optional[str]) -> None:
+    """Persist zone totals from active batches so every screen reads the same values."""
+    normalized_zone = _normalize_zone_code(zone_code)
+    if not normalized_zone:
+        return
+
+    from app.depot.vision.cluster import DepotZone
+
+    zone_result = await db.execute(
+        select(DepotZone).where(
+            DepotZone.zone_code == normalized_zone,
+            DepotZone.is_active == True,
+        )
+    )
+    zone = zone_result.scalar_one_or_none()
+    if not zone:
+        return
+
+    totals_result = await db.execute(
+        select(
+            func.coalesce(func.sum(InventoryBatch.quantity), 0),
+            func.coalesce(func.sum(InventoryBatch.original_quantity), 0),
+        ).where(
+            InventoryBatch.status == BatchStatus.ACTIVE,
+            func.upper(InventoryBatch.zone) == normalized_zone,
+        )
+    )
+    occupied, capacity = totals_result.one()
+    occupied = int(occupied or 0)
+    capacity = int(capacity or 0)
+
+    zone.current_occupancy = occupied
+    zone.max_capacity_units = capacity
+    zone.utilization_pct = round((occupied / capacity) * 100, 1) if capacity > 0 else 0.0
+    zone.status = _zone_status(zone.utilization_pct)
+
+
 def add_months(value: date, months: int) -> date:
     month = value.month - 1 + months
     year = value.year + month // 12
@@ -220,12 +269,14 @@ async def create_batch(
         raise HTTPException(status_code=409, detail="Batch code already exists")
 
     data = payload.model_dump()
+    data["zone"] = _normalize_zone_code(data.get("zone"))
     manufacture_date = data.get("manufacture_date") or date.today()
     data["manufacture_date"] = manufacture_date
     data["expiry_date"] = data.get("expiry_date") or add_months(manufacture_date, 6)
 
+    capacity = payload.quantity
     batch = InventoryBatch(**data)
-    batch.original_quantity = payload.quantity
+    batch.original_quantity = capacity
 
     # Compute expiry metadata
     if batch.expiry_date:
@@ -247,6 +298,8 @@ async def create_batch(
 
     db.add(batch)
     await db.commit()
+    await sync_zone_capacity_from_batches(db, batch.zone)
+    await db.commit()
     await db.refresh(batch)
     logger.info(f"Batch created: {batch.batch_code}, rule={batch.sequencing_rule}")
     return batch
@@ -266,8 +319,25 @@ async def list_batches(
         query = query.where(InventoryBatch.zone == zone)
     if status:
         query = query.where(InventoryBatch.status == status)
-    result = await db.execute(query.order_by(InventoryBatch.expiry_date.asc()))
+    result = await db.execute(query.order_by(InventoryBatch.created_at.desc()))
     return result.scalars().all()
+
+
+@router.delete("/batches/{batch_id}")
+async def delete_batch(
+    batch_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    batch = await db.get(InventoryBatch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    zone_code = batch.zone
+    await db.delete(batch)
+    await db.commit()
+    await sync_zone_capacity_from_batches(db, zone_code)
+    await db.commit()
+    return {"deleted": True, "batch_id": str(batch_id)}
 
 
 @router.get("/batches/near-expiry", response_model=list[BatchResponse])

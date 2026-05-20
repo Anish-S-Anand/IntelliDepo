@@ -123,26 +123,26 @@ DETECTION_MODEL = {
 }
 
 BATCHES = [
-    # Zone A batches (should total 810 bags to match CLUSTER_ZONES occupancy)
-    {"sku_id": "SKU-CEM-01", "product_name": "UltraTech Cement", "batch_number": "B2026-1022", "quantity": 490, "zone": "A", "rack": "A-01", "bin_location": "A-01-L1", "manufacturing_date": date(2026, 1, 15), "expiry_date": date(2026, 4, 15), "rule_type": "FIFO"},
-    {"sku_id": "SKU-CEM-02", "product_name": "ACC Cement", "batch_number": "B2026-1019", "quantity": 320, "zone": "A", "rack": "A-02", "bin_location": "A-02-L1", "manufacturing_date": date(2026, 2, 1), "expiry_date": date(2026, 5, 1), "rule_type": "FIFO"},
-    # Zone B batches (should total 450 bags to match CLUSTER_ZONES occupancy)
-    {"sku_id": "SKU-CEM-03", "product_name": "ACC Cement", "batch_number": "B2026-1021", "quantity": 450, "zone": "B", "rack": "B-02", "bin_location": "B-02-L2", "manufacturing_date": date(2026, 1, 10), "expiry_date": date(2026, 4, 10), "rule_type": "FEFO"},
-    # Zone C batches (should total 595 bags to match CLUSTER_ZONES occupancy)
-    {"sku_id": "SKU-CEM-04", "product_name": "JSW Cement", "batch_number": "B2026-1018", "quantity": 595, "zone": "C", "rack": "C-01", "bin_location": "C-01-L1", "manufacturing_date": date(2026, 1, 5), "expiry_date": date(2026, 4, 5), "rule_type": "FEFO"},
-    # Zone D batches (should total 910 bags to match CLUSTER_ZONES occupancy)
-    {"sku_id": "SKU-CEM-05", "product_name": "Ambuja Cement", "batch_number": "B2026-1023", "quantity": 910, "zone": "D", "rack": "D-01", "bin_location": "D-01-L1", "manufacturing_date": date(2026, 3, 1), "expiry_date": date(2026, 6, 1), "rule_type": "FIFO"},
+    # Zone A batches: mixed full, partial, and empty stock levels.
+    {"sku_id": "SKU-CEM-01", "product_name": "UltraTech Cement", "batch_number": "B2026-1022", "quantity": 490, "capacity": 500, "zone": "A", "rack": "A-01", "bin_location": "A-01-L1", "manufacturing_date": date(2026, 1, 15), "expiry_date": date(2026, 4, 15), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-02", "product_name": "ACC Cement", "batch_number": "B2026-1019", "quantity": 160, "capacity": 320, "zone": "A", "rack": "A-02", "bin_location": "A-02-L1", "manufacturing_date": date(2026, 2, 1), "expiry_date": date(2026, 5, 1), "rule_type": "FIFO"},
+    # Zone B batches.
+    {"sku_id": "SKU-CEM-03", "product_name": "ACC Cement", "batch_number": "B2026-1021", "quantity": 450, "capacity": 450, "zone": "B", "rack": "B-02", "bin_location": "B-02-L2", "manufacturing_date": date(2026, 1, 10), "expiry_date": date(2026, 4, 10), "rule_type": "FEFO"},
+    # Zone C batches.
+    {"sku_id": "SKU-CEM-04", "product_name": "JSW Cement", "batch_number": "B2026-1018", "quantity": 300, "capacity": 600, "zone": "C", "rack": "C-01", "bin_location": "C-01-L1", "manufacturing_date": date(2026, 1, 5), "expiry_date": date(2026, 4, 5), "rule_type": "FEFO"},
+    # Zone D batches.
+    {"sku_id": "SKU-CEM-05", "product_name": "Ambuja Cement", "batch_number": "B2026-1023", "quantity": 910, "capacity": 1000, "zone": "D", "rack": "D-01", "bin_location": "D-01-L1", "manufacturing_date": date(2026, 3, 1), "expiry_date": date(2026, 6, 1), "rule_type": "FIFO"},
     # Additional batches for more data
-    {"sku_id": "SKU-CEM-06", "product_name": "UltraTech Cement", "batch_number": "B2026-1024", "quantity": 250, "zone": "A", "rack": "A-03", "bin_location": "A-03-L1", "manufacturing_date": date(2026, 1, 20), "expiry_date": date(2026, 4, 20), "rule_type": "FIFO"},
-    {"sku_id": "SKU-CEM-07", "product_name": "ACC Cement", "batch_number": "B2026-1025", "quantity": 180, "zone": "B", "rack": "B-03", "bin_location": "B-03-L1", "manufacturing_date": date(2026, 1, 8), "expiry_date": date(2026, 4, 8), "rule_type": "FEFO"},
-    {"sku_id": "SKU-CEM-08", "product_name": "JSW Cement", "batch_number": "B2026-1026", "quantity": 420, "zone": "C", "rack": "C-02", "bin_location": "C-02-L1", "manufacturing_date": date(2026, 1, 3), "expiry_date": date(2026, 4, 3), "rule_type": "FIFO"},
-    {"sku_id": "SKU-CEM-09", "product_name": "Ambuja Cement", "batch_number": "B2026-1027", "quantity": 350, "zone": "D", "rack": "D-02", "bin_location": "D-02-L1", "manufacturing_date": date(2026, 2, 15), "expiry_date": date(2026, 5, 15), "rule_type": "FIFO"},
-    {"sku_id": "SKU-CEM-10", "product_name": "UltraTech Cement", "batch_number": "B2026-1028", "quantity": 290, "zone": "A", "rack": "A-04", "bin_location": "A-04-L1", "manufacturing_date": date(2026, 1, 5), "expiry_date": date(2026, 4, 5), "rule_type": "FIFO"},
-    {"sku_id": "SKU-CEM-11", "product_name": "ACC Cement", "batch_number": "B2026-1029", "quantity": 220, "zone": "B", "rack": "B-04", "bin_location": "B-04-L1", "manufacturing_date": date(2026, 1, 12), "expiry_date": date(2026, 4, 12), "rule_type": "FEFO"},
-    {"sku_id": "SKU-CEM-12", "product_name": "JSW Cement", "batch_number": "B2026-1030", "quantity": 380, "zone": "C", "rack": "C-03", "bin_location": "C-03-L1", "manufacturing_date": date(2026, 1, 7), "expiry_date": date(2026, 4, 7), "rule_type": "FEFO"},
-    {"sku_id": "SKU-CEM-13", "product_name": "Ambuja Cement", "batch_number": "B2026-1031", "quantity": 460, "zone": "D", "rack": "D-03", "bin_location": "D-03-L1", "manufacturing_date": date(2026, 3, 10), "expiry_date": date(2026, 6, 10), "rule_type": "FIFO"},
-    {"sku_id": "SKU-CEM-14", "product_name": "UltraTech Cement", "batch_number": "B2026-1032", "quantity": 310, "zone": "A", "rack": "A-05", "bin_location": "A-05-L1", "manufacturing_date": date(2026, 1, 25), "expiry_date": date(2026, 4, 25), "rule_type": "FIFO"},
-    {"sku_id": "SKU-CEM-15", "product_name": "ACC Cement", "batch_number": "B2026-1033", "quantity": 270, "zone": "B", "rack": "B-05", "bin_location": "B-05-L1", "manufacturing_date": date(2026, 1, 9), "expiry_date": date(2026, 4, 9), "rule_type": "FEFO"},
+    {"sku_id": "SKU-CEM-06", "product_name": "UltraTech Cement", "batch_number": "B2026-1024", "quantity": 0, "capacity": 250, "zone": "A", "rack": "A-03", "bin_location": "A-03-L1", "manufacturing_date": date(2026, 1, 20), "expiry_date": date(2026, 4, 20), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-07", "product_name": "ACC Cement", "batch_number": "B2026-1025", "quantity": 90, "capacity": 180, "zone": "B", "rack": "B-03", "bin_location": "B-03-L1", "manufacturing_date": date(2026, 1, 8), "expiry_date": date(2026, 4, 8), "rule_type": "FEFO"},
+    {"sku_id": "SKU-CEM-08", "product_name": "JSW Cement", "batch_number": "B2026-1026", "quantity": 420, "capacity": 420, "zone": "C", "rack": "C-02", "bin_location": "C-02-L1", "manufacturing_date": date(2026, 1, 3), "expiry_date": date(2026, 4, 3), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-09", "product_name": "Ambuja Cement", "batch_number": "B2026-1027", "quantity": 175, "capacity": 350, "zone": "D", "rack": "D-02", "bin_location": "D-02-L1", "manufacturing_date": date(2026, 2, 15), "expiry_date": date(2026, 5, 15), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-10", "product_name": "UltraTech Cement", "batch_number": "B2026-1028", "quantity": 145, "capacity": 290, "zone": "A", "rack": "A-04", "bin_location": "A-04-L1", "manufacturing_date": date(2026, 1, 5), "expiry_date": date(2026, 4, 5), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-11", "product_name": "ACC Cement", "batch_number": "B2026-1029", "quantity": 220, "capacity": 220, "zone": "B", "rack": "B-04", "bin_location": "B-04-L1", "manufacturing_date": date(2026, 1, 12), "expiry_date": date(2026, 4, 12), "rule_type": "FEFO"},
+    {"sku_id": "SKU-CEM-12", "product_name": "JSW Cement", "batch_number": "B2026-1030", "quantity": 190, "capacity": 380, "zone": "C", "rack": "C-03", "bin_location": "C-03-L1", "manufacturing_date": date(2026, 1, 7), "expiry_date": date(2026, 4, 7), "rule_type": "FEFO"},
+    {"sku_id": "SKU-CEM-13", "product_name": "Ambuja Cement", "batch_number": "B2026-1031", "quantity": 460, "capacity": 460, "zone": "D", "rack": "D-03", "bin_location": "D-03-L1", "manufacturing_date": date(2026, 3, 10), "expiry_date": date(2026, 6, 10), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-14", "product_name": "UltraTech Cement", "batch_number": "B2026-1032", "quantity": 0, "capacity": 310, "zone": "A", "rack": "A-05", "bin_location": "A-05-L1", "manufacturing_date": date(2026, 1, 25), "expiry_date": date(2026, 4, 25), "rule_type": "FIFO"},
+    {"sku_id": "SKU-CEM-15", "product_name": "ACC Cement", "batch_number": "B2026-1033", "quantity": 135, "capacity": 270, "zone": "B", "rack": "B-05", "bin_location": "B-05-L1", "manufacturing_date": date(2026, 1, 9), "expiry_date": date(2026, 4, 9), "rule_type": "FEFO"},
 ]
 
 DEMO_USERS = [
@@ -253,15 +253,15 @@ async def seed_database(db_url: str | None = None):
                       (id, gate_id, gate_code, plate_number, plate_confidence, vehicle_id,
                        decision, direction, snapshot_ref, denied_reason, processed_at,
                        created_at, updated_at)
-                    SELECT :id, :gate_id, :gate_code, :plate_number, :plate_confidence, :vehicle_id,
-                           :decision, :direction, :snapshot_ref, :denied_reason, :processed_at,
+                    SELECT :id, :gate_id, CAST(:gate_code AS varchar), CAST(:plate_number AS varchar), :plate_confidence, :vehicle_id,
+                           CAST(:decision AS varchar), CAST(:direction AS varchar), CAST(:snapshot_ref AS varchar), CAST(:denied_reason AS varchar), :processed_at,
                            :created_at, :updated_at
                     WHERE NOT EXISTS (
                         SELECT 1
                         FROM depot_gate_access_logs
-                        WHERE plate_number = :plate_number
-                          AND gate_code = :gate_code
-                          AND direction = :direction
+                        WHERE plate_number = CAST(:plate_number AS varchar)
+                          AND gate_code = CAST(:gate_code AS varchar)
+                          AND direction = CAST(:direction AS varchar)
                     )
                 """), {
                     "id": new_id(),
@@ -286,14 +286,21 @@ async def seed_database(db_url: str | None = None):
                     INSERT INTO depot_visitors
                       (id, name, company, purpose, contact_number, host_name, vehicle_plate,
                        status, checked_in_at, pass_valid_until, registered_by, created_at, updated_at)
-                    SELECT :id, :name, :company, :purpose, :contact_number, :host_name, :vehicle_plate,
-                           'checked_in', :now, :expiry, :user, :now, :now
+                    SELECT :id,
+                           CAST(:name AS varchar),
+                           CAST(:company AS varchar),
+                           CAST(:purpose AS varchar),
+                           CAST(:contact_number AS varchar),
+                           CAST(:host_name AS varchar),
+                           CAST(:vehicle_plate AS varchar),
+                           CAST('checked_in' AS varchar),
+                           :now, :expiry, CAST(:user AS varchar), :now, :now
                     WHERE NOT EXISTS (
                         SELECT 1
                         FROM depot_visitors
-                        WHERE name = :name
-                          AND company = :company
-                          AND status = 'checked_in'
+                        WHERE name = CAST(:name AS varchar)
+                          AND company = CAST(:company AS varchar)
+                          AND status = CAST('checked_in' AS varchar)
                     )
                 """), {**vis, "id": new_id(), "now": now, "expiry": now + timedelta(hours=8), "user": seed_user})
             logger.info(f"Seeded {len(VISITORS)} visitors")
@@ -447,23 +454,24 @@ async def seed_database(db_url: str | None = None):
             logger.info(f"Seeded {len(MANIFESTS)} shipment manifests")
 
             # ── Inventory Batches ──
-            # Vary batch creation timestamps for realistic activity patterns
+            # Vary batch creation timestamps across the replay window so
+            # heatmap date ranges show inventory building over the month.
             batch_timestamps = [
-                now - timedelta(hours=2),   # 2 hours ago
-                now - timedelta(days=5),    # 5 days ago
-                now - timedelta(hours=12),  # 12 hours ago
-                now - timedelta(days=3),    # 3 days ago
-                now - timedelta(days=1),    # 1 day ago
-                now - timedelta(hours=6),   # 6 hours ago
-                now - timedelta(days=2),    # 2 days ago
-                now - timedelta(hours=18),  # 18 hours ago
-                now - timedelta(days=4),    # 4 days ago
-                now - timedelta(hours=8),   # 8 hours ago
-                now - timedelta(days=6),    # 6 days ago
-                now - timedelta(hours=4),   # 4 hours ago
-                now - timedelta(days=7),    # 7 days ago
-                now - timedelta(hours=10),  # 10 hours ago
-                now - timedelta(days=8),    # 8 days ago
+                now - timedelta(days=29, hours=4),
+                now - timedelta(days=27, hours=2),
+                now - timedelta(days=25, hours=5),
+                now - timedelta(days=23, hours=3),
+                now - timedelta(days=21, hours=6),
+                now - timedelta(days=19, hours=2),
+                now - timedelta(days=17, hours=5),
+                now - timedelta(days=15, hours=3),
+                now - timedelta(days=13, hours=4),
+                now - timedelta(days=11, hours=2),
+                now - timedelta(days=9, hours=5),
+                now - timedelta(days=7, hours=3),
+                now - timedelta(days=5, hours=4),
+                now - timedelta(days=3, hours=2),
+                now - timedelta(days=1, hours=5),
             ]
             try:
                 async with db.begin_nested():
@@ -471,13 +479,21 @@ async def seed_database(db_url: str | None = None):
                         batch_time = batch_timestamps[idx] if idx < len(batch_timestamps) else now
                         await db.execute(text("""
                             INSERT INTO depot_inventory_batches (id, batch_code, sku_code, product_name, zone, rack, bin_location, quantity, original_quantity, manufacture_date, expiry_date, received_at, sequencing_rule, status, priority_score, is_near_expiry, created_at, updated_at)
-                            VALUES (:id, :batch_code, :sku_code, :product_name, :zone, :rack, :bin_location, :quantity, :quantity, :mfg, :exp, :batch_time, :sequencing_rule, 'active', 0.0, false, :batch_time, :batch_time)
-                            ON CONFLICT DO NOTHING
+                            VALUES (:id, :batch_code, :sku_code, :product_name, :zone, :rack, :bin_location, :quantity, :capacity, :mfg, :exp, :batch_time, :sequencing_rule, 'active', 0.0, false, :batch_time, :batch_time)
+                            ON CONFLICT (batch_code) DO UPDATE SET
+                                quantity = EXCLUDED.quantity,
+                                original_quantity = EXCLUDED.original_quantity,
+                                zone = EXCLUDED.zone,
+                                rack = EXCLUDED.rack,
+                                bin_location = EXCLUDED.bin_location,
+                                status = EXCLUDED.status,
+                                updated_at = EXCLUDED.updated_at
                         """), {
                             "id": new_id(), "product_name": batch["product_name"],
                             "batch_code": batch["batch_number"],
                             "sku_code": batch.get("sku_id", batch["batch_number"]),
                             "quantity": batch["quantity"],
+                            "capacity": batch.get("capacity", batch["quantity"]),
                             "zone": batch["zone"], "rack": batch["rack"], "bin_location": batch["bin_location"],
                             "mfg": batch_time.date(), "exp": add_months(batch_time.date(), 6),
                             "sequencing_rule": batch["rule_type"], "batch_time": batch_time,
@@ -485,6 +501,67 @@ async def seed_database(db_url: str | None = None):
                 logger.info(f"Seeded {len(BATCHES)} inventory batches")
             except Exception as e:
                 logger.warning(f"Skipped inventory batches: {e}")
+
+            try:
+                zones_result = await db.execute(text("""
+                    SELECT id, zone_code, max_capacity_units
+                    FROM depot_zones
+                    WHERE is_active = true
+                    ORDER BY zone_code
+                """))
+                zone_rows = zones_result.mappings().all()
+
+                batch_result = await db.execute(text("""
+                    SELECT zone, quantity, original_quantity, received_at
+                    FROM depot_inventory_batches
+                    WHERE status = 'active' AND zone IS NOT NULL
+                """))
+                batch_rows = batch_result.mappings().all()
+
+                await db.execute(text("""
+                    DELETE FROM depot_zone_density_history
+                    WHERE zone_id IN (
+                        SELECT id FROM depot_zones WHERE is_active = true
+                    )
+                """))
+
+                history_rows = 0
+                for day_offset in range(30, -1, -1):
+                    recorded_at = (now - timedelta(days=day_offset)).replace(hour=18, minute=0, second=0, microsecond=0)
+                    for zone in zone_rows:
+                        zone_code = zone["zone_code"]
+                        zone_batches = [
+                            batch for batch in batch_rows
+                            if batch["zone"] == zone_code and batch["received_at"] <= recorded_at
+                        ]
+                        capacity = sum(int(batch["original_quantity"] or 0) for batch in zone_batches)
+                        occupancy = sum(int(batch["quantity"] or 0) for batch in zone_batches)
+                        if capacity <= 0:
+                            capacity = int(zone["max_capacity_units"] or 0)
+                            occupancy = 0
+                        utilization = round((occupancy / capacity) * 100, 1) if capacity > 0 else 0.0
+                        status = "critical" if utilization >= 95 else "warning" if utilization >= 80 else "normal"
+
+                        await db.execute(text("""
+                            INSERT INTO depot_zone_density_history
+                                (id, zone_id, zone_code, occupancy, capacity, utilization_pct, status, recorded_at, created_at, updated_at)
+                            VALUES
+                                (:id, :zone_id, :zone_code, :occupancy, :capacity, :utilization_pct, :status, :recorded_at, :now, :now)
+                        """), {
+                            "id": new_id(),
+                            "zone_id": zone["id"],
+                            "zone_code": zone_code,
+                            "occupancy": occupancy,
+                            "capacity": capacity,
+                            "utilization_pct": utilization,
+                            "status": status,
+                            "recorded_at": recorded_at,
+                            "now": now,
+                        })
+                        history_rows += 1
+                logger.info(f"Seeded {history_rows} daily density snapshots for date-range heatmap replay")
+            except Exception as e:
+                logger.warning(f"Skipped density history seed: {e}")
 
             # ── IntelliOps Tasks ──
             ops_tasks = [
