@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, X, Calendar, Package, Layers } from "lucide-react";
-import { occColor } from "@/lib/depot-data";
+import { createPortal } from "react-dom";
 
 // ---------------------------------------------------------------------------
 // Types matching backend responses
@@ -54,6 +54,8 @@ interface ClusterCard {
 type FilterType = "all" | "full" | "empty" | "fifo";
 type ViewTab = "clusters" | "batches";
 
+const CEMENT_COMPANIES = ["UltraTech Cement", "ACC Cement", "JSW Cement", "Ambuja Cement"];
+
 // ---------------------------------------------------------------------------
 // Add Cluster Modal
 // ---------------------------------------------------------------------------
@@ -61,41 +63,83 @@ type ViewTab = "clusters" | "batches";
 interface AddClusterModalProps {
   onClose: () => void;
   onAdd: (cluster: ClusterCard) => void;
+  onRefresh: () => void;
 }
 
-function AddClusterModal({ onClose, onAdd }: AddClusterModalProps) {
+function AddClusterModal({ onClose, onAdd, onRefresh }: AddClusterModalProps) {
   const [form, setForm] = useState({
     zone: "A",
-    product: "",
+    product: CEMENT_COMPANIES[0],
     batch: "",
+    quantity: "500",
+    rack: "",
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.product || !form.batch) return;
-    const newCluster: ClusterCard = {
-      id: `${form.zone}-${form.batch}`,
-      zone: form.zone,
-      product: form.product,
-      capacity: 500, // Default capacity
-      occupied: 0,
-      batch: form.batch,
-      fifo: true, // Default to FIFO
-      lastActivity: new Date().toISOString(),
-      rack: "—",
-    };
-    onAdd(newCluster);
-    onClose();
+    setSubmitting(true);
+    setError("");
+    try {
+      // POST new batch to backend
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await fetch("/backend/depot/vision/sequencing/batches", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          batch_code: form.batch,
+          sku_code: `SKU-${form.zone}-${Date.now()}`,
+          product_name: form.product,
+          zone: form.zone,
+          rack: form.rack || `${form.zone}-01`,
+          bin_location: `${form.zone}-01-L1`,
+          quantity: parseInt(form.quantity) || 500,
+          sequencing_rule: "FIFO",
+        }),
+      });
+
+      if (res.ok) {
+        // Also add to local state immediately for instant feedback
+        const newCluster: ClusterCard = {
+          id: `${form.zone}-${form.batch}`,
+          zone: form.zone,
+          product: form.product,
+          capacity: parseInt(form.quantity) || 500,
+          occupied: parseInt(form.quantity) || 500,
+          batch: form.batch,
+          fifo: true,
+          lastActivity: new Date().toISOString(),
+          rack: form.rack || `${form.zone}-01`,
+        };
+        onAdd(newCluster);
+        onRefresh();
+        onClose();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.detail || `Failed (HTTP ${res.status})`);
+      }
+    } catch (err) {
+      setError("Network error — could not reach server");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] grid place-items-center bg-black/60 p-4" onClick={onClose}>
       <div
-        className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-6 w-full max-w-md shadow-2xl"
+        className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[#1E2F50] bg-[#14203A] p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-[16px] font-bold text-[#E8EDF8]">Register New Zone</h3>
+          <h3 className="text-[16px] font-bold text-[#E8EDF8]">Add New Batch</h3>
           <button onClick={onClose} className="text-[#4E6090] hover:text-[#E8EDF8] transition">
             <X className="w-4 h-4" />
           </button>
@@ -115,13 +159,16 @@ function AddClusterModal({ onClose, onAdd }: AddClusterModalProps) {
           </div>
           <div>
             <label className="text-[10px] text-[#4E6090] font-semibold uppercase tracking-wider block mb-1.5">Product Name *</label>
-            <input
+            <select
               required
               value={form.product}
               onChange={(e) => setForm((f) => ({ ...f, product: e.target.value }))}
-              placeholder="e.g. UltraTech Cement"
-              className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40 placeholder:text-[#4E6090]"
-            />
+              className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40"
+            >
+              {CEMENT_COMPANIES.map((company) => (
+                <option key={company} value={company}>{company}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="text-[10px] text-[#4E6090] font-semibold uppercase tracking-wider block mb-1.5">Batch Code *</label>
@@ -133,6 +180,29 @@ function AddClusterModal({ onClose, onAdd }: AddClusterModalProps) {
               className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40 placeholder:text-[#4E6090]"
             />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-[#4E6090] font-semibold uppercase tracking-wider block mb-1.5">Quantity</label>
+              <input
+                type="number"
+                min="1"
+                value={form.quantity}
+                onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
+                placeholder="500"
+                className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40 placeholder:text-[#4E6090]"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#4E6090] font-semibold uppercase tracking-wider block mb-1.5">Rack</label>
+              <input
+                value={form.rack}
+                onChange={(e) => setForm((f) => ({ ...f, rack: e.target.value }))}
+                placeholder="e.g. A-01"
+                className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40 placeholder:text-[#4E6090]"
+              />
+            </div>
+          </div>
+          {error && <p className="text-[11px] text-[#F04A4A]">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
@@ -143,14 +213,16 @@ function AddClusterModal({ onClose, onAdd }: AddClusterModalProps) {
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-lg bg-[#E5521A] text-white text-[12px] font-bold hover:bg-[#FF7A42] transition"
+              disabled={submitting}
+              className="px-5 py-2 rounded-lg bg-[#E5521A] text-white text-[12px] font-bold hover:bg-[#FF7A42] transition disabled:opacity-60"
             >
-              Register Zone
+              {submitting ? "Adding..." : "Add Batch"}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -162,6 +234,13 @@ function zoneColor(pct: number): string {
   if (pct >= 90) return "#F04A4A";
   if (pct >= 75) return "#F59E0B";
   return "#22D3A1";
+}
+
+function displayZoneName(zone: ZoneData): string {
+  return zone.name
+    .replace(/\s+[—-]\s+Zone\s+[A-Z0-9]+$/i, "")
+    .replace(/^Storage Bay\s+[A-Z0-9]+\s+[—-]\s+/i, "")
+    .trim();
 }
 
 function timeAgo(iso: string): string {
@@ -222,7 +301,7 @@ export default function InventoryPage() {
     try {
       const [zonesRes, batchesRes] = await Promise.allSettled([
         fetch("/backend/depot/vision/cluster/zones"),
-        fetch("/backend/depot/vision/sequencing/batches"),
+        fetch("/backend/depot/vision/sequencing/batches?status=active"),
       ]);
 
       // Zones
@@ -238,10 +317,10 @@ export default function InventoryPage() {
         const cards: ClusterCard[] = bData
           .filter((b) => b.status === "active")
           .map((b) => ({
-            id: `${b.zone || "?"}-${b.rack || b.batch_code}`,
+            id: b.id,
             zone: b.zone || "—",
             product: b.product_name || b.sku_code,
-            capacity: b.original_quantity || b.quantity,
+            capacity: b.original_quantity > 0 ? b.original_quantity : b.quantity,
             occupied: b.quantity,
             batch: b.batch_code,
             fifo: b.sequencing_rule === "FIFO",
@@ -272,16 +351,6 @@ export default function InventoryPage() {
     setDateFrom("");
     setDateTo("");
   };
-
-  // Filter clusters (for zones view - individual batches)
-  const filtered = clusters.filter((c) => {
-    const pct = c.capacity > 0 ? c.occupied / c.capacity : 0;
-    if (filter === "full" && pct < 0.70) return false; // 70% threshold for Near Full
-    if (filter === "empty" && c.occupied !== 0) return false; // Empty means occupied = 0
-    if (!matchesSearch(normalizedSearch, [c.product, c.id, c.zone, c.batch, c.rack])) return false;
-    if (!isWithinDateRange(c.lastActivity, dateFrom, dateTo)) return false;
-    return true;
-  });
 
   // Filter zones based on zone-level utilization (not individual cluster occupancy)
   const displayZones = zones.filter(z => {
@@ -331,6 +400,7 @@ export default function InventoryPage() {
         <AddClusterModal
           onClose={() => setShowAddModal(false)}
           onAdd={(newCluster) => setClusters((prev) => [newCluster, ...prev])}
+          onRefresh={() => { fetchData(); setViewTab("batches"); }}
         />
       )}
 
@@ -343,14 +413,85 @@ export default function InventoryPage() {
         <div className="flex items-center gap-2">
           {/* Export CSV Button */}
           <button
-            onClick={() => {/* Export CSV logic */}}
+            onClick={() => {
+              // Build CSV from zones + batches
+              const rows = [
+                ["Zone", "Product", "Batch", "Quantity", "Capacity", "Utilization %", "Status", "Rack", "Expiry Date"],
+                ...batchesFromAPI.map((b) => {
+                  const zone = zones.find((z) => z.zone_code === b.zone);
+                  return [
+                    b.zone ?? "",
+                    b.product_name ?? b.sku_code,
+                    b.batch_code,
+                    b.quantity,
+                    zone?.max_capacity_units ?? "",
+                    zone ? zone.utilization_pct.toFixed(1) + "%" : "",
+                    b.status,
+                    b.rack ?? "",
+                    b.expiry_date ?? "",
+                  ];
+                }),
+              ];
+              const csv = rows.map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
+              const blob = new Blob([csv], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `inventory_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-semibold hover:border-[#2A3F68] hover:text-[#E8EDF8] transition"
           >
             Export CSV
           </button>
           {/* Export PDF Report Button */}
           <button
-            onClick={() => {/* Export PDF logic */}}
+            onClick={() => {
+              const now = new Date().toLocaleString();
+              const rows = batchesFromAPI.map((b) => {
+                const zone = zones.find((z) => z.zone_code === b.zone);
+                return `<tr>
+                  <td>${b.zone ?? ""}</td>
+                  <td>${b.product_name ?? b.sku_code}</td>
+                  <td>${b.batch_code}</td>
+                  <td>${b.quantity}</td>
+                  <td>${zone?.max_capacity_units ?? ""}</td>
+                  <td>${zone ? zone.utilization_pct.toFixed(1) + "%" : ""}</td>
+                  <td>${b.status}</td>
+                  <td>${b.rack ?? ""}</td>
+                  <td>${b.expiry_date ?? ""}</td>
+                </tr>`;
+              }).join("");
+
+              const html = `<!DOCTYPE html><html><head><title>Inventory Report</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
+                h1 { font-size: 20px; margin-bottom: 4px; }
+                p { font-size: 12px; color: #666; margin-bottom: 16px; }
+                table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                th { background: #f0f0f0; padding: 8px; text-align: left; border: 1px solid #ddd; }
+                td { padding: 7px 8px; border: 1px solid #eee; }
+                tr:nth-child(even) { background: #fafafa; }
+              </style></head><body>
+              <h1>IntelliDepo — Inventory Report</h1>
+              <p>Generated: ${now}</p>
+              <table>
+                <thead><tr>
+                  <th>Zone</th><th>Product</th><th>Batch</th><th>Qty</th>
+                  <th>Capacity</th><th>Utilization</th><th>Status</th><th>Rack</th><th>Expiry</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+              </table>
+              </body></html>`;
+
+              const win = window.open("", "_blank");
+              if (win) {
+                win.document.write(html);
+                win.document.close();
+                win.print();
+              }
+            }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-semibold hover:border-[#2A3F68] hover:text-[#E8EDF8] transition"
           >
             Export PDF Report
@@ -361,7 +502,7 @@ export default function InventoryPage() {
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition"
           >
             <Plus className="w-3.5 h-3.5" />
-            {viewTab === "clusters" ? "Add Zone" : "Add Batch"}
+            {viewTab === "clusters" ? "Add Batch" : "Add Batch"}
           </button>
         </div>
       </div>
@@ -483,28 +624,28 @@ export default function InventoryPage() {
       {/* ── Clusters View ── */}
       {viewTab === "clusters" && (
         <>
-          {filtered.length === 0 ? (
+          {displayZones.length === 0 ? (
             <div className="text-center text-[#4E6090] text-[13px] py-16">
-              {clusters.length === 0
-                ? "No inventory batches found. Click \"Add Zone\" to register one."
+              {zones.length === 0
+                ? "No inventory zones found. Click \"Add Zone\" to register one."
                 : "No zones match the current filter."}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-              {filtered.slice(0, 5).map((c) => {
-                const pct = c.capacity > 0 ? Math.round((c.occupied / c.capacity) * 100) : 0;
-                const col = occColor(pct);
+              {displayZones.map((z) => {
+                const pct = Math.round(z.utilization_pct);
+                const col = zoneColor(pct);
                 return (
                   <div
-                    key={c.id + c.batch}
+                    key={z.id}
                     className="bg-[#14203A] border rounded-[14px] p-[15px] transition-all hover:border-[#2A3F68] hover:-translate-y-px"
                     style={{ borderColor: "#1E2F50" }}
                   >
                     <div className="flex justify-between mb-2.5">
-                  <div>
-                        <div className="text-[15px] font-bold text-[#E8EDF8]">Zone {c.zone}</div>
-                        <div className="text-[11px] text-[#8A9BBF] mt-0.5">{c.product}</div>
-                        <div className="text-[10px] text-[#4E6090] mt-0.5">Rack: {c.rack}</div>
+                      <div>
+                        <div className="text-[15px] font-bold text-[#E8EDF8]">Zone {z.zone_code}</div>
+                        <div className="text-[11px] text-[#8A9BBF] mt-0.5">{displayZoneName(z)}</div>
+                        <div className="text-[10px] text-[#4E6090] mt-0.5">{z.zone_type}</div>
                       </div>
                       <div className="flex flex-col gap-1 items-end">
                         <span
@@ -520,13 +661,13 @@ export default function InventoryPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-x-2.5 gap-y-1 text-[10px] mt-2.5">
                       <span className="text-[#4E6090]">Capacity</span>
-                      <span className="font-semibold text-[#E8EDF8]">{c.capacity.toLocaleString()} bags</span>
+                      <span className="font-semibold text-[#E8EDF8]">{z.max_capacity_units.toLocaleString()} bags</span>
                       <span className="text-[#4E6090]">Occupied</span>
-                      <span className="font-semibold text-[#E8EDF8]">{c.occupied.toLocaleString()} bags</span>
-                      <span className="text-[#4E6090]">Batch</span>
-                      <span className="font-semibold text-[#E8EDF8]">{c.batch}</span>
-                      <span className="text-[#4E6090]">Last Activity</span>
-                      <span className="font-semibold text-[#E8EDF8]">{timeAgo(c.lastActivity)}</span>
+                      <span className="font-semibold text-[#E8EDF8]">{z.current_occupancy.toLocaleString()} bags</span>
+                      <span className="text-[#4E6090]">Status</span>
+                      <span className="font-semibold text-[#E8EDF8]">{z.status}</span>
+                      <span className="text-[#4E6090]">Utilization</span>
+                      <span className="font-semibold text-[#E8EDF8]">{z.utilization_pct.toFixed(1)}%</span>
                     </div>
                   </div>
                 );

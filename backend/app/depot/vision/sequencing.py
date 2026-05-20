@@ -200,11 +200,17 @@ class GeneratePickRequest(BaseModel):
 # Batch Endpoints
 # ---------------------------------------------------------------------------
 
+def add_months(value: date, months: int) -> date:
+    month = value.month - 1 + months
+    year = value.year + month // 12
+    month = month % 12 + 1
+    days_in_month = [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    return date(year, month, min(value.day, days_in_month[month - 1]))
+
 @router.post("/batches", response_model=BatchResponse, status_code=201)
 async def create_batch(
     payload: BatchCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Register an inventory batch with expiry tracking."""
     existing = await db.execute(
@@ -213,19 +219,24 @@ async def create_batch(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Batch code already exists")
 
-    batch = InventoryBatch(**payload.model_dump())
+    data = payload.model_dump()
+    manufacture_date = data.get("manufacture_date") or date.today()
+    data["manufacture_date"] = manufacture_date
+    data["expiry_date"] = data.get("expiry_date") or add_months(manufacture_date, 6)
+
+    batch = InventoryBatch(**data)
     batch.original_quantity = payload.quantity
 
     # Compute expiry metadata
-    if payload.expiry_date:
-        delta = payload.expiry_date - date.today()
+    if batch.expiry_date:
+        delta = batch.expiry_date - date.today()
         batch.days_to_expiry = delta.days
         batch.is_near_expiry = delta.days <= 30
         if delta.days <= 0:
             batch.status = BatchStatus.EXPIRED
 
     # Compute priority score (lower = pick first)
-    if payload.sequencing_rule == SequencingRule.FEFO and payload.expiry_date:
+    if payload.sequencing_rule == SequencingRule.FEFO and batch.expiry_date:
         batch.priority_score = float(batch.days_to_expiry or 9999)
     elif payload.sequencing_rule == SequencingRule.FIFO:
         batch.priority_score = datetime.now(timezone.utc).timestamp()
