@@ -448,6 +448,10 @@ export default function InventoryPage() {
         fetch("/backend/depot/vision/sequencing/batches?status=active"),
       ]);
 
+      // Heatmap data (for accurate zone utilization) - removed as it's not being fetched
+      let heatmapData: Record<string, { utilization_pct: number; current_occupancy: number; max_capacity_units: number }> = {};
+      // Note: heatmapRes was removed since no third fetch was provided
+
       // Zones
       if (zonesRes.status === "fulfilled" && zonesRes.value.ok) {
         const zData: ZoneData[] = await zonesRes.value.json();

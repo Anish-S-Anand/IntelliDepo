@@ -311,23 +311,40 @@ export default function ExecutiveDashboard() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    
     const loadDashboardData = () => {
+      if (cancelled) return;
+      
       getDepotCommandSnapshot().then((snap) => {
-        if (snap.cameras.data.length > 0) setCameras(snap.cameras.data);
+        if (!cancelled && snap.cameras.data.length > 0) setCameras(snap.cameras.data);
       }).catch(() => {});
+<<<<<<< HEAD
       // Same endpoint as Inventory page — live utilization from active batches
       fetch("/backend/depot/vision/cluster/zones")
         .then((r) => r.ok ? r.json() : Promise.reject())
         .then((data: LiveZone[]) => { if (data.length > 0) setLiveZones(data); })
         .catch(() => {});
+=======
+      getZones().then((z) => { if (!cancelled && z.length > 0) setZones(z); }).catch(() => {});
+>>>>>>> e6caae971d568031e6f05ba0703ebb25f92f1833
       getIncidents()
-        .then((items) => setBackendIncidents(dedupeIncidentResponses(items)))
+        .then((items) => { if (!cancelled) setBackendIncidents(dedupeIncidentResponses(items)); })
         .catch(() => {});
     };
 
     loadDashboardData();
+<<<<<<< HEAD
     const id = setInterval(loadDashboardData, 10000);
     return () => clearInterval(id);
+=======
+    // Increased from 20s to 30s for better performance
+    const id = setInterval(loadDashboardData, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+>>>>>>> e6caae971d568031e6f05ba0703ebb25f92f1833
   }, []);
 
   // Map backend cameras to the shape used in the UI
