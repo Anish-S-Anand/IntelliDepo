@@ -132,7 +132,7 @@ export default function CommandPage() {
               label: "Lock Zone",
               sub: "Initiate lockdown",
               color: "#F04A4A",
-              fn: () => lockCommandZone(openIncidents[0]?.zone ?? "Depot perimeter"),
+              fn: () => lockCommandZone(openIncidents[0]?.zone_id ?? "Depot perimeter"),
               successMsg: "Zone lockdown initiated",
             },
             {

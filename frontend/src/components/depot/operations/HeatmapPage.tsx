@@ -1,18 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-<<<<<<< HEAD
-import {
-  getZones,
-  getHeatmap,
-  getDensityAnalytics,
-  getDensityHistory,
-  getThresholds,
-  type DensityEntry,
-  type DensityHistoryEntry,
-  type ThresholdResponse,
-} from "@/services/depotCluster";
-=======
 import {
   getZones,
   getHeatmap,
@@ -24,7 +12,6 @@ import {
   type ThresholdResponse,
 } from "@/services/depotCluster";
 import { ZONE_HISTORY } from "@/lib/depot-data";
->>>>>>> cbb2bb1bbfe3e1ceca7d65935f81fb6c2222d136
 import {
   MapPin,
   Layers,

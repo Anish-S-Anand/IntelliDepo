@@ -24,6 +24,18 @@ type SelectedVideo = {
   title: string;
 };
 
+type AnalysisReport = {
+  incidentId: string;
+  incidentType: string;
+  breachType: string;
+  videoFile: string;
+};
+
+type AcknowledgmentConfirmation = {
+  isOpen: boolean;
+  incidentId: string | null;
+};
+
 const EMPTY_VALUE = "-";
 const ALLOWED_EVIDENCE_TYPES = new Set(["unauthorized_entry", "loitering"]);
 const ALLOWED_EVIDENCE_VIDEOS = new Set(["Perimeter_Detection.mp4", "Theft Camera .mp4"]);
@@ -124,6 +136,8 @@ export default function IncidentsPage() {
   const [resolving, setResolving] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<SelectedVideo | null>(null);
   const [videoLoadError, setVideoLoadError] = useState<string | null>(null);
+  const [analysisReport, setAnalysisReport] = useState<AnalysisReport | null>(null);
+  const [ackConfirmation, setAckConfirmation] = useState<AcknowledgmentConfirmation>({ isOpen: false, incidentId: null });
   const selectedIncidentId = searchParams.get("incident");
 
   // Fetch real incidents from backend
@@ -208,6 +222,8 @@ export default function IncidentsPage() {
     try {
       await acknowledgeIncident(id, "Acknowledged from incident console");
       await fetchIncidents();
+      // Show acknowledgment confirmation popup
+      setAckConfirmation({ isOpen: true, incidentId: id });
     } catch {
       setAckError("Unable to acknowledge this incident. The displayed data was not changed.");
     } finally {
@@ -229,6 +245,8 @@ export default function IncidentsPage() {
       }
 
       await fetchIncidents();
+      // Show acknowledgment confirmation popup
+      setAckConfirmation({ isOpen: true, incidentId: incident.id });
     } catch {
       setAckError("Unable to acknowledge this breach. The active breach data was not changed.");
     } finally {
@@ -260,29 +278,94 @@ export default function IncidentsPage() {
     { label: "High", value: "HIGH", style: "border-[#F97316] text-[#F97316]" },
   ];
 
-  const handleBreachAnalysisClick = (breach: BreachResponse) => {
-    const linkedIncident = incidentByBreachId.get(breach.id);
-    const videoFile = resolveEvidenceVideo(linkedIncident?.video_archive_ref, breach.breach_type) || "Perimeter_Detection.mp4";
-    setVideoLoadError(null);
-    setSelectedVideo({
-      evidenceId: breach.id,
-      videoFile,
-      title: `${BREACH_TYPE_LABELS[breach.breach_type] || breach.breach_type} Analysis`,
-    });
-  };
-
   const handleIncidentAnalysisClick = (incident: Incident) => {
     const rawIncident = incidentById.get(incident.id);
     const linkedBreach = breaches.find((breach) => breach.id === rawIncident?.breach_id);
     const videoFile = resolveEvidenceVideo(rawIncident?.video_archive_ref, linkedBreach?.breach_type);
     if (!videoFile) return;
 
-    setVideoLoadError(null);
-    setSelectedVideo({
-      evidenceId: incident.id,
+    const breachType = linkedBreach?.breach_type || 
+      (incident.type.toLowerCase().includes('unauthorized') || incident.type.toLowerCase().includes('entry') ? 'unauthorized_entry' : 'loitering');
+
+    setAnalysisReport({
+      incidentId: incident.id,
+      incidentType: incident.type,
+      breachType,
       videoFile,
-      title: `${incident.type} Evidence`,
     });
+  };
+
+  const handleBreachAnalysisClick = (breach: BreachResponse) => {
+    const linkedIncident = incidentByBreachId.get(breach.id);
+    const videoFile = resolveEvidenceVideo(linkedIncident?.video_archive_ref, breach.breach_type) || "Perimeter_Detection.mp4";
+    
+    setAnalysisReport({
+      incidentId: breach.id,
+      incidentType: BREACH_TYPE_LABELS[breach.breach_type] || breach.breach_type,
+      breachType: breach.breach_type,
+      videoFile,
+    });
+  };
+
+  // Generate dummy data based on incident ID
+  const generateDummyData = (incidentId: string, type: string) => {
+    // Simple hash function for consistent dummy data
+    let hash = 0;
+    for (let i = 0; i < incidentId.length; i++) {
+      hash = ((hash << 5) - hash) + incidentId.charCodeAt(i);
+      hash = hash & hash;
+    }
+    const seed = Math.abs(hash);
+    
+    const firstNames = ['James', 'Michael', 'Robert', 'John', 'David', 'William', 'Richard'];
+    const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller'];
+    const officerNames = ['Sarah Johnson', 'Mike Rodriguez', 'Emily Chen', 'David Martinez'];
+    
+    const perpetratorName = `${firstNames[seed % firstNames.length]} ${lastNames[(seed + 1) % lastNames.length]}`;
+    const perpetratorId = `${String.fromCharCode(65 + (seed % 26))}${String.fromCharCode(65 + ((seed + 1) % 26))}${String(seed % 1000000).padStart(6, '0')}`;
+    const officerName = officerNames[seed % officerNames.length];
+    const badgeId = `SO-${String(seed % 10000).padStart(4, '0')}`;
+    
+    const items = ['Copper wire spool', 'Power tools set', 'Electronic components', 'Steel pipes bundle'];
+    const item = items[seed % items.length];
+    const value = 200 + (seed % 1800);
+    
+    return {
+      perpetrator: {
+        name: perpetratorName,
+        id: perpetratorId,
+        entryTime: new Date(Date.now() - (seed % 24) * 3600000).toLocaleString('en-US', { 
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+        }),
+        entryPoint: `North Gate - Zone ${String.fromCharCode(65 + (seed % 6))}`,
+        description: `Approximately 5'${8 + (seed % 5)}", average build, wearing dark hoodie and jeans`,
+        behavior: 'Observed loitering near high-value storage area, frequent glances at security cameras',
+      },
+      officer: {
+        name: officerName,
+        badgeId: badgeId,
+        acknowledgedAt: new Date().toLocaleString('en-US', { 
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+        }),
+      },
+      theft: {
+        item: item,
+        value: `$${value.toLocaleString()}`,
+        duration: `${15 + (seed % 45)} minutes`,
+        escapeRoute: `North via loading dock toward Zone ${String.fromCharCode(65 + (seed % 6))}`,
+      },
+      timeline: {
+        loiteringStart: new Date(Date.now() - (seed % 2) * 3600000 - 1800000).toLocaleString('en-US', { 
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+        }),
+        theftOccurred: new Date(Date.now() - (seed % 2) * 3600000 - 900000).toLocaleString('en-US', { 
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+        }),
+        departure: new Date(Date.now() - (seed % 2) * 3600000).toLocaleString('en-US', { 
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+        }),
+      },
+    };
   };
 
   return (
@@ -573,6 +656,219 @@ export default function IncidentsPage() {
                 {resolving ? "Resolving..." : "Resolve"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Analysis Report Modal */}
+      {analysisReport && (() => {
+        const dummyData = generateDummyData(analysisReport.incidentId, analysisReport.breachType);
+        const isUnauthorizedEntry = analysisReport.breachType === 'unauthorized_entry';
+        
+        return (
+          <div className="fixed inset-0 bg-black/80 z-[10000] flex items-center justify-center p-3 sm:p-4" onClick={() => setAnalysisReport(null)}>
+            <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-3 sm:p-5 w-full max-w-4xl max-h-[92dvh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center gap-3 mb-4">
+                <h3 className="text-[16px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+                  {analysisReport.incidentType} - Analysis Report
+                </h3>
+                <button
+                  onClick={() => setAnalysisReport(null)}
+                  className="rounded-lg p-1 text-[#8A9BBF] hover:text-[#E8EDF8] hover:bg-[#1E2F50] transition"
+                  aria-label="Close analysis report"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {isUnauthorizedEntry ? (
+                  <>
+                    {/* Perimeter Breach Report */}
+                    {/* Perpetrator Information */}
+                    <div className="bg-[#0F1A30] border border-[#1E2F50] rounded-lg p-4">
+                      <h4 className="text-[14px] font-bold text-[#E8EDF8] mb-3 pb-2 border-b border-[#1E2F50]">
+                        Perpetrator Information
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Name:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.perpetrator.name}</span>
+                        </div>
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">ID Number:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.perpetrator.id}</span>
+                        </div>
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Entry Time:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.perpetrator.entryTime}</span>
+                        </div>
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Entry Point:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.perpetrator.entryPoint}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Acknowledgment Status */}
+                    <div className="bg-[#0F1A30] border border-[#1E2F50] rounded-lg p-4">
+                      <h4 className="text-[14px] font-bold text-[#E8EDF8] mb-3 pb-2 border-b border-[#1E2F50]">
+                        Acknowledgment Status
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Officer:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.officer.name}</span>
+                        </div>
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Badge ID:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.officer.badgeId}</span>
+                        </div>
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Acknowledged:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.officer.acknowledgedAt}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Loitering/Theft Report */}
+                    {/* Perpetrator Description */}
+                    <div className="bg-[#0F1A30] border border-[#1E2F50] rounded-lg p-4">
+                      <h4 className="text-[14px] font-bold text-[#E8EDF8] mb-3 pb-2 border-b border-[#1E2F50]">
+                        Perpetrator Description
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Name:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.perpetrator.name}</span>
+                        </div>
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">ID Number:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.perpetrator.id}</span>
+                        </div>
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Physical Description:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.perpetrator.description}</span>
+                        </div>
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Behavior Pattern:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.perpetrator.behavior}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Theft Details */}
+                    <div className="bg-[#0F1A30] border border-[#1E2F50] rounded-lg p-4">
+                      <h4 className="text-[14px] font-bold text-[#E8EDF8] mb-3 pb-2 border-b border-[#1E2F50]">
+                        Theft Details
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Item Stolen:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.theft.item}</span>
+                        </div>
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Estimated Value:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.theft.value}</span>
+                        </div>
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Loitering Duration:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.theft.duration}</span>
+                        </div>
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Escape Route:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.theft.escapeRoute}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Timeline */}
+                    <div className="bg-[#0F1A30] border border-[#1E2F50] rounded-lg p-4">
+                      <h4 className="text-[14px] font-bold text-[#E8EDF8] mb-3 pb-2 border-b border-[#1E2F50]">
+                        Timeline
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Loitering Started:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.timeline.loiteringStart}</span>
+                        </div>
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Theft Occurred:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.timeline.theftOccurred}</span>
+                        </div>
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Departed:</span>
+                          <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.timeline.departure}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Video Evidence */}
+                <div className="bg-[#0F1A30] border border-[#1E2F50] rounded-lg p-4">
+                  <h4 className="text-[14px] font-bold text-[#E8EDF8] mb-3 pb-2 border-b border-[#1E2F50]">
+                    Video Evidence
+                  </h4>
+                  <div className="bg-black rounded-lg overflow-hidden aspect-video">
+                    <video
+                      key={`${analysisReport.incidentId}-${analysisReport.videoFile}`}
+                      src={getVideoUrl(analysisReport.videoFile)}
+                      controls
+                      autoPlay
+                      playsInline
+                      preload="metadata"
+                      className="w-full h-full object-contain"
+                      onError={() => setVideoLoadError(`Unable to load ${analysisReport.videoFile}`)}
+                      onLoadedData={() => setVideoLoadError(null)}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+                  <div className="mt-2 text-[10px] text-[#8A9BBF]">
+                    Video: {analysisReport.videoFile}
+                  </div>
+                  {videoLoadError && (
+                    <div className="mt-2 text-[10px] text-[#F04A4A] font-bold">
+                      {videoLoadError}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  onClick={() => setAnalysisReport(null)}
+                  className="px-4 py-2 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:border-[#2A3F68] hover:text-[#E8EDF8] transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Acknowledgment Confirmation Popup */}
+      {ackConfirmation.isOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[10001] flex items-center justify-center p-4" onClick={() => setAckConfirmation({ isOpen: false, incidentId: null })}>
+          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-8 w-full max-w-md text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-6">
+              <div className="text-[20px] font-bold text-[#E8EDF8] mb-2">
+                Issue is Acknowledged
+              </div>
+              <div className="text-[12px] text-[#8A9BBF]">
+                The incident has been successfully acknowledged
+              </div>
+            </div>
+            <button
+              onClick={() => setAckConfirmation({ isOpen: false, incidentId: null })}
+              className="px-6 py-2.5 rounded-lg bg-[#E5521A] text-white text-[12px] font-bold hover:bg-[#FF7A42] transition mx-auto"
+            >
+              Confirm
+            </button>
           </div>
         </div>
       )}
