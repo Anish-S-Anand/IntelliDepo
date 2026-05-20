@@ -81,6 +81,7 @@ function getCountingFeedUrl(): string {
   return `${base}/depot/vision/cameras/video-library/${encodeURIComponent(COUNTING_VIDEO_FILE)}/mjpeg?theme=dark&seek=18`;
 }
 
+<<<<<<< HEAD
 function classCount(camera: { by_class: RealtimeCountsResponse["cameras"][string]["by_class"] }, label: string): number {
   const value = camera.by_class[label];
   if (typeof value === "number") return value;
@@ -99,6 +100,47 @@ function activeConfidence(camera: RealtimeCountsResponse["cameras"][string] | un
   const avg = detections.reduce((sum, det) => sum + det.confidence, 0) / detections.length;
   return (avg * 100).toFixed(1);
 }
+=======
+function classCount(camera: { by_class: RealtimeCountsResponse["cameras"][string]["by_class"] }, label: string): number {
+  const value = camera.by_class[label];
+  if (typeof value === "number") return value;
+  return value?.net ?? ((value?.in ?? 0) - (value?.out ?? 0));
+}
+
+function activeClassCount(camera: RealtimeCountsResponse["cameras"][string] | undefined, label: string): number {
+  const detections = camera?.detections ?? [];
+  if (detections.length === 0) return classCount(camera ?? { by_class: {} }, label);
+  return detections.filter((det) => det.class.toLowerCase() === label).length;
+}
+
+function activeConfidence(camera: RealtimeCountsResponse["cameras"][string] | undefined, fallback: string): string {
+  const detections = camera?.detections ?? [];
+  const bags = detections.filter((det) => det.class.toLowerCase() === "bag");
+  const confidenceSource = bags.length > 0 ? bags : detections;
+  if (confidenceSource.length === 0) return fallback;
+  const avg = confidenceSource.reduce((sum, det) => sum + det.confidence, 0) / confidenceSource.length;
+  return (avg * 100).toFixed(1);
+}
+
+function activeRoleCount(camera: RealtimeCountsResponse["cameras"][string] | undefined, role: string): number {
+  return (camera?.detections ?? []).filter((det) => det.role?.toLowerCase() === role).length;
+}
+
+function detectionColor(detClass: string, role?: string): string {
+  const label = role?.toLowerCase() ?? detClass.toLowerCase();
+  if (label === "worker") return "#F5C542";
+  if (label === "manager") return "#5B9BF5";
+  if (detClass.toLowerCase() === "vehicle") return "#F5A623";
+  if (detClass.toLowerCase() === "person") return "#A78BFA";
+  return "#22D3A1";
+}
+
+function detectionLabel(detClass: string, role?: string): string {
+  if (role === "worker") return "WORKER";
+  if (role === "manager") return "MANAGER";
+  return detClass.toUpperCase();
+}
+>>>>>>> fca8741f06818592ec45431442d741e85da16722
 
 // ---------------------------------------------------------------------------
 // Data-shaping helpers
@@ -236,7 +278,9 @@ export default function CountingSummaryPage() {
       const avgConfidence = detections.length > 0
         ? detections.reduce((sum, det) => sum + det.confidence, 0) / detections.length * 100
         : 0;
-      const counted = camera.total || detections.length;
+      const counted = typeof camera.total === "number"
+        ? camera.total
+        : detections.filter((det) => det.class.toLowerCase() === "bag").length;
       return {
         id: camera.camera_id,
         manifestCode: "LIVE",
@@ -279,6 +323,7 @@ export default function CountingSummaryPage() {
   const hasReportSessions = Boolean(report && report.total_sessions > 0);
   const liveCameras = realtime ? Object.values(realtime.cameras) : [];
   const primaryLiveCamera = liveCameras.find((camera) => camera.camera_id === "jsw-counting-line") ?? liveCameras[0];
+<<<<<<< HEAD
   const liveDetected = liveCameras.reduce((sum, camera) => sum + (camera.total || camera.detections?.length || 0), 0);
   const totalExpected = hasReportSessions ? report!.total_expected : sessions.reduce((a, s) => a + s.totalExpected, 0);
   const totalCounted = liveDetected || (hasReportSessions ? report!.total_counted : sessions.reduce((a, s) => a + s.totalCounted, 0));
@@ -291,6 +336,26 @@ export default function CountingSummaryPage() {
   const liveBags = activeClassCount(primaryLiveCamera, "bag");
   const liveBoxes = activeClassCount(primaryLiveCamera, "box");
   const primaryConfidence = activeConfidence(primaryLiveCamera, avgConf);
+=======
+  const liveDetected = liveCameras.reduce((sum, camera) => sum + (typeof camera.total === "number" ? camera.total : 0), 0);
+  const totalExpected = hasReportSessions ? report!.total_expected : sessions.reduce((a, s) => a + s.totalExpected, 0);
+  const totalCounted = liveDetected || (hasReportSessions ? report!.total_counted : sessions.reduce((a, s) => a + s.totalCounted, 0));
+  void totalExpected;
+  void totalCounted;
+  const avgConf = sessions.some((s) => s.confidenceAvg > 0)
+    ? (sessions.reduce((a, s) => a + s.confidenceAvg, 0) / sessions.length).toFixed(1)
+    : "0.0";
+  const primaryDetections = primaryLiveCamera?.detections ?? [];
+  const liveBags = activeClassCount(primaryLiveCamera, "bag");
+  const livePeople = activeClassCount(primaryLiveCamera, "person");
+  const liveVehicles = activeClassCount(primaryLiveCamera, "vehicle");
+  const liveWorkers = activeRoleCount(primaryLiveCamera, "worker");
+  const liveManagers = activeRoleCount(primaryLiveCamera, "manager");
+  const primaryConfidence = activeConfidence(primaryLiveCamera, avgConf);
+  const countLineTop = `${((realtime?.counting_line_y ?? 0.68) * 100).toFixed(2)}%`;
+  const loadedBags = primaryLiveCamera?.loaded_count ?? primaryLiveCamera?.in_count ?? 0;
+  const unloadedBags = primaryLiveCamera?.unloaded_count ?? primaryLiveCamera?.out_count ?? 0;
+>>>>>>> fca8741f06818592ec45431442d741e85da16722
 
   const handleExport = useCallback(() => {
     if (sessions.length === 0) return;
@@ -346,6 +411,7 @@ export default function CountingSummaryPage() {
         </div>
       </div>
 
+<<<<<<< HEAD
       {/* Real-Time Counter */}
       <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px] mb-5">
         <div className="flex items-center gap-2 mb-4">
@@ -373,6 +439,40 @@ export default function CountingSummaryPage() {
 
       {/* Live Counting Feed */}
       <div className="mb-5">
+=======
+      {/* Real-Time Counter */}
+      <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px] mb-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-4 h-4 text-[#22D3A1]" />
+          <span className="text-[13px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+            Real-Time Counter
+          </span>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-9 gap-3">
+          {[
+            { label: "Live Bags", value: liveBags, color: "#22D3A1" },
+            { label: "Loaded", value: loadedBags, color: "#22D3A1" },
+            { label: "Unloaded", value: unloadedBags, color: "#F5A623" },
+            { label: "People", value: livePeople, color: "#A78BFA" },
+            { label: "Workers", value: liveWorkers, color: "#F5C542" },
+            { label: "Managers", value: liveManagers, color: "#5B9BF5" },
+            { label: "Vehicles", value: liveVehicles, color: "#E5521A" },
+            { label: "Active Detections", value: primaryDetections.length, color: "#5B9BF5" },
+            { label: "Confidence", value: `${primaryConfidence}%`, color: "#F5A623" },
+          ].map((item) => (
+            <div key={item.label} className="rounded-[12px] bg-[#0F1A30] border border-[#1E2F50] p-3">
+              <div className="text-[9px] font-bold uppercase tracking-wide text-[#4E6090] mb-1">{item.label}</div>
+              <div className="text-[24px] font-black" style={{ color: item.color, fontFamily: "'Syne', sans-serif" }}>
+                {item.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Live Counting Feed */}
+      <div className="mb-5">
+>>>>>>> fca8741f06818592ec45431442d741e85da16722
         <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] overflow-hidden">
           <div className="flex items-center justify-between px-[18px] py-3 border-b border-[#1E2F50]">
             <div className="flex items-center gap-2">
@@ -386,32 +486,46 @@ export default function CountingSummaryPage() {
               {realtime?.running ? "COUNTER RUNNING" : "COUNTER SYNCING"}
             </span>
           </div>
-          <div className="relative aspect-video bg-black">
+          <div className="relative aspect-[16/10] bg-black">
             <img
               src={countingFeedUrl}
               alt="JSW counting line footage"
               className="h-full w-full object-cover"
             />
-            <div className="absolute left-0 right-0 top-1/2 border-t-2 border-dashed border-[#22D3A1]/80 shadow-[0_0_18px_rgba(34,211,161,0.45)]" />
-            <div className="absolute left-4 top-[calc(50%-18px)] rounded-full bg-[#22D3A1] px-2 py-1 text-[9px] font-black text-[#07111F]">
+            <div
+              className="absolute left-0 right-0 border-t-2 border-dashed border-[#22D3A1]/80 shadow-[0_0_18px_rgba(34,211,161,0.45)]"
+              style={{ top: countLineTop }}
+            />
+            <div
+              className="absolute left-4 rounded-full bg-[#22D3A1] px-2 py-1 text-[9px] font-black text-[#07111F]"
+              style={{ top: `calc(${countLineTop} - 18px)` }}
+            >
               COUNT LINE
             </div>
-            {primaryDetections.slice(0, 5).map((det) => (
+            {primaryDetections.slice(0, 12).map((det) => {
+              const color = detectionColor(det.class, det.role);
+              return (
               <div
                 key={det.track_id}
-                className="absolute border-2 border-[#22D3A1] bg-[#22D3A1]/10"
+                className="absolute border-2"
                 style={{
                   left: `${det.bbox_x * 100}%`,
                   top: `${det.bbox_y * 100}%`,
                   width: `${det.bbox_w * 100}%`,
                   height: `${det.bbox_h * 100}%`,
+                  borderColor: color,
+                  backgroundColor: `${color}1A`,
                 }}
               >
-                <span className="absolute -top-5 left-0 rounded bg-[#22D3A1] px-1.5 py-0.5 text-[8px] font-black text-[#07111F]">
-                  {det.class.toUpperCase()} {(det.confidence * 100).toFixed(0)}%
+                <span
+                  className="absolute -top-5 left-0 rounded px-1.5 py-0.5 text-[8px] font-black text-[#07111F]"
+                  style={{ backgroundColor: color }}
+                >
+                  {detectionLabel(det.class, det.role)} {(det.confidence * 100).toFixed(0)}%
                 </span>
               </div>
-            ))}
+              );
+            })}
             <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between bg-gradient-to-t from-black/85 to-transparent px-4 pb-3 pt-14">
               <div>
                 <div style={{ background: "#ffffff", padding: "8px 14px", borderRadius: 10, display: "inline-block" }}>
@@ -425,12 +539,12 @@ export default function CountingSummaryPage() {
               </div>
               <div className="grid grid-cols-3 gap-2 text-right">
                 <div>
-                  <div className="text-[9px] font-bold text-[#8A9BBF] uppercase">In</div>
-                  <div className="text-[20px] font-black text-[#22D3A1]">{primaryLiveCamera?.in_count ?? 0}</div>
+                  <div className="text-[9px] font-bold text-[#8A9BBF] uppercase">Loaded</div>
+                  <div className="text-[20px] font-black text-[#22D3A1]">{loadedBags}</div>
                 </div>
                 <div>
-                  <div className="text-[9px] font-bold text-[#8A9BBF] uppercase">Out</div>
-                  <div className="text-[20px] font-black text-[#F5A623]">{primaryLiveCamera?.out_count ?? 0}</div>
+                  <div className="text-[9px] font-bold text-[#8A9BBF] uppercase">Unloaded</div>
+                  <div className="text-[20px] font-black text-[#F5A623]">{unloadedBags}</div>
                 </div>
                 <div>
                   <div className="text-[9px] font-bold text-[#8A9BBF] uppercase">Net</div>

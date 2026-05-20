@@ -98,17 +98,21 @@ logger = logging.getLogger("intelli.depot.realtime_counter")
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-COUNTING_LINE_Y            = float(os.getenv("COUNTING_LINE_Y",               "0.5"))
+COUNTING_LINE_Y            = float(os.getenv("COUNTING_LINE_Y",               "0.68"))
 DETECTION_INTERVAL         = float(os.getenv("RT_DETECTION_INTERVAL",         "3.0"))
 PUBLISH_INTERVAL           = float(os.getenv("RT_PUBLISH_INTERVAL",           "2.0"))
 CONFIDENCE_THRESHOLD       = float(os.getenv("RT_CONFIDENCE",                 "0.40"))
+ROI_CONFIDENCE_THRESHOLD   = float(os.getenv("RT_ROI_CONFIDENCE",             "0.05"))
+ROI_INFERENCE_IMGSZ        = int(os.getenv("RT_ROI_INFERENCE_IMGSZ",          "1280"))
+ROI_MIN_CONF_WITHOUT_MOTION= float(os.getenv("RT_ROI_MIN_CONF_WITHOUT_MOTION","0.18"))
 COUNTING_DEMO_SEEK_SECONDS = float(os.getenv("COUNTING_DEMO_SEEK_SECONDS",    "18.0"))
 VISION_COUNT_CACHE_SECONDS = float(os.getenv("RT_VISION_COUNT_CACHE_SECONDS", "1.5"))
 MIN_BAG_VISUAL_SCORE       = float(os.getenv("RT_MIN_BAG_VISUAL_SCORE",       "0.20"))
 MOTION_FRAME_DELTA_SECONDS = float(os.getenv("RT_MOTION_FRAME_DELTA_SECONDS", "0.45"))
 MIN_TRANSFER_MOTION_RATIO  = float(os.getenv("RT_MIN_TRANSFER_MOTION_RATIO",  "0.06"))
-COUNT_LINE_BAND            = float(os.getenv("RT_COUNT_LINE_BAND",            "0.22"))
+COUNT_LINE_BAND            = float(os.getenv("RT_COUNT_LINE_BAND",            "0.12"))
 MODEL_IOU_DEDUP_THRESHOLD  = float(os.getenv("RT_MODEL_IOU_DEDUP_THRESHOLD",  "0.50"))
+TRACK_CENTER_DIST_THRESHOLD= float(os.getenv("RT_TRACK_CENTER_DIST_THRESHOLD","0.10"))
 
 # Minimum frames a track must be seen before it is eligible for counting.
 # Prevents ghost detections (reflections, patches) from incrementing counts.
@@ -125,15 +129,23 @@ EXCLUSION_OVERLAP_IOU      = float(os.getenv("RT_EXCLUSION_OVERLAP_IOU",     "0.
 # Cement-bag aspect-ratio range (width / height in the frame).
 # When viewed from above on a conveyor: wide; when viewed from the side: tall.
 # Allow both orientations with a generous range.
-BAG_MIN_ASPECT             = float(os.getenv("RT_BAG_MIN_ASPECT",            "0.25"))
+BAG_MIN_ASPECT             = float(os.getenv("RT_BAG_MIN_ASPECT",            "0.12"))
 BAG_MAX_ASPECT             = float(os.getenv("RT_BAG_MAX_ASPECT",            "7.0"))
 
 # Maximum normalised bbox dimension (anything larger is a truck, not a bag).
 BAG_MAX_NORM_SIDE          = float(os.getenv("RT_BAG_MAX_NORM_SIDE",         "0.45"))
 
+# Pixel fallback must not turn small red logos, shadows, or worker clothing
+# fragments into bag counts. These defaults were checked against the bundled
+# JSW counting video at 854x480 display resolution.
+MIN_PIXEL_BAG_NORM_WIDTH   = float(os.getenv("RT_MIN_PIXEL_BAG_NORM_WIDTH",  "0.035"))
+MIN_PIXEL_BAG_NORM_HEIGHT  = float(os.getenv("RT_MIN_PIXEL_BAG_NORM_HEIGHT", "0.025"))
+MIN_PIXEL_BAG_AREA         = int(os.getenv("RT_MIN_PIXEL_BAG_AREA",          "320"))
+
 ALLOW_SIMULATED_COUNTING     = os.getenv("ALLOW_SIMULATED_COUNTING",         "false").lower() in {"1","true","yes"}
 ALLOW_REFERENCE_COUNT_PROFILE= os.getenv("ALLOW_REFERENCE_COUNT_PROFILE",    "false").lower() in {"1","true","yes"}
 ENABLE_PIXEL_BAG_FALLBACK    = os.getenv("RT_ENABLE_PIXEL_BAG_FALLBACK",     "true").lower() in {"1","true","yes"}
+ENABLE_ROI_BAG_INFERENCE     = os.getenv("RT_ENABLE_ROI_BAG_INFERENCE",      "true").lower() in {"1","true","yes"}
 
 COUNTABLE_CLASSES = ["bag", "box", "pallet", "carton", "truck", "vehicle"]
 COUNTED_CLASSES   = {"bag"}
@@ -166,6 +178,16 @@ _YOLO_CLASS_MAP: dict[str, str] = {
     "backpack": "bag", "handbag": "bag", "suitcase": "bag",
     "box": "box", "carton": "carton", "pallet": "pallet",
 }
+
+# Normalised regions where cement bags are large enough for the fine-tuned
+# checkpoint to work reliably. Full-frame CCTV inference makes individual bags
+# too small, so we run the same model again on these crops and project boxes
+# back into full-frame coordinates.
+_BAG_INFERENCE_ROIS: list[tuple[str, float, float, float, float]] = [
+    ("left_stack_transfer", 0.00, 0.46, 0.38, 0.86),
+    ("truck_bed_transfer",  0.18, 0.45, 0.72, 0.86),
+    ("right_stack_transfer",0.82, 0.36, 1.00, 0.84),
+]
 
 # ---------------------------------------------------------------------------
 # State
@@ -393,6 +415,82 @@ def _exclusion_regions_from_frame(frame: np.ndarray) -> dict[str, list[dict]]:
 
 
 # ===========================================================================
+# Live object metadata - people, roles, and vehicles
+# ===========================================================================
+
+def _person_role_from_clothing(frame: np.ndarray, det: dict) -> dict:
+    """
+    Lightweight role hint for the live overlay.
+
+    This is intentionally separate from counting logic: people are always
+    exclusion regions, and role hints must never increment bag counts.
+    """
+    try:
+        import cv2
+    except ImportError:
+        return {"role": "person", "role_confidence": 0.0}
+
+    h, w = frame.shape[:2]
+    x1 = max(0, int(det["bbox_x"] * w))
+    y1 = max(0, int(det["bbox_y"] * h))
+    x2 = min(w, int((det["bbox_x"] + det["bbox_w"]) * w))
+    y2 = min(h, int((det["bbox_y"] + det["bbox_h"]) * h))
+    if x2 <= x1 or y2 <= y1:
+        return {"role": "person", "role_confidence": 0.0}
+
+    crop = frame[y1:y2, x1:x2]
+    if crop.size == 0:
+        return {"role": "person", "role_confidence": 0.0}
+
+    hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+    hue = hsv[:, :, 0]
+    sat = hsv[:, :, 1]
+    val = hsv[:, :, 2]
+    high_vis = (
+        (hue >= 14)
+        & (hue <= 42)
+        & (sat >= 45)
+        & (val >= 80)
+    )
+    high_vis_ratio = float(np.mean(high_vis))
+
+    if high_vis_ratio >= 0.035:
+        return {
+            "role": "worker",
+            "role_confidence": round(min(0.98, 0.70 + high_vis_ratio * 3.0), 3),
+        }
+
+    return {
+        "role": "manager",
+        "role_confidence": round(max(0.45, 0.78 - high_vis_ratio * 2.0), 3),
+    }
+
+
+def _live_object_detection(
+    det: dict,
+    class_name: str,
+    track_id: int,
+    frame: Optional[np.ndarray] = None,
+) -> dict:
+    obj = {
+        "track_id": track_id,
+        "class": class_name,
+        "confidence": round(float(det.get("confidence", 0.0)), 4),
+        "bbox_x": round(float(det["bbox_x"]), 4),
+        "bbox_y": round(float(det["bbox_y"]), 4),
+        "bbox_w": round(float(det["bbox_w"]), 4),
+        "bbox_h": round(float(det["bbox_h"]), 4),
+        "countable": class_name == "bag",
+        "source_model": det.get("source_model", "coco_exclusion"),
+    }
+    if class_name == "person" and frame is not None:
+        obj.update(_person_role_from_clothing(frame, det))
+    if det.get("raw_class"):
+        obj["raw_class"] = det["raw_class"]
+    return obj
+
+
+# ===========================================================================
 # Geometry helpers
 # ===========================================================================
 
@@ -545,7 +643,77 @@ def _detect_frame(frame: np.ndarray) -> list[dict]:
                     "raw_class":    cls_name,
                 })
 
+    if ENABLE_ROI_BAG_INFERENCE:
+        raw.extend(_detect_frame_rois(frame, models))
+
     return _dedupe_detections(raw)
+
+
+def _detect_frame_rois(
+    frame: np.ndarray,
+    models: list[tuple[str, object]],
+) -> list[dict]:
+    """
+    Run the fine-tuned bag model on depot transfer ROIs.
+
+    The JSW CCTV frame is wide and high-mounted; a single cement bag often
+    occupies only a few dozen pixels in the full frame. Cropping the transfer
+    zones lets best_cement_bags_2025-05-29.pt see the sack at training scale.
+    """
+    if not models:
+        return []
+
+    h, w = frame.shape[:2]
+    raw: list[dict] = []
+
+    for roi_name, x1n, y1n, x2n, y2n in _BAG_INFERENCE_ROIS:
+        x1 = max(0, min(w - 1, int(x1n * w)))
+        y1 = max(0, min(h - 1, int(y1n * h)))
+        x2 = max(x1 + 1, min(w, int(x2n * w)))
+        y2 = max(y1 + 1, min(h, int(y2n * h)))
+        crop = frame[y1:y2, x1:x2]
+        if crop.size == 0:
+            continue
+        crop_h, crop_w = crop.shape[:2]
+
+        for model_name, model in models:
+            try:
+                results = model(
+                    crop,
+                    conf=ROI_CONFIDENCE_THRESHOLD,
+                    imgsz=ROI_INFERENCE_IMGSZ,
+                    verbose=False,
+                )
+            except Exception as exc:
+                logger.debug("ROI inference failed on %s/%s: %s", model_name, roi_name, exc)
+                continue
+
+            for r in results:
+                for box in r.boxes:
+                    cls_id = int(box.cls[0])
+                    cls_name = r.names.get(cls_id, "unknown")
+                    mapped = _YOLO_CLASS_MAP.get(cls_name, cls_name)
+                    if mapped not in COUNTABLE_CLASSES:
+                        continue
+                    bx1, by1, bx2, by2 = box.xyxy[0].tolist()
+                    gx1 = x1 + bx1
+                    gy1 = y1 + by1
+                    gx2 = x1 + bx2
+                    gy2 = y1 + by2
+                    raw.append({
+                        "class_label": mapped,
+                        "confidence": round(float(box.conf[0]), 4),
+                        "bbox_x": round(gx1 / w, 4),
+                        "bbox_y": round(gy1 / h, 4),
+                        "bbox_w": round((gx2 - gx1) / w, 4),
+                        "bbox_h": round((gy2 - gy1) / h, 4),
+                        "source_model": f"{model_name}:roi:{roi_name}",
+                        "raw_class": cls_name,
+                        "roi": roi_name,
+                        "crop_scale": round(max(crop_w / max(w, 1), crop_h / max(h, 1)), 4),
+                    })
+
+    return raw
 
 
 def _dedupe_detections(detections: list[dict]) -> list[dict]:
@@ -603,6 +771,20 @@ def _validated_bag_detections(
     # Primary model's truck detections are more accurate in depot context
     # (trained on depot footage). COCO vehicles cover cars/buses outside.
     exclusion_all = [*primary_vehicles, *person_regions, *vehicle_regions]
+    object_detections = [
+        *[
+            _live_object_detection(det, "vehicle", 20_000 + idx, frame)
+            for idx, det in enumerate(primary_vehicles)
+        ],
+        *[
+            _live_object_detection(det, "person", 30_000 + idx, frame)
+            for idx, det in enumerate(person_regions)
+        ],
+        *[
+            _live_object_detection(det, "vehicle", 40_000 + idx, frame)
+            for idx, det in enumerate(vehicle_regions)
+        ],
+    ]
 
     # ── Step 4: Filter bag candidates ────────────────────────────────────
     validated: list[dict] = []
@@ -639,6 +821,18 @@ def _validated_bag_detections(
             continue
 
         # Passed all gates — blend model confidence with visual evidence
+        # ROI detections recover small true bags, but low-confidence crop hits
+        # must show local motion before they can affect live counting.
+        is_roi_detection = ":roi:" in str(det.get("source_model", ""))
+        motion_ratio = _detection_motion_ratio(frame, previous_frame, det)
+        if is_roi_detection and det["confidence"] < ROI_MIN_CONF_WITHOUT_MOTION:
+            if motion_ratio < MIN_TRANSFER_MOTION_RATIO:
+                logger.debug(
+                    "Bag suppressed (ROI low-conf static): conf=%.3f motion=%.3f",
+                    det["confidence"], motion_ratio,
+                )
+                continue
+
         blended_conf = round(
             min(0.99, det["confidence"] * 0.80 + vis_score * 0.20), 4
         )
@@ -652,13 +846,16 @@ def _validated_bag_detections(
             "bbox_h":      det["bbox_h"],
             "source_model": det.get("source_model", "unknown"),
             "visual_score": round(vis_score, 3),
+            "motion_ratio": round(motion_ratio, 3),
         })
         track_id += 1
 
     # ── Step 5: Pixel fallback (only when models found nothing) ──────────
-    if not validated and ENABLE_PIXEL_BAG_FALLBACK and bag_candidates == []:
+    pixel_fallback_used = False
+    if not validated and ENABLE_PIXEL_BAG_FALLBACK:
         pixel_bags = _pixel_bag_candidates(frame, previous_frame, exclusion_all)
         validated.extend(pixel_bags)
+        pixel_fallback_used = bool(pixel_bags)
 
     analysis = {
         "primary_truck_regions":  len(primary_vehicles),
@@ -666,7 +863,8 @@ def _validated_bag_detections(
         "coco_vehicle_regions":   len(vehicle_regions),
         "bag_candidates_raw":     len(bag_candidates),
         "bag_candidates_passed":  len(validated),
-        "pixel_fallback_used":    (not bag_candidates and ENABLE_PIXEL_BAG_FALLBACK),
+        "pixel_fallback_used":    pixel_fallback_used,
+        "object_detections":      object_detections,
     }
     return validated, analysis
 
@@ -691,6 +889,27 @@ def _motion_mask(frame: np.ndarray, prev: Optional[np.ndarray]) -> Optional[np.n
     _, motion = cv2.threshold(diff, 22, 255, cv2.THRESH_BINARY)
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
     return cv2.dilate(motion, kernel, iterations=2)
+
+
+def _detection_motion_ratio(
+    frame: np.ndarray,
+    previous_frame: Optional[np.ndarray],
+    det: dict,
+) -> float:
+    motion = _motion_mask(frame, previous_frame)
+    if motion is None:
+        return 1.0
+    h, w = frame.shape[:2]
+    x1 = max(0, int(det["bbox_x"] * w))
+    y1 = max(0, int(det["bbox_y"] * h))
+    x2 = min(w, int((det["bbox_x"] + det["bbox_w"]) * w))
+    y2 = min(h, int((det["bbox_y"] + det["bbox_h"]) * h))
+    if x2 <= x1 or y2 <= y1:
+        return 0.0
+    crop_m = motion[y1:y2, x1:x2]
+    if crop_m.size == 0:
+        return 0.0
+    return float(np.mean(crop_m > 0))
 
 
 def _pixel_bag_candidates(
@@ -739,7 +958,9 @@ def _pixel_bag_candidates(
             "bbox_w": bw / w, "bbox_h": bh / h,
         }
 
-        if area < 80 or bw < 8 or bh < 5:
+        if area < MIN_PIXEL_BAG_AREA or bw < 8 or bh < 5:
+            continue
+        if det["bbox_w"] < MIN_PIXEL_BAG_NORM_WIDTH or det["bbox_h"] < MIN_PIXEL_BAG_NORM_HEIGHT:
             continue
         if not _is_plausible_bag_size(det):
             continue
@@ -801,15 +1022,18 @@ class _SimpleTracker:
         results: list[dict] = []
 
         for tid, trk in list(self.tracks.items()):
-            best_iou, best_idx = 0.0, -1
+            best_score, best_iou, best_idx = 0.0, 0.0, -1
             for di, det in enumerate(detections):
                 if di in matched_dets:
                     continue
                 iou = self._calc_iou(trk, det)
-                if iou > best_iou:
-                    best_iou, best_idx = iou, di
+                dist = self._center_distance(trk, det)
+                center_score = max(0.0, 1.0 - (dist / max(TRACK_CENTER_DIST_THRESHOLD, 1e-6)))
+                score = max(iou, center_score * 0.75)
+                if score > best_score:
+                    best_score, best_iou, best_idx = score, iou, di
 
-            if best_iou >= self.iou_threshold and best_idx >= 0:
+            if best_score >= self.iou_threshold and best_idx >= 0:
                 det       = detections[best_idx]
                 prev_y    = trk["center_y"]
                 new_y     = det["bbox_y"] + det["bbox_h"] / 2
@@ -829,6 +1053,7 @@ class _SimpleTracker:
                     "confirmed":    confirmed,
                     "cross_side":   new_side,
                     "source_model": det.get("source_model", "unknown"),
+                    "motion_ratio": det.get("motion_ratio", 0.0),
                 })
                 results.append({"track_id": tid, **self.tracks[tid]})
                 matched_tracks.add(tid)
@@ -859,6 +1084,7 @@ class _SimpleTracker:
                     "confirmed":      1 >= MIN_TRACK_AGE_FRAMES,
                     "cross_side":     "below" if center_y >= COUNTING_LINE_Y else "above",
                     "source_model":   det.get("source_model", "unknown"),
+                    "motion_ratio":   det.get("motion_ratio", 0.0),
                 }
                 results.append({"track_id": tid, **self.tracks[tid]})
 
@@ -876,6 +1102,14 @@ class _SimpleTracker:
         area_t = trk["bbox_w"] * trk["bbox_h"]
         area_d = det["bbox_w"] * det["bbox_h"]
         return inter / max(area_t + area_d - inter, 1e-9)
+
+    @staticmethod
+    def _center_distance(trk: dict, det: dict) -> float:
+        tx = trk["bbox_x"] + trk["bbox_w"] / 2
+        ty = trk["bbox_y"] + trk["bbox_h"] / 2
+        dx = det["bbox_x"] + det["bbox_w"] / 2
+        dy = det["bbox_y"] + det["bbox_h"] / 2
+        return ((tx - dx) ** 2 + (ty - dy) ** 2) ** 0.5
 
 
 _trackers: dict[str, _SimpleTracker] = {}
@@ -973,6 +1207,11 @@ def _process_tracks(camera_id: str, tracked: list[dict]) -> dict:
                 "target_side": "above",
                 "frames_left": CROSSING_CONFIRM_FRAMES,
             }
+        elif obj.get("motion_ratio", 0.0) >= MIN_TRANSFER_MOTION_RATIO and _is_in_transfer_corridor(obj):
+            direction = "in" if curr_y >= prev_y else "out"
+            delta[direction] += 1
+            delta[f"by_class_{direction}"][obj.get("class", "bag")] += 1
+            counted.add(tid)
 
     return delta
 
@@ -1001,6 +1240,7 @@ def _current_demo_seek_seconds() -> float:
 
 def _vision_counting_camera() -> Optional[dict]:
     """Run real vision on the demo video and return structured counts."""
+    global _demo_in_total, _demo_out_total, _demo_last_elapsed
     now    = time.monotonic()
     cached = _demo_vision_cache.get("camera")
     if cached and now - float(_demo_vision_cache.get("at", 0.0)) < VISION_COUNT_CACHE_SECONDS:
@@ -1031,8 +1271,30 @@ def _vision_counting_camera() -> Optional[dict]:
         pass
 
     detections, analysis = _validated_bag_detections(frame, prev_frame)
-    bag_count   = len(detections)
-    avg_conf    = (sum(d["confidence"] for d in detections) / bag_count) if bag_count else 0.0
+    if seek < _demo_last_elapsed:
+        _demo_in_total = 0
+        _demo_out_total = 0
+        _trackers.pop(COUNTING_DEMO_CAMERA_ID, None)
+        _counted_tracks.pop(COUNTING_DEMO_CAMERA_ID, None)
+        _pending_crosses.pop(COUNTING_DEMO_CAMERA_ID, None)
+    _demo_last_elapsed = seek
+
+    if COUNTING_DEMO_CAMERA_ID not in _trackers:
+        _trackers[COUNTING_DEMO_CAMERA_ID] = _SimpleTracker()
+    tracked_bags = _trackers[COUNTING_DEMO_CAMERA_ID].update(detections)
+    delta = _process_tracks(COUNTING_DEMO_CAMERA_ID, tracked_bags)
+    _demo_in_total += delta["in"]
+    _demo_out_total += delta["out"]
+
+    active_bag_count = len(tracked_bags)
+    net_count = _demo_in_total - _demo_out_total
+    avg_conf = (
+        sum(d["confidence"] for d in tracked_bags) / active_bag_count
+        if active_bag_count else 0.0
+    )
+    object_detections = analysis.get("object_detections", [])
+    person_count = sum(1 for obj in object_detections if obj.get("class") == "person")
+    vehicle_count = sum(1 for obj in object_detections if obj.get("class") == "vehicle")
 
     camera = {
         "camera_id":       COUNTING_DEMO_CAMERA_ID,
@@ -1041,14 +1303,36 @@ def _vision_counting_camera() -> Optional[dict]:
         "video_file":      COUNTING_DEMO_VIDEO,
         "reference_video": COUNTING_REFERENCE_VIDEO,
         "scene":           "Vision verified bag detections",
-        "in_count":        bag_count,
-        "out_count":       0,
-        "total":           bag_count,
+        "in_count":        _demo_in_total,
+        "out_count":       _demo_out_total,
+        "loaded_count":    _demo_in_total,
+        "unloaded_count":  _demo_out_total,
+        "total":           net_count,
         "by_class": {
-            "bag": {"in": bag_count, "out": 0, "net": bag_count},
+            "bag": {"in": _demo_in_total, "out": _demo_out_total, "net": net_count},
             "box": {"in": 0, "out": 0, "net": 0},
+            "person": {"in": person_count, "out": 0, "net": person_count},
+            "vehicle": {"in": vehicle_count, "out": 0, "net": vehicle_count},
         },
-        "detections":      detections,
+        "detections":      [
+            *[
+                {
+                    "track_id":   t["track_id"],
+                    "class":      t["class"],
+                    "confidence": t["confidence"],
+                    "confirmed":  t.get("confirmed", False),
+                    "track_age":  t.get("track_age", 0),
+                    "bbox_x":     t["bbox_x"],
+                    "bbox_y":     t["bbox_y"],
+                    "bbox_w":     t["bbox_w"],
+                    "bbox_h":     t["bbox_h"],
+                    "source_model": t.get("source_model", "unknown"),
+                    "motion_ratio": t.get("motion_ratio", 0.0),
+                }
+                for t in tracked_bags
+            ],
+            *object_detections,
+        ],
         "analysis":        {
             **analysis,
             "mode":          "transfer_count",
@@ -1075,6 +1359,7 @@ def _empty_counting_camera(scene: str) -> dict:
         "zone": "Loading Bay 1-4", "video_file": COUNTING_DEMO_VIDEO,
         "reference_video": COUNTING_REFERENCE_VIDEO, "scene": scene,
         "in_count": 0, "out_count": 0, "total": 0,
+        "loaded_count": 0, "unloaded_count": 0,
         "by_class": {
             "bag": {"in": 0, "out": 0, "net": 0},
             "box": {"in": 0, "out": 0, "net": 0},
@@ -1109,6 +1394,7 @@ def _reference_counting_camera() -> dict:
         "zone": "Loading Bay 1-4", "video_file": COUNTING_DEMO_VIDEO,
         "reference_video": COUNTING_REFERENCE_VIDEO, "scene": scene,
         "in_count": count, "out_count": 0, "total": count,
+        "loaded_count": count, "unloaded_count": 0,
         "by_class": {"bag": {"in": count, "out": 0, "net": count}, "box": {"in": 0, "out": 0, "net": 0}},
         "detections": dets,
         "last_update": datetime.now(timezone.utc).isoformat(),
@@ -1242,6 +1528,7 @@ async def _realtime_loop():
                 dets, _analysis = await loop.run_in_executor(
                     None, _validated_bag_detections, frame, prev_frame
                 )
+                object_detections = _analysis.get("object_detections", [])
 
                 _prev_frames[cam_id] = frame.copy()
 
@@ -1266,6 +1553,8 @@ async def _realtime_loop():
                 cc["in_count"]  += delta["in"]
                 cc["out_count"] += delta["out"]
                 cc["total"]      = cc["in_count"] - cc["out_count"]
+                cc["loaded_count"] = cc["in_count"]
+                cc["unloaded_count"] = cc["out_count"]
                 cc["last_update"]= datetime.now(timezone.utc).isoformat()
                 cc["detections"] = [
                     {
@@ -1278,9 +1567,11 @@ async def _realtime_loop():
                         "bbox_y":     t["bbox_y"],
                         "bbox_w":     t["bbox_w"],
                         "bbox_h":     t["bbox_h"],
+                        "source_model": t.get("source_model", "unknown"),
+                        "motion_ratio": t.get("motion_ratio", 0.0),
                     }
                     for t in tracked
-                ]
+                ] + list(object_detections)
 
                 for cls, cnt in delta["by_class_in"].items():
                     if cls not in cc["by_class"]:
