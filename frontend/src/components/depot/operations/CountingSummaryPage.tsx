@@ -414,11 +414,13 @@ export default function CountingSummaryPage() {
             ))}
             <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between bg-gradient-to-t from-black/85 to-transparent px-4 pb-3 pt-14">
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8A9BBF]">
-                  {primaryLiveCamera?.zone ?? "Loading Bay 1-4"}
-                </div>
-                <div className="text-[18px] font-black text-white" style={{ fontFamily: "'Syne', sans-serif" }}>
-                  {primaryLiveCamera?.scene ?? "Live bag movement"}
+                <div style={{ background: "#ffffff", padding: "8px 14px", borderRadius: 10, display: "inline-block" }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#000000", letterSpacing: "0.02em", whiteSpace: "nowrap" }}>
+                    {primaryLiveCamera?.zone ?? "Loading Bay 1-4"}
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#444444", whiteSpace: "nowrap", marginTop: 2 }}>
+                    {primaryLiveCamera?.scene ?? "Vision verified bag detections"}
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2 text-right">
