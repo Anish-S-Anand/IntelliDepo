@@ -130,6 +130,7 @@ function detectionLabel(detClass: string, role?: string): string {
   if (role === "manager") return "MANAGER";
   return detClass.toUpperCase();
 }
+>>>>>>> fca8741f06818592ec45431442d741e85da16722
 
 // ---------------------------------------------------------------------------
 // Data-shaping helpers
@@ -389,6 +390,7 @@ export default function CountingSummaryPage() {
 
       {/* Live Counting Feed */}
       <div className="mb-5">
+>>>>>>> fca8741f06818592ec45431442d741e85da16722
         <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] overflow-hidden">
           <div className="flex items-center justify-between px-[18px] py-3 border-b border-[#1E2F50]">
             <div className="flex items-center gap-2">

@@ -455,20 +455,7 @@ export default function InventoryPage() {
       // Zones
       if (zonesRes.status === "fulfilled" && zonesRes.value.ok) {
         const zData: ZoneData[] = await zonesRes.value.json();
-        // Update zones with heatmap data if available
-        const updatedZones = zData.map(zone => {
-          const heatmap = heatmapData[zone.zone_code];
-          if (heatmap) {
-            return {
-              ...zone,
-              utilization_pct: heatmap.utilization_pct,
-              current_occupancy: heatmap.current_occupancy,
-              max_capacity_units: heatmap.max_capacity_units,
-            };
-          }
-          return zone;
-        });
-        setZones(updatedZones.sort((a, b) => a.zone_code.localeCompare(b.zone_code)));
+        setZones(zData.sort((a, b) => a.zone_code.localeCompare(b.zone_code)));
       }
 
       // Batches → cluster cards AND store raw batch data
