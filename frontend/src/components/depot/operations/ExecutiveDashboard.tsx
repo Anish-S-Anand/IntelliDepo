@@ -319,32 +319,25 @@ export default function ExecutiveDashboard() {
       getDepotCommandSnapshot().then((snap) => {
         if (!cancelled && snap.cameras.data.length > 0) setCameras(snap.cameras.data);
       }).catch(() => {});
-<<<<<<< HEAD
       // Same endpoint as Inventory page — live utilization from active batches
       fetch("/backend/depot/vision/cluster/zones")
         .then((r) => r.ok ? r.json() : Promise.reject())
         .then((data: LiveZone[]) => { if (data.length > 0) setLiveZones(data); })
         .catch(() => {});
-=======
-      getZones().then((z) => { if (!cancelled && z.length > 0) setZones(z); }).catch(() => {});
->>>>>>> e6caae971d568031e6f05ba0703ebb25f92f1833
       getIncidents()
         .then((items) => { if (!cancelled) setBackendIncidents(dedupeIncidentResponses(items)); })
         .catch(() => {});
     };
 
     loadDashboardData();
-<<<<<<< HEAD
     const id = setInterval(loadDashboardData, 10000);
-    return () => clearInterval(id);
-=======
-    // Increased from 20s to 30s for better performance
-    const id = setInterval(loadDashboardData, 30000);
+    // Re-fetch immediately when a batch is added or deleted in Inventory
+    window.addEventListener("depot:batch-change", loadDashboardData);
     return () => {
       cancelled = true;
       clearInterval(id);
+      window.removeEventListener("depot:batch-change", loadDashboardData);
     };
->>>>>>> e6caae971d568031e6f05ba0703ebb25f92f1833
   }, []);
 
   // Map backend cameras to the shape used in the UI

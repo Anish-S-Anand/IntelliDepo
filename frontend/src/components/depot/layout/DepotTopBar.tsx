@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Bell, RefreshCw, Settings, User, Clock, LogOut, ChevronDown, Shield } from "lucide-react";
+import { Bell, RefreshCw, Settings, User, Clock, LogOut, ChevronDown, Shield, MapPin } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { getAllActiveAlerts } from "@/services/depotVision";
@@ -65,7 +65,7 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
 
   return (
     <header
-      className="depot-topbar fixed top-0 left-0 right-0 h-[52px] flex items-center px-3 sm:px-4 gap-2 sm:gap-3 z-50 theme-transition"
+      className="depot-topbar fixed top-0 left-0 right-0 h-[64px] flex items-center px-3 sm:px-4 gap-2 sm:gap-3 z-50 theme-transition"
       style={{
         backgroundColor: "var(--bg-nav)",
         borderBottom: "1px solid var(--bg-nav-border)",
@@ -84,25 +84,25 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
       {/* Logo */}
       <button
         onClick={() => router.push("/depot/operations")}
-        className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0"
+        className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0"
         aria-label="Go to depot home"
       >
-        <div className="w-[28px] h-[28px] sm:w-[32px] sm:h-[32px] rounded-lg bg-white flex items-center justify-center shadow-[0_0_8px_rgba(229,82,26,0.3)] overflow-hidden flex-shrink-0">
+        <div className="w-[44px] h-[44px] sm:w-[48px] sm:h-[48px] rounded-xl bg-white flex items-center justify-center shadow-[0_0_10px_rgba(229,82,26,0.3)] overflow-hidden flex-shrink-0">
           <Image
             src="/fidelis-logo.png"
             alt="Fidelis"
-            width={28}
-            height={28}
-            className="w-5 h-5 sm:w-6 sm:h-6 object-contain"
+            width={48}
+            height={48}
+            className="w-8 h-8 sm:w-9 sm:h-9 object-contain"
             priority
           />
         </div>
-        <div className="hidden xs:flex flex-col leading-none">
-          <span className="text-[#E5521A] font-extrabold text-[13px] sm:text-[15px] tracking-tight">
+        <div className="hidden xs:flex flex-col leading-none gap-0.5">
+          <span className="text-[#E5521A] font-extrabold text-[17px] sm:text-[19px] tracking-tight">
             Intelli
           </span>
           <span
-            className="text-[7px] sm:text-[8px] font-semibold tracking-[0.12em] uppercase"
+            className="text-[8px] sm:text-[9px] font-semibold tracking-[0.12em] uppercase"
             style={{ color: "var(--text-muted)" }}
           >
             IntelliDepot™
@@ -116,7 +116,7 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
         style={{ backgroundColor: "var(--border-default)" }}
       />
 
-      {/* Depot label — shows "IntelliDepot" since we're single-depot */}
+      {/* Depot location — shows warehouse location from logged-in account */}
       <div
         className="hidden sm:flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-semibold theme-transition"
         style={{
@@ -125,7 +125,16 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
           color: "var(--text-input)",
         }}
       >
-        📍 IntelliDepot
+        <MapPin className="w-3 h-3 text-[#E5521A] flex-shrink-0" />
+        {(() => {
+          if (user?.location) return user.location;
+          // Derive from full_name e.g. "Warehouse Manager - Bengaluru" → "Bengaluru"
+          if (user?.full_name) {
+            const parts = user.full_name.split(/[-–—]/);
+            if (parts.length > 1) return parts[parts.length - 1].trim();
+          }
+          return user?.email?.split("@")[0] ?? "Depot";
+        })()}
       </div>
 
       <div className="flex-1" />
