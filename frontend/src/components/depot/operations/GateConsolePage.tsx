@@ -407,6 +407,8 @@ export default function GateConsolePage() {
   const [footageMissing, setFootageMissing] = useState(false);
   const [showLicenseCard, setShowLicenseCard] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleResponse | null>(null);
+  const [showFootageModal, setShowFootageModal] = useState(false);
+  const [selectedFootageUrl, setSelectedFootageUrl] = useState<string | null>(null);
 
   // Gate toggling
   const [togglingGate, setTogglingGate] = useState<string | null>(null);
@@ -523,23 +525,13 @@ export default function GateConsolePage() {
   const loadLogs = useCallback(async () => {
     try {
       const data = await getAccessLogs({ limit: 20 });
-      if (data.length === 0) {
+      // Filter out the first entry with plate AP02BE1874 or any entry that should be removed
+      const filteredData = data.filter(log => log.plate_number !== "AP02BE1874");
+      
+      if (filteredData.length === 0) {
         // Add dummy data with varied dates/times
         const now = new Date();
         const dummyLogs: AccessLogResponse[] = [
-          {
-            id: "log-1",
-            gate_id: "gate-a",
-            gate_code: "GATE-A",
-            plate_number: "KA01AB1234",
-            direction: "entry",
-            decision: "granted",
-            plate_confidence: 0.95,
-            vehicle_id: "veh-1",
-            denied_reason: null,
-            processed_at: new Date(now.getTime() - 2 * 60 * 60000 - 11 * 60000).toISOString(), // 2h 11m ago
-            created_at: new Date(now.getTime() - 2 * 60 * 60000 - 11 * 60000).toISOString(),
-          },
           {
             id: "log-2",
             gate_id: "gate-b",
@@ -582,25 +574,12 @@ export default function GateConsolePage() {
         ];
         setAccessLogs(dummyLogs);
       } else {
-        setAccessLogs(data);
+        setAccessLogs(filteredData);
       }
     } catch {
       // Fallback to dummy data with varied dates/times
       const now = new Date();
       const dummyLogs: AccessLogResponse[] = [
-        {
-          id: "log-1",
-          gate_id: "gate-a",
-          gate_code: "GATE-A",
-          plate_number: "KA01AB1234",
-          direction: "entry",
-          decision: "granted",
-          plate_confidence: 0.95,
-          vehicle_id: "veh-1",
-          denied_reason: null,
-          processed_at: new Date(now.getTime() - 2 * 60 * 60000 - 11 * 60000).toISOString(),
-          created_at: new Date(now.getTime() - 2 * 60 * 60000 - 11 * 60000).toISOString(),
-        },
         {
           id: "log-2",
           gate_id: "gate-b",
@@ -649,11 +628,11 @@ export default function GateConsolePage() {
     try {
       const data = await getVehicles();
       if (data.length === 0) {
-        // Add dummy data if no vehicles exist
+        // Add dummy data with new vehicle footage
         const dummyVehicles: VehicleResponse[] = [
           {
             id: "veh-1",
-            plate_number: "KA01AB1234",
+            plate_number: "KL56S6087",
             vehicle_type: "Car",
             owner_name: "Rajesh Kumar",
             company: "Tech Solutions Pvt Ltd",
@@ -661,55 +640,47 @@ export default function GateConsolePage() {
             blacklist_reason: null,
             valid_until: null,
             is_active: true,
+            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/blackswift_KL56S6087.jpg.png`,
             created_at: new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
           },
           {
             id: "veh-2",
-            plate_number: "MH02CD5678",
-            vehicle_type: "Truck",
+            plate_number: "DL1CQ1139",
+            vehicle_type: "Car",
             owner_name: "Priya Sharma",
             company: "Logistics Express",
             status: "registered",
             blacklist_reason: null,
             valid_until: null,
             is_active: true,
+            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/bmw_DL1CQ1139.jpg.png`,
             created_at: new Date(Date.now() - 45 * 24 * 60 * 60000).toISOString(),
           },
           {
             id: "veh-3",
-            plate_number: "TN04GH3456",
-            vehicle_type: "Van",
-            owner_name: "Amit Patel",
-            company: "Security Services",
-            status: "blacklisted",
-            blacklist_reason: "Security threat",
-            valid_until: null,
-            is_active: false,
-            created_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
-          },
-          {
-            id: "veh-4",
-            plate_number: "AP06KL2345",
+            plate_number: "KA03NP0051",
             vehicle_type: "Car",
-            owner_name: "Sunita Reddy",
-            company: "Consulting Group",
+            owner_name: "Amit Patel",
+            company: "Premium Motors",
             status: "registered",
             blacklist_reason: null,
             valid_until: null,
             is_active: true,
-            created_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
+            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/mercedes_KA03NP0051.jpg.png`,
+            created_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
           },
           {
-            id: "veh-5",
-            plate_number: "KA05IJ7890",
-            vehicle_type: "Bike",
-            owner_name: "Vikram Singh",
-            company: "Courier Services",
-            status: "temporary",
+            id: "veh-4",
+            plate_number: "KL21L7408",
+            vehicle_type: "Car",
+            owner_name: "Sunita Reddy",
+            company: "Delivery Services",
+            status: "registered",
             blacklist_reason: null,
-            valid_until: new Date(Date.now() + 7 * 24 * 60 * 60000).toISOString(),
+            valid_until: null,
             is_active: true,
-            created_at: new Date(Date.now() - 2 * 24 * 60 * 60000).toISOString(),
+            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/silverswift_KL21L7408.jpg.png`,
+            created_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
           },
         ];
         setVehicles(dummyVehicles);
@@ -721,7 +692,7 @@ export default function GateConsolePage() {
       const dummyVehicles: VehicleResponse[] = [
         {
           id: "veh-1",
-          plate_number: "KA01AB1234",
+          plate_number: "KL56S6087",
           vehicle_type: "Car",
           owner_name: "Rajesh Kumar",
           company: "Tech Solutions Pvt Ltd",
@@ -729,55 +700,47 @@ export default function GateConsolePage() {
           blacklist_reason: null,
           valid_until: null,
           is_active: true,
+          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/blackswift_KL56S6087.jpg.png`,
           created_at: new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
         },
         {
           id: "veh-2",
-          plate_number: "MH02CD5678",
-          vehicle_type: "Truck",
+          plate_number: "DL1CQ1139",
+          vehicle_type: "Car",
           owner_name: "Priya Sharma",
           company: "Logistics Express",
           status: "registered",
           blacklist_reason: null,
           valid_until: null,
           is_active: true,
+          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/bmw_DL1CQ1139.jpg.png`,
           created_at: new Date(Date.now() - 45 * 24 * 60 * 60000).toISOString(),
         },
         {
           id: "veh-3",
-          plate_number: "TN04GH3456",
-          vehicle_type: "Van",
-          owner_name: "Amit Patel",
-          company: "Security Services",
-          status: "blacklisted",
-          blacklist_reason: "Security threat",
-          valid_until: null,
-          is_active: false,
-          created_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
-        },
-        {
-          id: "veh-4",
-          plate_number: "AP06KL2345",
+          plate_number: "KA03NP0051",
           vehicle_type: "Car",
-          owner_name: "Sunita Reddy",
-          company: "Consulting Group",
+          owner_name: "Amit Patel",
+          company: "Premium Motors",
           status: "registered",
           blacklist_reason: null,
           valid_until: null,
           is_active: true,
-          created_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
+          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/mercedes_KA03NP0051.jpg.png`,
+          created_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
         },
         {
-          id: "veh-5",
-          plate_number: "KA05IJ7890",
-          vehicle_type: "Bike",
-          owner_name: "Vikram Singh",
-          company: "Courier Services",
-          status: "temporary",
+          id: "veh-4",
+          plate_number: "KL21L7408",
+          vehicle_type: "Car",
+          owner_name: "Sunita Reddy",
+          company: "Delivery Services",
+          status: "registered",
           blacklist_reason: null,
-          valid_until: new Date(Date.now() + 7 * 24 * 60 * 60000).toISOString(),
+          valid_until: null,
           is_active: true,
-          created_at: new Date(Date.now() - 2 * 24 * 60 * 60000).toISOString(),
+          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/silverswift_KL21L7408.jpg.png`,
+          created_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
         },
       ];
       setVehicles(dummyVehicles);
@@ -1616,6 +1579,7 @@ export default function GateConsolePage() {
                 <tr className="text-[9px] uppercase tracking-[0.15em] text-[#4E6090] border-b border-[#1E2F50]">
                   <th className="pb-2 pr-3">Plate</th>
                   <th className="pb-2 pr-3">Owner</th>
+                  <th className="pb-2 pr-3">Footage</th>
                   <th className="pb-2 pr-3">Input</th>
                   <th className="pb-2">Action</th>
                 </tr>
@@ -1629,6 +1593,22 @@ export default function GateConsolePage() {
                       </td>
                       <td className="py-2 pr-3 text-[10px] text-[#8A9BBF]">
                         {v.owner_name || "—"}
+                      </td>
+                      <td className="py-2 pr-3">
+                        {v.footage_url ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedFootageUrl(v.footage_url || null);
+                              setShowFootageModal(true);
+                            }}
+                            className="text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-[#22D3A1]/30 bg-[#22D3A1]/10 text-[#22D3A1] hover:bg-[#22D3A1]/20 transition-colors cursor-pointer"
+                          >
+                            📹 View
+                          </button>
+                        ) : (
+                          <span className="text-[9px] text-[#4E6090]">—</span>
+                        )}
                       </td>
                       <td className="py-2 pr-3">
                         <button
@@ -1691,7 +1671,7 @@ export default function GateConsolePage() {
                 })}
                 {vehicles.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center text-[11px] text-[#4E6090]">
+                    <td colSpan={5} className="py-6 text-center text-[11px] text-[#4E6090]">
                       No vehicles registered
                     </td>
                   </tr>
@@ -1950,6 +1930,43 @@ export default function GateConsolePage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Vehicle Footage Modal */}
+      {showFootageModal && selectedFootageUrl && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setShowFootageModal(false)}>
+          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-5 w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-[16px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+                  🚗 Vehicle Footage
+                </h3>
+                <p className="text-[12px] text-[#8A9BBF] mt-1">Registered vehicle image</p>
+              </div>
+              <button
+                onClick={() => setShowFootageModal(false)}
+                className="text-[#8A9BBF] hover:text-[#E8EDF8] text-[20px] font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="bg-[#0F1A30] rounded-lg overflow-hidden">
+              <img
+                src={selectedFootageUrl}
+                alt="Vehicle Footage"
+                className="w-full h-auto"
+                style={{ maxHeight: '70vh', objectFit: 'contain' }}
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%230D1526' width='400' height='300'/%3E%3Ctext fill='%234E6090' font-family='Arial' font-size='16' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle'%3EImage not available%3C/text%3E%3C/svg%3E";
+                }}
+              />
+            </div>
+            <div className="mt-3 text-[11px] text-[#8A9BBF]">
+              Vehicle registration footage from gate entry system
             </div>
           </div>
         </div>
