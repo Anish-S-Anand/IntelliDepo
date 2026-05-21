@@ -581,7 +581,7 @@ export default function ExecutiveDashboard() {
               <div key={z.id} className="rounded-[12px] p-3 sm:p-4" style={innerCard}>
                 <div className="flex justify-between items-start mb-2">
                   <span className="text-[13px] sm:text-[15px] font-black" style={{ color: "var(--text-primary)" }}>
-                    {z.name}
+                    Zone {z.id}
                   </span>
                   <span className="text-[15px] sm:text-[18px] font-extrabold" style={{ color: col }}>
                     {z.pct}%

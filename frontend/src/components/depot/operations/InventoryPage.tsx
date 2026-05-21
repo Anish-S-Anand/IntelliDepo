@@ -222,6 +222,22 @@ function displayZoneName(zone: ZoneData): string {
     .trim();
 }
 
+// Fallback full names if backend returns short names
+const ZONE_FULL_NAMES: Record<string, string> = {
+  A: "UltraTech Cement — Zone A",
+  B: "ACC Cement — Zone B",
+  C: "JSW Cement — Zone C",
+  D: "Ambuja Cement — Zone D",
+};
+
+function resolveZoneName(zone: ZoneData): string {
+  // If name is just "Zone A" or similar short form, use the full name map
+  if (/^Zone\s+[A-Z]$/i.test(zone.name.trim()) || zone.name.trim() === zone.zone_code) {
+    return ZONE_FULL_NAMES[zone.zone_code] ?? zone.name;
+  }
+  return zone.name;
+}
+
 function matchesSearch(query: string, values: Array<string | number | null | undefined>): boolean {
   if (!query) return true;
   return values.some((value) => String(value ?? "").toLowerCase().includes(query));
@@ -726,8 +742,8 @@ export default function InventoryPage() {
                   opacity: 0.8,
                 }}
               />
-              <div className="text-[11px] font-extrabold text-[#4E6090] tracking-[0.12em]">
-                ZONE {z.zone_code}
+              <div className="text-[10px] font-extrabold text-[#4E6090] tracking-[0.08em] leading-tight px-1">
+                {resolveZoneName(z)}
               </div>
               <div className="text-[28px] font-extrabold my-1.5" style={{ color: col }}>
                 {pct}%
@@ -891,8 +907,7 @@ export default function InventoryPage() {
                   >
                     <div className="flex justify-between mb-2.5">
                       <div>
-                        <div className="text-[15px] font-bold text-[#E8EDF8]">Zone {z.zone_code}</div>
-                        <div className="text-[11px] text-[#8A9BBF] mt-0.5">{displayZoneName(z)}</div>
+                        <div className="text-[13px] font-bold text-[#E8EDF8] leading-tight">{resolveZoneName(z)}</div>
                         <div className="text-[10px] text-[#4E6090] mt-0.5">{z.zone_type}</div>
                       </div>
                       <div className="flex flex-col gap-1 items-end">
