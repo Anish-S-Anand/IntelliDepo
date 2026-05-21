@@ -12,10 +12,7 @@ import {
   type RealtimeCountsResponse,
   type ReconciliationReport,
 } from "@/services/depotCounting";
-import { exportCountingReport } from "@/lib/exportUtils";
 import {
-  Download,
-  FileText,
   ScanLine,
 } from "lucide-react";
 
@@ -130,7 +127,7 @@ function detectionLabel(detClass: string, role?: string): string {
   if (role === "manager") return "MANAGER";
   return detClass.toUpperCase();
 }
->>>>>>> fca8741f06818592ec45431442d741e85da16722
+
 
 // ---------------------------------------------------------------------------
 // Data-shaping helpers
@@ -334,24 +331,6 @@ export default function CountingSummaryPage() {
     };
   }, [report, realtime]);
 
-  const handleExport = useCallback(() => {
-    if (sessions.length === 0) return;
-    const headers = ["Manifest Code","Vehicle","Expected","Counted","Discrepancy","Confidence","Status","Zone","Camera","Time"];
-    const rows = sessions.map(r => [
-      r.manifestCode, r.vehicleNumber, r.totalExpected, r.totalCounted,
-      r.discrepancy, r.confidenceAvg.toFixed(1) + "%", r.status, r.zone, r.camera,
-      r.timestamp,
-    ]);
-    const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `counting-report-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [sessions]);
-
   // Loading state
   if (loading) {
     return (
@@ -376,21 +355,10 @@ export default function CountingSummaryPage() {
             Counting Summary
           </h2>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => exportCountingReport(sessions)} className="flex items-center gap-2 px-4 py-2 bg-[#E5521A]/10 border border-[#E5521A]/25 rounded-xl text-[#E5521A] text-[12px] font-bold hover:bg-[#E5521A]/20 transition-colors">
-            <FileText className="w-3.5 h-3.5" />
-            PDF
-          </button>
-          <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 bg-[#22D3A1]/10 border border-[#22D3A1]/25 rounded-xl text-[#22D3A1] text-[12px] font-bold hover:bg-[#22D3A1]/20 transition-colors">
-            <Download className="w-3.5 h-3.5" />
-            CSV
-          </button>
-        </div>
       </div>
 
       {/* Live Counting Feed */}
       <div className="mb-5">
->>>>>>> fca8741f06818592ec45431442d741e85da16722
         <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] overflow-hidden">
           <div className="flex items-center justify-between px-[18px] py-3 border-b border-[#1E2F50]">
             <div className="flex items-center gap-2">
