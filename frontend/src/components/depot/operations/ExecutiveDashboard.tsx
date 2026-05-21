@@ -303,19 +303,27 @@ export default function ExecutiveDashboard() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    
     const loadDashboardData = () => {
+      if (cancelled) return;
+      
       getDepotCommandSnapshot().then((snap) => {
-        if (snap.cameras.data.length > 0) setCameras(snap.cameras.data);
+        if (!cancelled && snap.cameras.data.length > 0) setCameras(snap.cameras.data);
       }).catch(() => {});
-      getZones().then((z) => { if (z.length > 0) setZones(z); }).catch(() => {});
+      getZones().then((z) => { if (!cancelled && z.length > 0) setZones(z); }).catch(() => {});
       getIncidents()
-        .then((items) => setBackendIncidents(dedupeIncidentResponses(items)))
+        .then((items) => { if (!cancelled) setBackendIncidents(dedupeIncidentResponses(items)); })
         .catch(() => {});
     };
 
     loadDashboardData();
-    const id = setInterval(loadDashboardData, 20000);
-    return () => clearInterval(id);
+    // Increased from 20s to 30s for better performance
+    const id = setInterval(loadDashboardData, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, []);
 
   // Map backend cameras to the shape used in the UI

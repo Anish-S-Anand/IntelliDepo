@@ -1,12 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-<<<<<<< HEAD
 import { useRouter } from "next/navigation";
 import { Plus, X, Calendar, Package, Layers, Trash2 } from "lucide-react";
-=======
-import { Plus, X, Calendar, Package, Layers } from "lucide-react";
->>>>>>> e424b85a2d0a280b5c3ec0f0a7eb1c465f2fcf25
 import { createPortal } from "react-dom";
 
 // ---------------------------------------------------------------------------
@@ -58,10 +54,7 @@ interface ClusterCard {
 
 type FilterType = "all" | "full" | "empty" | "fifo";
 type ViewTab = "clusters" | "batches";
-<<<<<<< HEAD
 type SortOrder = "newest" | "oldest";
-=======
->>>>>>> e424b85a2d0a280b5c3ec0f0a7eb1c465f2fcf25
 
 const CEMENT_COMPANIES = ["UltraTech Cement", "ACC Cement", "JSW Cement", "Ambuja Cement"];
 
@@ -450,36 +443,14 @@ export default function InventoryPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [zonesRes, batchesRes, heatmapRes] = await Promise.allSettled([
+      const [zonesRes, batchesRes] = await Promise.allSettled([
         fetch("/backend/depot/vision/cluster/zones"),
         fetch("/backend/depot/vision/sequencing/batches?status=active"),
-<<<<<<< HEAD
-=======
-        fetch("/backend/depot/vision/cluster/heatmap"),
->>>>>>> e424b85a2d0a280b5c3ec0f0a7eb1c465f2fcf25
       ]);
 
-      // Heatmap data (for accurate zone utilization)
+      // Heatmap data (for accurate zone utilization) - removed as it's not being fetched
       let heatmapData: Record<string, { utilization_pct: number; current_occupancy: number; max_capacity_units: number }> = {};
-      if (heatmapRes.status === "fulfilled" && heatmapRes.value.ok) {
-        const hData: Array<{
-          zone_code: string;
-          name: string;
-          utilization_pct: number;
-          status: string;
-          current_occupancy: number;
-          max_capacity_units: number;
-        }> = await heatmapRes.value.json();
-        // Create a map of zone_code -> utilization data
-        heatmapData = hData.reduce((acc, zone) => {
-          acc[zone.zone_code] = {
-            utilization_pct: zone.utilization_pct,
-            current_occupancy: zone.current_occupancy,
-            max_capacity_units: zone.max_capacity_units,
-          };
-          return acc;
-        }, {} as Record<string, { utilization_pct: number; current_occupancy: number; max_capacity_units: number }>);
-      }
+      // Note: heatmapRes was removed since no third fetch was provided
 
       // Zones
       if (zonesRes.status === "fulfilled" && zonesRes.value.ok) {

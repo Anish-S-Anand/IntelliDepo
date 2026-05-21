@@ -983,11 +983,12 @@ async def list_depot_videos():
 
 
 @router.get("/video-library/{filename}/mjpeg")
-async def stream_local_video(filename: str, theme: str = "light", seek: float = 0.0):
+async def stream_local_video(filename: str, theme: str = "light", seek: float = 0.0, fps: int = 24):
     """
     Stream a local depot video as MJPEG. Useful for previewing training videos.
     filename: e.g. 'cluster 13 (1).mp4'
     seek: start offset in seconds (default 0).
+    fps: target frames per second (default 24).
     """
     from app.depot.vision.video_library import get_local_video_path
 
@@ -1007,8 +1008,8 @@ async def stream_local_video(filename: str, theme: str = "light", seek: float = 
         # Set capture resolution before reading — reduces per-frame memory by ~4x
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 854)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        # Stream at 24fps for smooth playback
-        TARGET_FPS = 24
+        # Stream at requested fps for smooth playback
+        TARGET_FPS = max(1, min(fps, 60))  # Clamp between 1-60 fps
         src_fps = cap.get(cv2.CAP_PROP_FPS) or 25
         frame_skip = max(1, round(src_fps / TARGET_FPS))
         seek_frame = int(seek * src_fps)
@@ -1030,7 +1031,7 @@ async def stream_local_video(filename: str, theme: str = "light", seek: float = 
                     continue
                 frame = cv2.resize(frame, (854, 480))
                 jpeg_bytes = await loop.run_in_executor(
-                    _cv_pool, _cv_encode_jpeg, frame, 70
+                    _cv_pool, _cv_encode_jpeg, frame, 60  # Reduced quality from 70 to 60 for better performance
                 )
                 yield (
                     boundary

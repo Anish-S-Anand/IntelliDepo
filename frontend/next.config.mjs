@@ -10,6 +10,10 @@ const nextConfig = {
   },
   // Increase static chunk load timeout for large libraries like TensorFlow.js
   staticPageGenerationTimeout: 120,
+  // Enable SWC minification for faster builds
+  swcMinify: true,
+  // Optimize production builds
+  productionBrowserSourceMaps: false,
   async rewrites() {
     const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:8000";
 
