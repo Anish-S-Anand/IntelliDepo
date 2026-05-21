@@ -24,6 +24,7 @@ export interface VehicleResponse {
   blacklist_reason: string | null;
   valid_until: string | null;
   is_active: boolean;
+  footage_url?: string | null;
   created_at: string;
 }
 

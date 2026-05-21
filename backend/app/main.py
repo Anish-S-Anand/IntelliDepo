@@ -142,6 +142,12 @@ setup_middleware(app)
 # Mount static files for tmp folder (LPR images, etc.)
 app.mount("/tmp", StaticFiles(directory="tmp"), name="tmp")
 
+# Mount static files for vehicle registry images
+from pathlib import Path
+vehicle_registry_path = Path("tmp/vehicle_registry")
+vehicle_registry_path.mkdir(parents=True, exist_ok=True)
+app.mount("/api/tmp/vehicle_registry", StaticFiles(directory="tmp/vehicle_registry"), name="vehicle_registry")
+
 
 @app.get("/health")
 async def health_check():
