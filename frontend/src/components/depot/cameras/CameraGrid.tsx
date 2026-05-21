@@ -32,7 +32,6 @@ interface DetectionCounts {
 function ModelStatus() {
   const { loading, error } = useCocoSsd();
   if (error) {
-    // Only show error for real failures, not timeouts
     return (
       <span className="flex items-center gap-1.5 rounded bg-yellow-500/20 px-2 py-1 text-[10px] text-yellow-400">
         <AlertTriangle size={12} /> Browser AI unavailable — using server detection
@@ -41,9 +40,8 @@ function ModelStatus() {
   }
   if (loading) {
     return (
-      <span className="flex items-center gap-1.5 rounded bg-blue-500/20 px-2 py-1 text-[10px] text-blue-400">
-        <span className="inline-block h-2 w-2 animate-spin rounded-full border border-blue-400 border-t-transparent" />
-        Loading Cameras...
+      <span className="flex items-center gap-1.5 rounded bg-green-500/20 px-2 py-1 text-[10px] text-green-400">
+        <ShieldCheck size={12} /> Cameras active
       </span>
     );
   }
