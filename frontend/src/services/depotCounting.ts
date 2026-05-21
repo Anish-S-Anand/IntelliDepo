@@ -77,6 +77,11 @@ export interface ReconciliationReport {
 export interface RealtimeDetection {
   track_id: number;
   class: string;
+  role?: string;
+  role_confidence?: number;
+  countable?: boolean;
+  source_model?: string;
+  raw_class?: string;
   confidence: number;
   bbox_x: number;
   bbox_y: number;
@@ -93,6 +98,8 @@ export interface RealtimeCameraCount {
   scene?: string;
   in_count: number;
   out_count: number;
+  loaded_count?: number;
+  unloaded_count?: number;
   total: number;
   by_class: Record<string, number | { in?: number; out?: number; net?: number }>;
   detections?: RealtimeDetection[];

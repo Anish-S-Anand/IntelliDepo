@@ -95,9 +95,30 @@ function activeClassCount(camera: RealtimeCountsResponse["cameras"][string] | un
 
 function activeConfidence(camera: RealtimeCountsResponse["cameras"][string] | undefined, fallback: string): string {
   const detections = camera?.detections ?? [];
-  if (detections.length === 0) return fallback;
-  const avg = detections.reduce((sum, det) => sum + det.confidence, 0) / detections.length;
+  const bags = detections.filter((det) => det.class.toLowerCase() === "bag");
+  const confidenceSource = bags.length > 0 ? bags : detections;
+  if (confidenceSource.length === 0) return fallback;
+  const avg = confidenceSource.reduce((sum, det) => sum + det.confidence, 0) / confidenceSource.length;
   return (avg * 100).toFixed(1);
+}
+
+function activeRoleCount(camera: RealtimeCountsResponse["cameras"][string] | undefined, role: string): number {
+  return (camera?.detections ?? []).filter((det) => det.role?.toLowerCase() === role).length;
+}
+
+function detectionColor(detClass: string, role?: string): string {
+  const label = role?.toLowerCase() ?? detClass.toLowerCase();
+  if (label === "worker") return "#F5C542";
+  if (label === "manager") return "#5B9BF5";
+  if (detClass.toLowerCase() === "vehicle") return "#F5A623";
+  if (detClass.toLowerCase() === "person") return "#A78BFA";
+  return "#22D3A1";
+}
+
+function detectionLabel(detClass: string, role?: string): string {
+  if (role === "worker") return "WORKER";
+  if (role === "manager") return "MANAGER";
+  return detClass.toUpperCase();
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +257,9 @@ export default function CountingSummaryPage() {
       const avgConfidence = detections.length > 0
         ? detections.reduce((sum, det) => sum + det.confidence, 0) / detections.length * 100
         : 0;
-      const counted = camera.total || detections.length;
+      const counted = typeof camera.total === "number"
+        ? camera.total
+        : detections.filter((det) => det.class.toLowerCase() === "bag").length;
       return {
         id: camera.camera_id,
         manifestCode: "LIVE",
@@ -279,7 +302,7 @@ export default function CountingSummaryPage() {
   const hasReportSessions = Boolean(report && report.total_sessions > 0);
   const liveCameras = realtime ? Object.values(realtime.cameras) : [];
   const primaryLiveCamera = liveCameras.find((camera) => camera.camera_id === "jsw-counting-line") ?? liveCameras[0];
-  const liveDetected = liveCameras.reduce((sum, camera) => sum + (camera.total || camera.detections?.length || 0), 0);
+  const liveDetected = liveCameras.reduce((sum, camera) => sum + (typeof camera.total === "number" ? camera.total : 0), 0);
   const totalExpected = hasReportSessions ? report!.total_expected : sessions.reduce((a, s) => a + s.totalExpected, 0);
   const totalCounted = liveDetected || (hasReportSessions ? report!.total_counted : sessions.reduce((a, s) => a + s.totalCounted, 0));
   void totalExpected;
@@ -289,8 +312,14 @@ export default function CountingSummaryPage() {
     : "0.0";
   const primaryDetections = primaryLiveCamera?.detections ?? [];
   const liveBags = activeClassCount(primaryLiveCamera, "bag");
-  const liveBoxes = activeClassCount(primaryLiveCamera, "box");
+  const livePeople = activeClassCount(primaryLiveCamera, "person");
+  const liveVehicles = activeClassCount(primaryLiveCamera, "vehicle");
+  const liveWorkers = activeRoleCount(primaryLiveCamera, "worker");
+  const liveManagers = activeRoleCount(primaryLiveCamera, "manager");
   const primaryConfidence = activeConfidence(primaryLiveCamera, avgConf);
+  const countLineTop = `${((realtime?.counting_line_y ?? 0.68) * 100).toFixed(2)}%`;
+  const loadedBags = primaryLiveCamera?.loaded_count ?? primaryLiveCamera?.in_count ?? 0;
+  const unloadedBags = primaryLiveCamera?.unloaded_count ?? primaryLiveCamera?.out_count ?? 0;
 
   const handleExport = useCallback(() => {
     if (sessions.length === 0) return;
@@ -354,10 +383,15 @@ export default function CountingSummaryPage() {
             Real-Time Counter
           </span>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-9 gap-3">
           {[
             { label: "Live Bags", value: liveBags, color: "#22D3A1" },
-            { label: "Live Boxes", value: liveBoxes, color: "#E5521A" },
+            { label: "Loaded", value: loadedBags, color: "#22D3A1" },
+            { label: "Unloaded", value: unloadedBags, color: "#F5A623" },
+            { label: "People", value: livePeople, color: "#A78BFA" },
+            { label: "Workers", value: liveWorkers, color: "#F5C542" },
+            { label: "Managers", value: liveManagers, color: "#5B9BF5" },
+            { label: "Vehicles", value: liveVehicles, color: "#E5521A" },
             { label: "Active Detections", value: primaryDetections.length, color: "#5B9BF5" },
             { label: "Confidence", value: `${primaryConfidence}%`, color: "#F5A623" },
           ].map((item) => (
@@ -386,32 +420,46 @@ export default function CountingSummaryPage() {
               {realtime?.running ? "COUNTER RUNNING" : "COUNTER SYNCING"}
             </span>
           </div>
-          <div className="relative aspect-video bg-black">
+          <div className="relative aspect-[16/10] bg-black">
             <img
               src={countingFeedUrl}
               alt="JSW counting line footage"
               className="h-full w-full object-cover"
             />
-            <div className="absolute left-0 right-0 top-1/2 border-t-2 border-dashed border-[#22D3A1]/80 shadow-[0_0_18px_rgba(34,211,161,0.45)]" />
-            <div className="absolute left-4 top-[calc(50%-18px)] rounded-full bg-[#22D3A1] px-2 py-1 text-[9px] font-black text-[#07111F]">
+            <div
+              className="absolute left-0 right-0 border-t-2 border-dashed border-[#22D3A1]/80 shadow-[0_0_18px_rgba(34,211,161,0.45)]"
+              style={{ top: countLineTop }}
+            />
+            <div
+              className="absolute left-4 rounded-full bg-[#22D3A1] px-2 py-1 text-[9px] font-black text-[#07111F]"
+              style={{ top: `calc(${countLineTop} - 18px)` }}
+            >
               COUNT LINE
             </div>
-            {primaryDetections.slice(0, 5).map((det) => (
+            {primaryDetections.slice(0, 12).map((det) => {
+              const color = detectionColor(det.class, det.role);
+              return (
               <div
                 key={det.track_id}
-                className="absolute border-2 border-[#22D3A1] bg-[#22D3A1]/10"
+                className="absolute border-2"
                 style={{
                   left: `${det.bbox_x * 100}%`,
                   top: `${det.bbox_y * 100}%`,
                   width: `${det.bbox_w * 100}%`,
                   height: `${det.bbox_h * 100}%`,
+                  borderColor: color,
+                  backgroundColor: `${color}1A`,
                 }}
               >
-                <span className="absolute -top-5 left-0 rounded bg-[#22D3A1] px-1.5 py-0.5 text-[8px] font-black text-[#07111F]">
-                  {det.class.toUpperCase()} {(det.confidence * 100).toFixed(0)}%
+                <span
+                  className="absolute -top-5 left-0 rounded px-1.5 py-0.5 text-[8px] font-black text-[#07111F]"
+                  style={{ backgroundColor: color }}
+                >
+                  {detectionLabel(det.class, det.role)} {(det.confidence * 100).toFixed(0)}%
                 </span>
               </div>
-            ))}
+              );
+            })}
             <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between bg-gradient-to-t from-black/85 to-transparent px-4 pb-3 pt-14">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8A9BBF]">
@@ -423,12 +471,12 @@ export default function CountingSummaryPage() {
               </div>
               <div className="grid grid-cols-3 gap-2 text-right">
                 <div>
-                  <div className="text-[9px] font-bold text-[#8A9BBF] uppercase">In</div>
-                  <div className="text-[20px] font-black text-[#22D3A1]">{primaryLiveCamera?.in_count ?? 0}</div>
+                  <div className="text-[9px] font-bold text-[#8A9BBF] uppercase">Loaded</div>
+                  <div className="text-[20px] font-black text-[#22D3A1]">{loadedBags}</div>
                 </div>
                 <div>
-                  <div className="text-[9px] font-bold text-[#8A9BBF] uppercase">Out</div>
-                  <div className="text-[20px] font-black text-[#F5A623]">{primaryLiveCamera?.out_count ?? 0}</div>
+                  <div className="text-[9px] font-bold text-[#8A9BBF] uppercase">Unloaded</div>
+                  <div className="text-[20px] font-black text-[#F5A623]">{unloadedBags}</div>
                 </div>
                 <div>
                   <div className="text-[9px] font-bold text-[#8A9BBF] uppercase">Net</div>

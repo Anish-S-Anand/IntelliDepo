@@ -1,4 +1,4 @@
-# Implementation Plan: AI Analysis Log Feed
+## Implementation Plan: AI Analysis Log Feed
 
 ## Overview
 
