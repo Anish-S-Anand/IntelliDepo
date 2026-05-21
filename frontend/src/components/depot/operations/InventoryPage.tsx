@@ -231,11 +231,7 @@ const ZONE_FULL_NAMES: Record<string, string> = {
 };
 
 function resolveZoneName(zone: ZoneData): string {
-  // If name is just "Zone A" or similar short form, use the full name map
-  if (/^Zone\s+[A-Z]$/i.test(zone.name.trim()) || zone.name.trim() === zone.zone_code) {
-    return ZONE_FULL_NAMES[zone.zone_code] ?? zone.name;
-  }
-  return zone.name;
+  return `Zone ${zone.zone_code}`;
 }
 
 function matchesSearch(query: string, values: Array<string | number | null | undefined>): boolean {
