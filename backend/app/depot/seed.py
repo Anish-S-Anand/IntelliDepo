@@ -78,6 +78,7 @@ GATE_ACCESS_LOGS = [
     {"gate_code": "GATE-A", "plate_number": "KA01AB1234", "direction": "entry", "decision": "granted", "denied_reason": None, "minutes_ago": 260},
     {"gate_code": "GATE-A", "plate_number": "DL03EF9012", "direction": "entry", "decision": "granted", "denied_reason": None, "minutes_ago": 256},
     {"gate_code": "GATE-A", "plate_number": "MH02CD5678", "direction": "entry", "decision": "granted", "denied_reason": None, "minutes_ago": 256},
+    {"gate_code": "GATE-B", "plate_number": "RJ-14-IJ-7890", "direction": "exit", "decision": "granted", "denied_reason": None, "minutes_ago": 250},
     {"gate_code": "GATE-C", "plate_number": "TN04GH3456", "direction": "exit", "decision": "granted", "denied_reason": None, "minutes_ago": 243},
 ]
 

@@ -46,26 +46,23 @@ async def apply_live_batch_capacity(db: AsyncSession, zones: list["DepotZone"]) 
         select(
             InventoryBatch.zone,
             func.coalesce(func.sum(InventoryBatch.quantity), 0),
-            func.coalesce(func.sum(InventoryBatch.original_quantity), 0),
         )
         .where(InventoryBatch.status == "active")
         .group_by(InventoryBatch.zone)
     )
+    # occupied = sum of current quantity of active batches per zone
     totals = {
-        zone_code: {"occupied": int(occupied or 0), "capacity": int(capacity or 0)}
-        for zone_code, occupied, capacity in result.all()
+        zone_code: int(occupied or 0)
+        for zone_code, occupied in result.all()
         if zone_code
     }
 
     for zone in zones:
-        total = totals.get(zone.zone_code)
-        if not total:
-            continue
-
-        capacity = total["capacity"] or zone.max_capacity_units
-        utilization_pct = round((total["occupied"] / capacity) * 100, 1) if capacity > 0 else 0.0
-        zone.current_occupancy = total["occupied"]
-        zone.max_capacity_units = capacity
+        # Always use zone.max_capacity_units as the fixed denominator
+        capacity = zone.max_capacity_units or 1000
+        occupied = totals.get(zone.zone_code, 0)
+        utilization_pct = round((occupied / capacity) * 100, 1) if capacity > 0 else 0.0
+        zone.current_occupancy = occupied
         zone.utilization_pct = utilization_pct
         zone.status = _zone_status(utilization_pct)
 

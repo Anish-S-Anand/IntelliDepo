@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Activity, AlertTriangle, Camera, Shield, BellRing, DoorOpen, DoorClosed, Phone } from "lucide-react";
-import { getActiveIncidents, type IncidentResponse } from "@/services/depotPerimeter";
+import { Activity, AlertTriangle, Camera, Shield, BellRing, DoorOpen, DoorClosed, Phone, ChevronDown } from "lucide-react";
+import { getIncidents, type IncidentResponse } from "@/services/depotPerimeter";
 import {
   getDepotCommandSnapshot,
   openCommandGate,
@@ -21,18 +21,34 @@ export default function CommandPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [selectedGateId, setSelectedGateId] = useState<string>("");
 
   const showFeedback = (msg: string, ok = true) => {
     setFeedback({ msg, ok });
     setTimeout(() => setFeedback(null), 3000);
   };
 
+  // Optimistically update a gate's status in local state
+  const updateGateStatus = (gateId: string, newStatus: "open" | "closed") => {
+    setGates((prev) =>
+      prev.map((g) => (g.id === gateId ? { ...g, status: newStatus } : g))
+    );
+  };
+
   const runAction = async (key: string, fn: () => Promise<CommandActionResponse>, successMsg: string) => {
     setActionLoading(key);
+    // Optimistic update for gate actions
+    if (key === "open-gate" && selectedGateId) updateGateStatus(selectedGateId, "open");
+    if (key === "close-gate" && selectedGateId) updateGateStatus(selectedGateId, "closed");
     try {
       await fn();
       showFeedback(successMsg, true);
+      // Re-fetch to sync real state from backend
+      void fetchAll();
     } catch {
+      // Revert optimistic update on failure
+      if (key === "open-gate" && selectedGateId) updateGateStatus(selectedGateId, "closed");
+      if (key === "close-gate" && selectedGateId) updateGateStatus(selectedGateId, "open");
       showFeedback("Action failed — check connection", false);
     } finally {
       setActionLoading(null);
@@ -41,13 +57,16 @@ export default function CommandPage() {
 
   const fetchAll = useCallback(async () => {
     const [incRes, snapRes] = await Promise.allSettled([
-      getActiveIncidents(),
+      getIncidents(),
       getDepotCommandSnapshot(),
     ]);
     if (incRes.status === "fulfilled") setIncidents(incRes.value);
     if (snapRes.status === "fulfilled") {
       setCameras(snapRes.value.cameras.data);
-      setGates(snapRes.value.gates.data);
+      const fetchedGates = snapRes.value.gates.data;
+      setGates(fetchedGates);
+      // Auto-select first gate if none selected yet
+      setSelectedGateId((prev) => prev || fetchedGates[0]?.id || "");
     }
     setLoading(false);
   }, []);
@@ -60,7 +79,8 @@ export default function CommandPage() {
 
   const activeCameras = cameras.filter((c) => c.status === "active");
   const openGates = gates.filter((g) => g.status === "open");
-  const openIncidents = incidents.filter((i) => i.status === "open" || i.status === "escalated");
+  // Match Incidents tab: all non-resolved incidents (open + acknowledged + escalated)
+  const openIncidents = incidents.filter((i) => i.status !== "resolved");
   const criticalIncidents = incidents.filter((i) => i.severity === "critical");
 
   // Group cameras by zone for the depot overview cards
@@ -104,68 +124,106 @@ export default function CommandPage() {
             </span>
           )}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            {
-              key: "open-gate",
-              icon: DoorOpen,
-              label: "Open Gate",
-              sub: gates.find((g) => g.status !== "open")?.name ?? gates[0]?.name ?? "No gates",
-              color: "#22D3A1",
-              fn: () => openCommandGate(gates.find((g) => g.status !== "open")?.id),
-              successMsg: `${gates.find((g) => g.status !== "open")?.name ?? "Gate"} opened`,
-            },
-            {
-              key: "close-gate",
-              icon: DoorClosed,
-              label: "Close Gate",
-              sub: gates.find((g) => g.status === "open")?.name ?? "All closed",
-              color: "#F5A623",
-              fn: () => closeCommandGate(gates.find((g) => g.status === "open")?.id),
-              successMsg: `${gates.find((g) => g.status === "open")?.name ?? "Gate"} closed`,
-            },
-            {
-              key: "trigger-alert",
-              icon: BellRing,
-              label: "Trigger Alert",
-              sub: "Broadcast to all",
-              color: "#E5521A",
-              fn: triggerCommandAlert,
-              successMsg: "Manual alert triggered",
-            },
-            {
-              key: "contact",
-              icon: Phone,
-              label: "Contact Operator",
-              sub: "Page via intercom",
-              color: "#5B9BF5",
-              fn: contactCommandOperator,
-              successMsg: "Operator paged via intercom",
-            },
-          ].map((action) => {
-            const Icon = action.icon;
-            const isLoading = actionLoading === action.key;
-            return (
-              <button
-                key={action.key}
-                onClick={() => runAction(action.key, action.fn, action.successMsg)}
+
+        {/* Gate selector */}
+        {gates.length > 0 && (
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-[10px] text-[#4E6090] font-semibold uppercase tracking-wider">Gate:</span>
+            <div className="relative">
+              <select
+                value={selectedGateId}
+                onChange={(e) => setSelectedGateId(e.target.value)}
                 disabled={!!actionLoading}
-                className="flex min-h-[112px] flex-col items-center justify-center gap-2.5 rounded-[12px] border-2 border-[#33476C] bg-[#101D34] px-4 py-5 shadow-[0_8px_22px_rgba(2,8,23,0.18)] transition-all hover:border-[#4A628E] hover:bg-[#1A2A45] disabled:cursor-not-allowed disabled:opacity-50"
+                className="appearance-none bg-[#0D1526] border border-[#1E2F50] text-[#E8EDF8] text-[11px] font-semibold rounded-lg pl-3 pr-7 py-1.5 cursor-pointer hover:border-[#2A3F68] focus:outline-none focus:border-[#5B9BF5] transition-colors disabled:opacity-50"
               >
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: `${action.color}20`, border: `1.5px solid ${action.color}55` }}>
-                  {isLoading ? (
-                    <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: action.color, borderTopColor: "transparent" }} />
-                  ) : (
-                    <Icon className="h-5 w-5 stroke-[2.75]" style={{ color: action.color }} />
-                  )}
-                </div>
-                <div className="text-center">
-                  <div className="text-[12px] font-extrabold" style={{ color: action.color }}>{action.label}</div>
-                  <div className="mt-1 text-[10px] font-bold text-[#8B9BC1]">{action.sub}</div>
-                </div>
-              </button>
-            );
-          })}
+                {gates.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.gate_code} — {g.name}
+                    {g.status === "open" ? " (Open)" : " (Closed)"}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#4E6090] pointer-events-none" />
+            </div>
+            {(() => {
+              const sel = gates.find((g) => g.id === selectedGateId);
+              if (!sel) return null;
+              const isOpen = sel.status === "open";
+              return (
+                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${isOpen ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-500/15 text-slate-400"}`}>
+                  {sel.status.toUpperCase()}
+                </span>
+              );
+            })()}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {(() => {
+            const selectedGate = gates.find((g) => g.id === selectedGateId);
+            const gateName = selectedGate?.name ?? "No gates";
+            return [
+              {
+                key: "open-gate",
+                icon: DoorOpen,
+                label: "Open Gate",
+                sub: gateName,
+                color: "#22D3A1",
+                fn: () => openCommandGate(selectedGateId || undefined),
+                successMsg: `${gateName} opened`,
+              },
+              {
+                key: "close-gate",
+                icon: DoorClosed,
+                label: "Close Gate",
+                sub: gateName,
+                color: "#F5A623",
+                fn: () => closeCommandGate(selectedGateId || undefined),
+                successMsg: `${gateName} closed`,
+              },
+              {
+                key: "trigger-alert",
+                icon: BellRing,
+                label: "Trigger Alert",
+                sub: "Broadcast to all",
+                color: "#E5521A",
+                fn: triggerCommandAlert,
+                successMsg: "Manual alert triggered",
+              },
+              {
+                key: "contact",
+                icon: Phone,
+                label: "Contact Operator",
+                sub: "Page via intercom",
+                color: "#5B9BF5",
+                fn: contactCommandOperator,
+                successMsg: "Operator paged via intercom",
+              },
+            ].map((action) => {
+              const Icon = action.icon;
+              const isLoading = actionLoading === action.key;
+              return (
+                <button
+                  key={action.key}
+                  onClick={() => runAction(action.key, action.fn, action.successMsg)}
+                  disabled={!!actionLoading}
+                  className="flex min-h-[112px] flex-col items-center justify-center gap-2.5 rounded-[12px] border-2 border-[#33476C] bg-[#101D34] px-4 py-5 shadow-[0_8px_22px_rgba(2,8,23,0.18)] transition-all hover:border-[#4A628E] hover:bg-[#1A2A45] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: `${action.color}20`, border: `1.5px solid ${action.color}55` }}>
+                    {isLoading ? (
+                      <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: action.color, borderTopColor: "transparent" }} />
+                    ) : (
+                      <Icon className="h-5 w-5 stroke-[2.75]" style={{ color: action.color }} />
+                    )}
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[12px] font-extrabold" style={{ color: action.color }}>{action.label}</div>
+                    <div className="mt-1 text-[10px] font-bold text-[#8B9BC1]">{action.sub}</div>
+                  </div>
+                </button>
+              );
+            });
+          })()}
         </div>
       </div>
 
@@ -231,28 +289,7 @@ export default function CommandPage() {
         })}
       </div>
 
-      {/* Gate Status */}
-      {gates.length > 0 && (
-        <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px] mb-5">
-          <div className="text-[13px] font-bold text-[#E8EDF8] mb-3.5">Gate Status</div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {gates.map((g) => {
-              const col = g.status === "open" ? "#F5A623" : g.status === "closed" ? "#22D3A1" : "#F04A4A";
-              return (
-                <div key={g.id} className="bg-[#0F1A30] rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] font-bold text-[#E8EDF8]">{g.name}</span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${col}20`, color: col }}>
-                      {g.status.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-[#4E6090]">{g.total_entries_today} entries today</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+
 
       </div>
   );

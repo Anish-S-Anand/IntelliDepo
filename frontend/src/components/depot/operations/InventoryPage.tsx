@@ -140,7 +140,7 @@ function AddClusterModal({ onClose, onAdd, onRefresh }: AddClusterModalProps) {
               onChange={(e) => setForm((f) => ({ ...f, zone: e.target.value }))}
               className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40"
             >
-              {["A", "B", "C", "D", "E"].map((z) => (
+              {["A", "B", "C", "D"].map((z) => (
                 <option key={z} value={z}>Zone {z}</option>
               ))}
             </select>

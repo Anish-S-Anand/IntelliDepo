@@ -3,8 +3,16 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getDepotCommandSnapshot, type CameraRecord } from "@/services/depotCommand";
-import { getZones, type ZoneResponse } from "@/services/depotCluster";
 import { getIncidents, type IncidentResponse } from "@/services/depotPerimeter";
+
+interface LiveZone {
+  zone_code: string;
+  name: string;
+  utilization_pct: number;
+  current_occupancy: number;
+  max_capacity_units: number;
+  status: string;
+}
 import {
   ShieldAlert,
   CheckCircle2,
@@ -294,7 +302,7 @@ export default function ExecutiveDashboard() {
   const router = useRouter();
   const [, setTick] = useState(0);
   const [cameras, setCameras] = useState<CameraRecord[]>([]);
-  const [zones, setZones] = useState<ZoneResponse[]>([]);
+  const [liveZones, setLiveZones] = useState<LiveZone[]>([]);
   const [backendIncidents, setBackendIncidents] = useState<IncidentResponse[]>([]);
 
   useEffect(() => {
@@ -311,19 +319,32 @@ export default function ExecutiveDashboard() {
       getDepotCommandSnapshot().then((snap) => {
         if (!cancelled && snap.cameras.data.length > 0) setCameras(snap.cameras.data);
       }).catch(() => {});
+<<<<<<< HEAD
+      // Same endpoint as Inventory page — live utilization from active batches
+      fetch("/backend/depot/vision/cluster/zones")
+        .then((r) => r.ok ? r.json() : Promise.reject())
+        .then((data: LiveZone[]) => { if (data.length > 0) setLiveZones(data); })
+        .catch(() => {});
+=======
       getZones().then((z) => { if (!cancelled && z.length > 0) setZones(z); }).catch(() => {});
+>>>>>>> e6caae971d568031e6f05ba0703ebb25f92f1833
       getIncidents()
         .then((items) => { if (!cancelled) setBackendIncidents(dedupeIncidentResponses(items)); })
         .catch(() => {});
     };
 
     loadDashboardData();
+<<<<<<< HEAD
+    const id = setInterval(loadDashboardData, 10000);
+    return () => clearInterval(id);
+=======
     // Increased from 20s to 30s for better performance
     const id = setInterval(loadDashboardData, 30000);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
+>>>>>>> e6caae971d568031e6f05ba0703ebb25f92f1833
   }, []);
 
   // Map backend cameras to the shape used in the UI
@@ -336,16 +357,14 @@ export default function ExecutiveDashboard() {
       }))
     : [] as { id: string; location: string; status: "online" | "offline"; zone: string }[];
 
-  // Map backend zones to the shape used in the UI
-  const ZONES = zones.length > 0
-    ? zones.map((z) => ({
-        id: z.id,
-        name: zoneDisplayName(z),
-        pct: Math.round(z.utilization_pct),
-        used: z.current_occupancy,
-        total: z.max_capacity_units,
-      }))
-    : [] as { id: string; name: string; pct: number; used: number; total: number }[];
+  // Single source of truth: same zones endpoint as Inventory page
+  const ZONES = liveZones.map((z) => ({
+    id: z.zone_code,
+    name: z.name,
+    pct: Math.round(z.utilization_pct),
+    used: z.current_occupancy,
+    total: z.max_capacity_units,
+  }));
 
   const activeIncidents: Incident[] = backendIncidents
     .filter((incident) => incident.status !== "resolved")
