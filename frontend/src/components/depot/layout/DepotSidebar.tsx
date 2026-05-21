@@ -19,8 +19,8 @@ import { getAllActiveAlerts } from "@/services/depotVision";
 import { getPerimeterAlertCount } from "@/services/depotPerimeter";
 
 const NAV_ITEMS = [
-  { label: "CMD", fullLabel: "Command Center", href: "/depot/command", icon: Radio },
   { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard },
+  { label: "CMD", fullLabel: "Command Center", href: "/depot/command", icon: Radio },
   { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package },
   { label: "CAM", fullLabel: "Live Cameras", href: "/depot/vision", icon: Eye },
   { label: "CNT", fullLabel: "Counting", href: "/depot/counting", icon: Hash },

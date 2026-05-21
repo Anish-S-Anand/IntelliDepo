@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.database import BaseModel as DBBaseModel, get_db
 from app.core.auth.dependencies import get_current_user
@@ -25,6 +25,51 @@ from app.shared.models.user import User
 logger = logging.getLogger("intelli.depot.cluster")
 
 router = APIRouter(prefix="/depot/vision/cluster", tags=["Depot - Cluster Mapping"])
+
+
+def _zone_status(utilization_pct: float) -> str:
+    if utilization_pct >= 95:
+        return ZoneStatus.CRITICAL.value
+    if utilization_pct >= 80:
+        return ZoneStatus.WARNING.value
+    return ZoneStatus.NORMAL.value
+
+
+async def apply_live_batch_capacity(db: AsyncSession, zones: list["DepotZone"]) -> list["DepotZone"]:
+    """Overlay persisted zones with live inventory batch capacity totals."""
+    if not zones:
+        return zones
+
+    from app.depot.vision.sequencing import InventoryBatch
+
+    result = await db.execute(
+        select(
+            InventoryBatch.zone,
+            func.coalesce(func.sum(InventoryBatch.quantity), 0),
+            func.coalesce(func.sum(InventoryBatch.original_quantity), 0),
+        )
+        .where(InventoryBatch.status == "active")
+        .group_by(InventoryBatch.zone)
+    )
+    totals = {
+        zone_code: {"occupied": int(occupied or 0), "capacity": int(capacity or 0)}
+        for zone_code, occupied, capacity in result.all()
+        if zone_code
+    }
+
+    for zone in zones:
+        total = totals.get(zone.zone_code)
+        if not total:
+            continue
+
+        capacity = total["capacity"] or zone.max_capacity_units
+        utilization_pct = round((total["occupied"] / capacity) * 100, 1) if capacity > 0 else 0.0
+        zone.current_occupancy = total["occupied"]
+        zone.max_capacity_units = capacity
+        zone.utilization_pct = utilization_pct
+        zone.status = _zone_status(utilization_pct)
+
+    return zones
 
 
 # ---------------------------------------------------------------------------
@@ -204,10 +249,12 @@ async def list_zones(
     query = select(DepotZone).where(DepotZone.is_active == True)
     if zone_type:
         query = query.where(DepotZone.zone_type == zone_type)
-    if status:
-        query = query.where(DepotZone.status == status)
     result = await db.execute(query.order_by(DepotZone.zone_code))
-    return result.scalars().all()
+    zones = result.scalars().all()
+    zones = await apply_live_batch_capacity(db, zones)
+    if status:
+        zones = [zone for zone in zones if zone.status == status]
+    return zones
 
 
 @router.get("/zones/{zone_id}", response_model=ZoneResponse)
@@ -219,6 +266,7 @@ async def get_zone(
     zone = await db.get(DepotZone, zone_id)
     if not zone or not zone.is_active:
         raise HTTPException(status_code=404, detail="Zone not found")
+    await apply_live_batch_capacity(db, [zone])
     return zone
 
 
@@ -308,6 +356,7 @@ async def get_heatmap(
         select(DepotZone).where(DepotZone.is_active == True).order_by(DepotZone.zone_code)
     )
     zones = result.scalars().all()
+    zones = await apply_live_batch_capacity(db, zones)
     return [
         HeatmapEntry(
             zone_code=z.zone_code,
@@ -517,7 +566,6 @@ async def get_density_history(
     zone_id: Optional[uuid.UUID] = None,
     limit: int = 500,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Get zone density history for trend analysis."""
     query = select(ZoneDensityHistory)
@@ -606,6 +654,7 @@ async def get_density_analytics(
         select(DepotZone).where(DepotZone.is_active == True).order_by(DepotZone.zone_code)
     )
     zones = result.scalars().all()
+    zones = await apply_live_batch_capacity(db, zones)
 
     entries = []
     for z in zones:
@@ -734,6 +783,7 @@ async def get_capacity_status(
         select(DepotZone).where(DepotZone.is_active == True).order_by(DepotZone.zone_code)
     )
     zones = zones_result.scalars().all()
+    zones = await apply_live_batch_capacity(db, zones)
 
     # Get global threshold (most recent)
     global_result = await db.execute(

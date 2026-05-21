@@ -27,10 +27,10 @@ const ZONE_LAYOUT: Record<string, { x: number; z: number; w: number; d: number }
 };
 
 const ZONE_LABELS: Record<string, string> = {
-  A: "UltraTech Cement",
-  B: "ACC Cement",
-  C: "JSW Cement",
-  D: "Ambuja Cement",
+  A: "Zone A",
+  B: "Zone B",
+  C: "Zone C",
+  D: "Zone D",
 };
 
 function getZoneColor(status: string, utilPct: number): number {
@@ -114,8 +114,10 @@ export default function Warehouse3DMap({ zones, onZoneClick, selectedZone, flash
 
     Object.entries(ZONE_LAYOUT).forEach(([code, layout]) => {
       const zoneData = zoneMap.get(code);
-      const utilPct = zoneData?.utilizationPct ?? 50;
-      const status = zoneData?.status ?? "normal";
+      if (!zoneData) return;
+
+      const utilPct = zoneData.utilizationPct;
+      const status = zoneData.status;
       const color = getZoneColor(status, utilPct);
       const isSelected = selectedZone === code;
       const isFlashed = flashedZones?.has(code) ?? false;
