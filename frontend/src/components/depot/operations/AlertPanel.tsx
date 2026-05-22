@@ -342,7 +342,7 @@ export default function AlertPanel({
   if (!isOpen) return null;
 
   return (
-    <aside className="fixed top-[52px] right-0 bottom-0 w-[380px] bg-[#0D1526] border-l border-[#1E2F50] z-50 flex flex-col shadow-[-8px_0_32px_rgba(0,0,0,0.4)]">
+    <aside className="fixed top-[64px] right-0 bottom-0 w-[380px] bg-[#0D1526] border-l border-[#1E2F50] z-50 flex flex-col shadow-[-8px_0_32px_rgba(0,0,0,0.4)]">
       {/* Panel header */}
       <div className="px-4 py-3 border-b border-[#1E2F50] flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2">

@@ -19,17 +19,17 @@ import { getAllActiveAlerts } from "@/services/depotVision";
 import { getPerimeterAlertCount } from "@/services/depotPerimeter";
 
 const NAV_ITEMS = [
-  { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard },
-  { label: "CMD", fullLabel: "Command Center", href: "/depot/command", icon: Radio },
-  { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package },
-  { label: "CAM", fullLabel: "Live Cameras", href: "/depot/vision", icon: Eye },
-  { label: "CNT", fullLabel: "Counting", href: "/depot/counting", icon: Hash },
-  { label: "MAP", fullLabel: "Heatmap", href: "/depot/heatmap", icon: Map },
+  { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard, iconColor: "#5B9BF5" },
+  { label: "CMD", fullLabel: "Command Center", href: "/depot/command", icon: Radio, iconColor: "#22D3A1" },
+  { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package, iconColor: "#F5A623" },
+  { label: "CAM", fullLabel: "Live Cameras", href: "/depot/vision", icon: Eye, iconColor: "#A78BFA" },
+  { label: "CNT", fullLabel: "Counting", href: "/depot/counting", icon: Hash, iconColor: "#34D399" },
+  { label: "MAP", fullLabel: "Heatmap", href: "/depot/heatmap", icon: Map, iconColor: "#FB923C" },
   // Hidden temporarily - can be restored later
   // { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
   // { label: "SEQ", fullLabel: "Sequencing", href: "/depot/sequencing", icon: Layers },
-  { label: "GTE", fullLabel: "Gate Entry", href: "/depot/gate", icon: Shield },
-  { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle },
+  { label: "GTE", fullLabel: "Gate Entry", href: "/depot/gate", icon: Shield, iconColor: "#60A5FA" },
+  { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle, iconColor: "#F87171" },
 ];
 
 export default function DepotSidebar({ open, onClose }: { open: boolean; onClose?: () => void }) {
@@ -41,22 +41,22 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
   const isRegionalManager = normalizedRole === "regional_manager" || normalizedRole.includes("regional");
 
   const warehouseManagerNavItems = [
-    { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard },
-    { label: "CAM", fullLabel: "Live Cameras", href: "/depot/vision", icon: Eye },
-    { label: "GTE", fullLabel: "Gate Entry", href: "/depot/gate", icon: Shield },
-    { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle },
-    { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package },
+    { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard, iconColor: "#5B9BF5" },
+    { label: "CAM", fullLabel: "Live Cameras", href: "/depot/vision", icon: Eye, iconColor: "#A78BFA" },
+    { label: "GTE", fullLabel: "Gate Entry", href: "/depot/gate", icon: Shield, iconColor: "#60A5FA" },
+    { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle, iconColor: "#F87171" },
+    { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package, iconColor: "#F5A623" },
     // Hidden temporarily - can be restored later
     // { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
   ];
 
   const regionalManagerNavItems = [
-    { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard },
-    { label: "CAM", fullLabel: "Live Cameras", href: "/depot/vision", icon: Eye },
-    { label: "CMD", fullLabel: "Command Center", href: "/depot/command", icon: Radio },
-    { label: "GTE", fullLabel: "Gate Entry", href: "/depot/gate", icon: Shield },
-    { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle },
-    { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package },
+    { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard, iconColor: "#5B9BF5" },
+    { label: "CAM", fullLabel: "Live Cameras", href: "/depot/vision", icon: Eye, iconColor: "#A78BFA" },
+    { label: "CMD", fullLabel: "Command Center", href: "/depot/command", icon: Radio, iconColor: "#22D3A1" },
+    { label: "GTE", fullLabel: "Gate Entry", href: "/depot/gate", icon: Shield, iconColor: "#60A5FA" },
+    { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle, iconColor: "#F87171" },
+    { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package, iconColor: "#F5A623" },
     // Hidden temporarily - can be restored later
     // { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
   ];
@@ -97,7 +97,7 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
 
   return (
     <aside
-      className={`depot-sidebar fixed left-0 top-[52px] bottom-0 w-[204px] flex flex-col items-stretch py-[10px] px-2 gap-[3px] z-40 transition-all duration-300 ${
+      className={`depot-sidebar fixed left-0 top-[64px] bottom-0 w-[204px] flex flex-col items-stretch py-[10px] px-2 z-40 transition-all duration-300 ${
         open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       }`}
       style={{
@@ -105,7 +105,9 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
         borderRight: "1px solid var(--bg-nav-border)",
       }}
     >
-      {visibleNavItems.map((item) => {
+      {/* Nav items — fill available space */}
+      <div className="flex flex-col gap-[2px] flex-1">
+        {visibleNavItems.map((item) => {
         const Icon = item.icon;
         const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
         const badgeCount = item.href === "/depot/incidents" ? alertCount : 0;
@@ -132,7 +134,18 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
               transition: "background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease",
             }}
           >
-            <Icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+            <span
+              className="flex items-center justify-center w-7 h-7 rounded-lg shrink-0"
+              style={{
+                background: isActive ? "rgba(229,82,26,0.18)" : `${item.iconColor}22`,
+              }}
+            >
+              <Icon
+                className="w-4 h-4"
+                aria-hidden="true"
+                style={{ color: isActive ? "#E5521A" : item.iconColor }}
+              />
+            </span>
             <span className="text-[13.5px] font-bold tracking-[0.01em] leading-tight">
               {item.fullLabel || item.label}
             </span>
@@ -148,6 +161,15 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
           </Link>
         );
       })}
+      </div>
+
+      {/* Bottom — version / branding pinned to bottom */}
+      <div
+        className="px-3 py-3 text-[9px] font-semibold tracking-[0.1em] uppercase"
+        style={{ color: "var(--text-faint)", borderTop: "1px solid var(--bg-nav-border)" }}
+      >
+        IntelliDepot™ v1.0
+      </div>
     </aside>
   );
 }
