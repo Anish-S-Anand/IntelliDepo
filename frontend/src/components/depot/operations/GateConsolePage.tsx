@@ -152,14 +152,14 @@ function RegisterVisitorModal({
   };
 
   const inputCls =
-    "w-full bg-[#0D1526] border border-[#1E2F50] rounded-lg px-3 py-2 text-[12px] text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[#E5521A]/50";
+    "w-full bg-[#0D1526] border border-[#1E2F50] rounded-lg px-3 py-2 text-[12px] text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[var(--accent-border)]";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div className="w-full max-w-lg mx-4 rounded-[16px] border border-[#1E2F50] bg-[#14203A] shadow-xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E2F50]">
           <div className="flex items-center gap-2">
-            <UserPlus className="w-4 h-4 text-[#E5521A]" />
+            <UserPlus className="w-4 h-4 text-[var(--accent)]" />
             <h3 className="text-[14px] font-bold text-[#E8EDF8]">Register Visitor</h3>
           </div>
           <button type="button" onClick={onClose} className="text-[#4E6090] hover:text-[#E8EDF8]">
@@ -209,7 +209,7 @@ function RegisterVisitorModal({
             type="button"
             onClick={handle}
             disabled={!form.name.trim() || submitting}
-            className="px-4 py-2 rounded-lg bg-[#E5521A] text-white text-[12px] font-semibold hover:bg-[#E5521A]/90 disabled:opacity-50"
+            className="px-4 py-2 rounded-lg bg-[var(--accent-button-bg)] text-white text-[12px] font-semibold hover:bg-[var(--accent-hover)] disabled:opacity-50"
           >
             {submitting ? "Registering..." : "Register Visitor"}
           </button>
@@ -256,7 +256,7 @@ function RegisterVehicleModal({
   };
 
   const inputCls =
-    "w-full bg-[#0D1526] border border-[#1E2F50] rounded-lg px-3 py-2 text-[12px] text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[#E5521A]/50";
+    "w-full bg-[#0D1526] border border-[#1E2F50] rounded-lg px-3 py-2 text-[12px] text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[var(--accent-border)]";
 
   const handle = async () => {
     if (!form.plate_number.trim()) return;
@@ -276,7 +276,7 @@ function RegisterVehicleModal({
       <div className="w-full max-w-md mx-4 rounded-[16px] border border-[#1E2F50] bg-[#14203A] shadow-xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E2F50]">
           <div className="flex items-center gap-2">
-            <Car className="w-4 h-4 text-[#E5521A]" />
+            <Car className="w-4 h-4 text-[var(--accent)]" />
             <h3 className="text-[14px] font-bold text-[#E8EDF8]">Register Vehicle</h3>
           </div>
           <button type="button" onClick={onClose} className="text-[#4E6090] hover:text-[#E8EDF8]">
@@ -314,7 +314,7 @@ function RegisterVehicleModal({
           <div>
             <label className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-1 block">Add Docs</label>
             <div className="space-y-2">
-              <label className="flex items-center justify-center gap-2 w-full bg-[#0D1526] border border-dashed border-[#1E2F50] rounded-lg px-3 py-3 text-[12px] text-[#8A9BBF] hover:border-[#E5521A]/50 hover:text-[#E8EDF8] cursor-pointer transition">
+              <label className="flex items-center justify-center gap-2 w-full bg-[#0D1526] border border-dashed border-[#1E2F50] rounded-lg px-3 py-3 text-[12px] text-[#8A9BBF] hover:border-[var(--accent-border)] hover:text-[#E8EDF8] cursor-pointer transition">
                 <Plus className="w-4 h-4" />
                 <span>Upload Documents (PDF, JPG, PNG)</span>
                 <input
@@ -359,7 +359,7 @@ function RegisterVehicleModal({
             type="button"
             onClick={handle}
             disabled={!form.plate_number.trim() || submitting}
-            className="px-4 py-2 rounded-lg bg-[#E5521A] text-white text-[12px] font-semibold hover:bg-[#E5521A]/90 disabled:opacity-50"
+            className="px-4 py-2 rounded-lg bg-[var(--accent-button-bg)] text-white text-[12px] font-semibold hover:bg-[var(--accent-hover)] disabled:opacity-50"
           >
             {submitting ? "Registering..." : "Register Vehicle"}
           </button>
@@ -1200,7 +1200,7 @@ export default function GateConsolePage() {
     <div className="p-5 bg-[#0D1526] min-h-screen animate-[fadeIn_0.3s_ease]">
       {/* Header */}
       <div className="flex items-center gap-2 mb-5">
-        <Shield className="w-5 h-5 text-[#E5521A]" />
+        <Shield className="w-5 h-5 text-[var(--accent)]" />
         <h1
           className="text-[22px] font-extrabold text-[#E8EDF8]"
           style={{ fontFamily: "'Syne', sans-serif" }}
@@ -1400,14 +1400,14 @@ export default function GateConsolePage() {
 
           <div className="space-y-2.5">
             <input
-              className="w-full bg-[#0D1526] border border-[#1E2F50] rounded-lg px-3 py-2 text-[13px] font-mono text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[#E5521A]/50 uppercase tracking-wider"
+              className="w-full bg-[#0D1526] border border-[#1E2F50] rounded-lg px-3 py-2 text-[13px] font-mono text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[var(--accent-border)] uppercase tracking-wider"
               placeholder="Enter plate number..."
               value={scanPlate}
               onChange={(e) => setScanPlate(e.target.value.toUpperCase())}
               onKeyDown={(e) => e.key === "Enter" && void handleScan()}
             />
             <select
-              className="w-full bg-[#0D1526] border border-[#1E2F50] rounded-lg px-3 py-2 text-[12px] text-[#E8EDF8] focus:outline-none focus:border-[#E5521A]/50"
+              className="w-full bg-[#0D1526] border border-[#1E2F50] rounded-lg px-3 py-2 text-[12px] text-[#E8EDF8] focus:outline-none focus:border-[var(--accent-border)]"
               value={scanGateId}
               onChange={(e) => setScanGateId(e.target.value)}
             >
@@ -1422,7 +1422,7 @@ export default function GateConsolePage() {
                 disabled={scanning}
                 className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
                   scanDirection === "entry"
-                    ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
+                    ? "border-[var(--accent)] bg-[var(--accent-subtle-bg)] text-[var(--accent)]"
                     : "border-[#1E2F50] text-[#4E6090] hover:border-[#2A3F68]"
                 } ${scanning ? "opacity-60 cursor-wait" : ""}`}
               >
@@ -1435,7 +1435,7 @@ export default function GateConsolePage() {
                 disabled={scanning}
                 className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
                   scanDirection === "exit"
-                    ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
+                    ? "border-[var(--accent)] bg-[var(--accent-subtle-bg)] text-[var(--accent)]"
                     : "border-[#1E2F50] text-[#4E6090] hover:border-[#2A3F68]"
                 } ${scanning ? "opacity-60 cursor-wait" : ""}`}
               >
@@ -1498,7 +1498,7 @@ export default function GateConsolePage() {
             <button
               type="button"
               onClick={() => exportVehicleLog(accessLogs.map((l) => ({ ...l, processed_at: l.processed_at || l.created_at })))}
-              className="px-2.5 py-1 rounded-lg text-[10px] font-semibold border border-[#1E2F50] text-[#8A9BBF] hover:border-[#E5521A]/30 hover:text-[#E5521A] transition-colors"
+              className="px-2.5 py-1 rounded-lg text-[10px] font-semibold border border-[#1E2F50] text-[#8A9BBF] hover:border-[var(--accent-border)] hover:text-[var(--accent)] transition-colors"
             >
               PDF
             </button>
@@ -1521,7 +1521,7 @@ export default function GateConsolePage() {
             <div className="relative">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#4E6090]" />
               <input
-                className="bg-[#0D1526] border border-[#1E2F50] rounded-lg pl-7 pr-3 py-1.5 text-[11px] text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[#E5521A]/50 w-36"
+                className="bg-[#0D1526] border border-[#1E2F50] rounded-lg pl-7 pr-3 py-1.5 text-[11px] text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[var(--accent-border)] w-36"
                 placeholder="Search plate..."
                 value={logSearch}
                 onChange={(e) => setLogSearch(e.target.value)}
@@ -1604,7 +1604,7 @@ export default function GateConsolePage() {
             <button
               type="button"
               onClick={() => setShowVehicleModal(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#E5521A]/30 bg-[#E5521A]/10 text-[#E5521A] text-[10px] font-semibold hover:bg-[#E5521A]/20 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[var(--accent-border)] bg-[var(--accent-subtle-bg)] text-[var(--accent)] text-[10px] font-semibold hover:bg-[var(--accent-subtle)] transition-colors"
             >
               <Plus className="w-3 h-3" /> Register Vehicle
             </button>
@@ -1710,7 +1710,7 @@ export default function GateConsolePage() {
             <button
               type="button"
               onClick={() => setShowVisitorModal(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#E5521A]/30 bg-[#E5521A]/10 text-[#E5521A] text-[10px] font-semibold hover:bg-[#E5521A]/20 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[var(--accent-border)] bg-[var(--accent-subtle-bg)] text-[var(--accent)] text-[10px] font-semibold hover:bg-[var(--accent-subtle)] transition-colors"
             >
               <UserPlus className="w-3 h-3" /> Register Visitor
             </button>
@@ -1721,7 +1721,7 @@ export default function GateConsolePage() {
             <div className="relative flex-1">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#4E6090]" />
               <input
-                className="w-full bg-[#0D1526] border border-[#1E2F50] rounded-lg pl-7 pr-2 py-1.5 text-[10px] text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[#E5521A]/50"
+                className="w-full bg-[#0D1526] border border-[#1E2F50] rounded-lg pl-7 pr-2 py-1.5 text-[10px] text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[var(--accent-border)]"
                 placeholder="Search..."
                 value={logSearch}
                 onChange={(e) => setLogSearch(e.target.value)}
@@ -1731,7 +1731,7 @@ export default function GateConsolePage() {
               <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#4E6090] pointer-events-none" />
               <input
                 type="date"
-                className="bg-[#0D1526] border border-[#1E2F50] rounded-lg pl-7 pr-2 py-1.5 text-[10px] text-[#E8EDF8] focus:outline-none focus:border-[#E5521A]/50"
+                className="bg-[#0D1526] border border-[#1E2F50] rounded-lg pl-7 pr-2 py-1.5 text-[10px] text-[#E8EDF8] focus:outline-none focus:border-[var(--accent-border)]"
                 value={visitorDate}
                 onChange={(e) => setVisitorDate(e.target.value)}
                 title="Filter by date"

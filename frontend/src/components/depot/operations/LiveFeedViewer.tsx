@@ -190,7 +190,7 @@ function CameraCard({
       onClick={onSelect}
       className={`w-full text-left rounded-[16px] border overflow-hidden transition-all ${
         isSelected
-          ? "border-[#E5521A]/50 bg-[#14203A] shadow-[0_0_20px_rgba(229,82,26,0.15)]"
+          ? "border-[var(--accent-border)] bg-[#14203A] shadow-[0_0_20px_var(--accent-subtle-bg)]"
           : "border-[#1E2F50] bg-[#14203A] hover:border-[#2A3F68]"
       }`}
     >
@@ -244,7 +244,7 @@ function CameraCard({
             {/* Detection count badge */}
             {detectionCount > 0 && (
               <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-black/60 px-2 py-1 rounded backdrop-blur-sm z-10">
-                <ScanLine className="w-3 h-3 text-[#E5521A]" />
+                <ScanLine className="w-3 h-3 theme-text-nav-active" />
                 <span className="text-[10px] font-bold text-white">
                   {detectionCount} objects
                 </span>
@@ -274,7 +274,7 @@ function CameraCard({
                 e.stopPropagation();
                 onReconnect();
               }}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg border border-[#1E2F50] bg-[#0F1A30] text-[10px] text-[#8A9BBF] hover:border-[#E5521A]/30 hover:text-[#E5521A] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg border border-[#1E2F50] bg-[#0F1A30] text-[10px] text-[#8A9BBF] hover:border-[var(--accent-border)] hover:theme-text-nav-active transition-colors"
             >
               <RefreshCw className={`w-3 h-3 ${isReconnecting ? "animate-spin" : ""}`} />
               Reconnect
@@ -372,7 +372,7 @@ function ExpandedCameraView({
         <div className="rounded-[20px] border border-[#1E2F50] bg-[#0A0E1A] overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 border-b border-[#1E2F50]">
             <div className="flex items-center gap-3">
-              <Camera className="w-4 h-4 text-[#E5521A]" />
+              <Camera className="w-4 h-4 theme-text-nav-active" />
               <span className="text-sm font-bold text-white">{camera.name}</span>
               <span className="text-[10px] text-[#4E6090]">{camera.zone}</span>
             </div>
@@ -630,7 +630,7 @@ export default function LiveFeedViewer() {
       <div className="flex justify-between items-start mb-5 flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Eye className="w-5 h-5 text-[#E5521A]" />
+            <Eye className="w-5 h-5 theme-text-nav-active" />
             <h1
               className="text-[22px] font-extrabold text-[#E8EDF8]"
               style={{ fontFamily: "'Syne', sans-serif" }}
@@ -661,8 +661,8 @@ export default function LiveFeedViewer() {
               <span className="text-[#4E6090]">live</span>
             </span>
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#1E2F50] bg-[#14203A]">
-              <ScanLine className="w-3.5 h-3.5 text-[#E5521A]" />
-              <span className="font-extrabold text-[#E5521A]">{totalDetections}</span>
+              <ScanLine className="w-3.5 h-3.5 theme-text-nav-active" />
+              <span className="font-extrabold theme-text-nav-active">{totalDetections}</span>
               <span className="text-[#4E6090]">objects</span>
             </span>
           </div>
@@ -690,7 +690,7 @@ export default function LiveFeedViewer() {
             onClick={() => setLive(!live)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${
               live
-                ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
+                ? "border-[var(--accent)] theme-bg-accent-subtle theme-text-nav-active"
                 : "border-[#1E2F50] text-[#8A9BBF] hover:border-[#2A3F68]"
             }`}
           >
@@ -710,16 +710,16 @@ export default function LiveFeedViewer() {
       {/* ── LPR Gate Camera — dedicated full-width panel ── */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-3">
-          <Shield className="w-4 h-4 text-[#E5521A]" />
+          <Shield className="w-4 h-4 theme-text-nav-active" />
           <span className="text-[12px] font-bold text-[#E8EDF8] uppercase tracking-[0.15em]">LPR Gate Camera</span>
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#E5521A]/10 text-[#E5521A] border border-[#E5521A]/25">
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full theme-bg-accent-subtle theme-text-nav-active border border-[var(--accent-border)]">
             AUTO OCR · LIVE
           </span>
         </div>
         <LPRCameraPanel />
       </div>
 
-      <div className="h-px bg-gradient-to-r from-transparent via-[#E5521A]/30 to-transparent mb-5" />
+      <div className="h-px bg-gradient-to-r from-transparent via-[var(--accent-border)] to-transparent mb-5" />
 
       {/* Camera grid — regular CCTV feeds */}
       <div className="flex items-center gap-2 mb-3">

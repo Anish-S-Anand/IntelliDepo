@@ -187,7 +187,7 @@ export default function VideoPlayer({ videoFile, detectionId }: VideoPlayerProps
         <div className="flex items-center gap-2">
           <button
             onClick={togglePlay}
-            className="p-1.5 rounded bg-[#E5521A] text-white hover:bg-[#FF7A42] transition"
+            className="p-1.5 rounded theme-bg-accent text-white hover:bg-[var(--accent-hover)] transition"
             disabled={loading}
           >
             {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -234,7 +234,7 @@ export default function VideoPlayer({ videoFile, detectionId }: VideoPlayerProps
                 onClick={() => changePlaybackRate(rate)}
                 className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
                   playbackRate === rate
-                    ? "bg-[#E5521A] text-white"
+                    ? "theme-bg-accent text-white"
                     : "bg-[#1E2F50] text-[#8A9BBF] hover:bg-[#2A3F68]"
                 }`}
               >

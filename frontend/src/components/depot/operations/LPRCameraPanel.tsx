@@ -50,9 +50,9 @@ function PlateOverlay({ plate, confidence, decision }: {
       {/* Top status bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 bg-black/70 backdrop-blur-sm px-2.5 py-1.5 rounded-lg border border-white/10">
-          <ScanLine className="w-3 h-3 text-[#E5521A]" />
+          <ScanLine className="w-3 h-3 theme-text-nav-active" />
           <span className="text-[10px] font-bold text-white tracking-wider">LPR ACTIVE</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-[#E5521A] animate-pulse" />
+          <span className="w-1.5 h-1.5 rounded-full theme-bg-accent animate-pulse" />
         </div>
         <div
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg backdrop-blur-sm border text-[10px] font-bold"
@@ -108,7 +108,7 @@ function ScanningOverlay() {
         "bottom-6 left-6 border-b-2 border-l-2",
         "bottom-6 right-6 border-b-2 border-r-2",
       ].map((cls, i) => (
-        <div key={i} className={`absolute w-5 h-5 border-[#E5521A] ${cls}`} />
+        <div key={i} className={`absolute w-5 h-5 border-[var(--accent)] ${cls}`} />
       ))}
 
       {/* Scan beam */}
@@ -116,15 +116,15 @@ function ScanningOverlay() {
         <div
           className="absolute inset-y-0 w-1/3 rounded-full"
           style={{
-            background: "linear-gradient(90deg, transparent, #E5521A, transparent)",
+            background: "linear-gradient(90deg, transparent, var(--accent), transparent)",
             animation: "lpr-scan 2.5s linear infinite",
           }}
         />
       </div>
 
       {/* Label */}
-      <div className="mt-4 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-[#E5521A]/30">
-        <span className="text-[10px] font-bold text-[#E5521A] tracking-widest">SCANNING...</span>
+      <div className="mt-4 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-[var(--accent-border)]">
+        <span className="text-[10px] font-bold theme-text-nav-active tracking-widest">SCANNING...</span>
       </div>
     </div>
   );
@@ -229,8 +229,8 @@ export default function LPRCameraPanel() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#1E2F50]">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-[#E5521A]/15 border border-[#E5521A]/30 flex items-center justify-center">
-            <Shield className="w-4 h-4 text-[#E5521A]" />
+          <div className="w-8 h-8 rounded-lg bg-[var(--accent-subtle-bg)] border border-[var(--accent-border)] flex items-center justify-center">
+            <Shield className="w-4 h-4 theme-text-nav-active" />
           </div>
           <div>
             <div className="text-[13px] font-bold text-[#E8EDF8]">LPR Gate Camera</div>
@@ -250,7 +250,7 @@ export default function LPRCameraPanel() {
                 onClick={() => setDirection(d)}
                 className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider transition-colors"
                 style={{
-                  background: direction === d ? "#E5521A" : "transparent",
+                  background: direction === d ? "var(--accent)" : "transparent",
                   color: direction === d ? "white" : "#4E6090",
                 }}
               >
@@ -328,7 +328,7 @@ export default function LPRCameraPanel() {
 
         {/* Scanning spinner */}
         {scanning && (
-          <div className="absolute top-3 right-3 z-30 w-6 h-6 rounded-full border-2 border-[#E5521A] border-t-transparent animate-spin" />
+          <div className="absolute top-3 right-3 z-30 w-6 h-6 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
         )}
       </div>
 
@@ -362,7 +362,7 @@ export default function LPRCameraPanel() {
           </>
         ) : (
           <div className="flex items-center gap-2 text-[#4E6090]">
-            <ScanLine className="w-3.5 h-3.5 text-[#E5521A] animate-pulse" />
+            <ScanLine className="w-3.5 h-3.5 theme-text-nav-active animate-pulse" />
             <span className="text-[11px]">
               {error ? <span className="text-[#F04A4A]">{error}</span> : "Awaiting plate detection..."}
             </span>
@@ -376,9 +376,9 @@ export default function LPRCameraPanel() {
           disabled={scanning || !camera}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-bold transition-colors disabled:opacity-40"
           style={{
-            border: "1px solid rgba(229,82,26,0.3)",
-            background: "rgba(229,82,26,0.08)",
-            color: "#E5521A",
+            border: "1px solid var(--accent-border)",
+            background: "var(--accent-subtle)",
+            color: "var(--accent)",
           }}
         >
           <Camera className="w-3 h-3" />

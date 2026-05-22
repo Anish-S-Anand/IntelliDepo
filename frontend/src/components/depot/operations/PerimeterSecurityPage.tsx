@@ -172,7 +172,7 @@ export default function PerimeterSecurityPage() {
         <button
           onClick={handleRunAgent}
           disabled={agentRunning}
-          className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition disabled:opacity-50"
+          className="flex items-center gap-2 px-3.5 py-2 rounded-lg theme-bg-accent text-white text-[11px] font-bold hover:bg-[var(--accent-hover)] transition disabled:opacity-50"
         >
           <Radar className="w-3.5 h-3.5" />
           {agentRunning ? "Scanning..." : "Run Security Agent"}
@@ -216,7 +216,7 @@ export default function PerimeterSecurityPage() {
               onClick={() => setTab(t.value)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${
                 tab === t.value
-                  ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
+                  ? "border-[var(--accent)] theme-bg-accent-subtle theme-text-nav-active"
                   : "border-[#1E2F50] text-[#8A9BBF] hover:border-[#2A3F68] hover:text-[#E8EDF8]"
               }`}
             >
@@ -309,7 +309,7 @@ export default function PerimeterSecurityPage() {
                     return (
                       <div
                         key={b.id}
-                        className="p-2.5 rounded-[10px] bg-[#0F1A30] hover:bg-[#E5521A]/5 transition-colors"
+                        className="p-2.5 rounded-[10px] bg-[#0F1A30] hover:bg-[var(--accent-subtle)] transition-colors"
                         style={{ borderLeft: `3px solid ${sev.color}` }}
                       >
                         <div className="flex justify-between items-center">
@@ -341,7 +341,7 @@ export default function PerimeterSecurityPage() {
                             ) : (
                               <button
                                 onClick={() => { setResolveModal({ id: b.id, type: "breach" }); setReason(""); }}
-                                className="text-[9px] text-[#5B9BF5] hover:text-[#E5521A] transition"
+                                className="text-[9px] text-[#5B9BF5] hover:theme-text-nav-active transition"
                               >
                                 Resolve
                               </button>
@@ -418,7 +418,7 @@ export default function PerimeterSecurityPage() {
                             {inc.status === "open" && (
                               <button
                                 onClick={() => { setAckModal(inc.id); setReason(""); }}
-                                className="px-2 py-1 rounded-md bg-[#E5521A] text-white text-[10px] font-bold hover:bg-[#FF7A42] transition"
+                                className="px-2 py-1 rounded-md theme-bg-accent text-white text-[10px] font-bold hover:bg-[var(--accent-hover)] transition"
                               >
                                 Acknowledge
                               </button>
@@ -502,7 +502,7 @@ export default function PerimeterSecurityPage() {
                     )}
                     <div className="flex gap-2">
                       {b.snapshot_ref && (
-                        <button className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:text-[#E5521A] hover:border-[#E5521A]/40 transition">
+                        <button className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:theme-text-nav-active hover:border-[var(--accent-border)] transition">
                           View Snapshot
                         </button>
                       )}
@@ -536,7 +536,7 @@ export default function PerimeterSecurityPage() {
                       created_at: i.created_at, resolved_at: i.resolved_at,
                       resolution_notes: i.resolution_notes,
                     })))}
-                    className="px-3 py-1.5 rounded-lg text-[11px] font-bold border border-[#1E2F50] text-[#8A9BBF] hover:border-[#E5521A]/30 hover:text-[#E5521A] transition"
+                    className="px-3 py-1.5 rounded-lg text-[11px] font-bold border border-[#1E2F50] text-[#8A9BBF] hover:border-[var(--accent-border)] hover:theme-text-nav-active transition"
                   >
                     Export PDF
                   </button>
@@ -624,14 +624,14 @@ export default function PerimeterSecurityPage() {
                     )}
                     <div className="flex gap-2 mt-2">
                       {inc.video_archive_ref && (
-                        <button className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:text-[#E5521A] hover:border-[#E5521A]/40 transition">
+                        <button className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:theme-text-nav-active hover:border-[var(--accent-border)] transition">
                           View Evidence
                         </button>
                       )}
                       {inc.status === "open" && (
                         <button
                           onClick={() => { setAckModal(inc.id); setReason(""); }}
-                          className="px-3 py-1.5 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition"
+                          className="px-3 py-1.5 rounded-lg theme-bg-accent text-white text-[11px] font-bold hover:bg-[var(--accent-hover)] transition"
                         >
                           Acknowledge
                         </button>
@@ -747,7 +747,7 @@ export default function PerimeterSecurityPage() {
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Describe the action being taken (min 5 characters)..."
-              className="w-full h-24 bg-[#0F1A30] border border-[#1E2F50] rounded-lg p-3 text-[12px] text-[#E8EDF8] placeholder-[#4E6090] resize-none focus:border-[#E5521A] focus:outline-none"
+              className="w-full h-24 bg-[#0F1A30] border border-[#1E2F50] rounded-lg p-3 text-[12px] text-[#E8EDF8] placeholder-[#4E6090] resize-none focus:border-[var(--accent)] focus:outline-none"
             />
             <div className="flex justify-end gap-2 mt-3">
               <button
@@ -759,7 +759,7 @@ export default function PerimeterSecurityPage() {
               <button
                 onClick={handleAcknowledge}
                 disabled={reason.length < 5}
-                className="px-4 py-1.5 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold disabled:opacity-40"
+                className="px-4 py-1.5 rounded-lg theme-bg-accent text-white text-[11px] font-bold disabled:opacity-40"
               >
                 Confirm
               </button>

@@ -138,7 +138,7 @@ function AddClusterModal({ onClose, onAdd, onRefresh }: AddClusterModalProps) {
             <select
               value={form.zone}
               onChange={(e) => setForm((f) => ({ ...f, zone: e.target.value }))}
-              className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40"
+              className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[var(--accent-border)]"
             >
               {["A", "B", "C", "D"].map((z) => (
                 <option key={z} value={z}>Zone {z}</option>
@@ -151,7 +151,7 @@ function AddClusterModal({ onClose, onAdd, onRefresh }: AddClusterModalProps) {
               required
               value={form.product}
               onChange={(e) => setForm((f) => ({ ...f, product: e.target.value }))}
-              className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40"
+              className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[var(--accent-border)]"
             >
               {CEMENT_COMPANIES.map((company) => (
                 <option key={company} value={company}>{company}</option>
@@ -165,7 +165,7 @@ function AddClusterModal({ onClose, onAdd, onRefresh }: AddClusterModalProps) {
               value={form.batch}
               onChange={(e) => setForm((f) => ({ ...f, batch: e.target.value }))}
               placeholder="e.g. B2025-1024"
-              className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40 placeholder:text-[#4E6090]"
+              className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[var(--accent-border)] placeholder:text-[#4E6090]"
             />
           </div>
           <div>
@@ -177,7 +177,7 @@ function AddClusterModal({ onClose, onAdd, onRefresh }: AddClusterModalProps) {
                 value={form.quantity}
                 onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
                 placeholder="500"
-                className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40 placeholder:text-[#4E6090]"
+                className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[var(--accent-border)] placeholder:text-[#4E6090]"
               />
             </div>
           </div>
@@ -193,7 +193,7 @@ function AddClusterModal({ onClose, onAdd, onRefresh }: AddClusterModalProps) {
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 rounded-lg bg-[#E5521A] text-white text-[12px] font-bold hover:bg-[#FF7A42] transition disabled:opacity-60"
+              className="px-5 py-2 rounded-lg theme-bg-accent text-white text-[12px] font-bold hover:bg-[var(--accent-hover)] transition disabled:opacity-60"
             >
               {submitting ? "Adding..." : "Add Batch"}
             </button>
@@ -385,7 +385,7 @@ function BatchesTable({
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={safePage === 1}
-              className="px-3 py-1.5 rounded-lg text-[11px] font-bold border border-[#1E2F50] text-[#8A9BBF] hover:border-[#E5521A]/40 hover:text-[#E5521A] disabled:opacity-30 disabled:cursor-not-allowed transition"
+              className="px-3 py-1.5 rounded-lg text-[11px] font-bold border border-[#1E2F50] text-[#8A9BBF] hover:border-[var(--accent-border)] hover:theme-text-nav-active disabled:opacity-30 disabled:cursor-not-allowed transition"
             >
               ‹ Prev
             </button>
@@ -399,8 +399,8 @@ function BatchesTable({
                   onClick={() => setPage(n as number)}
                   className={`w-8 h-8 rounded-lg text-[11px] font-bold border transition ${
                     safePage === n
-                      ? "bg-[#E5521A] border-[#E5521A] text-white"
-                      : "border-[#1E2F50] text-[#8A9BBF] hover:border-[#E5521A]/40 hover:text-[#E5521A]"
+                      ? "theme-bg-accent border-[var(--accent)] text-white"
+                      : "border-[#1E2F50] text-[#8A9BBF] hover:border-[var(--accent-border)] hover:theme-text-nav-active"
                   }`}
                 >
                   {n}
@@ -411,7 +411,7 @@ function BatchesTable({
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage === totalPages}
-              className="px-3 py-1.5 rounded-lg text-[11px] font-bold border border-[#1E2F50] text-[#8A9BBF] hover:border-[#E5521A]/40 hover:text-[#E5521A] disabled:opacity-30 disabled:cursor-not-allowed transition"
+              className="px-3 py-1.5 rounded-lg text-[11px] font-bold border border-[#1E2F50] text-[#8A9BBF] hover:border-[var(--accent-border)] hover:theme-text-nav-active disabled:opacity-30 disabled:cursor-not-allowed transition"
             >
               Next ›
             </button>
@@ -563,7 +563,7 @@ export default function InventoryPage() {
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#e5521a] border-t-transparent" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
       </div>
     );
   }
@@ -700,7 +700,7 @@ export default function InventoryPage() {
           {/* Dynamic Add Button - changes based on active tab */}
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg theme-bg-accent text-white text-[11px] font-bold hover:bg-[var(--accent-hover)] transition"
           >
             <Plus className="w-3.5 h-3.5" />
             {viewTab === "clusters" ? "Add Batch" : "Add Batch"}
@@ -717,7 +717,7 @@ export default function InventoryPage() {
             <div
               key={z.id}
               onClick={() => router.push(`/depot/heatmap?zone=${z.zone_code}`)}
-              className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 text-center relative overflow-hidden transition-all hover:border-[#E5521A]/30 hover:shadow-[0_6px_24px_rgba(229,82,26,0.08)] cursor-pointer"
+              className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 text-center relative overflow-hidden transition-all hover:border-[var(--accent-border)] hover:shadow-[0_6px_24px_rgba(229,82,26,0.08)] cursor-pointer"
             >
               <div
                 className="absolute top-0 left-0 right-0 h-[3px]"
@@ -749,7 +749,7 @@ export default function InventoryPage() {
           onClick={() => setViewTab("clusters")}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
             viewTab === "clusters"
-              ? "bg-[#E5521A] text-white"
+              ? "theme-bg-accent text-white"
               : "text-[#8A9BBF] hover:text-[#E8EDF8]"
           }`}
         >
@@ -760,7 +760,7 @@ export default function InventoryPage() {
           onClick={() => setViewTab("batches")}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
             viewTab === "batches"
-              ? "bg-[#E5521A] text-white"
+              ? "theme-bg-accent text-white"
               : "text-[#8A9BBF] hover:text-[#E8EDF8]"
           }`}
         >
@@ -773,7 +773,7 @@ export default function InventoryPage() {
       <div className="bg-[#0F1A30] border border-[#1E2F50] rounded-[14px] p-3 mb-4">
         <div className="flex flex-wrap gap-2 items-center">
           {/* Search */}
-          <div className="flex items-center gap-2 flex-1 min-w-[200px] px-3 py-2 bg-[#14203A] border border-[#1E2F50] rounded-[10px] focus-within:border-[#E5521A]/40">
+          <div className="flex items-center gap-2 flex-1 min-w-[200px] px-3 py-2 bg-[#14203A] border border-[#1E2F50] rounded-[10px] focus-within:border-[var(--accent-border)]">
             <svg className="w-3.5 h-3.5 text-[#4E6090] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             <input
               type="text"
@@ -790,7 +790,7 @@ export default function InventoryPage() {
           </div>
 
           {/* Date range */}
-          <div className="flex items-center gap-1.5 px-3 py-2 bg-[#14203A] border border-[#1E2F50] rounded-[10px] focus-within:border-[#E5521A]/40">
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-[#14203A] border border-[#1E2F50] rounded-[10px] focus-within:border-[var(--accent-border)]">
             <Calendar className="w-3.5 h-3.5 text-[#4E6090] shrink-0" />
             <span className="text-[10px] text-[#4E6090] font-semibold uppercase tracking-wide">From</span>
             <input
@@ -824,7 +824,7 @@ export default function InventoryPage() {
                 onClick={() => setFilter(f.value)}
                 className={`px-3 py-1.5 rounded-[8px] text-[11px] font-bold transition-all ${
                   filter === f.value
-                    ? "bg-[#E5521A] text-white shadow-sm"
+                    ? "theme-bg-accent text-white shadow-sm"
                     : "text-[#8A9BBF] hover:text-[#E8EDF8] hover:bg-[#1E2F50]"
                 }`}
               >
@@ -850,7 +850,7 @@ export default function InventoryPage() {
           {hasActiveFilters && (
             <button
               onClick={resetFilters}
-              className="px-3 py-2 rounded-[10px] border border-[#E5521A]/30 text-[#E5521A] text-[11px] font-bold hover:bg-[#E5521A]/10 transition"
+              className="px-3 py-2 rounded-[10px] border border-[var(--accent-border)] theme-text-nav-active text-[11px] font-bold hover:theme-bg-accent-subtle transition"
             >
               Clear All
             </button>
@@ -861,7 +861,7 @@ export default function InventoryPage() {
         {hasActiveFilters && (
           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#1E2F50]">
             <span className="text-[10px] text-[#4E6090]">Active filters:</span>
-            {search && <span className="text-[10px] bg-[#E5521A]/10 text-[#E5521A] px-2 py-0.5 rounded-full border border-[#E5521A]/20">Search: &quot;{search}&quot;</span>}
+            {search && <span className="text-[10px] theme-bg-accent-subtle theme-text-nav-active px-2 py-0.5 rounded-full border border-[var(--accent-border)]">Search: &quot;{search}&quot;</span>}
             {filter !== "all" && <span className="text-[10px] bg-[#5B9BF5]/10 text-[#5B9BF5] px-2 py-0.5 rounded-full border border-[#5B9BF5]/20">{filter === "full" ? "Near Full" : "Empty"}</span>}
             {(dateFrom || dateTo) && <span className="text-[10px] bg-[#22D3A1]/10 text-[#22D3A1] px-2 py-0.5 rounded-full border border-[#22D3A1]/20">{dateFrom || "…"} → {dateTo || "…"}</span>}
           </div>
@@ -886,7 +886,7 @@ export default function InventoryPage() {
                   <div
                     key={z.id}
                     onClick={() => router.push(`/depot/heatmap?zone=${z.zone_code}`)}
-                    className="bg-[#14203A] border rounded-[14px] p-[15px] transition-all hover:border-[#E5521A]/40 hover:-translate-y-px cursor-pointer"
+                    className="bg-[#14203A] border rounded-[14px] p-[15px] transition-all hover:border-[var(--accent-border)] hover:-translate-y-px cursor-pointer"
                     style={{ borderColor: "#1E2F50" }}
                   >
                     <div className="flex justify-between mb-2.5">

@@ -72,7 +72,7 @@ export default function AnalysisSection({}: AnalysisSectionProps) {
         </p>
         <button
           onClick={handleRetry}
-          className="px-4 py-2 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition"
+          className="px-4 py-2 rounded-lg theme-bg-accent text-white text-[11px] font-bold hover:bg-[var(--accent-hover)] transition"
         >
           Try Again
         </button>

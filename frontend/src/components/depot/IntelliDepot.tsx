@@ -54,7 +54,7 @@ export default function IntelliDepot() {
     <div className="intelli-depot" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
       <style>{`
         :root {
-          --acc: #E5521A;
+          --acc: var(--accent);
           --acc-light: #FF7A42;
           --acc-deep: #C43A08;
           --acc-glow: rgba(229,82,26,0.18);

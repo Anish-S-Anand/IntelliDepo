@@ -27,7 +27,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         style={{ backgroundColor: "var(--bg-page, #080e1c)" }}
       >
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#E5521A] border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
           <span className="text-[12px] text-[#8A9BBF]">Loading IntelliDepot...</span>
         </div>
       </div>
@@ -41,7 +41,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         style={{ backgroundColor: "var(--bg-page, #080e1c)" }}
       >
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#E5521A] border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
           <span className="text-[12px] text-[#8A9BBF]">Redirecting to login...</span>
         </div>
       </div>

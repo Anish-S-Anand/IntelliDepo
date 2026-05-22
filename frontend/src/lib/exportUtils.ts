@@ -95,7 +95,7 @@ export function downloadPdf(
       }
 
       return `<div style="margin-bottom:24px">
-        <h2 style="font-size:16px;font-weight:600;color:#1e293b;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #e5521a">${s.title}</h2>
+        <h2 style="font-size:16px;font-weight:600;color:#1e293b;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #C74416">${s.title}</h2>
         ${content}
       </div>`;
     })
@@ -112,9 +112,9 @@ export function downloadPdf(
   </style>
 </head>
 <body>
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #e5521a">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #C74416">
     <div>
-      <div style="font-size:10px;font-weight:700;color:#e5521a;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">Fidelis IntelliDepot</div>
+      <div style="font-size:10px;font-weight:700;color:#C74416;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">Fidelis IntelliDepot</div>
       <h1 style="font-size:24px;font-weight:700;margin:0 0 4px 0;color:#0f172a">${title}</h1>
       <p style="font-size:12px;color:#64748b;margin:0">${subtitle}</p>
     </div>

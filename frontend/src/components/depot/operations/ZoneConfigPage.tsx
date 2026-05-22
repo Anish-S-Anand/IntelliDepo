@@ -185,7 +185,7 @@ export default function ZoneConfigPage() {
   if (loading) {
     return (
       <div className="p-5 flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 text-[#E5521A] animate-spin" />
+        <Loader2 className="w-6 h-6 theme-text-nav-active animate-spin" />
         <span className="ml-2 text-[12px] text-[#8A9BBF]">Loading zone configuration...</span>
       </div>
     );
@@ -206,7 +206,7 @@ export default function ZoneConfigPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <div className="text-[11px] text-[#E5521A] font-bold tracking-[0.1em] uppercase mb-1">
+          <div className="text-[11px] theme-text-nav-active font-bold tracking-[0.1em] uppercase mb-1">
             Zone Configuration
           </div>
           <h2 className="text-xl font-extrabold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
@@ -216,7 +216,7 @@ export default function ZoneConfigPage() {
             Zone boundary editor · Capacity thresholds · 12-month utilization archive
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#E5521A]/10 border border-[#E5521A]/25 rounded-xl text-[#E5521A] text-[12px] font-bold hover:bg-[#E5521A]/20 transition-colors">
+        <button className="flex items-center gap-2 px-4 py-2 theme-bg-accent-subtle border border-[var(--accent-border)] rounded-xl theme-text-nav-active text-[12px] font-bold hover:bg-[var(--accent-subtle-bg)] transition-colors">
           <Download className="w-3.5 h-3.5" />
           Export PDF
         </button>
@@ -230,7 +230,7 @@ export default function ZoneConfigPage() {
             onClick={() => setSelectedZoneId(z.id)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-[11px] font-bold transition-all whitespace-nowrap ${
               selectedZoneId === z.id
-                ? "bg-[#E5521A]/12 text-[#E5521A] border-[#E5521A]/25"
+                ? "theme-bg-accent-subtle theme-text-nav-active border-[var(--accent-border)]"
                 : "bg-[#14203A] text-[#4E6090] border-[#1E2F50] hover:text-[#8A9BBF] hover:border-[#1E2F50]"
             }`}
           >
@@ -247,7 +247,7 @@ export default function ZoneConfigPage() {
         <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px]">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-[#E5521A]" />
+              <MapPin className="w-4 h-4 theme-text-nav-active" />
               <span className="text-[13px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
                 Zone {zone.zone_code} — Properties
               </span>
@@ -367,8 +367,8 @@ export default function ZoneConfigPage() {
                     {displayPoints.length >= 3 && (
                       <polygon
                         points={displayPoints.map((p) => `${p[0]},${p[1]}`).join(" ")}
-                        fill={editingBoundary ? "rgba(91,155,245,0.12)" : "rgba(229,82,26,0.10)"}
-                        stroke={editingBoundary ? "#5B9BF5" : "#E5521A"}
+                        fill={editingBoundary ? "rgba(91,155,245,0.12)" : "var(--accent-subtle)"}
+                        stroke={editingBoundary ? "#5B9BF5" : "var(--accent)"}
                         strokeWidth={3}
                         strokeLinejoin="round"
                       />
@@ -378,14 +378,14 @@ export default function ZoneConfigPage() {
                       <polyline
                         points={displayPoints.map((p) => `${p[0]},${p[1]}`).join(" ")}
                         fill="none"
-                        stroke={editingBoundary ? "#5B9BF5" : "#E5521A"}
+                        stroke={editingBoundary ? "#5B9BF5" : "var(--accent)"}
                         strokeWidth={3}
                       />
                     )}
                     {/* Vertex markers */}
                     {displayPoints.map((p, i) => (
                       <g key={i}>
-                        <circle cx={p[0]} cy={p[1]} r={editingBoundary ? 18 : 14} fill={editingBoundary ? "#5B9BF5" : "#E5521A"} opacity={0.9} />
+                        <circle cx={p[0]} cy={p[1]} r={editingBoundary ? 18 : 14} fill={editingBoundary ? "#5B9BF5" : "var(--accent)"} opacity={0.9} />
                         <text x={p[0]} y={p[1]} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={editingBoundary ? 22 : 18} fontWeight="bold">
                           {i + 1}
                         </text>
@@ -511,7 +511,7 @@ export default function ZoneConfigPage() {
         </div>
       </div>
 
-      <div className="h-px bg-gradient-to-r from-transparent via-[#E5521A]/40 to-transparent mb-5" />
+      <div className="h-px bg-gradient-to-r from-transparent via-[var(--accent-border)] to-transparent mb-5" />
 
       {/* Historical Trends */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
@@ -659,7 +659,7 @@ export default function ZoneConfigPage() {
                   <div
                     key={cs.zone_code}
                     className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
-                      selectedZoneId === zoneId ? "bg-[#E5521A]/10" : "hover:bg-[#0F1A30]"
+                      selectedZoneId === zoneId ? "theme-bg-accent-subtle" : "hover:bg-[#0F1A30]"
                     }`}
                     onClick={() => { if (zoneId) setSelectedZoneId(zoneId); }}
                   >

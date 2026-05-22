@@ -114,7 +114,7 @@ function mapBackendIncident(inc: IncidentResponse): Incident {
     id: inc.id,
     type: inc.title,
     sev: sevMap[inc.severity] || "MEDIUM",
-    loc: `Zone ID: ${inc.zone_id}`,
+
     t: new Date(inc.created_at).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" }),
     status: statusMap[inc.status] || "open",
     cam: resolveEvidenceVideo(inc.video_archive_ref) || EMPTY_VALUE,
@@ -379,7 +379,7 @@ export default function IncidentsPage() {
             Live feed with severity tracking, escalation workflows, and perimeter breaches
           </p>
         </div>
-        <button className="px-3.5 py-2 rounded-lg bg-[#E5521A] border-[#E5521A] text-white text-[11px] font-bold">
+        <button className="px-3.5 py-2 rounded-lg theme-bg-accent border-[var(--accent)] text-white text-[11px] font-bold">
           + Report Incident
         </button>
       </div>
@@ -404,7 +404,7 @@ export default function IncidentsPage() {
       {/* View Tabs - Only Incidents */}
       <div className="flex gap-1 mb-4 bg-[#0F1A30] rounded-xl p-1 w-fit">
         <button
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-bold bg-[#E5521A] text-white"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-bold theme-bg-accent text-white"
         >
           <AlertTriangle className="w-3.5 h-3.5" />
           Incidents
@@ -419,7 +419,7 @@ export default function IncidentsPage() {
             onClick={() => setFilter(f.value)}
             className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${
               filter === f.value
-                ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
+                ? "border-[var(--accent)] theme-bg-accent-subtle theme-text-nav-active"
                 : f.style || "border-[#1E2F50] text-[#8A9BBF] hover:border-[#2A3F68] hover:text-[#E8EDF8]"
             }`}
           >
@@ -441,7 +441,7 @@ export default function IncidentsPage() {
             id={`incident-${i.id}`}
             key={i.id}
             className={`bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 transition-all hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)] ${
-              selectedIncidentId === i.id ? "ring-2 ring-[#E5521A]/70" : ""
+              selectedIncidentId === i.id ? "ring-2 ring-[var(--accent-border)]" : ""
             }`}
             style={{ borderLeftWidth: 4, borderLeftColor: SEV_COL[i.sev] }}
           >
@@ -465,16 +465,14 @@ export default function IncidentsPage() {
               </div>
               <div className="text-right">
                 <div className="text-[10px] text-[#4E6090]">{i.t}</div>
-                <div className="text-[10px] text-[#8A9BBF] mt-0.5">{i.cam !== EMPTY_VALUE ? `Camera: ${i.cam}` : ""}</div>
               </div>
             </div>
             <div className="text-[12px] text-[#8A9BBF] mb-2 leading-relaxed">{i.desc}</div>
-            <div className="text-[10px] text-[#4E6090]">📍 {i.loc} · 👤 {i.assignee}</div>
             <div className="flex flex-wrap gap-2 mt-2.5">
               <button
                 onClick={() => handleIncidentAnalysisClick(i)}
                 disabled={i.cam === EMPTY_VALUE}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:text-[#E5521A] hover:border-[#E5521A]/40 transition disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:theme-text-nav-active hover:border-[var(--accent-border)] transition disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Camera className="w-3.5 h-3.5" />
                 View Evidence
@@ -483,7 +481,7 @@ export default function IncidentsPage() {
                 <button
                   onClick={() => acknowledge(i.id)}
                   disabled={acknowledging === i.id}
-                  className="px-3 py-1.5 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg theme-bg-accent text-white text-[11px] font-bold hover:bg-[var(--accent-hover)] transition disabled:opacity-50"
                 >
                   {acknowledging === i.id ? "Acknowledging..." : "Acknowledge"}
                 </button>
@@ -551,7 +549,7 @@ export default function IncidentsPage() {
                       <button
                         onClick={() => acknowledgeBreach(b)}
                         disabled={acknowledging === b.id || isAcknowledged}
-                        className="text-[11px] font-bold px-3 py-1 rounded-full border border-[#E5521A] text-[#E5521A] hover:bg-[#E5521A]/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                        className="text-[11px] font-bold px-3 py-1 rounded-full border border-[var(--accent)] theme-text-nav-active hover:theme-bg-accent-subtle transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {acknowledging === b.id
                           ? "Acknowledging..."
@@ -565,17 +563,12 @@ export default function IncidentsPage() {
                     <div className="text-[10px] text-[#4E6090]">
                       {new Date(b.detected_at).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })}
                     </div>
-                    {b.camera_id && (
-                      <div className="text-[10px] text-[#8A9BBF] mt-0.5">📷 {b.camera_id}</div>
-                    )}
                   </div>
                 </div>
                 {b.notes && (
                   <div className="text-[12px] text-[#8A9BBF] mb-2">{b.notes}</div>
                 )}
                 <div className="flex items-center gap-1.5 text-[10px] text-[#4E6090]">
-                  <MapPin className="w-3 h-3" />
-                  Zone ID: {b.zone_id}
                   {b.alert_sent && (
                     <span className="ml-2 text-[#22D3A1]">✓ Alert sent</span>
                   )}
@@ -618,7 +611,6 @@ export default function IncidentsPage() {
               </video>
             </div>
             <div className="mt-3 flex flex-col gap-1 text-[11px] text-[#8A9BBF]">
-              <span>Video: {selectedVideo.videoFile}</span>
               <span>Evidence ID: {selectedVideo.evidenceId}</span>
               {videoLoadError && (
                 <span className="font-bold text-[#F04A4A]">{videoLoadError}</span>
@@ -827,9 +819,6 @@ export default function IncidentsPage() {
                       Your browser does not support the video tag.
                     </video>
                   </div>
-                  <div className="mt-2 text-[10px] text-[#8A9BBF]">
-                    Video: {analysisReport.videoFile}
-                  </div>
                   {videoLoadError && (
                     <div className="mt-2 text-[10px] text-[#F04A4A] font-bold">
                       {videoLoadError}
@@ -865,7 +854,7 @@ export default function IncidentsPage() {
             </div>
             <button
               onClick={() => setAckConfirmation({ isOpen: false, incidentId: null })}
-              className="px-6 py-2.5 rounded-lg bg-[#E5521A] text-white text-[12px] font-bold hover:bg-[#FF7A42] transition mx-auto"
+              className="px-6 py-2.5 rounded-lg theme-bg-accent text-white text-[12px] font-bold hover:bg-[var(--accent-hover)] transition mx-auto"
             >
               Confirm
             </button>

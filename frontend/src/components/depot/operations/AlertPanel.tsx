@@ -376,7 +376,7 @@ export default function AlertPanel({
             onClick={() => setFilter(tab.key)}
             className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-colors ${
               filter === tab.key
-                ? "bg-[#E5521A]/10 text-[#E5521A] border border-[#E5521A]/25"
+                ? "theme-bg-accent-subtle theme-text-nav-active border border-[var(--accent-border)]"
                 : "text-[#4E6090] hover:text-[#8A9BBF] border border-transparent"
             }`}
           >

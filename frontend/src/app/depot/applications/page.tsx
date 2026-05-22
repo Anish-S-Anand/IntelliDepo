@@ -12,7 +12,7 @@ const MODULES = [
     description: "Live operational overview, KPIs, throughput charts, counting sessions, and detailed analytics reporting.",
     icon: LayoutDashboard,
     href: "/depot/operations",
-    color: "#E5521A",
+    color: "#C74416",
     badge: "LIVE",
   },
   {
@@ -132,7 +132,7 @@ export default function DepotApplicationsPage() {
     <div className="p-5 animate-[fadeIn_0.3s_ease]">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#C43A08] to-[#E5521A] flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#B83E12] to-[#C74416] flex items-center justify-center">
           <Building2 className="w-5 h-5 text-white" />
         </div>
         <div>
@@ -162,7 +162,7 @@ export default function DepotApplicationsPage() {
             <button
               key={link.href}
               onClick={() => router.push(link.href)}
-              className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-semibold hover:border-[#E5521A]/40 hover:text-[#E5521A] transition"
+              className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-semibold hover:border-[var(--accent-border)] hover:theme-text-nav-active transition"
             >
               {link.label}
             </button>

@@ -98,7 +98,7 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
           />
         </div>
         <div className="hidden xs:flex flex-col leading-none">
-          <span className="text-[#E5521A] font-extrabold text-[13px] sm:text-[15px] tracking-tight">
+          <span className="theme-text-nav-active font-extrabold text-[13px] sm:text-[15px] tracking-tight">
             Intelli
           </span>
           <span
@@ -149,8 +149,8 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
           color: "var(--text-muted)",
         }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = "#E5521A";
-          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(229,82,26,0.5)";
+          (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent-border)";
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
@@ -170,8 +170,8 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
           color: "var(--text-muted)",
         }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = "#E5521A";
-          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(229,82,26,0.5)";
+          (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent-border)";
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
@@ -196,7 +196,7 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
           aria-label="Profile menu"
           aria-expanded={profileOpen}
         >
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#C43A08] to-[#E5521A] flex items-center justify-center text-[11px] font-extrabold text-white">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#C43A08] to-[var(--accent)] flex items-center justify-center text-[11px] font-extrabold text-white">
             {initials}
           </div>
           <ChevronDown
@@ -222,7 +222,7 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
               }}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#C43A08] to-[#E5521A] flex items-center justify-center text-[14px] font-extrabold text-white">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#C43A08] to-[var(--accent)] flex items-center justify-center text-[14px] font-extrabold text-white">
                   {initials}
                 </div>
                 <div>
@@ -232,7 +232,7 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
                   <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
                     {user?.email || "operator@intelli.com"}
                   </div>
-                  <div className="text-[9px] text-[#E5521A] font-semibold uppercase mt-0.5">
+                  <div className="text-[9px] theme-text-nav-active font-semibold uppercase mt-0.5">
                     {user?.role || "Admin"}
                   </div>
                 </div>
@@ -242,7 +242,7 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
             {/* Menu items */}
             <div className="py-1.5">
               {[
-                { icon: Settings, color: "#E5521A", label: "Settings", sub: "Account, alerts, integrations", href: "/depot/settings" },
+                { icon: Settings, color: "var(--accent)", label: "Settings", sub: "Account, alerts, integrations", href: "/depot/settings" },
                 { icon: User, color: "#5B9BF5", label: "Account Profile", sub: "Edit your profile details", href: "/depot/settings?tab=account" },
                 { icon: Clock, color: "#22D3A1", label: "Activity & Time Spent", sub: "Session history and usage", href: "/depot/settings?tab=activity" },
                 { icon: Shield, color: "#F5A623", label: "Security & Privacy", sub: "Password, 2FA, permissions", href: "/depot/settings?tab=security" },

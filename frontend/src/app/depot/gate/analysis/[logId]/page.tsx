@@ -117,7 +117,7 @@ export default function AnalysisPage({ params }: AnalysisPageProps) {
           <button
             type="button"
             onClick={handleBack}
-            className="mt-5 px-4 py-2 rounded-lg bg-[#E5521A] text-white text-[12px] font-semibold hover:bg-[#E5521A]/90 transition-colors"
+            className="mt-5 px-4 py-2 rounded-lg theme-bg-accent text-white text-[12px] font-semibold hover:theme-bg-accent-hover transition-colors"
           >
             Back to Gate Console
           </button>

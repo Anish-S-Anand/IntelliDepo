@@ -95,7 +95,7 @@ export default function CommandPage() {
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#e5521a] border-t-transparent" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
       </div>
     );
   }
@@ -115,7 +115,7 @@ export default function CommandPage() {
       <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 mb-5">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <BellRing className="w-4 h-4 text-[#E5521A]" />
+            <BellRing className="w-4 h-4 theme-text-nav-active" />
             <span className="text-[13px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>Quick Actions</span>
           </div>
           {feedback && (
@@ -186,7 +186,7 @@ export default function CommandPage() {
                 icon: BellRing,
                 label: "Trigger Alert",
                 sub: "Broadcast to all",
-                color: "#E5521A",
+                color: "var(--accent)",
                 fn: triggerCommandAlert,
                 successMsg: "Manual alert triggered",
               },
@@ -259,7 +259,7 @@ export default function CommandPage() {
           return (
             <div
               key={zoneName}
-              className="bg-[#14203A] border-[1.5px] border-[#1E2F50] rounded-[14px] p-[18px] transition-all hover:bg-[#E5521A]/3 hover:border-[#2A3F68]"
+              className="bg-[#14203A] border-[1.5px] border-[#1E2F50] rounded-[14px] p-[18px] transition-all hover:bg-[var(--accent-subtle)] hover:border-[#2A3F68]"
             >
               <div className="flex justify-between items-start mb-3">
                 <div>

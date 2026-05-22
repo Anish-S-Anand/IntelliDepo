@@ -42,7 +42,7 @@ export default function CameraDetailView({
       <div className="flex items-center gap-3">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:text-[#E5521A] hover:border-[#E5521A]/40 transition focus:outline-none focus:border-[#E5521A]"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:theme-text-nav-active hover:border-[var(--accent-border)] transition focus:outline-none focus:border-[var(--accent)]"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Back

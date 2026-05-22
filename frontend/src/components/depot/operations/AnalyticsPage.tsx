@@ -62,17 +62,17 @@ export default function AnalyticsPage() {
               onClick={() => setRange(r)}
               className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold capitalize transition-colors ${
                 range === r
-                  ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
+                  ? "border-[var(--accent)] theme-bg-accent-subtle theme-text-nav-active"
                   : "border-[#1E2F50] text-[#8A9BBF] hover:border-[#2A3F68] hover:text-[#E8EDF8]"
               }`}
             >
               {r}
             </button>
           ))}
-          <button className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[10px] font-bold hover:text-[#E5521A] hover:border-[#E5521A]/40 transition">
+          <button className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[10px] font-bold hover:theme-text-nav-active hover:border-[var(--accent-border)] transition">
             ↓ PDF
           </button>
-          <button className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[10px] font-bold hover:text-[#E5521A] hover:border-[#E5521A]/40 transition">
+          <button className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[10px] font-bold hover:theme-text-nav-active hover:border-[var(--accent-border)] transition">
             ↓ CSV
           </button>
         </div>
@@ -99,17 +99,17 @@ export default function AnalyticsPage() {
         <svg width="100%" height="170" viewBox={`0 0 ${svgW} ${svgH}`}>
           <defs>
             <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#E5521A" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#E5521A" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
             </linearGradient>
           </defs>
           <line x1="40" y1="10" x2="40" y2="148" stroke="#1E2F50" strokeWidth="1" />
           <line x1="40" y1="148" x2="550" y2="148" stroke="#1E2F50" strokeWidth="1" />
           <polygon points={polygon} fill="url(#lineGrad)" />
-          <polyline points={polyline} fill="none" stroke="#E5521A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          <polyline points={polyline} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           {points.map((p, i) => (
             <g key={i}>
-              <circle cx={p.x} cy={p.y} r={i === 4 ? 5 : 4} fill={i === 4 ? "#FF7A42" : "#E5521A"} stroke="#14203A" strokeWidth="2" />
+              <circle cx={p.x} cy={p.y} r={i === 4 ? 5 : 4} fill={i === 4 ? "#FF7A42" : "var(--accent)"} stroke="#14203A" strokeWidth="2" />
               <text x={p.x} y="163" fontSize="9" fill="#4E6090" textAnchor="middle">{p.day}</text>
             </g>
           ))}

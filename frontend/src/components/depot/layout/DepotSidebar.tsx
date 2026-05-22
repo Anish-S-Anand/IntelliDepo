@@ -122,13 +122,13 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
             aria-current={isActive ? "page" : undefined}
             className={cn(
               "depot-sidebar-item relative w-auto min-h-[50px] rounded-xl inline-flex flex-row items-center justify-start gap-[10px] px-[13px] text-[16px]",
-              "focus:outline-none focus:ring-2 focus:ring-[#E5521A] focus:ring-offset-2",
+              "focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2",
               isActive ? "active" : ""
             )}
             style={{
-              backgroundColor: isActive ? "rgba(229,82,26,0.12)" : "transparent",
-              color: isActive ? "#E5521A" : "var(--text-nav)",
-              border: isActive ? "1px solid rgba(229,82,26,0.22)" : "1px solid transparent",
+              backgroundColor: isActive ? "var(--accent-subtle)" : "transparent",
+              color: isActive ? "var(--accent)" : "var(--text-nav)",
+              border: isActive ? "1px solid var(--accent-border)" : "1px solid transparent",
               transition: "background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease",
             }}
           >

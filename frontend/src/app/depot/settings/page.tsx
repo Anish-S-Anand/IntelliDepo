@@ -69,7 +69,7 @@ export default function SettingsPage() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-[#1E2F50] last:border-b-0 ${
                     isActive
-                      ? "bg-[#E5521A]/10 text-[#E5521A]"
+                      ? "theme-bg-accent-subtle theme-text-nav-active"
                       : "text-[#8A9BBF] hover:bg-[#1E2F50] hover:text-[#E8EDF8]"
                   }`}
                 >
@@ -89,15 +89,15 @@ export default function SettingsPage() {
               <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-5">
                 <h2 className="text-[14px] font-bold text-[#E8EDF8] mb-4">Profile Information</h2>
                 <div className="flex items-center gap-4 mb-5">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#C43A08] to-[#E5521A] flex items-center justify-center text-[22px] font-extrabold text-white">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#C43A08] to-[var(--accent)] flex items-center justify-center text-[22px] font-extrabold text-white">
                     {user?.full_name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "OP"}
                   </div>
                   <div>
                     <div className="text-[16px] font-bold text-[#E8EDF8]">{user?.full_name || "Operator"}</div>
                     <div className="text-[12px] text-[#8A9BBF]">{user?.email || "operator@intelli.com"}</div>
-                    <div className="text-[10px] text-[#E5521A] font-semibold uppercase mt-1">{user?.role || "Admin"}</div>
+                    <div className="text-[10px] theme-text-nav-active font-semibold uppercase mt-1">{user?.role || "Admin"}</div>
                   </div>
-                  <button className="ml-auto px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-semibold hover:border-[#E5521A] hover:text-[#E5521A] transition flex items-center gap-1.5">
+                  <button className="ml-auto px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-semibold hover:border-[var(--accent-border)] hover:theme-text-nav-active transition flex items-center gap-1.5">
                     <Camera className="w-3.5 h-3.5" />
                     Change Photo
                   </button>
@@ -115,12 +115,12 @@ export default function SettingsPage() {
                       </label>
                       <input
                         defaultValue={field.value}
-                        className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40"
+                        className="w-full px-3 py-2 bg-[#0F1A30] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[var(--accent-border)]"
                       />
                     </div>
                   ))}
                 </div>
-                <button className="mt-4 px-4 py-2 rounded-lg bg-[#E5521A] text-white text-[12px] font-bold hover:bg-[#FF7A42] transition">
+                <button className="mt-4 px-4 py-2 rounded-lg theme-bg-accent text-white text-[12px] font-bold hover:bg-[var(--accent-hover)] transition">
                   Save Changes
                 </button>
               </div>
@@ -135,7 +135,7 @@ export default function SettingsPage() {
                   {[
                     { label: "Today", value: "4h 32m", icon: Clock, color: "#5B9BF5" },
                     { label: "This Week", value: "22h 15m", icon: Activity, color: "#22D3A1" },
-                    { label: "This Month", value: "87h 40m", icon: Globe, color: "#E5521A" },
+                    { label: "This Month", value: "87h 40m", icon: Globe, color: "var(--accent)" },
                   ].map((s) => {
                     const Icon = s.icon;
                     return (
@@ -189,7 +189,7 @@ export default function SettingsPage() {
                             <div className="text-[10px] text-[#4E6090]">{item.desc}</div>
                           </div>
                         </div>
-                        <button className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-semibold hover:border-[#E5521A] hover:text-[#E5521A] transition">
+                        <button className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-semibold hover:border-[var(--accent-border)] hover:theme-text-nav-active transition">
                           {item.action}
                         </button>
                       </div>
@@ -238,7 +238,7 @@ export default function SettingsPage() {
                 <h2 className="text-[14px] font-bold text-[#E8EDF8] mb-4">Alert Thresholds</h2>
                 <div className="space-y-3.5">
                   {[
-                    { label: "FIFO Compliance Warning Threshold", value: "90%", pct: 90, color: "#E5521A" },
+                    { label: "FIFO Compliance Warning Threshold", value: "90%", pct: 90, color: "var(--accent)" },
                     { label: "Cluster Capacity Critical Threshold", value: "95%", pct: 95, color: "#F04A4A" },
                     { label: "SLA Dwell Threshold (min)", value: "30", pct: 60, color: "#F5A623" },
                   ].map((t) => (
@@ -265,7 +265,7 @@ export default function SettingsPage() {
                   {[
                     { name: "SAP ERP Connector", status: "● Connected", badge: "LIVE", badgeCol: "#22D3A1" },
                     { name: "CCTV DVR API", status: "● 6 cameras active", badge: "LIVE", badgeCol: "#22D3A1" },
-                    { name: "SMS / WhatsApp Alerts", status: "Twilio Gateway", badge: "ENABLED", badgeCol: "#E5521A" },
+                    { name: "SMS / WhatsApp Alerts", status: "Twilio Gateway", badge: "ENABLED", badgeCol: "var(--accent)" },
                     { name: "LPR Engine", status: "Tesseract.js + Custom Model", badge: "ACTIVE", badgeCol: "#5B9BF5" },
                   ].map((int) => (
                     <div key={int.name} className="flex justify-between items-center p-3 bg-[#0F1A30] rounded-xl">
@@ -302,7 +302,7 @@ export default function SettingsPage() {
                         onClick={() => theme === "dark" && toggleTheme()}
                         className={`p-4 rounded-xl border-2 transition-all ${
                           theme === "light"
-                            ? "border-[#E5521A] bg-[#E5521A]/10"
+                            ? "border-[var(--accent)] theme-bg-accent-subtle"
                             : "border-[#1E2F50] hover:border-[#2A3F68]"
                         }`}
                       >
@@ -314,7 +314,7 @@ export default function SettingsPage() {
                         onClick={() => theme === "light" && toggleTheme()}
                         className={`p-4 rounded-xl border-2 transition-all ${
                           theme === "dark"
-                            ? "border-[#E5521A] bg-[#E5521A]/10"
+                            ? "border-[var(--accent)] theme-bg-accent-subtle"
                             : "border-[#1E2F50] hover:border-[#2A3F68]"
                         }`}
                       >

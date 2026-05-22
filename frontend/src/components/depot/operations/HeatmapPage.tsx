@@ -214,7 +214,7 @@ export default function HeatmapPage() {
   if (loading) {
     return (
       <div className="p-5 flex flex-col items-center justify-center h-[60vh]">
-        <Loader2 className="w-8 h-8 text-[#E5521A] animate-spin mb-3" />
+        <Loader2 className="w-8 h-8 theme-text-nav-active animate-spin mb-3" />
         <span className="text-[13px] text-[#8A9BBF]">Loading heatmap data...</span>
       </div>
     );
@@ -224,7 +224,7 @@ export default function HeatmapPage() {
     <div className="p-5">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <div className="text-[11px] text-[#E5521A] font-bold tracking-[0.1em] uppercase mb-1">Cluster Mapping</div>
+          <div className="text-[11px] theme-text-nav-active font-bold tracking-[0.1em] uppercase mb-1">Cluster Mapping</div>
           <h2 className="text-xl font-extrabold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>Warehouse Heatmap</h2>
           <p className="text-[11px] text-[#8A9BBF] mt-0.5">Zone density visualization · Capacity alerts · Real-time occupancy</p>
         </div>
@@ -258,7 +258,7 @@ export default function HeatmapPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3">
             <label className="flex items-center gap-2 rounded-[10px] border border-[#1E2F50] bg-[#0F1A30] px-3 py-2">
-              <Calendar className="h-3.5 w-3.5 text-[#E5521A]" />
+              <Calendar className="h-3.5 w-3.5 theme-text-nav-active" />
               <span className="text-[9px] font-bold uppercase tracking-wide text-[#4E6090]">From</span>
               <input
                 type="date"
@@ -269,7 +269,7 @@ export default function HeatmapPage() {
               />
             </label>
             <label className="flex items-center gap-2 rounded-[10px] border border-[#1E2F50] bg-[#0F1A30] px-3 py-2">
-              <Calendar className="h-3.5 w-3.5 text-[#E5521A]" />
+              <Calendar className="h-3.5 w-3.5 theme-text-nav-active" />
               <span className="text-[9px] font-bold uppercase tracking-wide text-[#4E6090]">To</span>
               <input
                 type="date"
@@ -282,7 +282,7 @@ export default function HeatmapPage() {
             <button
               type="button"
               onClick={() => { setHistoryStartDate(""); setHistoryEndDate(""); }}
-              className="rounded-[10px] border border-[#1E2F50] px-4 py-2 text-[11px] font-bold text-[#8A9BBF] transition-colors hover:border-[#E5521A]/40 hover:text-[#E5521A]"
+              className="rounded-[10px] border border-[#1E2F50] px-4 py-2 text-[11px] font-bold text-[#8A9BBF] transition-colors hover:border-[var(--accent-border)] hover:theme-text-nav-active"
             >
               Live
             </button>
@@ -291,14 +291,14 @@ export default function HeatmapPage() {
         <div className="hidden lg:block" />
       </div>
 
-      <div className="h-px bg-gradient-to-r from-transparent via-[#E5521A]/40 to-transparent mb-5" />
+      <div className="h-px bg-gradient-to-r from-transparent via-[var(--accent-border)] to-transparent mb-5" />
 
       {/* Map + Zone Detail */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4 mb-5">
         <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px]">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-[#E5521A]" />
+              <MapPin className="w-4 h-4 theme-text-nav-active" />
               <span className="text-[13px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>Warehouse Floor Plan</span>
             </div>
             <div className="flex gap-3">
@@ -380,7 +380,7 @@ export default function HeatmapPage() {
                 const isCritical = zone.status === "critical" || zone.utilizationPct >= thresholds.critical;
                 const sevColor = isCritical ? "#F04A4A" : "#F5A623";
                 return (
-                  <div key={zone.id} className="p-2.5 rounded-[10px] bg-[#0F1A30] hover:bg-[#E5521A]/5 transition-colors cursor-pointer" style={{ borderLeft: `3px solid ${sevColor}` }} onClick={() => setSelectedZone(zone)}>
+                  <div key={zone.id} className="p-2.5 rounded-[10px] bg-[#0F1A30] hover:bg-[var(--accent-subtle)] transition-colors cursor-pointer" style={{ borderLeft: `3px solid ${sevColor}` }} onClick={() => setSelectedZone(zone)}>
                     <div className="flex justify-between items-center">
                       <span className="text-[11px] font-bold" style={{ color: sevColor }}>Zone {zone.code}</span>
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border" style={{ background: `${sevColor}22`, color: sevColor, borderColor: `${sevColor}33` }}>{roundedStorageLevel(zone.utilizationPct)}%</span>
@@ -402,7 +402,7 @@ export default function HeatmapPage() {
               {displayZones.map((z) => {
                 const storageLevel = roundedStorageLevel(z.utilizationPct);
                 return (
-                  <div key={z.id} className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${selectedDisplayZone?.id === z.id ? "bg-[#E5521A]/10" : "hover:bg-[#0F1A30]"}`} onClick={() => setSelectedZone(z)}>
+                  <div key={z.id} className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${selectedDisplayZone?.id === z.id ? "theme-bg-accent-subtle" : "hover:bg-[#0F1A30]"}`} onClick={() => setSelectedZone(z)}>
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full" style={{ background: statusColor(z.status) }} />
                       <span className="text-[11px] font-bold text-[#E8EDF8]">{z.code}</span>

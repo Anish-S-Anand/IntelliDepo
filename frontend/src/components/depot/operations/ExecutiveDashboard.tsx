@@ -49,7 +49,7 @@ const WEEKLY_TOTALS = WEEKLY.reduce(
   { enter: 0, exit: 0 }
 );
 
-function zoneDisplayName(zone: ZoneResponse) {
+function zoneDisplayName(zone: LiveZone) {
   const code = zone.zone_code?.trim();
   return code ? `Zone ${code}` : "Zone";
 }
@@ -261,7 +261,7 @@ function KpiCard({
       className="rounded-[14px] p-3 sm:p-4 relative overflow-hidden cursor-default transition-all hover:-translate-y-0.5 group"
       style={{ ...cardStyle, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 6px 24px rgba(229,82,26,0.10)";
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 6px 24px var(--accent-subtle)";
         (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(229,82,26,0.25)";
       }}
       onMouseLeave={(e) => {
@@ -319,32 +319,19 @@ export default function ExecutiveDashboard() {
       getDepotCommandSnapshot().then((snap) => {
         if (!cancelled && snap.cameras.data.length > 0) setCameras(snap.cameras.data);
       }).catch(() => {});
-<<<<<<< HEAD
       // Same endpoint as Inventory page — live utilization from active batches
       fetch("/backend/depot/vision/cluster/zones")
         .then((r) => r.ok ? r.json() : Promise.reject())
         .then((data: LiveZone[]) => { if (data.length > 0) setLiveZones(data); })
         .catch(() => {});
-=======
-      getZones().then((z) => { if (!cancelled && z.length > 0) setZones(z); }).catch(() => {});
->>>>>>> e6caae971d568031e6f05ba0703ebb25f92f1833
       getIncidents()
         .then((items) => { if (!cancelled) setBackendIncidents(dedupeIncidentResponses(items)); })
         .catch(() => {});
     };
 
     loadDashboardData();
-<<<<<<< HEAD
     const id = setInterval(loadDashboardData, 10000);
     return () => clearInterval(id);
-=======
-    // Increased from 20s to 30s for better performance
-    const id = setInterval(loadDashboardData, 30000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
->>>>>>> e6caae971d568031e6f05ba0703ebb25f92f1833
   }, []);
 
   // Map backend cameras to the shape used in the UI
@@ -372,7 +359,6 @@ export default function ExecutiveDashboard() {
       id: incident.id,
       title: incident.title,
       what: incident.description || incident.title,
-      where: `Zone ID: ${incident.zone_id}`,
       doWhat: incident.status === "acknowledged"
         ? "Incident is acknowledged and awaiting closure."
         : "Ops team should review and take action.",
@@ -409,7 +395,7 @@ export default function ExecutiveDashboard() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap justify-between items-start gap-3 mb-5">
         <div>
-          <div className="text-[10px] sm:text-[11px] font-black tracking-[0.1em] uppercase mb-1" style={{ color: "#E5521A" }}>
+          <div className="text-[10px] sm:text-[11px] font-black tracking-[0.1em] uppercase mb-1" style={{ color: "var(--accent)" }}>
             Executive Overview
           </div>
           <h1 className="text-[18px] sm:text-[22px] font-extrabold" style={{ color: "var(--text-primary)" }}>
@@ -483,9 +469,9 @@ export default function ExecutiveDashboard() {
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm" style={{ background: "#E5521A" }} />
+              <div className="w-3 h-3 rounded-sm" style={{ background: "var(--accent)" }} />
               <span className="text-[10px] font-bold" style={{ color: "var(--text-muted)" }}>Bags In</span>
-              <span className="text-[10px] font-black" style={{ color: "#E5521A" }}>{fmtK(WEEKLY_TOTALS.enter)}</span>
+              <span className="text-[10px] font-black" style={{ color: "var(--accent)" }}>{fmtK(WEEKLY_TOTALS.enter)}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm" style={{ background: "rgba(91,155,245,0.85)" }} />
@@ -507,7 +493,7 @@ export default function ExecutiveDashboard() {
                   <div className="flex items-end gap-[5px]" style={{ height: CHART_H }}>
                     {/* In bar */}
                     <div className="flex flex-col items-center justify-end gap-[3px]" style={{ height: CHART_H }}>
-                      <span className="text-[10px] font-bold" style={{ color: peak ? "#E5521A" : "var(--text-muted)" }}>
+                      <span className="text-[10px] font-bold" style={{ color: peak ? "var(--accent)" : "var(--text-muted)" }}>
                         {day.enter}
                       </span>
                       <div style={{
@@ -534,7 +520,7 @@ export default function ExecutiveDashboard() {
                     </div>
                   </div>
                   <span className="text-[10px] sm:text-[11px]"
-                    style={{ color: peak ? "#E5521A" : "var(--text-faint)", fontWeight: peak ? 900 : 600 }}>
+                    style={{ color: peak ? "var(--accent)" : "var(--text-faint)", fontWeight: peak ? 900 : 600 }}>
                     {DAYS[i]}
                   </span>
                 </div>
@@ -547,11 +533,11 @@ export default function ExecutiveDashboard() {
         <div className="mt-4 pt-3 grid grid-cols-2 gap-2 sm:gap-3"
           style={{ borderTop: "1px solid var(--border-default)" }}>
           <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-            style={{ backgroundColor: "rgba(229,82,26,0.07)", border: "1px solid rgba(229,82,26,0.15)" }}>
-            <ArrowUpCircle className="w-4 h-4 shrink-0" style={{ color: "#E5521A" }} />
+            style={{ backgroundColor: "var(--accent-subtle)", border: "1px solid var(--accent-subtle-bg)" }}>
+            <ArrowUpCircle className="w-4 h-4 shrink-0" style={{ color: "var(--accent)" }} />
             <div>
               <div className="text-[9px] font-black uppercase" style={{ color: "var(--text-faint)" }}>Total Bags In</div>
-              <div className="text-[14px] sm:text-[15px] font-extrabold" style={{ color: "#E5521A" }}>
+              <div className="text-[14px] sm:text-[15px] font-extrabold" style={{ color: "var(--accent)" }}>
                 {WEEKLY_TOTALS.enter} this week
               </div>
             </div>
@@ -648,7 +634,7 @@ export default function ExecutiveDashboard() {
                     router.push(`/depot/incidents?incident=${encodeURIComponent(inc.id)}`);
                   }
                 }}
-                className="rounded-[14px] overflow-hidden transition-all hover:-translate-y-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#E5521A]/50"
+                className="rounded-[14px] overflow-hidden transition-all hover:-translate-y-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-border)]"
                 style={{ ...innerCard, borderLeft: `4px solid ${sc}` }}
                 onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.borderColor = sc)}
                 onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-default)")}
@@ -678,22 +664,11 @@ export default function ExecutiveDashboard() {
                     </p>
                   </div>
 
-                  {/* Action needed */}
-                  <div className="rounded-lg px-2.5 py-2 mb-2"
-                    style={{ backgroundColor: `${sc}0D`, border: `1px solid ${sc}25` }}>
-                    <div className="text-[9px] font-black uppercase mb-0.5" style={{ color: sc }}>Action needed</div>
-                    <p className="text-[10px] sm:text-[11px] leading-snug font-bold" style={{ color: sc }}>
-                      {inc.doWhat}
-                    </p>
-                  </div>
+
 
                   {/* Footer */}
                   <div className="flex justify-between items-center text-[9px]" style={{ color: "var(--text-faint)" }}>
                     <div className="flex flex-col gap-0.5 min-w-0 pr-2">
-                      <span className="font-bold truncate" style={{ color: "var(--text-muted)" }}>
-                        📍 {inc.where}
-                      </span>
-                      <span className="truncate">👤 {inc.assignee}</span>
                     </div>
                     <div className="flex flex-col items-end gap-0.5 shrink-0">
                       <span>{inc.ago}</span>

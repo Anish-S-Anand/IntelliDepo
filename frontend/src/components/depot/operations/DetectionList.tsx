@@ -102,7 +102,7 @@ export default function DetectionList({
             onClick={() => onDetectionSelect(detection.id)}
             className={`w-full bg-[#14203A] border rounded-[14px] p-3 text-left transition-all hover:border-[#2A3F68] hover:shadow-[0_4px_20px_rgba(0,0,0,0.2)] focus:outline-none ${
               isSelected
-                ? "border-[#E5521A] shadow-[0_4px_20px_rgba(229,82,26,0.3)]"
+                ? "border-[var(--accent)] shadow-[0_4px_20px_rgba(229,82,26,0.3)]"
                 : "border-[#1E2F50]"
             }`}
           >

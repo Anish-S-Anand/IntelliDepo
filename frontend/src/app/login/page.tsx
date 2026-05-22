@@ -119,7 +119,7 @@ export default function LoginPage() {
             />
           </div>
           <div className="text-center">
-            <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.35em] text-[#E5521A] mb-1">
+            <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.35em] mb-1" style={{ color: 'var(--accent)' }}>
               Fidelis
             </p>
             <h1 className="text-xl sm:text-2xl font-black tracking-tight transition-colors" style={{ color: headingColor }}>
@@ -162,14 +162,21 @@ export default function LoginPage() {
                   required
                   placeholder="you@company.com"
                   autoComplete="email"
-                  className="w-full rounded-xl pl-9 sm:pl-10 pr-4 py-2.5 sm:py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#E5521A]/50 transition-all"
+                  className="w-full rounded-xl pl-9 sm:pl-10 pr-4 py-2.5 sm:py-3 text-sm focus:outline-none focus:ring-2 transition-all"
                   style={{
                     background: inputBg,
                     border: `1px solid ${inputBorder}`,
                     color: inputText,
+                    boxShadow: 'none',
                   }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(229,82,26,0.5)")}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = inputBorder)}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "var(--accent-border)";
+                    e.currentTarget.style.boxShadow = "0 0 0 3px var(--accent-subtle)";
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = inputBorder;
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
                 />
                 <style>{`input::placeholder { color: ${inputPlaceholder}; }`}</style>
               </div>
@@ -195,14 +202,21 @@ export default function LoginPage() {
                   required
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  className="w-full rounded-xl pl-9 sm:pl-10 pr-10 py-2.5 sm:py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#E5521A]/50 transition-all"
+                  className="w-full rounded-xl pl-9 sm:pl-10 pr-10 py-2.5 sm:py-3 text-sm focus:outline-none focus:ring-2 transition-all"
                   style={{
                     background: inputBg,
                     border: `1px solid ${inputBorder}`,
                     color: inputText,
+                    boxShadow: 'none',
                   }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(229,82,26,0.5)")}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = inputBorder)}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "var(--accent-border)";
+                    e.currentTarget.style.boxShadow = "0 0 0 3px var(--accent-subtle)";
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = inputBorder;
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
                 />
                 <button
                   type="button"
@@ -229,8 +243,8 @@ export default function LoginPage() {
               disabled={isLoading}
               className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 sm:py-3.5 text-sm font-black text-white disabled:opacity-60 transition-all active:scale-[0.98] hover:shadow-xl"
               style={{
-                background: "linear-gradient(135deg, #E5521A, #FF7A42)",
-                boxShadow: "0 0 30px rgba(229,82,26,0.35)",
+                background: `linear-gradient(135deg, var(--accent-button-bg), var(--accent-hover))`,
+                boxShadow: "0 0 30px var(--accent-subtle)",
               }}
             >
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -247,7 +261,7 @@ export default function LoginPage() {
             }}
           >
             <div className="flex items-center gap-2 mb-2.5 sm:mb-3">
-              <Shield className="w-3.5 h-3.5 text-[#E5521A] flex-shrink-0" />
+              <Shield className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent)' }} />
               <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider" style={{ color: labelColor }}>
                 Demo Credentials
               </p>
@@ -274,7 +288,18 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => fillDemo(credential.email, credential.password)}
-                    className="flex-shrink-0 text-[10px] sm:text-[11px] font-black text-[#E5521A] bg-[#E5521A]/10 border border-[#E5521A]/20 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg hover:bg-[#E5521A]/20 transition active:scale-95"
+                    className="flex-shrink-0 text-[10px] sm:text-[11px] font-black px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg transition active:scale-95"
+                    style={{
+                      color: 'var(--accent)',
+                      backgroundColor: 'var(--accent-subtle-bg)',
+                      border: '1px solid var(--accent-border)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--accent-subtle)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--accent-subtle-bg)';
+                    }}
                   >
                     Use
                   </button>
@@ -291,7 +316,14 @@ export default function LoginPage() {
             Don&apos;t have an account?{" "}
             <Link
               href="/register"
-              className="font-black text-[#E5521A] hover:text-[#FF7A42] transition"
+              className="font-black transition"
+              style={{ color: 'var(--accent)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--accent-hover)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--accent)';
+              }}
             >
               Create account
             </Link>

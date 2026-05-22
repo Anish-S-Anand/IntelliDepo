@@ -14,7 +14,7 @@ const KPI_LABELS = [
   { label: "Bag Count Accuracy", key: "accuracy", glow: "#22D3A1" },
   { label: "FIFO Compliance", key: "fifo", glow: "#22D3A1" },
   { label: "Avg Loading Time", key: "loading", glow: "#5B9BF5" },
-  { label: "Depot Occupancy", key: "occupancy", glow: "#E5521A" },
+  { label: "Depot Occupancy", key: "occupancy", glow: "var(--accent)" },
   { label: "Active Alerts", key: "alerts", glow: "#F5A623" },
   { label: "Open Incidents", key: "incidents", glow: "#F04A4A" },
 ];
@@ -89,7 +89,7 @@ export default function OperationsDashboard() {
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#e5521a] border-t-transparent" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
       </div>
     );
   }
@@ -99,7 +99,7 @@ export default function OperationsDashboard() {
       {/* Hero Section */}
       <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-[#162040] to-[#1a0f05] border border-[#1E2F50] p-6 mb-5 grid grid-cols-1 lg:grid-cols-2 gap-5 items-center">
         <div>
-          <div className="text-[11px] text-[#E5521A] font-bold tracking-[0.1em] uppercase mb-1.5">
+          <div className="text-[11px] theme-text-nav-active font-bold tracking-[0.1em] uppercase mb-1.5">
             Live Operations
           </div>
           <h2 className="text-xl font-extrabold text-[#E8EDF8] mb-1" style={{ fontFamily: "'Syne', sans-serif" }}>
@@ -110,12 +110,12 @@ export default function OperationsDashboard() {
           </p>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { v: `${avgCapacity}%`, l: "Depot Occupancy", c: "#E5521A" },
+              { v: `${avgCapacity}%`, l: "Depot Occupancy", c: "var(--accent)" },
               { v: String(totalAlerts), l: "Active Alerts", c: "#22D3A1" },
               { v: String(openIncidents), l: "Open Incidents", c: "#5B9BF5" },
               { v: kpis ? String(kpis.total_events_today) : "—", l: "Events Today", c: "#F5A623" },
             ].map((s) => (
-              <div key={s.l} className="bg-[#E5521A]/6 border border-[#E5521A]/15 rounded-xl p-3.5">
+              <div key={s.l} className="theme-bg-accent-subtle border border-[var(--accent-border)] rounded-xl p-3.5">
                 <div className="text-2xl font-extrabold" style={{ color: s.c, fontFamily: "'Syne', sans-serif" }}>
                   {s.v}
                 </div>
@@ -125,10 +125,10 @@ export default function OperationsDashboard() {
           </div>
         </div>
         <div className="relative h-[200px] flex items-center justify-center">
-          <div className="absolute w-24 h-24 rounded-full bg-[#E5521A]/20 animate-ping" style={{ animationDuration: "3s" }} />
-          <div className="absolute w-32 h-32 rounded-full border-2 border-[#E5521A]/30 animate-spin" style={{ animationDuration: "8s" }} />
-          <div className="absolute w-20 h-20 rounded-full border border-[#E5521A]/50 animate-pulse" />
-          <div className="relative text-[#E5521A] font-extrabold text-lg">⚡</div>
+          <div className="absolute w-24 h-24 rounded-full bg-[var(--accent-subtle-bg)] animate-ping" style={{ animationDuration: "3s" }} />
+          <div className="absolute w-32 h-32 rounded-full border-2 border-[var(--accent-border)] animate-spin" style={{ animationDuration: "8s" }} />
+          <div className="absolute w-20 h-20 rounded-full border border-[var(--accent-border)] animate-pulse" />
+          <div className="relative theme-text-nav-active font-extrabold text-lg">⚡</div>
         </div>
       </div>
 
@@ -137,7 +137,7 @@ export default function OperationsDashboard() {
         {kpiValues.map((kpi) => (
           <div
             key={kpi.label}
-            className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 relative overflow-hidden transition-all hover:border-[#E5521A]/30 hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(229,82,26,0.1)] group"
+            className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 relative overflow-hidden transition-all hover:border-[var(--accent-border)] hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(229,82,26,0.1)] group"
           >
             <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full opacity-[0.06]" style={{ background: kpi.color }} />
             <div className="text-[9px] font-bold tracking-[0.08em] text-[#4E6090] uppercase mb-2">
@@ -149,12 +149,12 @@ export default function OperationsDashboard() {
             <div className="text-[10px] mt-1" style={{ color: kpi.color }}>
               {kpi.trend}
             </div>
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#E5521A] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         ))}
       </div>
 
-      <div className="h-px bg-gradient-to-r from-transparent via-[#E5521A]/40 to-transparent mb-5" />
+      <div className="h-px bg-gradient-to-r from-transparent via-[var(--accent-border)] to-transparent mb-5" />
 
       {/* Chart + Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4 mb-5">
@@ -162,7 +162,7 @@ export default function OperationsDashboard() {
         <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px]">
           <div className="flex justify-between items-center mb-3.5">
             <span className="text-[13px] font-bold text-[#E8EDF8]">Daily Throughput (Bags)</span>
-            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#E5521A]/10 text-[#E5521A] border border-[#E5521A]/20">
+            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full theme-bg-accent-subtle theme-text-nav-active border border-[var(--accent-border)]">
               THIS WEEK
             </span>
           </div>
@@ -179,8 +179,8 @@ export default function OperationsDashboard() {
                       height: h,
                       background: isHighlight
                         ? "linear-gradient(to bottom, #FF7A42, rgba(255,122,66,0.4))"
-                        : "linear-gradient(to bottom, rgba(229,82,26,0.9), rgba(229,82,26,0.3))",
-                      filter: isHighlight ? "drop-shadow(0 0 4px rgba(229,82,26,0.5))" : undefined,
+                        : "linear-gradient(to bottom, rgba(229,82,26,0.9), var(--accent-border))",
+                      filter: isHighlight ? "drop-shadow(0 0 4px var(--accent-border))" : undefined,
                     }}
                   />
                   <span className="text-[9px] text-[#4E6090]">{DAYS[i]}</span>
@@ -207,7 +207,7 @@ export default function OperationsDashboard() {
                 return (
                   <div
                     key={alert.id}
-                    className="p-2.5 rounded-[10px] bg-[#0F1A30] hover:bg-[#E5521A]/5 transition-colors"
+                    className="p-2.5 rounded-[10px] bg-[#0F1A30] hover:bg-[var(--accent-subtle)] transition-colors"
                     style={{ borderLeft: `3px solid ${sevColor}` }}
                   >
                     <div className="flex justify-between items-center">

@@ -100,7 +100,7 @@ export default function PlatformNav() {
               width={28}
               height={28}
               className="object-contain"
-              style={{ filter: "drop-shadow(0 0 6px rgba(229,82,26,0.5))" }}
+              style={{ filter: "drop-shadow(0 0 6px var(--accent-border))" }}
               priority
             />
           </div>
@@ -109,7 +109,7 @@ export default function PlatformNav() {
               style={{
                 fontSize: 18,
                 fontWeight: 800,
-                color: "#E5521A",
+                color: "var(--accent)",
                 letterSpacing: "-0.4px",
                 lineHeight: 1.1,
               }}
@@ -235,8 +235,8 @@ export default function PlatformNav() {
             transition: "border-color 0.15s, color 0.15s",
           }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "#E5521A";
-            (e.currentTarget as HTMLButtonElement).style.color = "#E5521A";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent)";
+            (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)";
           }}
           onMouseLeave={e => {
             (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-default)";
@@ -264,8 +264,8 @@ export default function PlatformNav() {
               transition: "border-color 0.15s, color 0.15s",
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#E5521A";
-              (e.currentTarget as HTMLButtonElement).style.color = "#E5521A";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent)";
+              (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)";
             }}
             onMouseLeave={e => {
               (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-default)";
@@ -361,7 +361,7 @@ export default function PlatformNav() {
             width: 34,
             height: 34,
             borderRadius: 8,
-            background: "linear-gradient(135deg, #C43A08, #E5521A)",
+            background: "linear-gradient(135deg, #C43A08, var(--accent))",
             color: "#fff",
             fontSize: 13,
             fontWeight: 800,
@@ -369,7 +369,7 @@ export default function PlatformNav() {
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
-            border: "1px solid rgba(229,82,26,0.3)",
+            border: "1px solid var(--accent-border)",
             cursor: "pointer",
           }}
           title={user?.email ?? "User"}

@@ -336,7 +336,7 @@ export default function CountingSummaryPage() {
     return (
       <div className="p-5 flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-[#E5521A] border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
           <span className="text-[12px] text-[#8A9BBF] font-bold tracking-wide">Loading counting data...</span>
         </div>
       </div>
@@ -348,7 +348,7 @@ export default function CountingSummaryPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <div className="text-[11px] text-[#E5521A] font-bold tracking-[0.1em] uppercase mb-1">
+          <div className="text-[11px] theme-text-nav-active font-bold tracking-[0.1em] uppercase mb-1">
             Automated Counting
           </div>
           <h2 className="text-xl font-extrabold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
@@ -362,7 +362,7 @@ export default function CountingSummaryPage() {
         <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] overflow-hidden">
           <div className="flex items-center justify-between px-[18px] py-3 border-b border-[#1E2F50]">
             <div className="flex items-center gap-2">
-              <ScanLine className="w-4 h-4 text-[#E5521A]" />
+              <ScanLine className="w-4 h-4 theme-text-nav-active" />
               <span className="text-[13px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
                 Live Counting Feed
               </span>

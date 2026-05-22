@@ -76,7 +76,7 @@ export default function CameraListView({ onCameraSelect }: CameraListViewProps) 
         <button
           key={camera.id}
           onClick={() => onCameraSelect(camera.id, camera.name)}
-          className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 text-left transition-all hover:border-[#2A3F68] hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)] focus:outline-none focus:border-[#E5521A]"
+          className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 text-left transition-all hover:border-[#2A3F68] hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)] focus:outline-none focus:border-[var(--accent)]"
         >
           <div className="flex items-start justify-between mb-2">
             <div className="flex-1">

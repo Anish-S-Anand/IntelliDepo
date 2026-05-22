@@ -160,7 +160,7 @@ export default function SequencingPage() {
             FIFO / FILO / LIFO / FEFO rule management, pick queues and audit trail
           </p>
         </div>
-        <button onClick={() => fetchAll()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[11px] text-[#8A9BBF] hover:border-[#E5521A]/40 hover:text-[#E5521A] transition-colors">
+        <button onClick={() => fetchAll()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[11px] text-[#8A9BBF] hover:border-[var(--accent-border)] hover:theme-text-nav-active transition-colors">
           <RefreshCw className="w-3 h-3" /> Refresh
         </button>
       </div>
@@ -169,11 +169,11 @@ export default function SequencingPage() {
       <section className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-[#E5521A]" />
+            <Layers className="w-4 h-4 theme-text-nav-active" />
             <h2 className="text-[14px] font-bold text-[#E8EDF8]" style={syne}>Rule Configuration</h2>
             <span className="text-[10px] text-[#4E6090]">{configs.length} rules</span>
           </div>
-          <button onClick={() => setShowAddRule(true)} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#E5521A]/10 border border-[#E5521A]/30 text-[#E5521A] text-[11px] font-semibold hover:bg-[#E5521A]/20 transition-colors">
+          <button onClick={() => setShowAddRule(true)} className="flex items-center gap-1 px-2.5 py-1 rounded-lg theme-bg-accent-subtle border border-[var(--accent-border)] theme-text-nav-active text-[11px] font-semibold hover:bg-[var(--accent-subtle-bg)] transition-colors">
             <Plus className="w-3 h-3" /> Add Rule
           </button>
         </div>
@@ -214,26 +214,26 @@ export default function SequencingPage() {
                 <button onClick={() => setShowAddRule(false)} className="text-[#4E6090] hover:text-[#E8EDF8]"><X className="w-4 h-4" /></button>
               </div>
               <label className="block text-[11px] text-[#8A9BBF]">Zone
-                <input value={newRule.zone} onChange={(e) => setNewRule({ ...newRule, zone: e.target.value })} placeholder="e.g. Zone A" className="mt-1 w-full px-3 py-1.5 bg-[#0D1526] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40 placeholder:text-[#4E6090]" />
+                <input value={newRule.zone} onChange={(e) => setNewRule({ ...newRule, zone: e.target.value })} placeholder="e.g. Zone A" className="mt-1 w-full px-3 py-1.5 bg-[#0D1526] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[var(--accent-border)] placeholder:text-[#4E6090]" />
               </label>
               <label className="block text-[11px] text-[#8A9BBF]">Rule Type
-                <select value={newRule.rule} onChange={(e) => setNewRule({ ...newRule, rule: e.target.value })} className="mt-1 w-full px-3 py-1.5 bg-[#0D1526] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40">
+                <select value={newRule.rule} onChange={(e) => setNewRule({ ...newRule, rule: e.target.value })} className="mt-1 w-full px-3 py-1.5 bg-[#0D1526] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[var(--accent-border)]">
                   {Object.keys(RULE_COLORS).map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
               </label>
               <label className="block text-[11px] text-[#8A9BBF]">SKU Pattern
-                <input value={newRule.sku_pattern} onChange={(e) => setNewRule({ ...newRule, sku_pattern: e.target.value })} className="mt-1 w-full px-3 py-1.5 bg-[#0D1526] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40" />
+                <input value={newRule.sku_pattern} onChange={(e) => setNewRule({ ...newRule, sku_pattern: e.target.value })} className="mt-1 w-full px-3 py-1.5 bg-[#0D1526] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[var(--accent-border)]" />
               </label>
               <label className="block text-[11px] text-[#8A9BBF]">Near-Expiry Days
-                <input type="number" value={newRule.near_expiry_days} onChange={(e) => setNewRule({ ...newRule, near_expiry_days: +e.target.value })} className="mt-1 w-full px-3 py-1.5 bg-[#0D1526] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[#E5521A]/40" />
+                <input type="number" value={newRule.near_expiry_days} onChange={(e) => setNewRule({ ...newRule, near_expiry_days: +e.target.value })} className="mt-1 w-full px-3 py-1.5 bg-[#0D1526] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none focus:border-[var(--accent-border)]" />
               </label>
               <label className="flex items-center gap-2 text-[11px] text-[#8A9BBF] cursor-pointer">
-                <input type="checkbox" checked={newRule.enforce_strict} onChange={(e) => setNewRule({ ...newRule, enforce_strict: e.target.checked })} className="accent-[#E5521A]" />
+                <input type="checkbox" checked={newRule.enforce_strict} onChange={(e) => setNewRule({ ...newRule, enforce_strict: e.target.checked })} className="accent-[var(--accent)]" />
                 Enforce strict compliance
               </label>
               <div className="flex justify-end gap-2 pt-1">
                 <button onClick={() => setShowAddRule(false)} className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[11px] text-[#8A9BBF] hover:text-[#E8EDF8]">Cancel</button>
-                <button onClick={handleAddRule} disabled={!newRule.zone.trim()} className="px-3 py-1.5 rounded-lg bg-[#E5521A] text-white text-[11px] font-semibold hover:bg-[#E5521A]/90 disabled:opacity-40 disabled:cursor-not-allowed">Create Rule</button>
+                <button onClick={handleAddRule} disabled={!newRule.zone.trim()} className="px-3 py-1.5 rounded-lg theme-bg-accent text-white text-[11px] font-semibold hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed">Create Rule</button>
               </div>
             </div>
           </div>
@@ -246,7 +246,7 @@ export default function SequencingPage() {
         {/* ──── 2. Pick Queue ──── */}
         <section className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4">
           <div className="flex items-center gap-2 mb-3">
-            <PackageCheck className="w-4 h-4 text-[#E5521A]" />
+            <PackageCheck className="w-4 h-4 theme-text-nav-active" />
             <h2 className="text-[14px] font-bold text-[#E8EDF8]" style={syne}>Pick Queue</h2>
             <span className="text-[10px] text-[#4E6090]">{pickOrders.length} pending</span>
           </div>
@@ -259,7 +259,7 @@ export default function SequencingPage() {
                 <div key={po.id} className="bg-[#0D1526] border border-[#1E2F50] rounded-xl p-3">
                   <div className="flex items-start justify-between gap-2 mb-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="text-[18px] font-extrabold text-[#E5521A]" style={syne}>#{po.pick_sequence}</span>
+                      <span className="text-[18px] font-extrabold theme-text-nav-active" style={syne}>#{po.pick_sequence}</span>
                       {ruleBadge(po.sequencing_rule)}
                       {complianceBadge(po.compliance_status)}
                     </div>
@@ -288,16 +288,16 @@ export default function SequencingPage() {
         <section className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <ArrowUpDown className="w-4 h-4 text-[#E5521A]" />
+              <ArrowUpDown className="w-4 h-4 theme-text-nav-active" />
               <h2 className="text-[14px] font-bold text-[#E8EDF8]" style={syne}>Batch Inventory</h2>
               <span className="text-[10px] text-[#4E6090]">{batches.length} batches</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <select value={batchZone} onChange={(e) => setBatchZone(e.target.value)} className="px-2 py-1 bg-[#0D1526] border border-[#1E2F50] rounded-lg text-[10px] text-[#8A9BBF] outline-none focus:border-[#E5521A]/40">
+              <select value={batchZone} onChange={(e) => setBatchZone(e.target.value)} className="px-2 py-1 bg-[#0D1526] border border-[#1E2F50] rounded-lg text-[10px] text-[#8A9BBF] outline-none focus:border-[var(--accent-border)]">
                 <option value="">All Zones</option>
                 {zones.map((z) => <option key={z} value={z}>{z}</option>)}
               </select>
-              <select value={batchStatus} onChange={(e) => setBatchStatus(e.target.value)} className="px-2 py-1 bg-[#0D1526] border border-[#1E2F50] rounded-lg text-[10px] text-[#8A9BBF] outline-none focus:border-[#E5521A]/40">
+              <select value={batchStatus} onChange={(e) => setBatchStatus(e.target.value)} className="px-2 py-1 bg-[#0D1526] border border-[#1E2F50] rounded-lg text-[10px] text-[#8A9BBF] outline-none focus:border-[var(--accent-border)]">
                 <option value="">All Status</option>
                 <option value="active">Active</option>
                 <option value="quarantined">Quarantined</option>
@@ -353,7 +353,7 @@ export default function SequencingPage() {
       {/* ════════ 4. Pick Log / Audit Trail ════════ */}
       <section className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4">
         <div className="flex items-center gap-2 mb-3">
-          <ClipboardList className="w-4 h-4 text-[#E5521A]" />
+          <ClipboardList className="w-4 h-4 theme-text-nav-active" />
           <h2 className="text-[14px] font-bold text-[#E8EDF8]" style={syne}>Pick Log / Audit Trail</h2>
           <span className="text-[10px] text-[#4E6090]">{pickLogs.length} entries</span>
         </div>
@@ -404,7 +404,7 @@ export default function SequencingPage() {
               <button onClick={() => setOverrideTarget(null)} className="text-[#4E6090] hover:text-[#E8EDF8]"><X className="w-4 h-4" /></button>
             </div>
             <p className="text-[11px] text-[#8A9BBF]">Provide a reason for overriding the sequencing rule. This will be logged in the audit trail.</p>
-            <textarea value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} rows={3} placeholder="e.g. Customer priority request, quality hold release..." className="w-full px-3 py-2 bg-[#0D1526] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none resize-none focus:border-[#E5521A]/40 placeholder:text-[#4E6090]" />
+            <textarea value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} rows={3} placeholder="e.g. Customer priority request, quality hold release..." className="w-full px-3 py-2 bg-[#0D1526] border border-[#1E2F50] rounded-lg text-[#E8EDF8] text-[12px] outline-none resize-none focus:border-[var(--accent-border)] placeholder:text-[#4E6090]" />
             <div className="flex justify-end gap-2">
               <button onClick={() => setOverrideTarget(null)} className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[11px] text-[#8A9BBF] hover:text-[#E8EDF8]">Cancel</button>
               <button onClick={handleOverride} disabled={!overrideReason.trim()} className="px-3 py-1.5 rounded-lg bg-[#F5A623] text-[#0D1526] text-[11px] font-semibold hover:bg-[#F5A623]/90 disabled:opacity-40 disabled:cursor-not-allowed">Submit Override</button>
