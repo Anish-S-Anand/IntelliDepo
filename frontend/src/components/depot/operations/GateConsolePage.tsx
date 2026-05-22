@@ -26,6 +26,7 @@ import {
   getGates,
   gateAction,
   getVehicles,
+  getVehicleFootageMap,
   registerVehicle,
   blacklistVehicle,
   processLprScan,
@@ -63,6 +64,30 @@ function isUuid(value: string): boolean {
 function getBackendBaseUrl(): string {
   if (typeof window === "undefined") return "http://localhost:8000";
   return `${window.location.protocol}//${window.location.hostname}:8000`;
+}
+
+// Hardcoded fallback map: normalised plate → filename
+const PLATE_FOOTAGE_MAP: Record<string, string> = {
+  "KL56S6087": "blackswift_KL56S6087.jpg.png",
+  "DL1CQ1139": "bmw_DL1CQ1139.jpg.png",
+  "KA03NP0051": "mercedes_KA03NP0051.jpg.png",
+  "KL21L7408": "silverswift_KL21L7408.jpg.png",
+};
+
+function getFootageUrl(plateNumber: string, dynamicMap?: Record<string, string>): string | null {
+  const normalized = plateNumber.replace(/[\s\-\.]/g, "").toUpperCase();
+  // Try dynamic map from backend first
+  if (dynamicMap) {
+    const key = Object.keys(dynamicMap).find(
+      (k) => normalized.includes(k.toUpperCase()) || k.toUpperCase().includes(normalized)
+    );
+    if (key) return `${getBackendBaseUrl()}${dynamicMap[key]}`;
+  }
+  // Fallback to hardcoded map
+  const entry = Object.entries(PLATE_FOOTAGE_MAP).find(
+    ([k]) => normalized.includes(k.toUpperCase()) || k.toUpperCase().includes(normalized)
+  );
+  return entry ? `${getBackendBaseUrl()}/tmp/vehicle_registry/${entry[1]}` : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -379,6 +404,7 @@ export default function GateConsolePage() {
   const [accessLogs, setAccessLogs] = useState<AccessLogResponse[]>([]);
   const [vehicles, setVehicles] = useState<VehicleResponse[]>([]);
   const [visitors, setVisitors] = useState<VisitorResponse[]>([]);
+  const [footageMap, setFootageMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   // LPR Scanner
@@ -685,7 +711,13 @@ export default function GateConsolePage() {
         ];
         setVehicles(dummyVehicles);
       } else {
-        setVehicles(data);
+        // Fetch footage map from backend and enrich vehicles
+        const map = await getVehicleFootageMap();
+        setFootageMap(map);
+        setVehicles(data.map((v) => ({
+          ...v,
+          footage_url: v.footage_url || getFootageUrl(v.plate_number, map),
+        })));
       }
     } catch {
       // Fallback to dummy data on error

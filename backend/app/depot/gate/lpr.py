@@ -573,6 +573,34 @@ async def list_vehicles(
     return result.scalars().all()
 
 
+@router.get("/vehicles/footage-map")
+async def get_vehicle_footage_map():
+    """
+    Scans tmp/vehicle_registry/ and returns a dict mapping
+    normalised plate numbers to their image URLs.
+    Filename convention: {description}_{PLATE}.jpg.png
+    """
+    from pathlib import Path
+    import re
+
+    registry_dir = Path("tmp/vehicle_registry")
+    footage_map: dict[str, str] = {}
+
+    if registry_dir.exists():
+        for f in registry_dir.iterdir():
+            if f.is_file() and f.suffix.lower() in {".png", ".jpg", ".jpeg"}:
+                # Extract plate: everything after the last underscore, strip extensions
+                stem = f.name
+                # Remove all extensions
+                name_no_ext = stem.split(".")[0]  # e.g. "blackswift_KL56S6087"
+                parts = name_no_ext.rsplit("_", 1)
+                if len(parts) == 2:
+                    plate = parts[1].upper().replace("-", "").replace(" ", "")
+                    footage_map[plate] = f"/tmp/vehicle_registry/{f.name}"
+
+    return footage_map
+
+
 @router.patch("/vehicles/{vehicle_id}/blacklist", response_model=VehicleResponse)
 async def blacklist_vehicle(
     vehicle_id: uuid.UUID,

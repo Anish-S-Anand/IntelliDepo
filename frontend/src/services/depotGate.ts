@@ -128,6 +128,15 @@ export async function processLprImageScan(
   return res.data;
 }
 
+export async function getVehicleFootageMap(): Promise<Record<string, string>> {
+  try {
+    const res = await api.get<Record<string, string>>("/depot/gate/vehicles/footage-map");
+    return res.data;
+  } catch {
+    return {};
+  }
+}
+
 export async function getAccessLogs(params?: {
   gate_id?: string; decision?: string; plate_number?: string; limit?: number;
 }): Promise<AccessLogResponse[]> {
