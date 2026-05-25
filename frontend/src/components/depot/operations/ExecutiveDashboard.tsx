@@ -49,7 +49,7 @@ const WEEKLY_TOTALS = WEEKLY.reduce(
   { enter: 0, exit: 0 }
 );
 
-function zoneDisplayName(zone: ZoneResponse) {
+function nzoneDisplayName(zone: LiveZone) {
   const code = zone.zone_code?.trim();
   return code ? `Zone ${code}` : "Zone";
 }
