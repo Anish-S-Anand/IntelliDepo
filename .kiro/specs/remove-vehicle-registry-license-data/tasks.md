@@ -1,0 +1,83 @@
+# Implementation Plan
+
+- [x] 1. Write bug condition exploration test
+  - **Property 1: Bug Condition** - License Data Display in View Docs Modal
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the bug exists (modal displays sensitive license and registration data)
+  - **Scoped PBT Approach**: Scope the property to concrete failing cases - clicking "View Docs" button for any vehicle in the Vehicle Registry INPUT column
+  - Test that clicking "View Docs" button displays driver's license information (license number, DOB, blood group) and vehicle registration information (registration number, owner name, company) on UNFIXED code
+  - The test assertions should match the Expected Behavior Properties from design: no license data should be displayed
+  - Run test on UNFIXED code
+  - **EXPECTED OUTCOME**: Test FAILS (this is correct - it proves the bug exists and sensitive data is currently displayed)
+  - Document counterexamples found:
+    - Modal displays driver's license card with license number, "15 Aug 1985" DOB, "O+" blood group
+    - Modal displays vehicle registration card with registration number, vehicle type, owner details
+    - License numbers are derived from plate numbers (e.g., "MH-12-AB-1234" → "MH12AB1234")
+  - Mark task complete when test is written, run, and failure is documented
+  - _Requirements: 1.1, 1.2, 1.3_
+
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Table and Other Functionality Unchanged
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe behavior on UNFIXED code for non-buggy inputs (all interactions that do NOT involve clicking "View Docs" button)
+  - Write property-based tests capturing observed behavior patterns from Preservation Requirements:
+    - Vehicle Registry table displays correctly with all columns (PLATE, OWNER, FOOTAGE, INPUT, ACTION)
+    - INPUT column header is displayed
+    - "📄 View Docs" button appears for each vehicle row
+    - "📹 View" button in FOOTAGE column opens footage modal correctly
+    - "Blacklist" button in ACTION column functions correctly
+    - "Register Vehicle" button opens vehicle registration modal correctly
+    - Other Gate Entry sections (Access Log Feed, AI Analysis Log Feed, Visitor Management) function without changes
+  - Property-based testing generates many test cases for stronger guarantees
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
+
+- [x] 3. Fix for removing license data from View Docs modal
+
+  - [x] 3.1 Implement the fix
+    - Open file: `frontend/src/components/depot/operations/GateConsolePage.tsx`
+    - Locate the License Card Modal (lines 1831-1951)
+    - Remove Driver's License Card Section (lines 1847-1895) - delete entire driver's license card div
+    - Remove Vehicle Registration Card Section (lines 1898-1949) - delete entire vehicle registration card div
+    - Keep Modal Shell (lines 1831-1846 and 1950-1951) with title and close button
+    - Add a message in the modal body: "Document information has been removed" or leave it empty
+    - Ensure the "View Docs" button click handler (lines 1617-1620) remains unchanged
+    - Ensure the button continues to be displayed in the INPUT column
+    - _Bug_Condition: isBugCondition(input) where input.buttonClicked == "View Docs Button" AND input.location == "Vehicle Registry INPUT Column" AND modalDisplaysLicenseData(input)_
+    - _Expected_Behavior: For any user click on "View Docs" button, system SHALL NOT display driver's license information (license number, DOB, blood group, etc.) or vehicle registration information (registration number, owner name, company, etc.)_
+    - _Preservation: All interactions NOT involving "View Docs" button SHALL produce exactly the same behavior as original code - table display, column headers, other buttons (View Footage, Blacklist, Register Vehicle), other modals, and all other Gate Entry sections_
+    - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
+
+  - [x] 3.2 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - No License Data Display
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior (no license data displayed)
+    - When this test passes, it confirms the expected behavior is satisfied
+    - Run bug condition exploration test from step 1
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug is fixed - no license or registration data is displayed)
+    - Verify modal does NOT contain driver's license section
+    - Verify modal does NOT contain vehicle registration section
+    - Verify modal does NOT display hardcoded values ("15 Aug 1985", "O+")
+    - Verify modal does NOT display derived license numbers
+    - _Requirements: 2.1, 2.2, 2.3_
+
+  - [x] 3.3 Verify preservation tests still pass
+    - **Property 2: Preservation** - Table and Other Functionality Unchanged
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions)
+    - Confirm Vehicle Registry table displays correctly with all columns
+    - Confirm INPUT column header is displayed
+    - Confirm "📄 View Docs" button appears for each vehicle row
+    - Confirm "📹 View" button opens footage modal correctly
+    - Confirm "Blacklist" button functions correctly
+    - Confirm "Register Vehicle" button opens modal correctly
+    - Confirm other Gate Entry sections function without changes
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
+
+- [x] 4. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
