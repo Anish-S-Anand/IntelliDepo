@@ -431,36 +431,6 @@ export default function ExecutiveDashboard() {
 
       <div className="h-px mb-5" style={{ background: "linear-gradient(90deg, transparent, rgba(229,82,26,0.35), transparent)" }} />
 
-      {/* ── Cameras ────────────────────────────────────────────────────────── */}
-      <div className="mb-5">
-        <SectionHeading sub="Live status of all 6 cameras">📷 Camera Status</SectionHeading>
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-2.5">
-          {CAMERAS.map((cam) => {
-            const online = cam.status === "online";
-            const col = online ? "var(--color-success)" : "var(--color-danger)";
-            return (
-              <div key={cam.id} className="rounded-[12px] p-3" style={cardStyle}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] sm:text-[12px] font-black" style={{ color: "var(--text-primary)" }}>
-                    {cam.location}
-                  </span>
-                  <span
-                    className="flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-full"
-                    style={{ background: `${col}15`, color: col, border: `1px solid ${col}30` }}
-                  >
-                    {online ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-                    {online ? "ON" : "OFF"}
-                  </span>
-                </div>
-                <div className="text-[9px] mt-1 font-bold" style={{ color: "var(--text-faint)" }}>
-                  {cam.zone}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* ── Throughput Chart ───────────────────────────────────────────────── */}
       <div className="rounded-[14px] p-4 sm:p-[18px] mb-5" style={cardStyle}>
         {/* Chart header */}

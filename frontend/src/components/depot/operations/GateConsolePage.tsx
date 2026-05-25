@@ -26,6 +26,7 @@ import {
   getGates,
   gateAction,
   getVehicles,
+  getVehicleFootageMap,
   registerVehicle,
   blacklistVehicle,
   processLprScan,
@@ -63,6 +64,30 @@ function isUuid(value: string): boolean {
 function getBackendBaseUrl(): string {
   if (typeof window === "undefined") return "http://localhost:8000";
   return `${window.location.protocol}//${window.location.hostname}:8000`;
+}
+
+// Hardcoded fallback map: normalised plate → filename
+const PLATE_FOOTAGE_MAP: Record<string, string> = {
+  "KL56S6087": "blackswift_KL56S6087.jpg.png",
+  "DL1CQ1139": "bmw_DL1CQ1139.jpg.png",
+  "KA03NP0051": "mercedes_KA03NP0051.jpg.png",
+  "KL21L7408": "silverswift_KL21L7408.jpg.png",
+};
+
+function getFootageUrl(plateNumber: string, dynamicMap?: Record<string, string>): string | null {
+  const normalized = plateNumber.replace(/[\s\-\.]/g, "").toUpperCase();
+  // Try dynamic map from backend first
+  if (dynamicMap) {
+    const key = Object.keys(dynamicMap).find(
+      (k) => normalized.includes(k.toUpperCase()) || k.toUpperCase().includes(normalized)
+    );
+    if (key) return `${getBackendBaseUrl()}${dynamicMap[key]}`;
+  }
+  // Fallback to hardcoded map
+  const entry = Object.entries(PLATE_FOOTAGE_MAP).find(
+    ([k]) => normalized.includes(k.toUpperCase()) || k.toUpperCase().includes(normalized)
+  );
+  return entry ? `${getBackendBaseUrl()}/tmp/vehicle_registry/${entry[1]}` : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -379,6 +404,7 @@ export default function GateConsolePage() {
   const [accessLogs, setAccessLogs] = useState<AccessLogResponse[]>([]);
   const [vehicles, setVehicles] = useState<VehicleResponse[]>([]);
   const [visitors, setVisitors] = useState<VisitorResponse[]>([]);
+  const [footageMap, setFootageMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   // LPR Scanner
@@ -685,7 +711,13 @@ export default function GateConsolePage() {
         ];
         setVehicles(dummyVehicles);
       } else {
-        setVehicles(data);
+        // Fetch footage map from backend and enrich vehicles
+        const map = await getVehicleFootageMap();
+        setFootageMap(map);
+        setVehicles(data.map((v) => ({
+          ...v,
+          footage_url: v.footage_url || getFootageUrl(v.plate_number, map),
+        })));
       }
     } catch {
       // Fallback to dummy data on error
@@ -1843,93 +1875,8 @@ export default function GateConsolePage() {
               </button>
             </div>
             
-            {/* Driver's License Card */}
-            <div className="bg-gradient-to-br from-[#1a2942] to-[#0F1A30] rounded-xl p-6 border border-[#2A3F68] mb-4">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-1">Driver's License</div>
-                  <div className="text-[18px] font-bold text-[#E8EDF8]">{selectedVehicle.owner_name || "Unknown"}</div>
-                </div>
-                <div className="w-20 h-20 bg-[#0D1526] rounded-lg border border-[#1E2F50] flex items-center justify-center">
-                  <span className="text-[10px] text-[#4E6090]">PHOTO</span>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 text-[11px]">
-                <div>
-                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">License Number</div>
-                  <div className="font-mono font-bold text-[#E8EDF8]">
-                    {selectedVehicle.plate_number.replace(/-/g, '').substring(0, 10)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Date of Birth</div>
-                  <div className="text-[#8A9BBF]">15 Aug 1985</div>
-                </div>
-                <div>
-                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Issue Date</div>
-                  <div className="text-[#8A9BBF]">
-                    {new Date(selectedVehicle.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Expiry Date</div>
-                  <div className="text-[#8A9BBF]">
-                    {new Date(new Date(selectedVehicle.created_at).getTime() + 10 * 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Blood Group</div>
-                  <div className="text-[#8A9BBF]">O+</div>
-                </div>
-                <div>
-                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Vehicle Class</div>
-                  <div className="text-[#8A9BBF] uppercase">{selectedVehicle.vehicle_type || "LMV"}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Vehicle Registration Card */}
-            <div className="bg-gradient-to-br from-[#1a2942] to-[#0F1A30] rounded-xl p-6 border border-[#2A3F68]">
-              <div className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-3">Vehicle Registration Certificate</div>
-              
-              <div className="grid grid-cols-2 gap-4 text-[11px]">
-                <div>
-                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Registration Number</div>
-                  <div className="font-mono font-bold text-[#E8EDF8] text-[14px]">{selectedVehicle.plate_number}</div>
-                </div>
-                <div>
-                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Vehicle Type</div>
-                  <div className="text-[#8A9BBF] capitalize">{selectedVehicle.vehicle_type || "Truck"}</div>
-                </div>
-                <div>
-                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Owner Name</div>
-                  <div className="text-[#8A9BBF]">{selectedVehicle.owner_name || "Unknown"}</div>
-                </div>
-                <div>
-                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Company</div>
-                  <div className="text-[#8A9BBF]">{selectedVehicle.company || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Registration Date</div>
-                  <div className="text-[#8A9BBF]">
-                    {new Date(selectedVehicle.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Status</div>
-                  <div className="text-[#8A9BBF] capitalize">{selectedVehicle.status}</div>
-                </div>
-                <div className="col-span-2">
-                  <div className="text-[9px] uppercase tracking-wider text-[#4E6090] mb-1">Insurance Valid Until</div>
-                  <div className="text-[#8A9BBF]">
-                    {selectedVehicle.valid_until 
-                      ? new Date(selectedVehicle.valid_until).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-                      : new Date(new Date(selectedVehicle.created_at).getTime() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-                    }
-                  </div>
-                </div>
-              </div>
+            <div className="text-center py-8 text-[#8A9BBF]">
+              Document information has been removed
             </div>
           </div>
         </div>
