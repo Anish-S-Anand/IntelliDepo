@@ -406,7 +406,7 @@ export default function ExecutiveDashboard() {
             Executive Overview
           </div>
           <h1 className="text-[18px] sm:text-[22px] font-extrabold" style={{ color: "var(--text-primary)" }}>
-            Operations Hub
+            Depot Mobile
           </h1>
           <p className="text-[10px] sm:text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
             IntelliDepot · {CAMERAS.filter(c => c.status === "online").length} of {CAMERAS.length} cameras active
@@ -420,17 +420,6 @@ export default function ExecutiveDashboard() {
           System Online
         </span>
       </div>
-
-      {/* ── KPI Strip ──────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-5">
-        <KpiCard label="Alerts Right Now" value={String(critCount + offlineCams + atRiskZones)}
-                                                                sub={`${critCount} urgent · ${offlineCams} camera offline`} color={(critCount + offlineCams) > 0 ? "var(--color-warning)" : "var(--color-success)"} icon={AlertTriangle} cardStyle={cardStyle} />
-        <KpiCard label="Problems to Fix" value={String(openCount)} sub={openCount > 0 ? `${openCount} open incident${openCount !== 1 ? "s" : ""}` : "All clear"} color={openCount > 0 ? "var(--color-danger)" : "var(--color-success)"} icon={ShieldAlert} cardStyle={cardStyle} />
-        <KpiCard label="Storage Used"   value={`${avgOccupancy}%`} sub={`${atRiskZones} zones almost full`} color={avgOccupancy > 90 ? "var(--color-danger)" : avgOccupancy > 80 ? "var(--color-warning)" : "var(--color-success)"} icon={Package} cardStyle={cardStyle} />
-        <KpiCard label="Fixed"          value={String(INCIDENTS.filter(i => i.status !== "open" && i.status !== "escalated").length)} sub="Incidents resolved" color="var(--color-success)" icon={CheckCircle2} cardStyle={cardStyle} />
-      </div>
-
-      <div className="h-px mb-5" style={{ background: "linear-gradient(90deg, transparent, rgba(229,82,26,0.35), transparent)" }} />
 
       {/* ── Throughput Chart ───────────────────────────────────────────────── */}
       <div className="rounded-[14px] p-4 sm:p-[18px] mb-5" style={cardStyle}>

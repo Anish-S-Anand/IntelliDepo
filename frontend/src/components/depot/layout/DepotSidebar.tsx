@@ -20,7 +20,7 @@ import { getAllActiveAlerts } from "@/services/depotVision";
 import { getPerimeterAlertCount } from "@/services/depotPerimeter";
 
 const NAV_ITEMS = [
-  { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard, iconColor: "#5B9BF5" },
+  { label: "OPS", fullLabel: "Depot Mobile", href: "/depot/operations", icon: LayoutDashboard, iconColor: "#5B9BF5" },
   { label: "CMD", fullLabel: "Command Center", href: "/depot/command", icon: Radio, iconColor: "#22D3A1" },
   { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package, iconColor: "#F5A623" },
   { label: "CAM", fullLabel: "Live Cameras", href: "/depot/vision", icon: Eye, iconColor: "#A78BFA" },
@@ -42,7 +42,7 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
   const isRegionalManager = normalizedRole === "regional_manager" || normalizedRole.includes("regional");
 
   const warehouseManagerNavItems = [
-    { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard, iconColor: "#5B9BF5" },
+    { label: "OPS", fullLabel: "Depot Mobile", href: "/depot/operations", icon: LayoutDashboard, iconColor: "#5B9BF5" },
     { label: "CAM", fullLabel: "Live Cameras", href: "/depot/vision", icon: Eye, iconColor: "#A78BFA" },
     { label: "GTE", fullLabel: "Gate Entry", href: "/depot/gate", icon: Shield, iconColor: "#60A5FA" },
     { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle, iconColor: "#F87171" },
@@ -52,7 +52,7 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
   ];
 
   const regionalManagerNavItems = [
-    { label: "OPS", fullLabel: "Operations Hub", href: "/depot/operations", icon: LayoutDashboard, iconColor: "#5B9BF5" },
+    { label: "OPS", fullLabel: "Depot Mobile", href: "/depot/operations", icon: LayoutDashboard, iconColor: "#5B9BF5" },
     { label: "CAM", fullLabel: "Live Cameras", href: "/depot/vision", icon: Eye, iconColor: "#A78BFA" },
     { label: "CMD", fullLabel: "Command Center", href: "/depot/command", icon: Radio, iconColor: "#22D3A1" },
     { label: "GTE", fullLabel: "Gate Entry", href: "/depot/gate", icon: Shield, iconColor: "#60A5FA" },

@@ -153,7 +153,7 @@ export default function DepotApplicationsPage() {
         <p className="text-[11px] text-[#4E6090] mb-3 font-semibold uppercase tracking-wider">Quick Access</p>
         <div className="flex flex-wrap gap-2">
           {[
-            { label: "Operations Hub", href: "/depot/operations" },
+            { label: "Depot Mobile", href: "/depot/operations" },
             { label: "Live Vision", href: "/depot/vision" },
             { label: "Incidents", href: "/depot/incidents" },
             { label: "Inventory", href: "/depot/inventory" },
