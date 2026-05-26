@@ -126,7 +126,7 @@ export default function LoginPage() {
               IntelliDepot
             </h1>
             <p className="mt-1 text-[12px] sm:text-[13px] transition-colors" style={{ color: subColor }}>
-              A Unified Intelligence AI Platform
+              A Unified Intelligence AI Platform for Smarter Depots
             </p>
           </div>
         </div>

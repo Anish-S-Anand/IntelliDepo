@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Activity,
   AlertTriangle,
@@ -401,9 +402,9 @@ export default function CommandPage() {
         </section>
       </div>
 
-      {broadcastOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setBroadcastOpen(false)}>
-          <div className="w-full max-w-md rounded-[16px] border border-[#1E2F50] bg-[#14203A] p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      {broadcastOpen && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] grid min-h-dvh place-items-center overflow-y-auto bg-black/70 px-4 py-10" onClick={() => setBroadcastOpen(false)}>
+          <div className="my-auto w-full max-w-md rounded-[16px] border border-[#1E2F50] bg-[#14203A] p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Radio className="h-4 w-4 text-[#E5521A]" />
@@ -444,12 +445,13 @@ export default function CommandPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {contactOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setContactOpen(false)}>
-          <div className="w-full max-w-md rounded-[16px] border border-[#1E2F50] bg-[#14203A] p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      {contactOpen && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] grid min-h-dvh place-items-center overflow-y-auto bg-black/70 px-4 py-10" onClick={() => setContactOpen(false)}>
+          <div className="my-auto w-full max-w-md rounded-[16px] border border-[#1E2F50] bg-[#14203A] p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-[#5B9BF5]" />
@@ -488,7 +490,8 @@ export default function CommandPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
