@@ -552,7 +552,7 @@ export default function GateConsolePage() {
     try {
       const data = await getAccessLogs({ limit: 20 });
       // Filter out the first entry with plate AP02BE1874 or any entry that should be removed
-      const filteredData = data.filter(log => log.plate_number !== "AP02BE1874" && log.plate_number !== "RJ-14-LJ-7880");
+      const filteredData = data.filter(log => log.plate_number !== "AP02BE1874" && log.plate_number !== "RJ-14-LJ-7880" && log.plate_number !== "RJ-14-IJ-7890");
       
       if (filteredData.length === 0) {
         // Add dummy data with varied dates/times
