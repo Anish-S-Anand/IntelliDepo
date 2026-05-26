@@ -854,6 +854,8 @@ async def list_access_logs(
     db: AsyncSession = Depends(get_db),
 ):
     query = select(GateAccessLog)
+    # Filter out specific plate numbers that should not be displayed
+    query = query.where(GateAccessLog.plate_number.notin_(["AP02BE1874", "RJ-14-LJ-7880", "RJ-14-IJ-7890"]))
     if gate_id:
         query = query.where(GateAccessLog.gate_id == gate_id)
     if decision:
