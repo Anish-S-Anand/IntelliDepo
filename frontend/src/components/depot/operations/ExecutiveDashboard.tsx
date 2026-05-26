@@ -156,7 +156,7 @@ const INCIDENTS: Incident[] = [
     icon: Camera,
   },
 ];
-
+ 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function zoneColor(pct: number): string {
   if (pct >= 95) return "var(--color-danger)";

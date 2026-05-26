@@ -68,10 +68,10 @@ function getBackendBaseUrl(): string {
 
 // Hardcoded fallback map: normalised plate → filename
 const PLATE_FOOTAGE_MAP: Record<string, string> = {
-  "KL56S6087": "blackswift_KL56S6087.jpg.png",
-  "DL1CQ1139": "bmw_DL1CQ1139.jpg.png",
-  "KA03NP0051": "mercedes_KA03NP0051.jpg.png",
-  "KL21L7408": "silverswift_KL21L7408.jpg.png",
+  "KA01AB1234": "blackswift_KA01AB1234.jpg.png",
+  "MH02CD5678": "bmw_MH02CD5678.jpg.png",
+  "DL03EF9012": "mercedes_DL03EF9012.jpg.png",
+  "TN04GH3456": "silverswift_TN04GH3456.jpg.png",
 };
 
 function getFootageUrl(plateNumber: string, dynamicMap?: Record<string, string>): string | null {
@@ -552,7 +552,7 @@ export default function GateConsolePage() {
     try {
       const data = await getAccessLogs({ limit: 20 });
       // Filter out the first entry with plate AP02BE1874 or any entry that should be removed
-      const filteredData = data.filter(log => log.plate_number !== "AP02BE1874");
+      const filteredData = data.filter(log => log.plate_number !== "AP02BE1874" && log.plate_number !== "RJ-14-LJ-7880");
       
       if (filteredData.length === 0) {
         // Add dummy data with varied dates/times
@@ -658,7 +658,7 @@ export default function GateConsolePage() {
         const dummyVehicles: VehicleResponse[] = [
           {
             id: "veh-1",
-            plate_number: "KL56S6087",
+            plate_number: "KA01AB1234",
             vehicle_type: "Car",
             owner_name: "Rajesh Kumar",
             company: "Tech Solutions Pvt Ltd",
@@ -666,12 +666,12 @@ export default function GateConsolePage() {
             blacklist_reason: null,
             valid_until: null,
             is_active: true,
-            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/blackswift_KL56S6087.jpg.png`,
+            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/blackswift_KA01AB1234.jpg.png`,
             created_at: new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
           },
           {
             id: "veh-2",
-            plate_number: "DL1CQ1139",
+            plate_number: "MH02CD5678",
             vehicle_type: "Car",
             owner_name: "Priya Sharma",
             company: "Logistics Express",
@@ -679,12 +679,12 @@ export default function GateConsolePage() {
             blacklist_reason: null,
             valid_until: null,
             is_active: true,
-            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/bmw_DL1CQ1139.jpg.png`,
+            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/bmw_MH02CD5678.jpg.png`,
             created_at: new Date(Date.now() - 45 * 24 * 60 * 60000).toISOString(),
           },
           {
             id: "veh-3",
-            plate_number: "KA03NP0051",
+            plate_number: "DL03EF9012",
             vehicle_type: "Car",
             owner_name: "Amit Patel",
             company: "Premium Motors",
@@ -692,12 +692,12 @@ export default function GateConsolePage() {
             blacklist_reason: null,
             valid_until: null,
             is_active: true,
-            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/mercedes_KA03NP0051.jpg.png`,
+            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/mercedes_DL03EF9012.jpg.png`,
             created_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
           },
           {
             id: "veh-4",
-            plate_number: "KL21L7408",
+            plate_number: "TN04GH3456",
             vehicle_type: "Car",
             owner_name: "Sunita Reddy",
             company: "Delivery Services",
@@ -705,7 +705,7 @@ export default function GateConsolePage() {
             blacklist_reason: null,
             valid_until: null,
             is_active: true,
-            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/silverswift_KL21L7408.jpg.png`,
+            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/silverswift_TN04GH3456.jpg.png`,
             created_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
           },
         ];
@@ -724,7 +724,7 @@ export default function GateConsolePage() {
       const dummyVehicles: VehicleResponse[] = [
         {
           id: "veh-1",
-          plate_number: "KL56S6087",
+          plate_number: "KA01AB1234",
           vehicle_type: "Car",
           owner_name: "Rajesh Kumar",
           company: "Tech Solutions Pvt Ltd",
@@ -732,12 +732,12 @@ export default function GateConsolePage() {
           blacklist_reason: null,
           valid_until: null,
           is_active: true,
-          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/blackswift_KL56S6087.jpg.png`,
+          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/blackswift_KA01AB1234.jpg.png`,
           created_at: new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
         },
         {
           id: "veh-2",
-          plate_number: "DL1CQ1139",
+          plate_number: "MH02CD5678",
           vehicle_type: "Car",
           owner_name: "Priya Sharma",
           company: "Logistics Express",
@@ -745,12 +745,12 @@ export default function GateConsolePage() {
           blacklist_reason: null,
           valid_until: null,
           is_active: true,
-          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/bmw_DL1CQ1139.jpg.png`,
+          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/bmw_MH02CD5678.jpg.png`,
           created_at: new Date(Date.now() - 45 * 24 * 60 * 60000).toISOString(),
         },
         {
           id: "veh-3",
-          plate_number: "KA03NP0051",
+          plate_number: "DL03EF9012",
           vehicle_type: "Car",
           owner_name: "Amit Patel",
           company: "Premium Motors",
@@ -758,12 +758,12 @@ export default function GateConsolePage() {
           blacklist_reason: null,
           valid_until: null,
           is_active: true,
-          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/mercedes_KA03NP0051.jpg.png`,
+          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/mercedes_DL03EF9012.jpg.png`,
           created_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
         },
         {
           id: "veh-4",
-          plate_number: "KL21L7408",
+          plate_number: "TN04GH3456",
           vehicle_type: "Car",
           owner_name: "Sunita Reddy",
           company: "Delivery Services",
@@ -771,7 +771,7 @@ export default function GateConsolePage() {
           blacklist_reason: null,
           valid_until: null,
           is_active: true,
-          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/silverswift_KL21L7408.jpg.png`,
+          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/silverswift_TN04GH3456.jpg.png`,
           created_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
         },
       ];
@@ -1617,7 +1617,7 @@ export default function GateConsolePage() {
                 </tr>
               </thead>
               <tbody>
-                {vehicles.map((v) => {
+                {vehicles.filter((v) => !!v.footage_url).map((v) => {
                   return (
                     <tr key={v.id} className="border-b border-[#1E2F50]/50 hover:bg-[#0D1526]/50">
                       <td className="py-2 pr-3 text-[11px] font-mono font-bold text-[#E8EDF8]">

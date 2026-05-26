@@ -182,6 +182,30 @@ export interface CommandCenterSnapshot {
   recent_actions: CommandActionResponse[];
 }
 
+interface LegacyPerimeterIncident {
+  id: string;
+  severity: string;
+  title: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+}
+
+interface LegacyZone {
+  zone_code: string;
+  name: string;
+  utilization_pct: number;
+  current_occupancy: number;
+  max_capacity_units: number;
+  status: string;
+}
+
+function countTone(count: number, criticalAt = 4): CommandKpi["tone"] {
+  if (count >= criticalAt) return "critical";
+  if (count > 0) return "warning";
+  return "healthy";
+}
+
 function demoCommandCenterSnapshot(): CommandCenterSnapshot {
   const now = new Date().toISOString();
   return {
@@ -282,6 +306,120 @@ export async function getDepotCommandSnapshot(): Promise<DepotCommandSnapshot> {
   };
 }
 
+async function getLegacyCommandCenterSnapshot(): Promise<CommandCenterSnapshot> {
+  const [base, incidents, zones, recentActions] = await Promise.all([
+    getDepotCommandSnapshot(),
+    safeGet<LegacyPerimeterIncident[]>("/depot/vision/perimeter/incidents"),
+    safeGet<LegacyZone[]>("/depot/vision/cluster/zones"),
+    safeGet<CommandActionResponse[]>("/depot/command/actions/recent?limit=8"),
+  ]);
+
+  const now = new Date().toISOString();
+  const cameras = base.cameras.data;
+  const gates = base.gates.data;
+  const breaches = base.breaches.data;
+  const logs = base.accessLogs.data;
+  const incidentRows = incidents.kind === "success"
+    ? incidents.data.filter((incident) => incident.status !== "resolved")
+    : [];
+  const zoneRows = zones.kind === "success" ? zones.data : [];
+  const actionRows = recentActions.kind === "success" ? recentActions.data : [];
+
+  const activeCameraCount = cameras.filter((camera) => camera.status === "active").length;
+  const openGateCount = gates.filter((gate) => gate.status === "open").length;
+  const highIncidentCount = incidentRows.filter((incident) => ["critical", "high"].includes(incident.severity)).length;
+  const capacityRiskCount = zoneRows.filter((zone) => zone.utilization_pct >= 80).length;
+  const deniedAccessCount = logs.filter((log) => log.decision !== "granted").length;
+  const riskPoints = highIncidentCount * 12 + incidentRows.length * 5 + breaches.length * 4 + capacityRiskCount * 6 + deniedAccessCount * 3;
+
+  if (cameras.length === 0 && gates.length === 0 && zoneRows.length === 0 && incidentRows.length === 0) {
+    return demoCommandCenterSnapshot();
+  }
+
+  return {
+    generated_at: now,
+    health_score: Math.max(0, Math.min(100, 100 - riskPoints)),
+    kpis: [
+      {
+        key: "cameras",
+        label: "Active Cameras",
+        value: `${activeCameraCount}/${cameras.length}`,
+        detail: "Live visual coverage",
+        tone: activeCameraCount === cameras.length ? "healthy" : "warning",
+      },
+      {
+        key: "gates",
+        label: "Open Gates",
+        value: String(openGateCount),
+        detail: `${gates.reduce((sum, gate) => sum + (gate.total_entries_today || 0), 0)} entries today`,
+        tone: openGateCount > 0 ? "warning" : "healthy",
+      },
+      {
+        key: "incidents",
+        label: "Open Incidents",
+        value: String(incidentRows.length + breaches.length),
+        detail: `${highIncidentCount} high priority`,
+        tone: countTone(incidentRows.length + breaches.length),
+      },
+      {
+        key: "zones",
+        label: "Capacity Risk",
+        value: String(capacityRiskCount),
+        detail: "Zones above 80% utilization",
+        tone: countTone(capacityRiskCount, 3),
+      },
+    ],
+    gates: gates.map((gate) => ({
+      id: gate.id,
+      gate_code: gate.gate_code,
+      name: gate.name,
+      gate_type: gate.gate_type,
+      status: gate.status,
+      total_entries_today: gate.total_entries_today,
+      last_activity_at: null,
+    })),
+    cameras: cameras.map((camera) => ({
+      id: camera.id,
+      name: camera.name,
+      zone: camera.zone,
+      status: camera.status,
+      protocol: camera.protocol,
+      last_seen: camera.last_seen,
+    })),
+    zones: zoneRows
+      .sort((a, b) => b.utilization_pct - a.utilization_pct)
+      .slice(0, 6)
+      .map((zone) => ({
+        zone_code: zone.zone_code,
+        name: zone.name,
+        utilization_pct: zone.utilization_pct,
+        current_occupancy: zone.current_occupancy,
+        max_capacity_units: zone.max_capacity_units,
+        status: zone.status,
+      })),
+    exceptions: [],
+    timeline: [
+      ...logs.map((log) => ({
+        id: log.id,
+        type: "gate",
+        title: `${log.plate_number} ${log.direction}`,
+        detail: `${log.gate_code || "Gate"} - ${log.decision}`,
+        status: log.decision,
+        occurred_at: log.processed_at,
+      })),
+      ...actionRows.map((action) => ({
+        id: action.id,
+        type: "command",
+        title: action.action_type.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase()),
+        detail: action.message,
+        status: action.status,
+        occurred_at: now,
+      })),
+    ].sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime()).slice(0, 12),
+    recent_actions: actionRows,
+  };
+}
+
 export async function getCommandCenterSnapshot(): Promise<CommandCenterSnapshot> {
   try {
     const res = await api.get<CommandCenterSnapshot>("/depot/command/snapshot", { timeout: 5000 });
@@ -290,7 +428,7 @@ export async function getCommandCenterSnapshot(): Promise<CommandCenterSnapshot>
       kpis: res.data.kpis.filter((kpi) => kpi.key !== "inventory" && kpi.key !== "access"),
     };
   } catch {
-    return demoCommandCenterSnapshot();
+    return getLegacyCommandCenterSnapshot();
   }
 }
 
@@ -455,12 +593,18 @@ async function postCommandAction(url: string, payload: Record<string, unknown>):
   }
 }
 
+function validUuid(value?: string): string | undefined {
+  return value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value
+    : undefined;
+}
+
 export async function openCommandGate(gateId?: string): Promise<CommandActionResponse> {
-  return postCommandAction("/depot/command/actions/open-gate", { gate_id: gateId });
+  return postCommandAction("/depot/command/actions/open-gate", { gate_id: validUuid(gateId) });
 }
 
 export async function closeCommandGate(gateId?: string): Promise<CommandActionResponse> {
-  return postCommandAction("/depot/command/actions/close-gate", { gate_id: gateId });
+  return postCommandAction("/depot/command/actions/close-gate", { gate_id: validUuid(gateId) });
 }
 
 export async function lockCommandZone(zone = "Depot perimeter"): Promise<CommandActionResponse> {
