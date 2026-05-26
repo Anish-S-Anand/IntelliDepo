@@ -12,14 +12,22 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import Column, DateTime, Integer, JSON, String, Text, desc, select
+from sqlalchemy import Column, DateTime, Integer, JSON, String, Text, desc, or_, select
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import get_current_user
 from app.database import BaseModel as DBBaseModel, get_db
-from app.depot.gate.lpr import Gate, GateStatus, _get_active_gate
-from app.depot.ops.incidents import IncidentPriority, IncidentStatus, OpsIncident
+from app.depot.gate.lpr import Gate, GateAccessLog, GateStatus, _get_active_gate
+from app.depot.inventory.core import InventoryItem, StockStatus
+from app.depot.ops.incidents import IncidentPriority, IncidentStatus as OpsIncidentStatus, OpsIncident
+from app.depot.vision.camera import Camera, CameraStatus
+from app.depot.vision.cluster import DepotZone, apply_live_batch_capacity
+from app.depot.vision.perimeter import (
+    PerimeterBreach,
+    PerimeterIncident,
+    IncidentStatus as PerimeterIncidentStatus,
+)
 from app.shared.models.user import User
 
 logger = logging.getLogger("intelli.depot.command")
@@ -99,6 +107,73 @@ class CommandActionResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CommandKpi(BaseModel):
+    key: str
+    label: str
+    value: str
+    detail: str
+    tone: str = "normal"
+
+
+class CommandException(BaseModel):
+    id: str
+    source: str
+    title: str
+    detail: str
+    priority: str
+    zone: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class CommandZoneSummary(BaseModel):
+    zone_code: str
+    name: str
+    utilization_pct: float
+    current_occupancy: int
+    max_capacity_units: int
+    status: str
+
+
+class CommandGateSummary(BaseModel):
+    id: str
+    gate_code: str
+    name: str
+    gate_type: str
+    status: str
+    total_entries_today: int
+    last_activity_at: Optional[datetime] = None
+
+
+class CommandCameraSummary(BaseModel):
+    id: str
+    name: str
+    zone: Optional[str]
+    status: str
+    protocol: str
+    last_seen: Optional[datetime]
+
+
+class CommandTimelineItem(BaseModel):
+    id: str
+    type: str
+    title: str
+    detail: str
+    status: str
+    occurred_at: datetime
+
+
+class CommandCenterSnapshot(BaseModel):
+    generated_at: datetime
+    health_score: int
+    kpis: list[CommandKpi]
+    gates: list[CommandGateSummary]
+    cameras: list[CommandCameraSummary]
+    zones: list[CommandZoneSummary]
+    exceptions: list[CommandException]
+    timeline: list[CommandTimelineItem]
+    recent_actions: list[CommandActionResponse]
 
 
 def _actor_name(user: User) -> str:
@@ -188,6 +263,241 @@ async def _publish_command_event(action: CommandActionLog) -> None:
         logger.debug("Realtime command publish skipped", exc_info=True)
 
 
+def _tone_for_count(count: int, warn_at: int = 1, critical_at: int = 5) -> str:
+    if count >= critical_at:
+        return "critical"
+    if count >= warn_at:
+        return "warning"
+    return "healthy"
+
+
+def _incident_priority(severity: str) -> str:
+    sev = (severity or "").lower()
+    if sev == "critical":
+        return "P1"
+    if sev == "high":
+        return "P2"
+    if sev == "medium":
+        return "P3"
+    return "P4"
+
+
+def _dt(value: Optional[datetime]) -> datetime:
+    return value or datetime.now(timezone.utc)
+
+
+async def _command_snapshot(db: AsyncSession) -> CommandCenterSnapshot:
+    now = datetime.now(timezone.utc)
+
+    camera_rows = (await db.execute(
+        select(Camera).where(Camera.is_active == True).order_by(Camera.zone, Camera.name)
+    )).scalars().all()
+    gate_rows = (await db.execute(
+        select(Gate).where(Gate.is_active == True).order_by(Gate.gate_code)
+    )).scalars().all()
+    incident_rows = (await db.execute(
+        select(PerimeterIncident)
+        .where(PerimeterIncident.status != PerimeterIncidentStatus.RESOLVED.value)
+        .order_by(desc(PerimeterIncident.created_at))
+        .limit(12)
+    )).scalars().all()
+    breach_rows = (await db.execute(
+        select(PerimeterBreach)
+        .where(PerimeterBreach.resolved_at.is_(None))
+        .order_by(desc(PerimeterBreach.detected_at))
+        .limit(8)
+    )).scalars().all()
+    low_stock_rows = (await db.execute(
+        select(InventoryItem)
+        .where(
+            or_(
+                InventoryItem.status.in_([StockStatus.LOW_STOCK.value, StockStatus.OUT_OF_STOCK.value]),
+                InventoryItem.quantity <= InventoryItem.reorder_level,
+            )
+        )
+        .order_by(InventoryItem.quantity.asc(), InventoryItem.zone)
+        .limit(8)
+    )).scalars().all()
+    zone_rows = (await db.execute(
+        select(DepotZone).where(DepotZone.is_active == True).order_by(DepotZone.zone_code)
+    )).scalars().all()
+    zone_rows = await apply_live_batch_capacity(db, list(zone_rows))
+    access_log_rows = (await db.execute(
+        select(GateAccessLog).order_by(desc(GateAccessLog.processed_at)).limit(8)
+    )).scalars().all()
+    action_rows = (await db.execute(
+        select(CommandActionLog).order_by(desc(CommandActionLog.executed_at)).limit(8)
+    )).scalars().all()
+
+    active_camera_count = sum(1 for camera in camera_rows if camera.status == CameraStatus.ACTIVE.value)
+    open_gate_count = sum(1 for gate in gate_rows if gate.status == GateStatus.OPEN.value)
+    total_entries_today = sum(int(gate.total_entries_today or 0) for gate in gate_rows)
+    critical_incident_count = sum(1 for incident in incident_rows if incident.severity in {"critical", "high"})
+    risky_zone_count = sum(1 for zone in zone_rows if float(zone.utilization_pct or 0) >= 80)
+    denied_access_count = sum(1 for log in access_log_rows if log.decision != "granted")
+
+    risk_points = (
+        critical_incident_count * 12
+        + len(incident_rows) * 5
+        + len(low_stock_rows) * 4
+        + risky_zone_count * 6
+        + denied_access_count * 3
+    )
+    health_score = max(0, min(100, 100 - risk_points))
+
+    kpis = [
+        CommandKpi(
+            key="cameras",
+            label="Active Cameras",
+            value=f"{active_camera_count}/{len(camera_rows)}",
+            detail="Live visual coverage",
+            tone="healthy" if active_camera_count == len(camera_rows) else "warning",
+        ),
+        CommandKpi(
+            key="gates",
+            label="Open Gates",
+            value=str(open_gate_count),
+            detail=f"{total_entries_today} entries today",
+            tone="warning" if open_gate_count else "healthy",
+        ),
+        CommandKpi(
+            key="incidents",
+            label="Open Incidents",
+            value=str(len(incident_rows)),
+            detail=f"{critical_incident_count} high priority",
+            tone=_tone_for_count(len(incident_rows), warn_at=1, critical_at=4),
+        ),
+        CommandKpi(
+            key="inventory",
+            label="Stock Exceptions",
+            value=str(len(low_stock_rows)),
+            detail="Low or reorder-level stock",
+            tone=_tone_for_count(len(low_stock_rows), warn_at=1, critical_at=6),
+        ),
+        CommandKpi(
+            key="zones",
+            label="Capacity Risk",
+            value=str(risky_zone_count),
+            detail="Zones above 80% utilization",
+            tone=_tone_for_count(risky_zone_count, warn_at=1, critical_at=3),
+        ),
+        CommandKpi(
+            key="access",
+            label="Access Denials",
+            value=str(denied_access_count),
+            detail="Recent gate exceptions",
+            tone=_tone_for_count(denied_access_count, warn_at=1, critical_at=4),
+        ),
+    ]
+
+    exceptions: list[CommandException] = []
+    for incident in incident_rows:
+        exceptions.append(CommandException(
+            id=str(incident.id),
+            source="Incident",
+            title=incident.title,
+            detail=incident.description or f"{incident.severity.title()} incident waiting for closure",
+            priority=_incident_priority(incident.severity),
+            created_at=incident.created_at,
+        ))
+    for breach in breach_rows:
+        exceptions.append(CommandException(
+            id=str(breach.id),
+            source="Perimeter",
+            title=f"{breach.breach_type.replace('_', ' ').title()} detected",
+            detail=breach.notes or "Active perimeter breach has not been resolved",
+            priority=_incident_priority(breach.severity),
+            zone=str(breach.zone_id),
+            created_at=breach.detected_at,
+        ))
+    for item in low_stock_rows:
+        exceptions.append(CommandException(
+            id=str(item.id),
+            source="Inventory",
+            title=f"SKU {item.sku_id} below reorder level",
+            detail=f"{item.quantity} available, reorder at {item.reorder_level}",
+            priority="P2" if item.quantity <= 0 else "P3",
+            zone=item.zone,
+            created_at=item.created_at,
+        ))
+    exceptions = sorted(exceptions, key=lambda item: (_dt(item.created_at)), reverse=True)[:12]
+
+    zones = [
+        CommandZoneSummary(
+            zone_code=zone.zone_code,
+            name=zone.name,
+            utilization_pct=float(zone.utilization_pct or 0),
+            current_occupancy=int(zone.current_occupancy or 0),
+            max_capacity_units=int(zone.max_capacity_units or 0),
+            status=zone.status,
+        )
+        for zone in sorted(zone_rows, key=lambda z: float(z.utilization_pct or 0), reverse=True)[:6]
+    ]
+
+    timeline: list[CommandTimelineItem] = []
+    for log in access_log_rows:
+        timeline.append(CommandTimelineItem(
+            id=str(log.id),
+            type="gate",
+            title=f"{log.plate_number} {log.direction}",
+            detail=f"{log.gate_code or 'Gate'} - {log.decision}",
+            status=log.decision,
+            occurred_at=_dt(log.processed_at),
+        ))
+    for action in action_rows:
+        timeline.append(CommandTimelineItem(
+            id=str(action.id),
+            type="command",
+            title=action.action_type.replace("_", " ").title(),
+            detail=action.message,
+            status=action.status,
+            occurred_at=_dt(action.executed_at),
+        ))
+    for incident in incident_rows[:4]:
+        timeline.append(CommandTimelineItem(
+            id=str(incident.id),
+            type="incident",
+            title=incident.title,
+            detail=f"{incident.severity.title()} - {incident.status}",
+            status=incident.status,
+            occurred_at=_dt(incident.created_at),
+        ))
+    timeline = sorted(timeline, key=lambda item: item.occurred_at, reverse=True)[:12]
+
+    return CommandCenterSnapshot(
+        generated_at=now,
+        health_score=health_score,
+        kpis=kpis,
+        gates=[
+            CommandGateSummary(
+                id=str(gate.id),
+                gate_code=gate.gate_code,
+                name=gate.name,
+                gate_type=gate.gate_type,
+                status=gate.status,
+                total_entries_today=int(gate.total_entries_today or 0),
+                last_activity_at=gate.last_opened or gate.last_closed,
+            )
+            for gate in gate_rows
+        ],
+        cameras=[
+            CommandCameraSummary(
+                id=str(camera.id),
+                name=camera.name,
+                zone=camera.zone,
+                status=camera.status,
+                protocol=camera.protocol,
+                last_seen=camera.last_seen,
+            )
+            for camera in camera_rows
+        ],
+        zones=zones,
+        exceptions=exceptions,
+        timeline=timeline,
+        recent_actions=action_rows,
+    )
+
+
 def _new_incident(
     *,
     title: str,
@@ -208,7 +518,7 @@ def _new_incident(
         source="manual",
         priority=priority.value,
         severity_score=scores[priority],
-        status=IncidentStatus.OPEN.value,
+        status=OpsIncidentStatus.OPEN.value,
         zone=zone,
         assigned_to=assigned_to,
         escalation_level=0,
@@ -376,6 +686,15 @@ async def contact_operator_action(
     await db.refresh(action)
     await _publish_command_event(action)
     return action
+
+
+@router.get("/snapshot", response_model=CommandCenterSnapshot)
+async def command_center_snapshot(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """One backend-computed operating picture for the Warehouse Manager view."""
+    return await _command_snapshot(db)
 
 
 @router.get("/actions/recent", response_model=list[CommandActionResponse])

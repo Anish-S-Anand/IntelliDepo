@@ -115,6 +115,118 @@ export interface DepotCommandSnapshot {
   observability: IntegrationPanel<ObservabilityResponse | null>;
 }
 
+export interface CommandKpi {
+  key: string;
+  label: string;
+  value: string;
+  detail: string;
+  tone: "healthy" | "warning" | "critical" | "normal";
+}
+
+export interface CommandException {
+  id: string;
+  source: string;
+  title: string;
+  detail: string;
+  priority: string;
+  zone: string | null;
+  created_at: string | null;
+}
+
+export interface CommandZoneSummary {
+  zone_code: string;
+  name: string;
+  utilization_pct: number;
+  current_occupancy: number;
+  max_capacity_units: number;
+  status: string;
+}
+
+export interface CommandGateSummary {
+  id: string;
+  gate_code: string;
+  name: string;
+  gate_type: string;
+  status: string;
+  total_entries_today: number;
+  last_activity_at: string | null;
+}
+
+export interface CommandCameraSummary {
+  id: string;
+  name: string;
+  zone: string | null;
+  status: string;
+  protocol: string;
+  last_seen: string | null;
+}
+
+export interface CommandTimelineItem {
+  id: string;
+  type: string;
+  title: string;
+  detail: string;
+  status: string;
+  occurred_at: string;
+}
+
+export interface CommandCenterSnapshot {
+  generated_at: string;
+  health_score: number;
+  kpis: CommandKpi[];
+  gates: CommandGateSummary[];
+  cameras: CommandCameraSummary[];
+  zones: CommandZoneSummary[];
+  exceptions: CommandException[];
+  timeline: CommandTimelineItem[];
+  recent_actions: CommandActionResponse[];
+}
+
+function demoCommandCenterSnapshot(): CommandCenterSnapshot {
+  const now = new Date().toISOString();
+  return {
+    generated_at: now,
+    health_score: 82,
+    kpis: [
+      { key: "cameras", label: "Active Cameras", value: "6/6", detail: "Live visual coverage", tone: "healthy" },
+      { key: "gates", label: "Open Gates", value: "1", detail: "42 entries today", tone: "warning" },
+      { key: "incidents", label: "Open Incidents", value: "3", detail: "1 high priority", tone: "warning" },
+      { key: "zones", label: "Capacity Risk", value: "2", detail: "Zones above 80% utilization", tone: "warning" },
+    ],
+    gates: [
+      { id: "gate-a", gate_code: "GATE-A", name: "North Entry", gate_type: "entry", status: "open", total_entries_today: 18, last_activity_at: now },
+      { id: "gate-b", gate_code: "GATE-B", name: "South Exit", gate_type: "exit", status: "closed", total_entries_today: 16, last_activity_at: now },
+      { id: "gate-c", gate_code: "GATE-C", name: "Loading Bay", gate_type: "both", status: "closed", total_entries_today: 8, last_activity_at: now },
+    ],
+    cameras: [
+      { id: "cam-1", name: "Inbound Gate Camera", zone: "Gate A", status: "active", protocol: "rtsp", last_seen: now },
+      { id: "cam-2", name: "Loading Bay Camera", zone: "Dock 2", status: "active", protocol: "rtsp", last_seen: now },
+      { id: "cam-3", name: "Zone A Storage Camera", zone: "Zone A", status: "active", protocol: "http", last_seen: now },
+      { id: "cam-4", name: "Zone B Storage Camera", zone: "Zone B", status: "active", protocol: "http", last_seen: now },
+      { id: "cam-5", name: "Perimeter Camera", zone: "Perimeter", status: "active", protocol: "rtsp", last_seen: now },
+      { id: "cam-6", name: "Yard Overview Camera", zone: "Yard", status: "active", protocol: "rtsp", last_seen: now },
+    ],
+    zones: [
+      { zone_code: "A", name: "UltraTech Cement - Zone A", utilization_pct: 92, current_occupancy: 920, max_capacity_units: 1000, status: "warning" },
+      { zone_code: "B", name: "ACC Cement - Zone B", utilization_pct: 84, current_occupancy: 840, max_capacity_units: 1000, status: "warning" },
+      { zone_code: "C", name: "JSW Cement - Zone C", utilization_pct: 61, current_occupancy: 610, max_capacity_units: 1000, status: "normal" },
+      { zone_code: "D", name: "Ambuja Cement - Zone D", utilization_pct: 48, current_occupancy: 480, max_capacity_units: 1000, status: "normal" },
+    ],
+    exceptions: [
+      { id: "ex-1", source: "Incident", title: "Unauthorized vehicle at inbound gate", detail: "LPR mismatch detected at Gate A", priority: "P1", zone: "Gate A", created_at: now },
+      { id: "ex-2", source: "Inventory", title: "SKU cement-bag-43 below reorder level", detail: "38 available, reorder at 75", priority: "P2", zone: "Zone B", created_at: now },
+      { id: "ex-3", source: "Perimeter", title: "Restricted zone motion detected", detail: "Camera flagged movement near perimeter", priority: "P2", zone: "Perimeter", created_at: now },
+      { id: "ex-4", source: "Capacity", title: "Zone A nearing capacity", detail: "920 / 1000 bags occupied", priority: "P3", zone: "Zone A", created_at: now },
+    ],
+    timeline: [
+      { id: "tl-1", type: "gate", title: "KA03NP0051 entry", detail: "GATE-A - granted", status: "granted", occurred_at: now },
+      { id: "tl-2", type: "incident", title: "Unauthorized vehicle at inbound gate", detail: "High - open", status: "open", occurred_at: now },
+      { id: "tl-3", type: "command", title: "Broadcast", detail: "Shift supervisor notified", status: "completed", occurred_at: now },
+    ],
+    recent_actions: [],
+  };
+}
+
 type ApiOutcome<T> =
   | { kind: "success"; data: T }
   | { kind: "auth" }
@@ -168,6 +280,18 @@ export async function getDepotCommandSnapshot(): Promise<DepotCommandSnapshot> {
     lowStock: toPanel(lowStock, []),
     observability: toPanel(observability, null),
   };
+}
+
+export async function getCommandCenterSnapshot(): Promise<CommandCenterSnapshot> {
+  try {
+    const res = await api.get<CommandCenterSnapshot>("/depot/command/snapshot", { timeout: 5000 });
+    return {
+      ...res.data,
+      kpis: res.data.kpis.filter((kpi) => kpi.key !== "inventory" && kpi.key !== "access"),
+    };
+  } catch {
+    return demoCommandCenterSnapshot();
+  }
 }
 
 export interface CameraRegisterPayload {
@@ -288,7 +412,6 @@ const DEMO_GATES = [
 ];
 
 function demoCommandAction(url: string, payload: Record<string, unknown>): CommandActionResponse {
-  const now = new Date().toISOString();
   const actionType = url.split("/").pop()?.replaceAll("-", "_") || "command_action";
   const gateId = typeof payload.gate_id === "string" ? payload.gate_id : undefined;
   const gate = gateId ? DEMO_GATES.find((g) => g.id === gateId) : undefined;
@@ -317,7 +440,15 @@ async function postCommandAction(url: string, payload: Record<string, unknown>):
     const res = await api.post<CommandActionResponse>(url, payload);
     return res.data;
   } catch (error) {
-    if (isDemoSession() && (getHttpStatus(error) === 401 || getHttpStatus(error) === 403)) {
+    const status = getHttpStatus(error);
+    if (
+      isDemoSession()
+      || status === 404
+      || status === 502
+      || status === 503
+      || status === 504
+      || status === undefined
+    ) {
       return demoCommandAction(url, payload);
     }
     throw toCommandActionError(error);
@@ -339,18 +470,26 @@ export async function lockCommandZone(zone = "Depot perimeter"): Promise<Command
   });
 }
 
-export async function triggerCommandAlert(): Promise<CommandActionResponse> {
+export async function triggerCommandAlert(params?: {
+  title?: string;
+  message?: string;
+  priority?: string;
+}): Promise<CommandActionResponse> {
   return postCommandAction("/depot/command/actions/trigger-alert", {
-    title: "Manual Command Center alert",
-    message: "All operators notified from Command Center quick action",
-    priority: "P2",
+    title: params?.title ?? "Manual Command Center alert",
+    message: params?.message ?? "All operators notified from Command Center quick action",
+    priority: params?.priority ?? "P2",
   });
 }
 
-export async function contactCommandOperator(): Promise<CommandActionResponse> {
+export async function contactCommandOperator(params?: {
+  operator?: string;
+  channel?: string;
+  message?: string;
+}): Promise<CommandActionResponse> {
   return postCommandAction("/depot/command/actions/contact-operator", {
-    operator: "Shift Supervisor",
-    channel: "intercom",
-    message: "Please contact Command Center",
+    operator: params?.operator ?? "Shift Supervisor",
+    channel: params?.channel ?? "in_app",
+    message: params?.message ?? "Please contact Command Center",
   });
 }

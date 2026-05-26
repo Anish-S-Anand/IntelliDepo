@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 /**
- * Analytics has been merged into the Operations Hub (Dashboard).
+ * Analytics has been merged into the Depot Mobile (Dashboard).
  * This page redirects to /depot/operations.
  */
 export default function AnalyticsRoute() {

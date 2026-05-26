@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import AuthGuard from "@/components/auth/AuthGuard";
 import DepotTopBar from "@/components/depot/layout/DepotTopBar";
 import DepotSidebar from "@/components/depot/layout/DepotSidebar";
+import BroadcastBanner from "@/components/depot/layout/BroadcastBanner";
 
 export default function DepotLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -39,6 +40,9 @@ export default function DepotLayout({ children }: { children: React.ReactNode })
 
         {/* Sidebar */}
         <DepotSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+        {/* Global broadcast banner — shows on all depot pages when a broadcast is sent */}
+        <BroadcastBanner />
 
         {/* Main Content */}
         <main
