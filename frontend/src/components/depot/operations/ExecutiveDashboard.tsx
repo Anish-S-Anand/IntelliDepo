@@ -74,7 +74,6 @@ interface Incident {
   id: string;
   title: string;
   what: string;           // plain-language "what happened"
-  where: string;          // plain-language "where"
   doWhat: string;         // plain-language "what to do"
   severity: Severity;
   status: Status;
@@ -90,7 +89,6 @@ const INCIDENTS: Incident[] = [
     id: "INC-001",
     title: "Unauthorized Entry",
     what: "Someone entered Gate C without a valid badge — scan failed 3 times in a row.",
-    where: "Gate C · North Side",
     doWhat: "Security officer should check Gate C immediately.",
     severity: "critical", status: "escalated",
     assignee: "Sec. Officer Rajan",
@@ -101,7 +99,6 @@ const INCIDENTS: Incident[] = [
     id: "INC-002",
     title: "Person Loitering",
     what: "Someone has been standing in the restricted staging area near Bay 7 for over 15 minutes with no work order.",
-    where: "Bay 7 · Staging Area",
     doWhat: "Supervisor should go and check this person's access.",
     severity: "high", status: "open",
     assignee: "Supervisor Meera",
@@ -112,7 +109,6 @@ const INCIDENTS: Incident[] = [
     id: "INC-003",
     title: "Unauthorized Entry",
     what: "A vehicle entered Dock B at 08:42 but its number plate was not in our system.",
-    where: "Dock B · Vehicle Gate",
     doWhat: "Ops Lead should verify the vehicle and driver at Dock B.",
     severity: "high", status: "open",
     assignee: "Ops Lead Vishal",
@@ -123,7 +119,6 @@ const INCIDENTS: Incident[] = [
     id: "INC-004",
     title: "Bag Count Mismatch",
     what: "Camera counted 1,208 bags but the delivery note says 1,300. That's 92 bags unaccounted for.",
-    where: "Zone C · Receiving Area",
     doWhat: "Count team should do a manual recount in Zone C.",
     severity: "high", status: "monitoring",
     assignee: "Count Lead Priya",
@@ -134,7 +129,6 @@ const INCIDENTS: Incident[] = [
     id: "INC-005",
     title: "Person Loitering",
     what: "Two people were spotted near Emergency Exit E-2 for 22 minutes after their shift ended.",
-    where: "Emergency Exit E-2",
     doWhat: "Security should check Emergency Exit E-2 now.",
     severity: "medium", status: "open",
     assignee: "Unassigned",
@@ -145,7 +139,6 @@ const INCIDENTS: Incident[] = [
     id: "INC-006",
     title: "Zone A Almost Full",
     what: "Zone A is 91% full and getting close to its limit. New bags may not fit soon.",
-    where: "Zone A · Storage",
     doWhat: "Warehouse manager should redirect incoming bags to Zone D.",
     severity: "medium", status: "monitoring",
     assignee: "Warehouse Mgr. Anil",
@@ -156,7 +149,6 @@ const INCIDENTS: Incident[] = [
     id: "INC-007",
     title: "Camera Signal Lost",
     what: "Camera CAM-06 in Zone B (Aisle 4) is not sending a clear picture — signal keeps dropping.",
-    where: "Zone B · Aisle 4",
     doWhat: "Tech team should check and restart CAM-06.",
     severity: "medium", status: "open",
     assignee: "Tech. Support Karan",
