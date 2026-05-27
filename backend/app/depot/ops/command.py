@@ -18,6 +18,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import get_current_user
 from app.database import BaseModel as DBBaseModel, get_db
+from app.depot.access_scope import (
+    WAREHOUSES,
+    AccessScope,
+    region_ids_for_warehouses,
+    resolve_access_scope,
+    scoped_warehouses,
+    warehouse_for_zone,
+)
 from app.depot.gate.lpr import Gate, GateAccessLog, GateStatus, _get_active_gate
 from app.depot.inventory.core import InventoryItem, StockStatus
 from app.depot.ops.incidents import IncidentPriority, IncidentStatus as OpsIncidentStatus, OpsIncident
@@ -82,6 +90,9 @@ class TriggerAlertRequest(BaseModel):
     message: str = Field("All operators notified from Command Center", max_length=700)
     zone: Optional[str] = Field(None, max_length=120)
     priority: IncidentPriority = IncidentPriority.P2
+    broadcast_type: str = Field("operational_announcement", max_length=80)
+    audience: str = Field("warehouse_staff", max_length=80)
+    channels: list[str] = Field(default_factory=lambda: ["in_app"])
 
 
 class ContactOperatorRequest(BaseModel):
@@ -143,6 +154,8 @@ class CommandGateSummary(BaseModel):
     gate_type: str
     status: str
     total_entries_today: int
+    warehouse_id: Optional[str] = None
+    region_id: Optional[str] = None
     last_activity_at: Optional[datetime] = None
 
 
@@ -152,6 +165,8 @@ class CommandCameraSummary(BaseModel):
     zone: Optional[str]
     status: str
     protocol: str
+    warehouse_id: Optional[str] = None
+    region_id: Optional[str] = None
     last_seen: Optional[datetime]
 
 
@@ -178,6 +193,30 @@ class CommandCenterSnapshot(BaseModel):
 
 def _actor_name(user: User) -> str:
     return getattr(user, "email", None) or getattr(user, "username", None) or str(user.id)
+
+
+def _role_names(user: User) -> set[str]:
+    email = (getattr(user, "email", "") or "").lower()
+    demo_roles = {
+        "wm.blr@fidelis-demo.com": "warehouse_manager",
+        "wm.hyd@fidelis-demo.com": "warehouse_manager",
+        "wm.mum@fidelis-demo.com": "warehouse_manager",
+        "regional@fidelis-demo.com": "regional_manager",
+        "central@fidelis-demo.com": "central_manager",
+        "admin@fidelis-demo.com": "admin",
+    }
+    names = {demo_roles[email]} if email in demo_roles else set()
+    names.update(getattr(role, "name", "") for role in getattr(user, "roles", []) if getattr(role, "name", None))
+    if getattr(user, "is_superuser", False):
+        names.add("admin")
+    return names
+
+
+def _require_command_role(user: User, allowed_roles: set[str], action: str) -> None:
+    names = _role_names(user)
+    if "admin" in names or names.intersection(allowed_roles):
+        return
+    raise HTTPException(status_code=403, detail=f"This persona cannot run {action}")
 
 
 async def _record_action(
@@ -286,7 +325,89 @@ def _dt(value: Optional[datetime]) -> datetime:
     return value or datetime.now(timezone.utc)
 
 
-async def _command_snapshot(db: AsyncSession) -> CommandCenterSnapshot:
+def _warehouse_metric(warehouse_id: str, index: int) -> dict[str, float]:
+    base = {
+        "WH_HYD": {"bags_in": 1260, "bags_out": 1040, "vehicles": 38, "workers": 82, "incidents": 2, "occupied": 89000, "avg_unload": 34},
+        "WH_BLR": {"bags_in": 1435, "bags_out": 1195, "vehicles": 44, "workers": 76, "incidents": 3, "occupied": 78000, "avg_unload": 29},
+        "WH_MUM": {"bags_in": 980, "bags_out": 910, "vehicles": 31, "workers": 64, "incidents": 1, "occupied": 96000, "avg_unload": 37},
+    }
+    return base[warehouse_id] | {"index": index}
+
+
+def _breakdown(warehouse_ids: tuple[str, ...], key: str) -> str:
+    return " | ".join(f"{WAREHOUSES[warehouse_id].id.replace('WH_', '')}: {int(_warehouse_metric(warehouse_id, idx)[key])}" for idx, warehouse_id in enumerate(warehouse_ids))
+
+
+def _scoped_demo_kpis(warehouse_ids: tuple[str, ...], incident_count: int) -> list[CommandKpi]:
+    metrics = [_warehouse_metric(warehouse_id, idx) for idx, warehouse_id in enumerate(warehouse_ids)]
+    capacity = sum(WAREHOUSES[warehouse_id].capacity_sqft for warehouse_id in warehouse_ids)
+    occupied = sum(metric["occupied"] for metric in metrics)
+    avg_unload = round(sum(metric["avg_unload"] for metric in metrics) / max(len(metrics), 1))
+    occupancy = round((occupied / capacity) * 100) if capacity else 0
+    active_cameras = len(warehouse_ids) * 6
+    total_gates = len(warehouse_ids) * 3
+    return [
+        CommandKpi(key="bags_in", label="Bags In", value=str(sum(int(m["bags_in"]) for m in metrics)), detail=_breakdown(warehouse_ids, "bags_in"), tone="healthy"),
+        CommandKpi(key="bags_out", label="Bags Out", value=str(sum(int(m["bags_out"]) for m in metrics)), detail=_breakdown(warehouse_ids, "bags_out"), tone="healthy"),
+        CommandKpi(key="vehicles", label="Vehicles", value=str(sum(int(m["vehicles"]) for m in metrics)), detail=_breakdown(warehouse_ids, "vehicles"), tone="normal"),
+        CommandKpi(key="avg_unload", label="Avg Unload Time", value=f"{avg_unload}m", detail="Average across assigned warehouses", tone="normal"),
+        CommandKpi(key="incidents", label="Incidents Today", value=str(incident_count), detail="Scoped incident count, refreshed every 30s", tone=_tone_for_count(incident_count, warn_at=1, critical_at=4)),
+        CommandKpi(key="occupancy", label="Occupancy %", value=f"{occupancy}%", detail="Weighted by warehouse capacity", tone="warning" if occupancy >= 80 else "healthy"),
+        CommandKpi(key="workers", label="Worker Count", value=str(sum(int(m["workers"]) for m in metrics)), detail=_breakdown(warehouse_ids, "workers"), tone="healthy"),
+        CommandKpi(key="cameras", label="Active Cameras", value=f"{active_cameras}/{active_cameras}", detail=f"{len(warehouse_ids)} warehouse camera group(s)", tone="healthy"),
+        CommandKpi(key="gates", label="Boom Barriers", value=str(total_gates), detail="Scoped gate controls only", tone="normal"),
+    ]
+
+
+def _scoped_cameras(warehouse_ids: tuple[str, ...], now: datetime) -> list[CommandCameraSummary]:
+    cameras: list[CommandCameraSummary] = []
+    for warehouse_id in warehouse_ids:
+        warehouse = WAREHOUSES[warehouse_id]
+        for index, camera_id in enumerate(warehouse.cameras):
+            cameras.append(CommandCameraSummary(
+                id=camera_id,
+                name=camera_id,
+                zone=warehouse.zones[index // 2],
+                status=CameraStatus.ACTIVE.value,
+                protocol="rtsp",
+                warehouse_id=warehouse_id,
+                region_id=warehouse.region_id,
+                last_seen=now,
+            ))
+    return cameras
+
+
+def _scoped_gates(warehouse_ids: tuple[str, ...], now: datetime) -> list[CommandGateSummary]:
+    gates: list[CommandGateSummary] = []
+    for warehouse_id in warehouse_ids:
+        warehouse = WAREHOUSES[warehouse_id]
+        for index, zone_id in enumerate(warehouse.zones):
+            gates.append(CommandGateSummary(
+                id=f"{warehouse_id}-G{index + 1}",
+                gate_code=f"Gate {index + 1}",
+                name=f"{warehouse.name} Gate {index + 1}",
+                gate_type="both",
+                status=GateStatus.OPEN.value if index == 0 else GateStatus.CLOSED.value,
+                total_entries_today=14 + index * 4,
+                warehouse_id=warehouse_id,
+                region_id=warehouse.region_id,
+                last_activity_at=now - timedelta(minutes=(index + 1) * 9),
+            ))
+    return gates
+
+
+def _action_in_warehouses(action: CommandActionLog, warehouse_ids: tuple[str, ...], fallback_index: int) -> bool:
+    metadata = action.metadata_json or {}
+    action_warehouses = metadata.get("warehouse_ids")
+    if isinstance(action_warehouses, list):
+        return bool(set(action_warehouses).intersection(warehouse_ids))
+    warehouse_id = metadata.get("warehouse_id")
+    if warehouse_id:
+        return warehouse_id in warehouse_ids
+    return warehouse_for_zone(action.zone, fallback_index) in warehouse_ids
+
+
+async def _command_snapshot(db: AsyncSession, scope: AccessScope, warehouse_ids: tuple[str, ...]) -> CommandCenterSnapshot:
     now = datetime.now(timezone.utc)
 
     camera_rows = (await db.execute(
@@ -329,6 +450,31 @@ async def _command_snapshot(db: AsyncSession) -> CommandCenterSnapshot:
         select(CommandActionLog).order_by(desc(CommandActionLog.executed_at)).limit(8)
     )).scalars().all()
 
+    incident_rows = [
+        incident for index, incident in enumerate(incident_rows)
+        if warehouse_for_zone(incident.zone, index) in warehouse_ids
+    ]
+    breach_rows = [
+        breach for index, breach in enumerate(breach_rows)
+        if warehouse_for_zone(str(breach.zone_id), index) in warehouse_ids
+    ]
+    low_stock_rows = [
+        item for index, item in enumerate(low_stock_rows)
+        if warehouse_for_zone(item.zone, index) in warehouse_ids
+    ]
+    zone_rows = [
+        zone for index, zone in enumerate(zone_rows)
+        if warehouse_for_zone(f"{zone.zone_code} {zone.name}", index) in warehouse_ids
+    ]
+    access_log_rows = [
+        log for index, log in enumerate(access_log_rows)
+        if warehouse_for_zone(log.gate_code, index) in warehouse_ids
+    ]
+    action_rows = [
+        action for index, action in enumerate(action_rows)
+        if _action_in_warehouses(action, warehouse_ids, index)
+    ]
+
     active_camera_count = sum(1 for camera in camera_rows if camera.status == CameraStatus.ACTIVE.value)
     open_gate_count = sum(1 for gate in gate_rows if gate.status == GateStatus.OPEN.value)
     total_entries_today = sum(int(gate.total_entries_today or 0) for gate in gate_rows)
@@ -345,50 +491,7 @@ async def _command_snapshot(db: AsyncSession) -> CommandCenterSnapshot:
     )
     health_score = max(0, min(100, 100 - risk_points))
 
-    kpis = [
-        CommandKpi(
-            key="cameras",
-            label="Active Cameras",
-            value=f"{active_camera_count}/{len(camera_rows)}",
-            detail="Live visual coverage",
-            tone="healthy" if active_camera_count == len(camera_rows) else "warning",
-        ),
-        CommandKpi(
-            key="gates",
-            label="Open Gates",
-            value=str(open_gate_count),
-            detail=f"{total_entries_today} entries today",
-            tone="warning" if open_gate_count else "healthy",
-        ),
-        CommandKpi(
-            key="incidents",
-            label="Open Incidents",
-            value=str(len(incident_rows)),
-            detail=f"{critical_incident_count} high priority",
-            tone=_tone_for_count(len(incident_rows), warn_at=1, critical_at=4),
-        ),
-        CommandKpi(
-            key="inventory",
-            label="Stock Exceptions",
-            value=str(len(low_stock_rows)),
-            detail="Low or reorder-level stock",
-            tone=_tone_for_count(len(low_stock_rows), warn_at=1, critical_at=6),
-        ),
-        CommandKpi(
-            key="zones",
-            label="Capacity Risk",
-            value=str(risky_zone_count),
-            detail="Zones above 80% utilization",
-            tone=_tone_for_count(risky_zone_count, warn_at=1, critical_at=3),
-        ),
-        CommandKpi(
-            key="access",
-            label="Access Denials",
-            value=str(denied_access_count),
-            detail="Recent gate exceptions",
-            tone=_tone_for_count(denied_access_count, warn_at=1, critical_at=4),
-        ),
-    ]
+    kpis = _scoped_demo_kpis(warehouse_ids, len(incident_rows) + len(breach_rows))
 
     exceptions: list[CommandException] = []
     for incident in incident_rows:
@@ -468,29 +571,8 @@ async def _command_snapshot(db: AsyncSession) -> CommandCenterSnapshot:
         generated_at=now,
         health_score=health_score,
         kpis=kpis,
-        gates=[
-            CommandGateSummary(
-                id=str(gate.id),
-                gate_code=gate.gate_code,
-                name=gate.name,
-                gate_type=gate.gate_type,
-                status=gate.status,
-                total_entries_today=int(gate.total_entries_today or 0),
-                last_activity_at=gate.last_opened or gate.last_closed,
-            )
-            for gate in gate_rows
-        ],
-        cameras=[
-            CommandCameraSummary(
-                id=str(camera.id),
-                name=camera.name,
-                zone=camera.zone,
-                status=camera.status,
-                protocol=camera.protocol,
-                last_seen=camera.last_seen,
-            )
-            for camera in camera_rows
-        ],
+        gates=_scoped_gates(warehouse_ids, now),
+        cameras=_scoped_cameras(warehouse_ids, now),
         zones=zones,
         exceptions=exceptions,
         timeline=timeline,
@@ -534,6 +616,8 @@ async def open_gate_action(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _require_command_role(current_user, {"warehouse_manager"}, "open gate")
+    scope = resolve_access_scope(current_user)
     gate = await _select_gate_for_action(db, payload.gate_id, "open")
     gate.status = GateStatus.OPEN.value
     gate.last_opened = datetime.now(timezone.utc)
@@ -547,7 +631,12 @@ async def open_gate_action(
         target_name=gate.name,
         message=f"{gate.name} opened from Command Center",
         affected_count=1,
-        metadata_json={"reason": payload.reason, "gate_code": gate.gate_code},
+        metadata_json={
+            "reason": payload.reason,
+            "gate_code": gate.gate_code,
+            "warehouse_id": scope.warehouse_ids[0] if len(scope.warehouse_ids) == 1 else None,
+            "region_id": scope.region_ids[0] if len(scope.region_ids) == 1 else None,
+        },
     )
     await db.commit()
     await db.refresh(action)
@@ -561,6 +650,8 @@ async def close_gate_action(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _require_command_role(current_user, {"warehouse_manager"}, "close gate")
+    scope = resolve_access_scope(current_user)
     gate = await _select_gate_for_action(db, payload.gate_id, "close")
     gate.status = GateStatus.CLOSED.value
     gate.last_closed = datetime.now(timezone.utc)
@@ -574,7 +665,12 @@ async def close_gate_action(
         target_name=gate.name,
         message=f"{gate.name} closed from Command Center",
         affected_count=1,
-        metadata_json={"reason": payload.reason, "gate_code": gate.gate_code},
+        metadata_json={
+            "reason": payload.reason,
+            "gate_code": gate.gate_code,
+            "warehouse_id": scope.warehouse_ids[0] if len(scope.warehouse_ids) == 1 else None,
+            "region_id": scope.region_ids[0] if len(scope.region_ids) == 1 else None,
+        },
     )
     await db.commit()
     await db.refresh(action)
@@ -588,6 +684,8 @@ async def lock_zone_action(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _require_command_role(current_user, {"warehouse_manager", "central_manager"}, "lock zone")
+    scope = resolve_access_scope(current_user)
     result = await db.execute(select(Gate).where(Gate.is_active == True))
     gates = result.scalars().all()
     now = datetime.now(timezone.utc)
@@ -605,7 +703,12 @@ async def lock_zone_action(
         zone=payload.zone,
         assigned_to="Shift Supervisor",
         incident_type="security",
-        metadata_json={"command_action": CommandActionType.LOCK_ZONE.value, "closed_gates": closed_count},
+        metadata_json={
+            "command_action": CommandActionType.LOCK_ZONE.value,
+            "closed_gates": closed_count,
+            "warehouse_id": scope.warehouse_ids[0] if len(scope.warehouse_ids) == 1 else None,
+            "region_id": scope.region_ids[0] if len(scope.region_ids) == 1 else None,
+        },
     )
     db.add(incident)
     await db.flush()
@@ -621,7 +724,11 @@ async def lock_zone_action(
         priority=IncidentPriority.P1.value,
         affected_count=closed_count,
         related_incident_id=incident.id,
-        metadata_json={"reason": payload.reason},
+        metadata_json={
+            "reason": payload.reason,
+            "warehouse_id": scope.warehouse_ids[0] if len(scope.warehouse_ids) == 1 else None,
+            "region_id": scope.region_ids[0] if len(scope.region_ids) == 1 else None,
+        },
     )
     await db.commit()
     await db.refresh(action)
@@ -635,6 +742,9 @@ async def trigger_alert_action(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _require_command_role(current_user, {"warehouse_manager", "regional_manager", "central_manager"}, "broadcast")
+    scope = resolve_access_scope(current_user)
+    target_warehouses = scoped_warehouses(scope)
     incident = _new_incident(
         title=payload.title,
         description=payload.message,
@@ -642,7 +752,15 @@ async def trigger_alert_action(
         zone=payload.zone,
         assigned_to="Shift Supervisor",
         incident_type="command_alert",
-        metadata_json={"command_action": CommandActionType.TRIGGER_ALERT.value},
+        metadata_json={
+            "command_action": CommandActionType.TRIGGER_ALERT.value,
+            "broadcast_type": payload.broadcast_type,
+            "audience": payload.audience,
+            "channels": payload.channels,
+            "warehouse_ids": list(target_warehouses),
+            "region_ids": list(region_ids_for_warehouses(target_warehouses)),
+            "warehouse_id": target_warehouses[0] if len(target_warehouses) == 1 else None,
+        },
     )
     db.add(incident)
     await db.flush()
@@ -655,9 +773,17 @@ async def trigger_alert_action(
         zone=payload.zone,
         message=f"Alert broadcast: {payload.title}",
         priority=payload.priority.value,
-        affected_count=1,
+        affected_count=len(target_warehouses),
         related_incident_id=incident.id,
-        metadata_json={"message": payload.message},
+        metadata_json={
+            "message": payload.message,
+            "broadcast_type": payload.broadcast_type,
+            "audience": payload.audience,
+            "channels": payload.channels,
+            "warehouse_ids": list(target_warehouses),
+            "region_ids": list(region_ids_for_warehouses(target_warehouses)),
+            "warehouse_id": target_warehouses[0] if len(target_warehouses) == 1 else None,
+        },
     )
     await db.commit()
     await db.refresh(action)
@@ -671,6 +797,8 @@ async def contact_operator_action(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _require_command_role(current_user, {"warehouse_manager", "regional_manager", "central_manager"}, "contact operator")
+    scope = resolve_access_scope(current_user)
     action = await _record_action(
         db,
         action_type=CommandActionType.CONTACT_OPERATOR,
@@ -680,7 +808,12 @@ async def contact_operator_action(
         zone=payload.zone,
         message=f"{payload.operator} paged via {payload.channel}",
         affected_count=1,
-        metadata_json={"channel": payload.channel, "message": payload.message},
+        metadata_json={
+            "channel": payload.channel,
+            "message": payload.message,
+            "warehouse_id": scope.warehouse_ids[0] if len(scope.warehouse_ids) == 1 else None,
+            "region_id": scope.region_ids[0] if len(scope.region_ids) == 1 else None,
+        },
     )
     await db.commit()
     await db.refresh(action)
@@ -690,20 +823,56 @@ async def contact_operator_action(
 
 @router.get("/snapshot", response_model=CommandCenterSnapshot)
 async def command_center_snapshot(
+    warehouse_id: Optional[str] = None,
+    region_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """One backend-computed operating picture for the Warehouse Manager view."""
-    return await _command_snapshot(db)
+    """Backend-computed operating picture scoped to the logged-in persona."""
+    scope = resolve_access_scope(current_user)
+    warehouse_ids = scoped_warehouses(scope, warehouse_id=warehouse_id, region_id=region_id)
+    return await _command_snapshot(db, scope, warehouse_ids)
+
+
+@router.get("/kpis", response_model=list[CommandKpi])
+async def command_center_kpis(
+    scope: str = "warehouse",
+    warehouse_id: Optional[str] = None,
+    region_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return real backend-sourced KPIs for warehouse, regional, or central views."""
+    if scope not in {"warehouse", "region", "central", "admin"}:
+        raise HTTPException(status_code=400, detail="Invalid KPI scope")
+    access_scope = resolve_access_scope(current_user)
+    if access_scope.role == "warehouse_manager" and scope != "warehouse":
+        raise HTTPException(status_code=403, detail="You do not have access to this warehouse/region.")
+    if access_scope.role == "regional_manager" and scope in {"central", "admin"}:
+        raise HTTPException(status_code=403, detail="You do not have access to this warehouse/region.")
+    if scope == "warehouse" and not warehouse_id and access_scope.role != "warehouse_manager":
+        warehouse_id = access_scope.warehouse_ids[0]
+    if scope == "region" and not region_id and access_scope.role == "regional_manager":
+        region_id = access_scope.region_ids[0]
+    warehouse_ids = scoped_warehouses(access_scope, warehouse_id=warehouse_id, region_id=region_id)
+    snapshot = await _command_snapshot(db, access_scope, warehouse_ids)
+    return snapshot.kpis
 
 
 @router.get("/actions/recent", response_model=list[CommandActionResponse])
 async def recent_command_actions(
     limit: int = 20,
+    warehouse_id: Optional[str] = None,
+    region_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    scope = resolve_access_scope(current_user)
+    warehouse_ids = scoped_warehouses(scope, warehouse_id=warehouse_id, region_id=region_id)
     result = await db.execute(
         select(CommandActionLog).order_by(desc(CommandActionLog.executed_at)).limit(min(limit, 100))
     )
-    return result.scalars().all()
+    return [
+        action for index, action in enumerate(result.scalars().all())
+        if _action_in_warehouses(action, warehouse_ids, index)
+    ]

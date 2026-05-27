@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { useAuthStore } from "@/stores/authStore";
+import { getUnifiedDepotSource } from "@/services/depotUnifiedSource";
 import {
   getZones,
   getDensityAnalytics,
@@ -116,6 +118,7 @@ function findReplayEntryInRange(
 
 export default function HeatmapPage() {
   const searchParams = useSearchParams();
+  const user = useAuthStore((state) => state.user);
   const zoneParam = searchParams.get("zone");
   const [zones, setZones] = useState<MergedZone[]>([]);
   const [thresholds, setThresholds] = useState<{ warning: number; critical: number }>({ warning: 80, critical: 95 });
@@ -128,6 +131,44 @@ export default function HeatmapPage() {
 
   const fetchData = useCallback(async () => {
     try {
+      const source = await getUnifiedDepotSource({
+        role: user?.role,
+        email: user?.email,
+        location: user?.location,
+      });
+      const densityMap = new Map<string, DensityEntry>();
+      source.density.forEach((d) => densityMap.set(normalizeZoneCode(d.zone_code), d));
+      const merged: MergedZone[] = source.zones.filter((z) => z.is_active).map((z) => {
+        const zoneCode = normalizeZoneCode(z.zone_code);
+        const den = densityMap.get(zoneCode);
+        return {
+          id: z.id,
+          code: zoneCode,
+          name: z.name || `Zone ${zoneCode}`,
+          type: z.zone_type,
+          floor: z.floor,
+          areaSqm: z.area_sqm ?? 0,
+          maxCapacity: z.max_capacity_units,
+          currentOccupancy: z.current_occupancy,
+          utilizationPct: z.utilization_pct,
+          status: z.status,
+          polygon: z.polygon_coords ?? [],
+          densityPerSqm: den?.objects_per_sqm ?? (z.area_sqm ? z.current_occupancy / z.area_sqm : 0),
+        };
+      });
+      setZones(merged);
+      setThresholds({ warning: 80, critical: 95 });
+      setSelectedZone((prev) => {
+        if (!prev && zoneParam) {
+          const normalized = normalizeZoneCode(zoneParam);
+          return merged.find((z) => z.code === normalized) ?? null;
+        }
+        if (!prev) return null;
+        return merged.find((z) => z.id === prev.id) ?? null;
+      });
+      return;
+
+      {
       const [zonesResult, densityResult, thresholdResult] = await Promise.allSettled([
         getZones(),
         getDensityAnalytics(),
@@ -135,13 +176,13 @@ export default function HeatmapPage() {
       ]);
 
       if (zonesResult.status !== "fulfilled") {
-        throw zonesResult.reason;
+        throw (zonesResult as PromiseRejectedResult).reason;
       }
 
-      const zonesRes = zonesResult.value;
-      const densityRes = densityResult.status === "fulfilled" ? densityResult.value : [];
+      const zonesRes = (zonesResult as PromiseFulfilledResult<Awaited<ReturnType<typeof getZones>>>).value;
+      const densityRes = densityResult.status === "fulfilled" ? (densityResult as PromiseFulfilledResult<DensityEntry[]>).value : [];
       const nextThresholds = thresholdResult.status === "fulfilled"
-        ? getLiveThresholds(thresholdResult.value)
+        ? getLiveThresholds((thresholdResult as PromiseFulfilledResult<ThresholdResponse[]>).value)
         : { warning: 80, critical: 95 };
 
       const densityMap = new Map<string, DensityEntry>();
@@ -167,12 +208,13 @@ export default function HeatmapPage() {
         if (!prev) return null;
         return merged.find((z) => z.id === prev.id) ?? null;
       });
+      }
     } catch (error) {
       console.error("HeatmapPage: failed to load live inventory zones", error);
     } finally {
       setLoading(false);
     }
-  }, [zoneParam]);
+  }, [user?.email, user?.location, user?.role, zoneParam]);
 
   useEffect(() => {
     fetchData();

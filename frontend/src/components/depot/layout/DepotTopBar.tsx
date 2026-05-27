@@ -56,7 +56,17 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
 
   const initials = user?.full_name
     ? user.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-    : "OP";
+    : "--";
+  const normalizedRole = (user?.role ?? "").toLowerCase().replace(/\s+/g, "_");
+  const commandHomeHref = normalizedRole === "warehouse_manager" || normalizedRole.includes("warehouse")
+    ? "/depot/command/warehouse"
+    : normalizedRole === "regional_manager" || normalizedRole.includes("regional")
+      ? "/depot/command/regional"
+      : normalizedRole === "central_manager" || normalizedRole.includes("central")
+        ? "/depot/command/central"
+        : normalizedRole.includes("admin")
+          ? "/depot/command/admin"
+          : "/depot/command";
 
   const handleLogout = () => {
     logout();
@@ -83,7 +93,7 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
 
       {/* Logo */}
       <button
-        onClick={() => router.push("/depot/operations")}
+        onClick={() => router.push(commandHomeHref)}
         className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0"
         aria-label="Go to depot home"
       >
@@ -236,13 +246,13 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
                 </div>
                 <div>
                   <div className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>
-                    {user?.full_name || "Operator"}
+                    {user?.full_name || "Login required"}
                   </div>
                   <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-                    {user?.email || "operator@intelli.com"}
+                    {user?.email || "No active account"}
                   </div>
                   <div className="text-[9px] text-[#E5521A] font-semibold uppercase mt-0.5">
-                    {user?.role || "Admin"}
+                    {user?.role || "Unauthenticated"}
                   </div>
                 </div>
               </div>

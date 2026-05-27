@@ -3,7 +3,7 @@
  */
 import { create } from "zustand";
 import api from "@/services/api";
-import { getDemoCredential } from "@/lib/demoCredentials";
+import { DEMO_CREDENTIALS, getDemoCredential } from "@/lib/demoCredentials";
 
 interface User {
   id: string;
@@ -28,6 +28,17 @@ interface AuthState {
   logout: () => void;
   fetchMe: () => Promise<void>;
   clearError: () => void;
+}
+
+function enrichDemoRole<T extends User>(user: T): T {
+  const demoCredential = DEMO_CREDENTIALS.find((credential) => credential.email.toLowerCase() === user.email.toLowerCase());
+  if (!demoCredential) return user;
+  return {
+    ...user,
+    role: demoCredential.role,
+    location: demoCredential.location,
+    is_superuser: demoCredential.role === "admin" || user.is_superuser,
+  };
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -55,7 +66,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
 
       const { data: user } = await api.get("/api/v1/auth/me");
-      set({ user });
+      set({ user: enrichDemoRole(user) });
     } catch (err: any) {
       console.warn("Backend login failed, trying local demo credentials");
 
@@ -115,7 +126,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   fetchMe: async () => {
     try {
       const { data } = await api.get("/api/v1/auth/me");
-      set({ user: data, isAuthenticated: true });
+      set({ user: enrichDemoRole(data), isAuthenticated: true });
     } catch {
       set({ user: null, isAuthenticated: false });
       localStorage.removeItem("token");

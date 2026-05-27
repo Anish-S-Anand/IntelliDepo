@@ -90,12 +90,12 @@ export default function SettingsPage() {
                 <h2 className="text-[14px] font-bold text-[#E8EDF8] mb-4">Profile Information</h2>
                 <div className="flex items-center gap-4 mb-5">
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#C43A08] to-[#E5521A] flex items-center justify-center text-[22px] font-extrabold text-white">
-                    {user?.full_name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "OP"}
+                    {user?.full_name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "--"}
                   </div>
                   <div>
-                    <div className="text-[16px] font-bold text-[#E8EDF8]">{user?.full_name || "Operator"}</div>
-                    <div className="text-[12px] text-[#8A9BBF]">{user?.email || "operator@intelli.com"}</div>
-                    <div className="text-[10px] text-[#E5521A] font-semibold uppercase mt-1">{user?.role || "Admin"}</div>
+                    <div className="text-[16px] font-bold text-[#E8EDF8]">{user?.full_name || "Login required"}</div>
+                    <div className="text-[12px] text-[#8A9BBF]">{user?.email || "No active account"}</div>
+                    <div className="text-[10px] text-[#E5521A] font-semibold uppercase mt-1">{user?.role || "Unauthenticated"}</div>
                   </div>
                   <button className="ml-auto px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-semibold hover:border-[#E5521A] hover:text-[#E5521A] transition flex items-center gap-1.5">
                     <Camera className="w-3.5 h-3.5" />
@@ -104,10 +104,10 @@ export default function SettingsPage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
-                    { label: "Full Name", value: user?.full_name || "Operator" },
-                    { label: "Email Address", value: user?.email || "operator@intelli.com" },
-                    { label: "Role", value: user?.role || "Admin" },
-                    { label: "Location", value: user?.location || "Mumbai, India" },
+                    { label: "Full Name", value: user?.full_name || "Login required" },
+                    { label: "Email Address", value: user?.email || "No active account" },
+                    { label: "Role", value: user?.role || "Unauthenticated" },
+                    { label: "Location", value: user?.location || "No assigned location" },
                   ].map((field) => (
                     <div key={field.label}>
                       <label className="text-[10px] text-[#4E6090] font-semibold uppercase tracking-wider block mb-1.5">

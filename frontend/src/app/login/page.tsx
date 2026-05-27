@@ -13,8 +13,17 @@ import { useTheme } from "@/components/layout/ThemeProvider";
 function roleLabel(role: string) {
   if (role === "warehouse_manager") return "Warehouse Manager";
   if (role === "regional_manager") return "Regional Manager";
+  if (role === "central_manager") return "Central Manager";
   if (role === "admin") return "Admin";
   return role;
+}
+
+function commandRouteForRole(role?: string) {
+  if (role === "warehouse_manager") return "/depot/command/warehouse";
+  if (role === "regional_manager") return "/depot/command/regional";
+  if (role === "central_manager") return "/depot/command/central";
+  if (role === "admin") return "/depot/command/admin";
+  return "/depot/command";
 }
 
 export default function LoginPage() {
@@ -32,7 +41,8 @@ export default function LoginPage() {
     clearError();
     try {
       await login(email, password);
-      router.push("/depot/operations");
+      const demoCredential = DEMO_CREDENTIALS.find((credential) => credential.email.toLowerCase() === email.trim().toLowerCase());
+      router.push(commandRouteForRole(demoCredential?.role));
     } catch {
       // error is set in store
     }

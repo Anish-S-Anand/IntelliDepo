@@ -33,7 +33,17 @@ _DEMO_USER_MAP = {
     "wm.hyd@fidelis-demo.com": {"full_name": "Warehouse Manager - Hyderabad", "role": "warehouse_manager", "is_superuser": False},
     "wm.mum@fidelis-demo.com": {"full_name": "Warehouse Manager - Mumbai", "role": "warehouse_manager", "is_superuser": False},
     "regional@fidelis-demo.com": {"full_name": "Regional Manager - India", "role": "regional_manager", "is_superuser": False},
+    "central@fidelis-demo.com": {"full_name": "Central Manager - Command", "role": "central_manager", "is_superuser": False},
     "admin@fidelis-demo.com": {"full_name": "Platform Admin", "role": "admin", "is_superuser": True},
+}
+
+_DEMO_TOKEN_EMAIL_MAP = {
+    "wh-blr": "wm.blr@fidelis-demo.com",
+    "wh-hyd": "wm.hyd@fidelis-demo.com",
+    "wh-mum": "wm.mum@fidelis-demo.com",
+    "regional-india": "regional@fidelis-demo.com",
+    "central-command": "central@fidelis-demo.com",
+    "admin-platform": "admin@fidelis-demo.com",
 }
 
 
@@ -79,17 +89,9 @@ async def get_current_user(
 
     # ── Demo token bypass ──────────────────────────────────────────────────
     if token.startswith("demo-token-"):
-        # Format: demo-token-<uuid> where uuid maps to a demo credential id
-        # Try to find the user by matching the token suffix to known demo emails
-        demo_emails = list(_DEMO_USER_MAP.keys())
-        # Try each demo email to find a matching user
-        for email in demo_emails:
-            result = await db.execute(select(User).where(User.email == email))
-            user = result.scalar_one_or_none()
-            if user and user.is_active:
-                return user
-        # If no demo users exist yet, create the admin
-        user = await _get_or_create_demo_user(db, "admin@fidelis-demo.com")
+        token_id = token.removeprefix("demo-token-")
+        demo_email = _DEMO_TOKEN_EMAIL_MAP.get(token_id, "admin@fidelis-demo.com")
+        user = await _get_or_create_demo_user(db, demo_email)
         if user:
             return user
         raise credentials_exception

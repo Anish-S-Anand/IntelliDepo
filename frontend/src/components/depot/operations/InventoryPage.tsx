@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, X, Calendar, Package, Layers, Trash2 } from "lucide-react";
 import { createPortal } from "react-dom";
+import { useAuthStore } from "@/stores/authStore";
+import { getUnifiedDepotSource } from "@/services/depotUnifiedSource";
 
 // ---------------------------------------------------------------------------
 // Types matching backend responses
@@ -440,6 +442,7 @@ function BatchesTable({
 
 export default function InventoryPage() {
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
   const [zones, setZones] = useState<ZoneData[]>([]);
   const [clusters, setClusters] = useState<ClusterCard[]>([]);
   const [batchesFromAPI, setBatchesFromAPI] = useState<BatchData[]>([]);
@@ -455,6 +458,42 @@ export default function InventoryPage() {
 
   const fetchData = useCallback(async () => {
     try {
+      const source = await getUnifiedDepotSource({
+        role: user?.role,
+        email: user?.email,
+        location: user?.location,
+      });
+      const zData: ZoneData[] = source.zones.map((zone) => ({
+        id: zone.id,
+        zone_code: zone.zone_code,
+        name: zone.name,
+        zone_type: zone.zone_type,
+        max_capacity_units: zone.max_capacity_units,
+        current_occupancy: zone.current_occupancy,
+        utilization_pct: zone.utilization_pct,
+        status: zone.status,
+      }));
+      const bData: BatchData[] = newestBatchesFirst(source.batches.map((batch) => ({
+        ...batch,
+        expiry_date: batch.expiry_date ?? undefined,
+      })));
+      setZones(zData.sort((a, b) => a.zone_code.localeCompare(b.zone_code)));
+      setBatchesFromAPI(bData);
+      setClusters(bData
+        .filter((b) => b.status === "active")
+        .map((b) => ({
+          id: b.id,
+          zone: b.zone || "—",
+          product: b.product_name || b.sku_code,
+          capacity: batchCapacity(b),
+          occupied: batchOccupied(b),
+          batch: b.batch_code,
+          fifo: b.sequencing_rule === "FIFO",
+          lastActivity: b.created_at,
+          rack: b.rack || "—",
+        })));
+      return;
+
       const [zonesRes, batchesRes] = await Promise.allSettled([
         fetch("/backend/depot/vision/cluster/zones"),
         fetch("/backend/depot/vision/sequencing/batches?status=active"),
@@ -465,14 +504,14 @@ export default function InventoryPage() {
       // Note: heatmapRes was removed since no third fetch was provided
 
       // Zones
-      if (zonesRes.status === "fulfilled" && zonesRes.value.ok) {
-        const zData: ZoneData[] = await zonesRes.value.json();
+      if (zonesRes.status === "fulfilled" && (zonesRes as PromiseFulfilledResult<Response>).value.ok) {
+        const zData: ZoneData[] = await (zonesRes as PromiseFulfilledResult<Response>).value.json();
         setZones(zData.sort((a, b) => a.zone_code.localeCompare(b.zone_code)));
       }
 
       // Batches → cluster cards AND store raw batch data
-      if (batchesRes.status === "fulfilled" && batchesRes.value.ok) {
-        const bData: BatchData[] = newestBatchesFirst(await batchesRes.value.json());
+      if (batchesRes.status === "fulfilled" && (batchesRes as PromiseFulfilledResult<Response>).value.ok) {
+        const bData: BatchData[] = newestBatchesFirst(await (batchesRes as PromiseFulfilledResult<Response>).value.json());
         setBatchesFromAPI(bData); // Store raw API data
         const cards: ClusterCard[] = bData
           .filter((b) => b.status === "active")
@@ -494,7 +533,7 @@ export default function InventoryPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.email, user?.location, user?.role]);
 
   useEffect(() => {
     fetchData();

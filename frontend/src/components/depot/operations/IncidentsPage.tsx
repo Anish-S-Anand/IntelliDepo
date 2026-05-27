@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { Radar, Shield, AlertTriangle, MapPin, Camera, X } from "lucide-react";
+import { Radar, Shield, AlertTriangle, MapPin, Camera, X, Bell, CheckCircle2, ExternalLink, UserCheck } from "lucide-react";
+import { useAuthStore } from "@/stores/authStore";
 import { SEV_COL, STA_COL } from "@/lib/depot-data";
 import type { Incident } from "@/lib/depot-data";
 import { getVideoUrl } from "@/services/depotVision";
@@ -15,6 +16,14 @@ import {
   type IncidentResponse,
   type BreachResponse,
 } from "@/services/depotPerimeter";
+import {
+  getUnifiedIncidentDetail,
+  getUnifiedIncidents,
+  runIncidentBusinessAction,
+  type IncidentBusinessAction,
+  type UnifiedIncident,
+} from "@/services/depotOps";
+import { getUnifiedDepotSource } from "@/services/depotUnifiedSource";
 
 type FilterType = "all" | "acknowledged" | "resolved" | "CRITICAL" | "HIGH" | "perimeter";
 
@@ -35,6 +44,14 @@ type AcknowledgmentConfirmation = {
   isOpen: boolean;
   incidentId: string | null;
 };
+
+const BUSINESS_ACTIONS: { action: IncidentBusinessAction; label: string; notes: string; assigned_to?: string }[] = [
+  { action: "dispatch_security", label: "Dispatch Security", notes: "Security team dispatched to incident location.", assigned_to: "Security Team" },
+  { action: "notify_supervisor", label: "Notify Supervisor", notes: "Shift supervisor notified for incident follow-up." },
+  { action: "escalate_to_regional_manager", label: "Escalate", notes: "Incident escalated to regional manager.", assigned_to: "Regional Manager" },
+  { action: "mark_false_alarm", label: "False Alarm", notes: "Marked as false alarm after verification." },
+  { action: "resolve_with_outcome", label: "Resolve", notes: "Incident resolved with documented outcome." },
+];
 
 const EMPTY_VALUE = "-";
 const ALLOWED_EVIDENCE_TYPES = new Set(["unauthorized_entry", "loitering"]);
@@ -123,8 +140,40 @@ function mapBackendIncident(inc: IncidentResponse): Incident {
   };
 }
 
+function formatUnifiedTime(value?: string | null): string {
+  if (!value) return EMPTY_VALUE;
+  return new Date(value).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function evidenceHref(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  if (typeof window === "undefined") return url;
+  return `${window.location.protocol}//${window.location.hostname}:8000${url}`;
+}
+
+function unifiedSeverityColor(severity: UnifiedIncident["severity"]): string {
+  if (severity === "critical") return "#F04A4A";
+  if (severity === "warning") return "#F5A623";
+  return "#5B9BF5";
+}
+
+function notificationColor(status: string): string {
+  const normalized = status.toLowerCase();
+  if (["delivered", "sent", "read"].includes(normalized)) return "#22D3A1";
+  if (["failed", "cancelled"].includes(normalized)) return "#F04A4A";
+  if (["retrying", "queued", "sending", "pending"].includes(normalized)) return "#F5A623";
+  return "#8A9BBF";
+}
+
 export default function IncidentsPage() {
   const searchParams = useSearchParams();
+  const user = useAuthStore((state) => state.user);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [rawIncidents, setRawIncidents] = useState<IncidentResponse[]>([]);
   const [breaches, setBreaches] = useState<BreachResponse[]>([]);
@@ -138,13 +187,24 @@ export default function IncidentsPage() {
   const [videoLoadError, setVideoLoadError] = useState<string | null>(null);
   const [analysisReport, setAnalysisReport] = useState<AnalysisReport | null>(null);
   const [ackConfirmation, setAckConfirmation] = useState<AcknowledgmentConfirmation>({ isOpen: false, incidentId: null });
+  const [unifiedIncidents, setUnifiedIncidents] = useState<UnifiedIncident[]>([]);
+  const [selectedUnifiedIncident, setSelectedUnifiedIncident] = useState<UnifiedIncident | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [businessActionLoading, setBusinessActionLoading] = useState<IncidentBusinessAction | null>(null);
+  const [businessActionNotes, setBusinessActionNotes] = useState("");
+  const [notifyChannel, setNotifyChannel] = useState("in_app");
+  const [notifyRecipient, setNotifyRecipient] = useState("Shift Supervisor");
   const selectedIncidentId = searchParams.get("incident");
 
   // Fetch real incidents from backend
   const fetchIncidents = useCallback(async () => {
     try {
-      const backendIncidents = await getIncidents();
-      const uniqueIncidents = dedupeIncidents(backendIncidents.filter(hasAllowedEvidence));
+      const source = await getUnifiedDepotSource({
+        role: user?.role,
+        email: user?.email,
+        location: user?.location,
+      });
+      const uniqueIncidents = dedupeIncidents(source.incidents);
       setRawIncidents(uniqueIncidents);
       setIncidents(uniqueIncidents.map(mapBackendIncident));
     } catch {
@@ -163,16 +223,28 @@ export default function IncidentsPage() {
     } catch {
       // Keep the current real breach data instead of substituting demo records.
     }
+  }, [user?.email, user?.location, user?.role]);
+
+  const fetchUnifiedIncidents = useCallback(async () => {
+    try {
+      const data = await getUnifiedIncidents({ limit: 50 });
+      setUnifiedIncidents(data);
+    } catch {
+      // Unified API is additive during migration; keep legacy incident data visible.
+    }
   }, []);
+
   useEffect(() => {
     void fetchIncidents();
     void fetchBreaches();
+    void fetchUnifiedIncidents();
     const interval = setInterval(() => {
       void fetchIncidents();
       void fetchBreaches();
+      void fetchUnifiedIncidents();
     }, 20000);
     return () => clearInterval(interval);
-  }, [fetchIncidents, fetchBreaches]);
+  }, [fetchIncidents, fetchBreaches, fetchUnifiedIncidents]);
 
   const filtered = useMemo(() => incidents.filter((i) => {
     if (filter === "all") return true;
@@ -192,6 +264,10 @@ export default function IncidentsPage() {
   const incidentById = useMemo(
     () => new Map(rawIncidents.map((incident) => [incident.id, incident])),
     [rawIncidents],
+  );
+  const unifiedIncidentById = useMemo(
+    () => new Map(unifiedIncidents.map((incident) => [incident.id, incident])),
+    [unifiedIncidents],
   );
 
   useEffect(() => {
@@ -307,8 +383,52 @@ export default function IncidentsPage() {
     });
   };
 
+  const openUnifiedDetail = async (incidentId: string) => {
+    setDetailLoading(true);
+    setAckError(null);
+    try {
+      const detail = await getUnifiedIncidentDetail(incidentId);
+      setSelectedUnifiedIncident(detail);
+      setBusinessActionNotes("");
+      setNotifyChannel("in_app");
+      setNotifyRecipient(detail.assigned_to || "Shift Supervisor");
+    } catch {
+      const cached = unifiedIncidentById.get(incidentId);
+      if (cached) setSelectedUnifiedIncident(cached);
+      else setAckError("Unable to load the unified incident detail.");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const runBusinessAction = async (
+    action: IncidentBusinessAction,
+    fallbackNotes: string,
+    assignedTo?: string,
+  ) => {
+    if (!selectedUnifiedIncident || businessActionLoading) return;
+    setBusinessActionLoading(action);
+    setAckError(null);
+    try {
+      const result = await runIncidentBusinessAction(selectedUnifiedIncident.id, {
+        action,
+        notes: businessActionNotes.trim() || fallbackNotes,
+        assigned_to: assignedTo,
+        channel: action === "notify_supervisor" ? notifyChannel : undefined,
+        recipient: action === "notify_supervisor" ? notifyRecipient : undefined,
+      });
+      setSelectedUnifiedIncident(result.incident);
+      setBusinessActionNotes("");
+      await Promise.all([fetchUnifiedIncidents(), fetchIncidents(), fetchBreaches()]);
+    } catch {
+      setAckError("Unable to apply the business action. The displayed data was not changed.");
+    } finally {
+      setBusinessActionLoading(null);
+    }
+  };
+
   // Generate dummy data based on incident ID
-  const generateDummyData = (incidentId: string, type: string) => {
+  const generateDummyData = (incidentId: string) => {
     // Simple hash function for consistent dummy data
     let hash = 0;
     for (let i = 0; i < incidentId.length; i++) {
@@ -472,6 +592,14 @@ export default function IncidentsPage() {
             <div className="text-[10px] text-[#4E6090]">📍 {i.loc} · 👤 {i.assignee}</div>
             <div className="flex flex-wrap gap-2 mt-2.5">
               <button
+                onClick={() => openUnifiedDetail(i.id)}
+                disabled={detailLoading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#5B9BF5]/35 text-[#5B9BF5] text-[11px] font-bold hover:bg-[#5B9BF5]/10 transition disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                Business Detail
+              </button>
+              <button
                 onClick={() => handleIncidentAnalysisClick(i)}
                 disabled={i.cam === EMPTY_VALUE}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:text-[#E5521A] hover:border-[#E5521A]/40 transition disabled:cursor-not-allowed disabled:opacity-40"
@@ -586,6 +714,222 @@ export default function IncidentsPage() {
         )}
       </div>
 
+      {/* Unified Business Incident Detail */}
+      {selectedUnifiedIncident && (
+        <div className="fixed inset-0 bg-black/75 z-[10000] flex items-center justify-center p-3 sm:p-4" onClick={() => setSelectedUnifiedIncident(null)}>
+          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl w-full max-w-5xl max-h-[92dvh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 z-10 bg-[#14203A]/95 border-b border-[#1E2F50] px-4 sm:px-5 py-4 flex items-start justify-between gap-3">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-[17px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+                    {selectedUnifiedIncident.title || selectedUnifiedIncident.incident_type}
+                  </h3>
+                  <span
+                    className="rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase"
+                    style={{
+                      background: `${unifiedSeverityColor(selectedUnifiedIncident.severity)}22`,
+                      borderColor: `${unifiedSeverityColor(selectedUnifiedIncident.severity)}55`,
+                      color: unifiedSeverityColor(selectedUnifiedIncident.severity),
+                    }}
+                  >
+                    {selectedUnifiedIncident.severity}
+                  </span>
+                  <span className="rounded-full border border-[#5B9BF5]/35 bg-[#5B9BF5]/10 px-2.5 py-1 text-[10px] font-bold uppercase text-[#5B9BF5]">
+                    {selectedUnifiedIncident.status.replaceAll("_", " ")}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-[#8A9BBF]">
+                  {selectedUnifiedIncident.priority} · {formatUnifiedTime(selectedUnifiedIncident.timestamp)} · {selectedUnifiedIncident.location_label}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedUnifiedIncident(null)}
+                className="rounded-lg p-1 text-[#8A9BBF] hover:text-[#E8EDF8] hover:bg-[#1E2F50] transition"
+                aria-label="Close incident detail"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[1.05fr_0.95fr]">
+              <div className="space-y-4">
+                <section className="rounded-xl border border-[#1E2F50] bg-[#0F1A30] p-4">
+                  <div className="mb-3 flex items-center gap-2 text-[13px] font-bold text-[#E8EDF8]">
+                    <UserCheck className="h-4 w-4 text-[#5B9BF5]" />
+                    Business Context
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {[
+                      ["Incident Type", selectedUnifiedIncident.incident_type],
+                      ["Warehouse", selectedUnifiedIncident.warehouse_id || "Primary Warehouse"],
+                      ["Cluster", selectedUnifiedIncident.cluster_id || EMPTY_VALUE],
+                      ["Gate", selectedUnifiedIncident.gate_id || EMPTY_VALUE],
+                      ["Camera", selectedUnifiedIncident.camera_id || EMPTY_VALUE],
+                      ["Assigned To", selectedUnifiedIncident.assigned_to || "Unassigned"],
+                      ["Detected Entity", selectedUnifiedIncident.detected_entity],
+                      ["Vehicle Plate", selectedUnifiedIncident.vehicle_plate || EMPTY_VALUE],
+                      ["Reason", selectedUnifiedIncident.reason || EMPTY_VALUE],
+                    ].map(([label, value]) => (
+                      <div key={label} className="min-w-0">
+                        <div className="text-[10px] font-bold uppercase text-[#4E6090]">{label}</div>
+                        <div className="mt-1 break-words text-[12px] font-semibold text-[#E8EDF8]">{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedUnifiedIncident.description && (
+                    <p className="mt-4 text-[12px] leading-relaxed text-[#8A9BBF]">{selectedUnifiedIncident.description}</p>
+                  )}
+                </section>
+
+                <section className="rounded-xl border border-[#1E2F50] bg-[#0F1A30] p-4">
+                  <div className="mb-3 flex items-center gap-2 text-[13px] font-bold text-[#E8EDF8]">
+                    <Camera className="h-4 w-4 text-[#22D3A1]" />
+                    Evidence
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {evidenceHref(selectedUnifiedIncident.evidence_snapshot_url) && (
+                      <a
+                        href={evidenceHref(selectedUnifiedIncident.evidence_snapshot_url) || undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#22D3A1]/35 px-3 py-2 text-[11px] font-bold text-[#22D3A1] hover:bg-[#22D3A1]/10"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        CCTV Snapshot
+                      </a>
+                    )}
+                    {evidenceHref(selectedUnifiedIncident.evidence_video_url) && (
+                      <a
+                        href={evidenceHref(selectedUnifiedIncident.evidence_video_url) || undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#5B9BF5]/35 px-3 py-2 text-[11px] font-bold text-[#5B9BF5] hover:bg-[#5B9BF5]/10"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        CCTV Video
+                      </a>
+                    )}
+                    {!selectedUnifiedIncident.evidence_snapshot_url && !selectedUnifiedIncident.evidence_video_url && (
+                      <span className="text-[12px] text-[#8A9BBF]">No CCTV evidence link is attached yet.</span>
+                    )}
+                  </div>
+                </section>
+
+                <section className="rounded-xl border border-[#1E2F50] bg-[#0F1A30] p-4">
+                  <div className="mb-3 flex items-center gap-2 text-[13px] font-bold text-[#E8EDF8]">
+                    <CheckCircle2 className="h-4 w-4 text-[#F5A623]" />
+                    Business Actions
+                  </div>
+                  <textarea
+                    value={businessActionNotes}
+                    onChange={(e) => setBusinessActionNotes(e.target.value)}
+                    placeholder="Optional action notes..."
+                    className="mb-3 h-20 w-full resize-none rounded-lg border border-[#1E2F50] bg-[#14203A] p-3 text-[12px] text-[#E8EDF8] placeholder-[#4E6090] outline-none focus:border-[#5B9BF5]"
+                  />
+                  <div className="mb-3 grid gap-2 sm:grid-cols-2">
+                    <select
+                      value={notifyChannel}
+                      onChange={(e) => setNotifyChannel(e.target.value)}
+                      className="rounded-lg border border-[#1E2F50] bg-[#14203A] px-3 py-2 text-[12px] text-[#E8EDF8] outline-none focus:border-[#5B9BF5]"
+                    >
+                      <option value="in_app">App notification</option>
+                      <option value="email">Email</option>
+                    </select>
+                    <input
+                      value={notifyRecipient}
+                      onChange={(e) => setNotifyRecipient(e.target.value)}
+                      placeholder="Notification recipient"
+                      className="rounded-lg border border-[#1E2F50] bg-[#14203A] px-3 py-2 text-[12px] text-[#E8EDF8] placeholder-[#4E6090] outline-none focus:border-[#5B9BF5]"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {BUSINESS_ACTIONS.map((item) => (
+                      <button
+                        key={item.action}
+                        onClick={() => runBusinessAction(item.action, item.notes, item.assigned_to)}
+                        disabled={businessActionLoading !== null}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#1E2F50] px-3 py-2 text-[11px] font-bold text-[#E8EDF8] transition hover:border-[#E5521A]/50 hover:text-[#FFB088] disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {businessActionLoading === item.action ? "Working..." : item.label}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              </div>
+
+              <div className="space-y-4">
+                <section className="rounded-xl border border-[#1E2F50] bg-[#0F1A30] p-4">
+                  <div className="mb-3 flex items-center gap-2 text-[13px] font-bold text-[#E8EDF8]">
+                    <Bell className="h-4 w-4 text-[#5B9BF5]" />
+                    Notification Delivery
+                  </div>
+                  <div className="space-y-2">
+                    {selectedUnifiedIncident.notification_summary.length === 0 ? (
+                      <div className="text-[12px] text-[#8A9BBF]">No delivery records yet.</div>
+                    ) : (
+                      selectedUnifiedIncident.notification_summary.map((notification) => (
+                        <div key={notification.id} className="rounded-lg border border-[#1E2F50] bg-[#14203A] p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="text-[12px] font-bold capitalize text-[#E8EDF8]">{notification.channel.replaceAll("_", " ")}</div>
+                            <span
+                              className="rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase"
+                              style={{
+                                color: notificationColor(notification.status),
+                                borderColor: `${notificationColor(notification.status)}55`,
+                                background: `${notificationColor(notification.status)}18`,
+                              }}
+                            >
+                              {notification.status}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-[11px] text-[#8A9BBF]">{notification.recipient || "Recipient not recorded"}</div>
+                          <div className="mt-1 text-[10px] text-[#4E6090]">
+                            Sent {formatUnifiedTime(notification.sent_at)}
+                            {notification.provider_message_id ? ` · ${notification.provider_message_id}` : ""}
+                          </div>
+                          {notification.error_message && (
+                            <div className="mt-1 text-[10px] font-bold text-[#F04A4A]">{notification.error_message}</div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </section>
+
+                <section className="rounded-xl border border-[#1E2F50] bg-[#0F1A30] p-4">
+                  <div className="mb-3 flex items-center gap-2 text-[13px] font-bold text-[#E8EDF8]">
+                    <Radar className="h-4 w-4 text-[#22D3A1]" />
+                    Incident Timeline
+                  </div>
+                  <div className="space-y-3">
+                    {selectedUnifiedIncident.timeline.length === 0 ? (
+                      <div className="text-[12px] text-[#8A9BBF]">No timeline entries yet.</div>
+                    ) : (
+                      selectedUnifiedIncident.timeline.map((item) => (
+                        <div key={item.id} className="border-l border-[#1E2F50] pl-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[12px] font-bold capitalize text-[#E8EDF8]">{item.action.replaceAll("_", " ")}</span>
+                            <span className="text-[10px] text-[#4E6090]">{formatUnifiedTime(item.occurred_at)}</span>
+                          </div>
+                          <div className="mt-1 text-[11px] text-[#8A9BBF]">
+                            {item.details || `${item.previous_state || "new"} to ${item.new_state || selectedUnifiedIncident.status}`}
+                          </div>
+                          {(item.actor || item.actor_role) && (
+                            <div className="mt-1 text-[10px] text-[#4E6090]">
+                              {item.actor || "System"}{item.actor_role ? ` · ${item.actor_role}` : ""}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Video Analysis Modal */}
       {selectedVideo && (
         <div className="fixed inset-0 bg-black/80 z-[10000] flex items-center justify-center p-3 sm:p-4" onClick={() => setSelectedVideo(null)}>
@@ -662,7 +1006,7 @@ export default function IncidentsPage() {
 
       {/* Analysis Report Modal */}
       {analysisReport && (() => {
-        const dummyData = generateDummyData(analysisReport.incidentId, analysisReport.breachType);
+        const dummyData = generateDummyData(analysisReport.incidentId);
         const isUnauthorizedEntry = analysisReport.breachType === 'unauthorized_entry';
         
         return (

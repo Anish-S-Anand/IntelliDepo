@@ -2,17 +2,29 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/stores/authStore";
 
 /**
- * /depot root redirects directly to the Operations Hub.
- * This avoids the legacy HTML mount and goes straight to the main dashboard.
+ * /depot root redirects to the role-specific Command Center.
  */
 export default function DepotPage() {
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
-    router.replace("/depot/operations");
-  }, [router]);
+    const normalizedRole = (user?.role ?? "").toLowerCase().replace(/\s+/g, "_");
+    const commandRoute = normalizedRole === "warehouse_manager" || normalizedRole.includes("warehouse")
+      ? "/depot/command/warehouse"
+      : normalizedRole === "regional_manager" || normalizedRole.includes("regional")
+        ? "/depot/command/regional"
+        : normalizedRole === "central_manager" || normalizedRole.includes("central")
+          ? "/depot/command/central"
+          : normalizedRole.includes("admin")
+            ? "/depot/command/admin"
+            : "/depot/command";
+
+    router.replace(commandRoute);
+  }, [router, user?.role]);
 
   return (
     <div className="flex h-screen items-center justify-center bg-[#080d18]">

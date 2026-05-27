@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getDepotCommandSnapshot, type CameraRecord } from "@/services/depotCommand";
-import { getIncidents, type IncidentResponse } from "@/services/depotPerimeter";
+import { useAuthStore } from "@/stores/authStore";
+import { getUnifiedDepotSource, type UnifiedDepotSource } from "@/services/depotUnifiedSource";
+import type { IncidentResponse } from "@/services/depotPerimeter";
 
 interface LiveZone {
   zone_code: string;
@@ -48,11 +49,6 @@ const WEEKLY_TOTALS = WEEKLY.reduce(
   (a, d) => ({ enter: a.enter + d.enter, exit: a.exit + d.exit }),
   { enter: 0, exit: 0 }
 );
-
-function zoneDisplayName(zone: ZoneResponse) {
-  const code = zone.zone_code?.trim();
-  return code ? `Zone ${code}` : "Zone";
-}
 
 // ─── 6 Cameras — replaced by live backend data ──────────────────────────────
 // (CAMERAS constant removed — now fetched from API)
@@ -300,15 +296,14 @@ function SectionHeading({ children, sub }: { children: React.ReactNode; sub?: st
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function ExecutiveDashboard() {
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
   const [, setTick] = useState(0);
-  const [cameras, setCameras] = useState<CameraRecord[]>([]);
-  const [liveZones, setLiveZones] = useState<LiveZone[]>([]);
-  const [backendIncidents, setBackendIncidents] = useState<IncidentResponse[]>([]);
+  const [depotSource, setDepotSource] = useState<UnifiedDepotSource | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
-  }, []);
+  }, [user?.email, user?.location, user?.role]);
 
   useEffect(() => {
     let cancelled = false;
@@ -316,17 +311,14 @@ export default function ExecutiveDashboard() {
     const loadDashboardData = () => {
       if (cancelled) return;
       
-      getDepotCommandSnapshot().then((snap) => {
-        if (!cancelled && snap.cameras.data.length > 0) setCameras(snap.cameras.data);
+      getUnifiedDepotSource({
+        role: user?.role,
+        email: user?.email,
+        location: user?.location,
+      }).then((source) => {
+        if (!cancelled) setDepotSource(source);
       }).catch(() => {});
       // Same endpoint as Inventory page — live utilization from active batches
-      fetch("/backend/depot/vision/cluster/zones")
-        .then((r) => r.ok ? r.json() : Promise.reject())
-        .then((data: LiveZone[]) => { if (data.length > 0) setLiveZones(data); })
-        .catch(() => {});
-      getIncidents()
-        .then((items) => { if (!cancelled) setBackendIncidents(dedupeIncidentResponses(items)); })
-        .catch(() => {});
     };
 
     loadDashboardData();
@@ -341,8 +333,8 @@ export default function ExecutiveDashboard() {
   }, []);
 
   // Map backend cameras to the shape used in the UI
-  const CAMERAS = cameras.length > 0
-    ? cameras.map((c) => ({
+  const CAMERAS = depotSource
+    ? depotSource.commandSnapshot.cameras.map((c) => ({
         id: c.id,
         location: c.name,
         status: c.status === "active" ? "online" as const : "offline" as const,
@@ -351,7 +343,7 @@ export default function ExecutiveDashboard() {
     : [] as { id: string; location: string; status: "online" | "offline"; zone: string }[];
 
   // Single source of truth: same zones endpoint as Inventory page
-  const ZONES = liveZones.map((z) => ({
+  const ZONES = (depotSource?.zones ?? []).map((z) => ({
     id: z.zone_code,
     name: z.name,
     pct: Math.round(z.utilization_pct),
@@ -359,7 +351,7 @@ export default function ExecutiveDashboard() {
     total: z.max_capacity_units,
   }));
 
-  const activeIncidents: Incident[] = backendIncidents
+  const activeIncidents: Incident[] = (depotSource?.incidents ?? [])
     .filter((incident) => incident.status !== "resolved")
     .map((incident) => ({
       id: incident.id,
@@ -383,7 +375,12 @@ export default function ExecutiveDashboard() {
   const atRiskZones   = ZONES.filter((z) => z.pct >= 85).length;
   const avgOccupancy  = ZONES.length > 0 ? Math.round(ZONES.reduce((a, z) => a + z.pct, 0) / ZONES.length) : 0;
 
-  const MAX_BAR = Math.max(...WEEKLY.flatMap((d) => [d.enter, d.exit]));
+  const weekly = depotSource?.weeklyThroughput ?? WEEKLY;
+  const weeklyTotals = weekly.reduce(
+    (a, d) => ({ enter: a.enter + d.enter, exit: a.exit + d.exit }),
+    { enter: 0, exit: 0 },
+  );
+  const MAX_BAR = Math.max(...weekly.flatMap((d) => [d.enter, d.exit]));
   const CHART_H = 220;
 
   const cardStyle: React.CSSProperties = {
@@ -437,12 +434,12 @@ export default function ExecutiveDashboard() {
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm" style={{ background: "#E5521A" }} />
               <span className="text-[10px] font-bold" style={{ color: "var(--text-muted)" }}>Bags In</span>
-              <span className="text-[10px] font-black" style={{ color: "#E5521A" }}>{fmtK(WEEKLY_TOTALS.enter)}</span>
+              <span className="text-[10px] font-black" style={{ color: "#E5521A" }}>{fmtK(weeklyTotals.enter)}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm" style={{ background: "rgba(91,155,245,0.85)" }} />
               <span className="text-[10px] font-bold" style={{ color: "var(--text-muted)" }}>Bags Out</span>
-              <span className="text-[10px] font-black" style={{ color: "var(--color-info)" }}>{fmtK(WEEKLY_TOTALS.exit)}</span>
+              <span className="text-[10px] font-black" style={{ color: "var(--color-info)" }}>{fmtK(weeklyTotals.exit)}</span>
             </div>
           </div>
         </div>
@@ -450,7 +447,7 @@ export default function ExecutiveDashboard() {
         {/* Grouped bars */}
         <div className="w-full overflow-x-auto">
           <div className="flex items-end gap-3 sm:gap-5" style={{ minWidth: 300, minHeight: CHART_H + 52 }}>
-            {WEEKLY.map((day, i) => {
+            {weekly.map((day, i) => {
               const eH   = Math.max(8, Math.round((day.enter / MAX_BAR) * CHART_H));
               const xH   = Math.max(8, Math.round((day.exit  / MAX_BAR) * CHART_H));
               const peak = i === 4;
@@ -504,7 +501,7 @@ export default function ExecutiveDashboard() {
             <div>
               <div className="text-[9px] font-black uppercase" style={{ color: "var(--text-faint)" }}>Total Bags In</div>
               <div className="text-[14px] sm:text-[15px] font-extrabold" style={{ color: "#E5521A" }}>
-                {WEEKLY_TOTALS.enter} this week
+                {weeklyTotals.enter} this week
               </div>
             </div>
           </div>
@@ -514,7 +511,7 @@ export default function ExecutiveDashboard() {
             <div>
               <div className="text-[9px] font-black uppercase" style={{ color: "var(--text-faint)" }}>Total Bags Out</div>
               <div className="text-[14px] sm:text-[15px] font-extrabold" style={{ color: "var(--color-info)" }}>
-                {WEEKLY_TOTALS.exit} this week
+                {weeklyTotals.exit} this week
               </div>
             </div>
           </div>

@@ -1,4 +1,4 @@
-export type DemoRole = "warehouse_manager" | "regional_manager" | "admin";
+export type DemoRole = "warehouse_manager" | "regional_manager" | "central_manager" | "admin";
 
 export interface DemoCredential {
   id: string;
@@ -38,9 +38,17 @@ export const DEMO_CREDENTIALS: DemoCredential[] = [
     id: "regional-india",
     email: "regional@fidelis-demo.com",
     password: "MacroPulse2025!",
-    fullName: "Regional Manager - India",
+    fullName: "Regional Manager - South",
     role: "regional_manager",
-    location: "India",
+    location: "South",
+  },
+  {
+    id: "central-command",
+    email: "central@fidelis-demo.com",
+    password: "MacroPulse2025!",
+    fullName: "Central Manager - Command",
+    role: "central_manager",
+    location: "National",
   },
   {
     id: "admin-platform",

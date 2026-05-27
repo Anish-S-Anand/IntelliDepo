@@ -982,6 +982,8 @@ export default function GateConsolePage() {
 
   // Initial load
   useEffect(() => {
+    // Load footage map independently so access log footage works even before vehicles load
+    getVehicleFootageMap().then((map) => { if (Object.keys(map).length > 0) setFootageMap(map); }).catch(() => {});
     Promise.allSettled([loadGates(), loadLogs(), loadVehicles(), loadVisitors()]).then(() =>
       setLoading(false),
     );
@@ -1828,22 +1830,28 @@ export default function GateConsolePage() {
             </div>
             <div className="bg-[#0F1A30] rounded-lg overflow-hidden">
               {footageMissing ? (
-                <div className="flex min-h-[280px] flex-col items-center justify-center gap-2 px-6 text-center">
-                  <Camera className="h-8 w-8 text-[#4E6090]" />
-                  <p className="text-[13px] font-semibold text-[#E8EDF8]">Footage unavailable</p>
-                  <p className="max-w-md text-[11px] text-[#8A9BBF]">
-                    No saved LPR image was found for {selectedPlateNumber}. Capture a new scan or add the footage file in backend/tmp.
-                  </p>
+                <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 px-6 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-[#14203A] border border-[#1E2F50] flex items-center justify-center">
+                    <Camera className="h-7 w-7 text-[#4E6090]" />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-bold text-[#E8EDF8] mb-1">No footage captured</p>
+                    <p className="text-[11px] text-[#4E6090]">
+                      Plate: <span className="text-[#5B9BF5] font-mono font-bold">{selectedPlateNumber}</span>
+                    </p>
+                    <p className="text-[10px] text-[#4E6090] mt-1">LPR image not available for this scan</p>
+                  </div>
                 </div>
               ) : (
                 <img
-                  src={`${getBackendBaseUrl()}/tmp/${selectedPlateNumber}.png`}
-                  alt={`LPR Analysis for ${selectedPlateNumber}`}
+                  src={getFootageUrl(selectedPlateNumber, footageMap) ?? `${getBackendBaseUrl()}/tmp/${selectedPlateNumber}.png`}
+                  alt={`LPR footage for ${selectedPlateNumber}`}
                   className="w-full h-auto"
                   style={{ maxHeight: '75vh', objectFit: 'contain' }}
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    if (target.src.endsWith(".png")) {
+                    // Try .jpg fallback if not already tried
+                    if (!target.src.includes("vehicle_registry") && target.src.endsWith(".png")) {
                       target.src = `${getBackendBaseUrl()}/tmp/${selectedPlateNumber}.jpg`;
                       return;
                     }

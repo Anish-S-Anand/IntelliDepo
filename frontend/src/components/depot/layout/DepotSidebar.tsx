@@ -12,25 +12,22 @@ import {
   Eye,
   AlertTriangle,
   Radio,
-  Hash,
-  Map,
   Shield,
+  Map,
+  ScanLine,
 } from "lucide-react";
 import { getAllActiveAlerts } from "@/services/depotVision";
 import { getPerimeterAlertCount } from "@/services/depotPerimeter";
 
 const NAV_ITEMS = [
-  { label: "OPS", fullLabel: "Depot Mobile", href: "/depot/operations", icon: LayoutDashboard, iconColor: "#5B9BF5" },
   { label: "CMD", fullLabel: "Command Center", href: "/depot/command", icon: Radio, iconColor: "#22D3A1" },
-  { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package, iconColor: "#F5A623" },
+  { label: "OPS", fullLabel: "Depot Mobile", href: "/depot/operations", icon: LayoutDashboard, iconColor: "#5B9BF5" },
   { label: "CAM", fullLabel: "Live Cameras", href: "/depot/vision", icon: Eye, iconColor: "#A78BFA" },
-  { label: "CNT", fullLabel: "Counting", href: "/depot/counting", icon: Hash, iconColor: "#34D399" },
-  { label: "MAP", fullLabel: "Heatmap", href: "/depot/heatmap", icon: Map, iconColor: "#FB923C" },
-  // Hidden temporarily - can be restored later
-  // { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
-  // { label: "SEQ", fullLabel: "Sequencing", href: "/depot/sequencing", icon: Layers },
   { label: "GTE", fullLabel: "Gate Entry", href: "/depot/gate", icon: Shield, iconColor: "#60A5FA" },
+  { label: "CNT", fullLabel: "Counting", href: "/depot/counting", icon: ScanLine, iconColor: "#34D399" },
   { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle, iconColor: "#F87171" },
+  { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package, iconColor: "#F5A623" },
+  { label: "MAP", fullLabel: "Heatmap", href: "/depot/heatmap", icon: Map, iconColor: "#FB923C" },
 ];
 
 export default function DepotSidebar({ open, onClose }: { open: boolean; onClose?: () => void }) {
@@ -40,33 +37,20 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
   const normalizedRole = (user?.role ?? "").toLowerCase().replace(/\s+/g, "_");
   const isWarehouseManager = normalizedRole === "warehouse_manager" || normalizedRole.includes("warehouse");
   const isRegionalManager = normalizedRole === "regional_manager" || normalizedRole.includes("regional");
-
-  const warehouseManagerNavItems = [
-    { label: "OPS", fullLabel: "Depot Mobile", href: "/depot/operations", icon: LayoutDashboard, iconColor: "#5B9BF5" },
-    { label: "CAM", fullLabel: "Live Cameras", href: "/depot/vision", icon: Eye, iconColor: "#A78BFA" },
-    { label: "GTE", fullLabel: "Gate Entry", href: "/depot/gate", icon: Shield, iconColor: "#60A5FA" },
-    { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle, iconColor: "#F87171" },
-    { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package, iconColor: "#F5A623" },
-    // Hidden temporarily - can be restored later
-    // { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
-  ];
-
-  const regionalManagerNavItems = [
-    { label: "OPS", fullLabel: "Depot Mobile", href: "/depot/operations", icon: LayoutDashboard, iconColor: "#5B9BF5" },
-    { label: "CAM", fullLabel: "Live Cameras", href: "/depot/vision", icon: Eye, iconColor: "#A78BFA" },
-    { label: "CMD", fullLabel: "Command Center", href: "/depot/command", icon: Radio, iconColor: "#22D3A1" },
-    { label: "GTE", fullLabel: "Gate Entry", href: "/depot/gate", icon: Shield, iconColor: "#60A5FA" },
-    { label: "INC", fullLabel: "Incidents", href: "/depot/incidents", icon: AlertTriangle, iconColor: "#F87171" },
-    { label: "INV", fullLabel: "Inventory", href: "/depot/inventory", icon: Package, iconColor: "#F5A623" },
-    // Hidden temporarily - can be restored later
-    // { label: "ZNE", fullLabel: "Zones", href: "/depot/zones", icon: Sliders },
-  ];
-
-  const visibleNavItems = isWarehouseManager
-    ? warehouseManagerNavItems
+  const isCentralManager = normalizedRole === "central_manager" || normalizedRole.includes("central");
+  const commandHref = isWarehouseManager
+    ? "/depot/command/warehouse"
     : isRegionalManager
-      ? regionalManagerNavItems
-      : NAV_ITEMS;
+      ? "/depot/command/regional"
+      : isCentralManager
+        ? "/depot/command/central"
+        : normalizedRole.includes("admin")
+          ? "/depot/command/admin"
+          : "/depot/command";
+
+  const visibleNavItems = NAV_ITEMS.map((item) => (
+    item.label === "CMD" ? { ...item, href: commandHref } : item
+  ));
 
   useEffect(() => {
     let cancelled = false;

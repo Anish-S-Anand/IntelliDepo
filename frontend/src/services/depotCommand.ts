@@ -149,6 +149,8 @@ export interface CommandGateSummary {
   gate_type: string;
   status: string;
   total_entries_today: number;
+  warehouse_id?: string | null;
+  region_id?: string | null;
   last_activity_at: string | null;
 }
 
@@ -158,6 +160,8 @@ export interface CommandCameraSummary {
   zone: string | null;
   status: string;
   protocol: string;
+  warehouse_id?: string | null;
+  region_id?: string | null;
   last_seen: string | null;
 }
 
@@ -180,6 +184,46 @@ export interface CommandCenterSnapshot {
   exceptions: CommandException[];
   timeline: CommandTimelineItem[];
   recent_actions: CommandActionResponse[];
+}
+
+export interface HierarchyCamera {
+  id: string;
+  name: string;
+  status: string;
+  zone: string;
+  gate_id: string | null;
+}
+
+export interface HierarchyGate {
+  id: string;
+  name: string;
+  gate_code: string;
+  status: string;
+  cameras: HierarchyCamera[];
+}
+
+export interface HierarchyZone {
+  id: string;
+  name: string;
+  gates: HierarchyGate[];
+  cameras: HierarchyCamera[];
+}
+
+export interface HierarchyWarehouse {
+  id: string;
+  name: string;
+  zones: HierarchyZone[];
+}
+
+export interface HierarchyRegion {
+  id: string;
+  name: string;
+  warehouses: HierarchyWarehouse[];
+}
+
+export interface DepotHierarchy {
+  organization: string;
+  regions: HierarchyRegion[];
 }
 
 interface LegacyPerimeterIncident {
@@ -206,36 +250,98 @@ function countTone(count: number, criticalAt = 4): CommandKpi["tone"] {
   return "healthy";
 }
 
+const DEMO_WAREHOUSES = {
+  WH_HYD: {
+    name: "Hyderabad Depot",
+    region_id: "REG_SOUTH",
+    zones: ["HYD-Z1", "HYD-Z2", "HYD-Z3"],
+    cameras: ["CAM-H1", "CAM-H2", "CAM-H3", "CAM-H4", "CAM-H5", "CAM-H6"],
+    metrics: { bags_in: 1260, bags_out: 1040, vehicles: 38, workers: 82, incidents: 2, occupancy: 74, unload: 34 },
+  },
+  WH_BLR: {
+    name: "Bangalore Depot",
+    region_id: "REG_SOUTH",
+    zones: ["BLR-Z1", "BLR-Z2", "BLR-Z3"],
+    cameras: ["CAM-B1", "CAM-B2", "CAM-B3", "CAM-B4", "CAM-B5", "CAM-B6"],
+    metrics: { bags_in: 1435, bags_out: 1195, vehicles: 44, workers: 76, incidents: 3, occupancy: 71, unload: 29 },
+  },
+  WH_MUM: {
+    name: "Mumbai Depot",
+    region_id: "REG_WEST",
+    zones: ["MUM-Z1", "MUM-Z2", "MUM-Z3"],
+    cameras: ["CAM-M1", "CAM-M2", "CAM-M3", "CAM-M4", "CAM-M5", "CAM-M6"],
+    metrics: { bags_in: 980, bags_out: 910, vehicles: 31, workers: 64, incidents: 1, occupancy: 82, unload: 37 },
+  },
+} as const;
+
+type DemoWarehouseId = keyof typeof DEMO_WAREHOUSES;
+type DemoMetricKey = keyof typeof DEMO_WAREHOUSES.WH_HYD.metrics;
+
+function demoWarehouseIds(): DemoWarehouseId[] {
+  if (typeof window === "undefined") return ["WH_BLR"];
+  const token = localStorage.getItem("token") || "";
+  if (token.includes("wh-hyd")) return ["WH_HYD"];
+  if (token.includes("wh-blr")) return ["WH_BLR"];
+  if (token.includes("wh-mum")) return ["WH_MUM"];
+  if (token.includes("regional-india")) return ["WH_HYD", "WH_BLR"];
+  return ["WH_HYD", "WH_BLR", "WH_MUM"];
+}
+
+function scopedBreakdown(warehouseIds: DemoWarehouseId[], key: DemoMetricKey) {
+  return warehouseIds.map((id) => `${id.replace("WH_", "")}: ${DEMO_WAREHOUSES[id].metrics[key]}`).join(" | ");
+}
+
 function demoCommandCenterSnapshot(): CommandCenterSnapshot {
   const now = new Date().toISOString();
+  const warehouseIds = demoWarehouseIds();
+  const metrics = warehouseIds.map((id) => DEMO_WAREHOUSES[id].metrics);
+  const sum = (key: DemoMetricKey) => metrics.reduce((total, item) => total + Number(item[key]), 0);
+  const avgUnload = Math.round(sum("unload") / Math.max(metrics.length, 1));
+  const occupancy = Math.round(sum("occupancy") / Math.max(metrics.length, 1));
+  const cameras = warehouseIds.flatMap((warehouseId) => DEMO_WAREHOUSES[warehouseId].cameras.map((cameraId, index) => ({
+    id: cameraId,
+    name: cameraId,
+    zone: DEMO_WAREHOUSES[warehouseId].zones[Math.floor(index / 2)],
+    status: "active",
+    protocol: "rtsp",
+    warehouse_id: warehouseId,
+    region_id: DEMO_WAREHOUSES[warehouseId].region_id,
+    last_seen: now,
+  })));
+  const gates = warehouseIds.flatMap((warehouseId) => DEMO_WAREHOUSES[warehouseId].zones.map((zone, index) => ({
+    id: `${warehouseId}-G${index + 1}`,
+    gate_code: `Gate ${index + 1}`,
+    name: `${DEMO_WAREHOUSES[warehouseId].name} Gate ${index + 1}`,
+    gate_type: "both",
+    status: index === 0 ? "open" : "closed",
+    total_entries_today: 14 + index * 4,
+    warehouse_id: warehouseId,
+    region_id: DEMO_WAREHOUSES[warehouseId].region_id,
+    last_activity_at: now,
+  })));
   return {
     generated_at: now,
     health_score: 82,
     kpis: [
-      { key: "cameras", label: "Active Cameras", value: "6/6", detail: "Live visual coverage", tone: "healthy" },
-      { key: "gates", label: "Open Gates", value: "1", detail: "42 entries today", tone: "warning" },
-      { key: "incidents", label: "Open Incidents", value: "3", detail: "1 high priority", tone: "warning" },
-      { key: "zones", label: "Capacity Risk", value: "2", detail: "Zones above 80% utilization", tone: "warning" },
+      { key: "bags_in", label: "Bags In", value: String(sum("bags_in")), detail: scopedBreakdown(warehouseIds, "bags_in"), tone: "healthy" },
+      { key: "bags_out", label: "Bags Out", value: String(sum("bags_out")), detail: scopedBreakdown(warehouseIds, "bags_out"), tone: "healthy" },
+      { key: "vehicles", label: "Vehicles", value: String(sum("vehicles")), detail: scopedBreakdown(warehouseIds, "vehicles"), tone: "normal" },
+      { key: "avg_unload", label: "Avg Unload Time", value: `${avgUnload}m`, detail: "Average across assigned warehouses", tone: "normal" },
+      { key: "incidents", label: "Incidents Today", value: String(sum("incidents")), detail: scopedBreakdown(warehouseIds, "incidents"), tone: sum("incidents") > 3 ? "critical" : "warning" },
+      { key: "occupancy", label: "Occupancy %", value: `${occupancy}%`, detail: "Scoped warehouse occupancy", tone: occupancy >= 80 ? "warning" : "healthy" },
+      { key: "workers", label: "Worker Count", value: String(sum("workers")), detail: scopedBreakdown(warehouseIds, "workers"), tone: "healthy" },
+      { key: "cameras", label: "Active Cameras", value: `${cameras.length}/${cameras.length}`, detail: `${warehouseIds.length} warehouse camera group(s)`, tone: "healthy" },
     ],
-    gates: [
-      { id: "gate-a", gate_code: "GATE-A", name: "North Entry", gate_type: "entry", status: "open", total_entries_today: 18, last_activity_at: now },
-      { id: "gate-b", gate_code: "GATE-B", name: "South Exit", gate_type: "exit", status: "closed", total_entries_today: 16, last_activity_at: now },
-      { id: "gate-c", gate_code: "GATE-C", name: "Loading Bay", gate_type: "both", status: "closed", total_entries_today: 8, last_activity_at: now },
-    ],
-    cameras: [
-      { id: "cam-1", name: "Inbound Gate Camera", zone: "Gate A", status: "active", protocol: "rtsp", last_seen: now },
-      { id: "cam-2", name: "Loading Bay Camera", zone: "Dock 2", status: "active", protocol: "rtsp", last_seen: now },
-      { id: "cam-3", name: "Zone A Storage Camera", zone: "Zone A", status: "active", protocol: "http", last_seen: now },
-      { id: "cam-4", name: "Zone B Storage Camera", zone: "Zone B", status: "active", protocol: "http", last_seen: now },
-      { id: "cam-5", name: "Perimeter Camera", zone: "Perimeter", status: "active", protocol: "rtsp", last_seen: now },
-      { id: "cam-6", name: "Yard Overview Camera", zone: "Yard", status: "active", protocol: "rtsp", last_seen: now },
-    ],
-    zones: [
-      { zone_code: "A", name: "UltraTech Cement - Zone A", utilization_pct: 92, current_occupancy: 920, max_capacity_units: 1000, status: "warning" },
-      { zone_code: "B", name: "ACC Cement - Zone B", utilization_pct: 84, current_occupancy: 840, max_capacity_units: 1000, status: "warning" },
-      { zone_code: "C", name: "JSW Cement - Zone C", utilization_pct: 61, current_occupancy: 610, max_capacity_units: 1000, status: "normal" },
-      { zone_code: "D", name: "Ambuja Cement - Zone D", utilization_pct: 48, current_occupancy: 480, max_capacity_units: 1000, status: "normal" },
-    ],
+    gates,
+    cameras,
+    zones: warehouseIds.flatMap((warehouseId) => DEMO_WAREHOUSES[warehouseId].zones.map((zone, index) => ({
+      zone_code: zone,
+      name: `${zone} (Cluster ${index + 1})`,
+      utilization_pct: DEMO_WAREHOUSES[warehouseId].metrics.occupancy - index * 3,
+      current_occupancy: 700 + index * 80,
+      max_capacity_units: 1000,
+      status: index === 0 ? "warning" : "normal",
+    }))),
     exceptions: [
       { id: "ex-1", source: "Incident", title: "Unauthorized vehicle at inbound gate", detail: "LPR mismatch detected at Gate A", priority: "P1", zone: "Gate A", created_at: now },
       { id: "ex-2", source: "Inventory", title: "SKU cement-bag-43 below reorder level", detail: "38 available, reorder at 75", priority: "P2", zone: "Zone B", created_at: now },
@@ -432,6 +538,16 @@ export async function getCommandCenterSnapshot(): Promise<CommandCenterSnapshot>
   }
 }
 
+export async function getDepotHierarchy(): Promise<DepotHierarchy> {
+  const { data } = await api.get<DepotHierarchy>("/depot/hierarchy");
+  return data;
+}
+
+export async function getCommandKpis(scope: "warehouse" | "region" | "central" | "admin" = "warehouse"): Promise<CommandKpi[]> {
+  const { data } = await api.get<CommandKpi[]>(`/depot/command/kpis?scope=${scope}`);
+  return data;
+}
+
 export interface CameraRegisterPayload {
   name: string;
   stream_url: string;
@@ -618,11 +734,17 @@ export async function triggerCommandAlert(params?: {
   title?: string;
   message?: string;
   priority?: string;
+  broadcast_type?: string;
+  audience?: string;
+  channels?: string[];
 }): Promise<CommandActionResponse> {
   return postCommandAction("/depot/command/actions/trigger-alert", {
     title: params?.title ?? "Manual Command Center alert",
     message: params?.message ?? "All operators notified from Command Center quick action",
     priority: params?.priority ?? "P2",
+    broadcast_type: params?.broadcast_type ?? "operational_announcement",
+    audience: params?.audience ?? "warehouse_staff",
+    channels: params?.channels ?? ["in_app"],
   });
 }
 
