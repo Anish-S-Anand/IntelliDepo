@@ -128,6 +128,8 @@ function CameraGridInner() {
   );
 
   const cameras = useMemo(() => cameraGroups.flatMap((group) => group.cameras), [cameraGroups]);
+  const overviewMode = cameraGroups.length > 1;
+  const overviewColumns = cameraGroups.length > 2 ? "grid-cols-6" : "grid-cols-4";
 
   const handleDetectionUpdate = useCallback(
     (cameraIndex: number) =>
@@ -161,8 +163,8 @@ function CameraGridInner() {
   const activeCameras = cameras.length;
 
   return (
-    <div className="flex h-full flex-col gap-3 bg-[#0a0f1a] p-4">
-      <div className="flex items-center justify-between">
+    <div className="flex h-[calc(100vh-88px)] flex-col gap-2 overflow-hidden bg-[#0a0f1a] p-3">
+      <div className="flex shrink-0 items-center justify-between">
         <div className="flex items-center gap-2">
           <Camera size={18} className="text-[#3fb950]" />
           <h2 className="text-sm font-bold text-white">IntelliVision</h2>
@@ -173,21 +175,64 @@ function CameraGridInner() {
         <ModelStatus />
       </div>
 
-      <div className="flex-1 overflow-y-auto pr-1">
-        {cameraGroups.map((group, groupIndex) => (
-          <section key={group.warehouseId} className={groupIndex > 0 ? "mt-4" : ""}>
-            {cameraGroups.length > 1 && (
-              <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-xs font-extrabold uppercase tracking-[0.14em] text-white/70">
-                  {group.label}
-                </h3>
-                <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] font-bold text-white/50">
-                  {group.cameras.length} feeds
-                </span>
-              </div>
-            )}
-            <div className="grid grid-cols-3 gap-2">
-              {group.cameras.map((cam) => {
+      {overviewMode && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {cameraGroups.map((group) => (
+            <span key={group.warehouseId} className="rounded bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-white/60">
+              {group.label}: {group.cameras.length}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {overviewMode ? (
+          <section className={`grid h-full ${overviewColumns} grid-rows-3 gap-2`}>
+            {cameras.map((cam) => {
+              const cameraIndex = cameras.findIndex((camera) => camera.id === cam.id);
+              const det = detections[cameraIndex];
+              const isOffline = !cam.videoFile;
+
+              return (
+                <div key={cam.id} className="relative min-h-0">
+                  <VideoFeed
+                    name={cam.name}
+                    cameraId={cam.id}
+                    videoFile={cam.videoFile}
+                    cameraIndex={cameraIndex}
+                    offline={isOffline}
+                    compact
+                    onDetectionUpdate={handleDetectionUpdate(cameraIndex)}
+                  />
+                  {!isOffline && (
+                    <div className="absolute top-1 left-1 flex flex-col gap-0.5">
+                      {det?.vehicles != null && det.vehicles > 0 && (
+                        <div className="flex items-center gap-0.5 rounded bg-[#3fb950] px-1.5 py-0.5 text-[9px] font-bold text-black">
+                          <Truck size={8} /> {det.vehicles}
+                        </div>
+                      )}
+                      {det?.workers != null && det.workers > 0 && (
+                        <div className="flex items-center gap-0.5 rounded bg-blue-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                          <Users size={8} /> {det.workers}
+                        </div>
+                      )}
+                      {det?.cementBags != null && det.cementBags > 0 && (
+                        <div className="flex items-center gap-0.5 rounded bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-black">
+                          <Package size={8} /> {det.cementBags} bags
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+        ) : (
+          <div className="h-full overflow-y-auto pr-1">
+            {cameraGroups.map((group, groupIndex) => (
+              <section key={group.warehouseId} className={groupIndex > 0 ? "mt-4" : ""}>
+                <div className="grid grid-cols-3 gap-2">
+                  {group.cameras.map((cam) => {
                 const cameraIndex = cameras.findIndex((camera) => camera.id === cam.id);
                 const det = detections[cameraIndex];
                 const isOffline = !cam.videoFile;
@@ -223,10 +268,12 @@ function CameraGridInner() {
                     )}
                   </div>
                 );
-              })}
-            </div>
-          </section>
-        ))}
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

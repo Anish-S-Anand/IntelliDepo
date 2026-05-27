@@ -97,21 +97,21 @@ const ROLE_WAREHOUSE_REGISTRY = {
     region_id: "REG_SOUTH",
     zones: ["HYD-Z1", "HYD-Z2", "HYD-Z3"],
     cameras: ["CAM-H1", "CAM-H2", "CAM-H3", "CAM-H4", "CAM-H5", "CAM-H6"],
-    metrics: { bagsIn: 1260, bagsOut: 1040, vehicles: 38, workers: 82, incidents: 2, occupancy: 74, unload: 34 },
+    metrics: { bagsIn: 1260, bagsOut: 1040, vehicles: 38, workers: 82, incidents: 2, occupancy: 74, unload: 34, health: 91 },
   },
   WH_BLR: {
     name: "Bangalore Depot",
     region_id: "REG_SOUTH",
     zones: ["BLR-Z1", "BLR-Z2", "BLR-Z3"],
     cameras: ["CAM-B1", "CAM-B2", "CAM-B3", "CAM-B4", "CAM-B5", "CAM-B6"],
-    metrics: { bagsIn: 1435, bagsOut: 1195, vehicles: 44, workers: 76, incidents: 3, occupancy: 71, unload: 29 },
+    metrics: { bagsIn: 1435, bagsOut: 1195, vehicles: 44, workers: 76, incidents: 3, occupancy: 71, unload: 29, health: 91 },
   },
   WH_MUM: {
     name: "Mumbai Depot",
     region_id: "REG_WEST",
     zones: ["MUM-Z1", "MUM-Z2", "MUM-Z3"],
     cameras: ["CAM-M1", "CAM-M2", "CAM-M3", "CAM-M4", "CAM-M5", "CAM-M6"],
-    metrics: { bagsIn: 980, bagsOut: 910, vehicles: 31, workers: 64, incidents: 1, occupancy: 82, unload: 37 },
+    metrics: { bagsIn: 980, bagsOut: 910, vehicles: 31, workers: 64, incidents: 1, occupancy: 82, unload: 37, health: 88 },
   },
 } as const;
 
@@ -184,45 +184,30 @@ const PERSONA_PROFILES: Record<CommandPersona, {
   subtitle: string;
   scope: string;
   location: string;
-  visibility: string[];
-  control: string[];
-  analysis: string[];
 }> = {
   warehouse_manager: {
     title: "Warehouse Manager Command Center",
     subtitle: "Live warehouse visibility, local controls, and shift-level analysis.",
     scope: "Warehouse",
     location: "Current warehouse",
-    visibility: ["Cameras", "Vehicles", "Entry/exit", "Bags", "Clusters", "Workers"],
-    control: ["Boom barriers", "Broadcasts", "Access permissions", "Notifications"],
-    analysis: ["Vehicle count", "Loading stats", "Incidents", "Utilization", "Capacity"],
   },
   regional_manager: {
     title: "Regional Manager Command Center",
     subtitle: "Multi-warehouse visibility, regional alerts, and cross-warehouse comparison.",
     scope: "Region",
     location: "India region",
-    visibility: ["Multi-warehouse status", "Regional incidents", "Camera health", "Gate exceptions"],
-    control: ["Regional broadcasts", "Escalations", "Supervisor notifications"],
-    analysis: ["Warehouse comparison", "Regional incidents", "Capacity risk", "Throughput trends"],
   },
   central_manager: {
     title: "Central Command Center",
     subtitle: "National warehouse visibility, central governance, and major incident oversight.",
     scope: "National",
     location: "All regions",
-    visibility: ["National warehouse status", "Major incidents", "Regional health", "Critical sites"],
-    control: ["Central broadcasts", "Governance actions", "Major escalation"],
-    analysis: ["National KPIs", "Regional trends", "SLA risk", "Incident governance"],
   },
   admin: {
     title: "Administrator Command Center",
     subtitle: "Platform configuration, integrations, permissions, and operational audit.",
     scope: "Platform",
     location: "All warehouses",
-    visibility: ["System health", "Users", "Integrations", "Warehouse hierarchy"],
-    control: ["Permissions", "Templates", "Integrations", "All command controls"],
-    analysis: ["Audit", "Adoption", "Integration health", "Governance"],
   },
 };
 
@@ -402,14 +387,18 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
       : "All Warehouses";
   const incidentKpi = Number(scopedKpis.find((kpi) => kpi.key === "incidents")?.value || 0);
   const occupancyKpi = scopedKpis.find((kpi) => kpi.key === "occupancy")?.value || "0%";
-  const personaRows = visibleWarehouseIds.map((warehouseId, index) => ({
-    name: WAREHOUSE_LABELS[warehouseId]?.name || warehouseId,
-    region: WAREHOUSE_LABELS[warehouseId]?.region || "Region",
-    health: String(Math.max(72, (snapshot?.health_score ?? 82) - index * 4)),
-    incidents: incidentKpi,
-    occupancy: occupancyKpi,
-    tone: (snapshot?.health_score ?? 82) >= 85 ? "#22D3A1" : (snapshot?.health_score ?? 82) >= 65 ? "#F5A623" : "#F04A4A",
-  }));
+  const personaRows = visibleWarehouseIds.map((warehouseId) => {
+    const warehouseHealth = ROLE_WAREHOUSE_REGISTRY[warehouseId as RoleWarehouseId]?.metrics.health ?? snapshot?.health_score ?? 82;
+
+    return {
+      name: WAREHOUSE_LABELS[warehouseId]?.name || warehouseId,
+      region: WAREHOUSE_LABELS[warehouseId]?.region || "Region",
+      health: String(warehouseHealth),
+      incidents: incidentKpi,
+      occupancy: occupancyKpi,
+      tone: warehouseHealth >= 85 ? "#22D3A1" : warehouseHealth >= 65 ? "#F5A623" : "#F04A4A",
+    };
+  });
   const groupedCameras = visibleWarehouseIds.map((warehouseId) => ({
     warehouseId,
     label: WAREHOUSE_LABELS[warehouseId]?.name || warehouseId,
@@ -483,29 +472,6 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
             <RefreshCw className="h-4 w-4" />
           </button>
         </div>
-      </div>
-
-      <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
-        {[
-          { label: "Visibility", detail: persona.visibility.join(", "), icon: Camera, color: "#5B9BF5" },
-          { label: "Control", detail: persona.control.join(", "), icon: Shield, color: "#E5521A" },
-          { label: "Analysis", detail: persona.analysis.join(", "), icon: BarChart3, color: "#22D3A1" },
-        ].map((pillar) => {
-          const Icon = pillar.icon;
-          return (
-            <section key={pillar.label} className="rounded-[12px] border border-[#1E2F50] bg-[#14203A] p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border" style={{ background: `${pillar.color}18`, borderColor: `${pillar.color}44` }}>
-                  <Icon className="h-4 w-4" style={{ color: pillar.color }} />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[13px] font-extrabold text-[#E8EDF8]">{pillar.label}</div>
-                  <div className="mt-0.5 text-[10px] font-semibold text-[#8A9BBF]">{pillar.detail}</div>
-                </div>
-              </div>
-            </section>
-          );
-        })}
       </div>
 
       <section className="mb-5 rounded-[14px] border border-[#1E2F50] bg-[#14203A] p-4">
@@ -721,7 +687,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
         </section>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
         <section className="rounded-[14px] border border-[#1E2F50] bg-[#14203A] p-4">
           <div className="mb-3 flex items-center gap-2">
             <DoorClosed className="h-4 w-4 text-[#F5A623]" />
@@ -750,23 +716,25 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
             <Camera className="h-4 w-4 text-[#5B9BF5]" />
             <h2 className="text-[13px] font-extrabold text-[#E8EDF8]">Visibility: Camera Coverage</h2>
           </div>
-          <div className="max-h-[280px] space-y-3 overflow-y-auto pr-1">
+          <div className="space-y-3">
             {groupedCameras.map((group) => (
               <div key={group.warehouseId} className="space-y-2">
                 {personaKey !== "warehouse_manager" && (
                   <div className="px-1 text-[10px] font-extrabold uppercase text-[#5B9BF5]">{group.label} Cameras</div>
                 )}
-                {group.cameras.map((camera) => (
-                  <div key={camera.id} className="flex items-center justify-between rounded-[10px] border border-[#1E2F50] bg-[#0D1526] p-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-[12px] font-bold text-[#E8EDF8]">{camera.name}</div>
-                      <div className="text-[10px] text-[#8A9BBF]">{camera.zone || "Unassigned"} - {camera.protocol.toUpperCase()}</div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {group.cameras.map((camera) => (
+                    <div key={camera.id} className="flex items-center justify-between rounded-[10px] border border-[#1E2F50] bg-[#0D1526] p-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-[12px] font-bold text-[#E8EDF8]">{camera.name}</div>
+                        <div className="text-[10px] text-[#8A9BBF]">{camera.zone || "Unassigned"} - {camera.protocol.toUpperCase()}</div>
+                      </div>
+                      <span className={camera.status === "active" ? "text-[10px] font-extrabold text-[#22D3A1]" : "text-[10px] font-extrabold text-[#F5A623]"}>
+                        {camera.status.toUpperCase()}
+                      </span>
                     </div>
-                    <span className={camera.status === "active" ? "text-[10px] font-extrabold text-[#22D3A1]" : "text-[10px] font-extrabold text-[#F5A623]"}>
-                      {camera.status.toUpperCase()}
-                    </span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             ))}
           </div>

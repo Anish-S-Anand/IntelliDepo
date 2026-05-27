@@ -39,21 +39,21 @@ const WAREHOUSE_SEED = {
     regionId: "REG_SOUTH",
     zones: ["HYD-Z1", "HYD-Z2", "HYD-Z3"],
     cameras: ["CAM-H1", "CAM-H2", "CAM-H3", "CAM-H4", "CAM-H5", "CAM-H6"],
-    metrics: { bagsIn: 1260, bagsOut: 1040, vehicles: 38, workers: 82, incidents: 2, occupancy: 74, unload: 34 },
+    metrics: { bagsIn: 1260, bagsOut: 1040, vehicles: 38, workers: 82, incidents: 2, occupancy: 74, unload: 34, health: 91 },
   },
   WH_BLR: {
     name: "Bangalore Depot",
     regionId: "REG_SOUTH",
     zones: ["BLR-Z1", "BLR-Z2", "BLR-Z3"],
     cameras: ["CAM-B1", "CAM-B2", "CAM-B3", "CAM-B4", "CAM-B5", "CAM-B6"],
-    metrics: { bagsIn: 1435, bagsOut: 1195, vehicles: 44, workers: 76, incidents: 3, occupancy: 71, unload: 29 },
+    metrics: { bagsIn: 1435, bagsOut: 1195, vehicles: 44, workers: 76, incidents: 3, occupancy: 71, unload: 29, health: 91 },
   },
   WH_MUM: {
     name: "Mumbai Depot",
     regionId: "REG_WEST",
     zones: ["MUM-Z1", "MUM-Z2", "MUM-Z3"],
     cameras: ["CAM-M1", "CAM-M2", "CAM-M3", "CAM-M4", "CAM-M5", "CAM-M6"],
-    metrics: { bagsIn: 980, bagsOut: 910, vehicles: 31, workers: 64, incidents: 1, occupancy: 82, unload: 37 },
+    metrics: { bagsIn: 980, bagsOut: 910, vehicles: 31, workers: 64, incidents: 1, occupancy: 82, unload: 37, health: 88 },
   },
 } as const;
 
@@ -204,7 +204,7 @@ function buildCommandSnapshot(source: Omit<UnifiedDepotSource, "commandSnapshot"
 
   return {
     generated_at: now,
-    health_score: source.kpis.incidentsToday > 3 ? 84 : 91,
+    health_score: avgSeed(source.warehouseIds, "health"),
     kpis: [
       { key: "bags_in", label: "Bags In", value: String(source.kpis.bagsIn), detail: scopedBreakdown(source.warehouseIds, "bagsIn"), tone: "healthy" },
       { key: "bags_out", label: "Bags Out", value: String(source.kpis.bagsOut), detail: scopedBreakdown(source.warehouseIds, "bagsOut"), tone: "healthy" },
