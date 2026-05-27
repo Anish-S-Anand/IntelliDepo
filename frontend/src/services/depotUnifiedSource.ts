@@ -140,26 +140,34 @@ function zoneCapacityTotals(zones: ZoneResponse[]) {
 }
 
 function fallbackBatches(zones: ZoneResponse[]): BatchResponse[] {
-  return zones.map((zone, index) => ({
-    id: `seed-batch-${zone.zone_code}`,
-    batch_code: `B-${zone.zone_code}-${index + 1}`,
-    sku_code: `SKU-${zone.zone_code}`,
-    product_name: ["UltraTech Cement", "ACC Cement", "JSW Cement", "Ambuja Cement"][index % 4],
-    zone: zone.zone_code,
-    rack: `R-${index + 1}`,
-    bin_location: `BIN-${index + 1}`,
-    quantity: zone.current_occupancy,
-    original_quantity: zone.max_capacity_units,
-    manufacture_date: null,
-    expiry_date: null,
-    received_at: new Date().toISOString(),
-    sequencing_rule: "FIFO",
-    priority_score: 50 + index,
-    status: "active",
-    is_near_expiry: false,
-    days_to_expiry: null,
-    created_at: new Date().toISOString(),
-  }));
+  const now = new Date();
+  return zones.map((zone, index) => {
+    // Stagger creation dates: each batch created 15-60 days apart going back in time
+    const daysAgo = 15 + index * 20; // 15, 35, 55, 75... days ago
+    const createdAt = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+    // Expiry is 6 months after creation
+    const expiryDate = new Date(createdAt.getTime() + 180 * 24 * 60 * 60 * 1000);
+    return {
+      id: `seed-batch-${zone.zone_code}`,
+      batch_code: `B-${zone.zone_code}-${index + 1}`,
+      sku_code: `SKU-${zone.zone_code}`,
+      product_name: ["UltraTech Cement", "ACC Cement", "JSW Cement", "Ambuja Cement"][index % 4],
+      zone: zone.zone_code,
+      rack: `R-${index + 1}`,
+      bin_location: `BIN-${index + 1}`,
+      quantity: zone.current_occupancy,
+      original_quantity: zone.max_capacity_units,
+      manufacture_date: null,
+      expiry_date: expiryDate.toISOString(),
+      received_at: createdAt.toISOString(),
+      sequencing_rule: "FIFO",
+      priority_score: 50 + index,
+      status: "active",
+      is_near_expiry: false,
+      days_to_expiry: Math.round((expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)),
+      created_at: createdAt.toISOString(),
+    };
+  });
 }
 
 function fallbackIncidents(warehouseIds: DepotWarehouseId[]): IncidentResponse[] {
