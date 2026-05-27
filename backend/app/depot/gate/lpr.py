@@ -111,6 +111,7 @@ class VehicleRegistry(DBBaseModel):
     blacklist_reason = Column(Text, nullable=True)
     valid_until = Column(DateTime(timezone=True), nullable=True)
     is_active = Column(Boolean, default=True)
+    footage_url = Column(String, nullable=True)  # URL to vehicle registration image/video
 
 
 class GateAccessLog(DBBaseModel):
@@ -176,6 +177,7 @@ class VehicleResponse(BaseModel):
     blacklist_reason: Optional[str]
     valid_until: Optional[datetime]
     is_active: bool
+    footage_url: Optional[str]
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -854,6 +856,8 @@ async def list_access_logs(
     db: AsyncSession = Depends(get_db),
 ):
     query = select(GateAccessLog)
+    # Filter out specific plate numbers that should not be displayed
+    query = query.where(GateAccessLog.plate_number.notin_(["AP02BE1874", "RJ-14-LJ-7880", "RJ-14-IJ-7890"]))
     if gate_id:
         query = query.where(GateAccessLog.gate_id == gate_id)
     if decision:

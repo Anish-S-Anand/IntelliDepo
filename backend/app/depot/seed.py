@@ -58,20 +58,20 @@ GATES = [
 ]
 
 VEHICLES = [
-    {"plate_number": "TN-04-AB-1234", "vehicle_type": "truck", "owner_name": "Rajesh Kumar", "company": "TransCargo India", "status": "approved"},
-    {"plate_number": "MH-12-CD-5678", "vehicle_type": "truck", "owner_name": "Suresh Patel", "company": "BlueLine Logistics", "status": "approved"},
-    {"plate_number": "GJ-05-EF-9012", "vehicle_type": "truck", "owner_name": "Amit Shah", "company": "Gujarat Transport", "status": "approved"},
-    {"plate_number": "DL-03-GH-3456", "vehicle_type": "container", "owner_name": "Vikram Singh", "company": "Delhi Freight Corp", "status": "approved"},
-    {"plate_number": "RJ-14-IJ-7890", "vehicle_type": "truck", "owner_name": "Mohan Joshi", "company": "Rajasthan Cargo", "status": "approved"},
-    {"plate_number": "KA-01-KL-2345", "vehicle_type": "tanker", "owner_name": "Prasad Rao", "company": "Southern Transport", "status": "approved"},
-    {"plate_number": "AP-09-MN-6789", "vehicle_type": "van", "owner_name": "Ravi Teja", "company": "QuickShip", "status": "pending"},
-    {"plate_number": "UP-80-OP-0123", "vehicle_type": "truck", "owner_name": "Anil Gupta", "company": "UP Movers", "status": "pending"},
-    {"plate_number": "MH-01-QR-4567", "vehicle_type": "van", "owner_name": "Unknown", "company": "Unregistered", "status": "blacklisted"},
-    {"plate_number": "DL-10-ST-8901", "vehicle_type": "truck", "owner_name": "Suspicious", "company": "N/A", "status": "blacklisted"},
-    {"plate_number": "KA01AB1234", "vehicle_type": "truck", "owner_name": "Gate Demo Operator", "company": "Cement Depot Fleet", "status": "registered"},
-    {"plate_number": "DL03EF9012", "vehicle_type": "truck", "owner_name": "Gate Demo Operator", "company": "Cement Depot Fleet", "status": "registered"},
-    {"plate_number": "MH02CD5678", "vehicle_type": "truck", "owner_name": "Gate Demo Operator", "company": "Cement Depot Fleet", "status": "registered"},
-    {"plate_number": "TN04GH3456", "vehicle_type": "truck", "owner_name": "Gate Demo Operator", "company": "Cement Depot Fleet", "status": "registered"},
+    {"plate_number": "TN-04-AB-1234", "vehicle_type": "truck", "owner_name": "Rajesh Kumar", "company": "TransCargo India", "status": "approved", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=TN-04-AB-1234"},
+    {"plate_number": "MH-12-CD-5678", "vehicle_type": "truck", "owner_name": "Suresh Patel", "company": "BlueLine Logistics", "status": "approved", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=MH-12-CD-5678"},
+    {"plate_number": "GJ-05-EF-9012", "vehicle_type": "truck", "owner_name": "Amit Shah", "company": "Gujarat Transport", "status": "approved", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=GJ-05-EF-9012"},
+    {"plate_number": "DL-03-GH-3456", "vehicle_type": "container", "owner_name": "Vikram Singh", "company": "Delhi Freight Corp", "status": "approved", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=DL-03-GH-3456"},
+    {"plate_number": "RJ-14-IJ-7890", "vehicle_type": "truck", "owner_name": "Mohan Joshi", "company": "Rajasthan Cargo", "status": "approved", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=RJ-14-IJ-7890"},
+    {"plate_number": "KA-01-KL-2345", "vehicle_type": "tanker", "owner_name": "Prasad Rao", "company": "Southern Transport", "status": "approved", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=KA-01-KL-2345"},
+    {"plate_number": "AP-09-MN-6789", "vehicle_type": "van", "owner_name": "Ravi Teja", "company": "QuickShip", "status": "pending", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=AP-09-MN-6789"},
+    {"plate_number": "UP-80-OP-0123", "vehicle_type": "truck", "owner_name": "Anil Gupta", "company": "UP Movers", "status": "pending", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=UP-80-OP-0123"},
+    {"plate_number": "MH-01-QR-4567", "vehicle_type": "van", "owner_name": "Unknown", "company": "Unregistered", "status": "blacklisted", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=MH-01-QR-4567"},
+    {"plate_number": "DL-10-ST-8901", "vehicle_type": "truck", "owner_name": "Suspicious", "company": "N/A", "status": "blacklisted", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=DL-10-ST-8901"},
+    {"plate_number": "KA01AB1234", "vehicle_type": "truck", "owner_name": "Rajesh Kumar", "company": "Cement Depot Fleet", "status": "registered", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=KA01AB1234"},
+    {"plate_number": "DL03EF9012", "vehicle_type": "truck", "owner_name": "Amit Patel", "company": "Cement Depot Fleet", "status": "registered", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=DL03EF9012"},
+    {"plate_number": "MH02CD5678", "vehicle_type": "truck", "owner_name": "Priya Sharma", "company": "Cement Depot Fleet", "status": "registered", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=MH02CD5678"},
+    {"plate_number": "TN04GH3456", "vehicle_type": "truck", "owner_name": "Sunita Reddy", "company": "Cement Depot Fleet", "status": "registered", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=TN04GH3456"},
 ]
 
 GATE_ACCESS_LOGS = [
