@@ -37,27 +37,40 @@ const WAREHOUSE_SEED = {
   WH_HYD: {
     name: "Hyderabad Depot",
     regionId: "REG_SOUTH",
-    zones: ["HYD-Z1", "HYD-Z2", "HYD-Z3"],
+    zones: ["HYD-Z1", "HYD-Z2", "HYD-Z3", "HYD-Z4"],
     cameras: ["CAM-H1", "CAM-H2", "CAM-H3", "CAM-H4", "CAM-H5", "CAM-H6"],
     metrics: { bagsIn: 1260, bagsOut: 1040, vehicles: 38, workers: 82, incidents: 2, occupancy: 74, unload: 34, health: 91 },
   },
   WH_BLR: {
     name: "Bangalore Depot",
     regionId: "REG_SOUTH",
-    zones: ["BLR-Z1", "BLR-Z2", "BLR-Z3"],
+    zones: ["BLR-Z1", "BLR-Z2", "BLR-Z3", "BLR-Z4"],
     cameras: ["CAM-B1", "CAM-B2", "CAM-B3", "CAM-B4", "CAM-B5", "CAM-B6"],
     metrics: { bagsIn: 1435, bagsOut: 1195, vehicles: 44, workers: 76, incidents: 3, occupancy: 71, unload: 29, health: 91 },
   },
   WH_MUM: {
     name: "Mumbai Depot",
     regionId: "REG_WEST",
-    zones: ["MUM-Z1", "MUM-Z2", "MUM-Z3"],
+    zones: ["MUM-Z1", "MUM-Z2", "MUM-Z3", "MUM-Z4"],
     cameras: ["CAM-M1", "CAM-M2", "CAM-M3", "CAM-M4", "CAM-M5", "CAM-M6"],
     metrics: { bagsIn: 980, bagsOut: 910, vehicles: 31, workers: 64, incidents: 1, occupancy: 82, unload: 37, health: 88 },
   },
 } as const;
 
 type SeedMetricKey = keyof typeof WAREHOUSE_SEED.WH_HYD.metrics;
+
+// Zone→gate mapping: Z1→Gate A, Z2→Gate B, Z3→Gate C, Z4→no gate
+// Zone→camera mapping: Z1→[cam1,cam2], Z2→[cam3], Z3→[cam4], Z4→[cam5,cam6]
+const GATE_SEED = [
+  { suffix: "A", name: "Gate A - North Entry", gateType: "entry", status: "open" },
+  { suffix: "B", name: "Gate B - South Exit", gateType: "exit", status: "closed" },
+  { suffix: "C", name: "Gate C - Loading Dock", gateType: "loading", status: "open" },
+] as const;
+
+// Camera count per zone index: [2, 1, 1, 2]
+const ZONE_CAMERA_COUNTS = [2, 1, 1, 2] as const;
+// Gate index per zone index: [0=A, 1=B, 2=C, null=none]
+const ZONE_GATE_INDEX = [0, 1, 2, null] as const;
 
 export function scopedWarehouseIdsForUser(role?: string, email?: string, location?: string): DepotWarehouseId[] {
   const normalizedRole = (role ?? "").toLowerCase().replace(/\s+/g, "_");
@@ -125,6 +138,35 @@ function fallbackZones(warehouseIds: DepotWarehouseId[]): ZoneResponse[] {
       };
     });
   });
+}
+
+function normalizeZoneCode(value: string | null | undefined): string {
+  return (value ?? "").trim().toUpperCase();
+}
+
+function zoneBelongsToWarehouse(zone: Pick<ZoneResponse, "zone_code" | "name">, warehouseId: DepotWarehouseId): boolean {
+  const warehouse = WAREHOUSE_SEED[warehouseId];
+  const code = normalizeZoneCode(zone.zone_code);
+  const name = normalizeZoneCode(zone.name);
+  return warehouse.zones.some((zoneCode) => {
+    const normalized = normalizeZoneCode(zoneCode);
+    return code === normalized || name.includes(normalized);
+  });
+}
+
+function scopeZones(zones: ZoneResponse[], warehouseIds: DepotWarehouseId[]): ZoneResponse[] {
+  const scoped = zones.filter((zone) =>
+    zone.is_active !== false && warehouseIds.some((warehouseId) => zoneBelongsToWarehouse(zone, warehouseId))
+  );
+  return scoped.sort((a, b) => normalizeZoneCode(a.zone_code).localeCompare(normalizeZoneCode(b.zone_code)));
+}
+
+function scopeBatches(batches: BatchResponse[], zoneCodes: Set<string>): BatchResponse[] {
+  return batches.filter((batch) => zoneCodes.has(normalizeZoneCode(batch.zone)));
+}
+
+function scopeDensity(density: DensityEntry[], zoneCodes: Set<string>): DensityEntry[] {
+  return density.filter((entry) => zoneCodes.has(normalizeZoneCode(entry.zone_code)));
 }
 
 function zoneCapacityTotals(zones: ZoneResponse[]) {
@@ -224,12 +266,12 @@ function buildCommandSnapshot(source: Omit<UnifiedDepotSource, "commandSnapshot"
       { key: "workers", label: "Worker Count", value: String(source.kpis.workers), detail: scopedBreakdown(source.warehouseIds, "workers"), tone: "healthy" },
       { key: "cameras", label: "Active Cameras", value: `${source.kpis.activeCameras}/${source.kpis.totalCameras}`, detail: `${source.warehouseIds.length} authorized warehouse group(s)`, tone: "healthy" },
     ],
-    gates: source.warehouseIds.flatMap((warehouseId) => WAREHOUSE_SEED[warehouseId].zones.map((zone, index) => ({
-      id: `${warehouseId}-G${index + 1}`,
-      gate_code: `Gate ${index + 1}`,
-      name: `${WAREHOUSE_SEED[warehouseId].name} Gate ${index + 1}`,
-      gate_type: "both",
-      status: index === 0 ? "open" : "closed",
+    gates: source.warehouseIds.flatMap((warehouseId) => GATE_SEED.map((gate, index) => ({
+      id: `${warehouseId}-GATE-${gate.suffix}`,
+      gate_code: `GATE-${gate.suffix}`,
+      name: gate.name,
+      gate_type: gate.gateType,
+      status: gate.status,
       total_entries_today: 14 + index * 4,
       warehouse_id: warehouseId,
       region_id: WAREHOUSE_SEED[warehouseId].regionId,
@@ -278,13 +320,13 @@ export async function getUnifiedDepotSource(params: {
     getBatches({ status: "active" }),
   ]);
 
-  // Current backend zone, batch, incident, and camera APIs are global and do not
-  // yet expose persisted warehouse IDs. Use scoped demo data here so persona
-  // dashboards do not show the same storage/utilization figures for BLR/HYD/MUM.
-  const zones = fallbackZones(warehouseIds);
-  const incidents = fallbackIncidents(warehouseIds);
-  const batches = fallbackBatches(zones);
-  const density = densityResult.status === "fulfilled" ? densityResult.value : [];
+  const backendZones = zonesResult.status === "fulfilled" ? scopeZones(zonesResult.value, warehouseIds) : [];
+  const zones = backendZones.length > 0 ? backendZones : fallbackZones(warehouseIds);
+  const zoneCodes = new Set(zones.map((zone) => normalizeZoneCode(zone.zone_code)));
+  const backendBatches = batchesResult.status === "fulfilled" ? scopeBatches(batchesResult.value, zoneCodes) : [];
+  const batches = backendBatches.length > 0 ? backendBatches : fallbackBatches(zones);
+  const incidents = incidentsResult.status === "fulfilled" ? incidentsResult.value : fallbackIncidents(warehouseIds);
+  const density = densityResult.status === "fulfilled" ? scopeDensity(densityResult.value, zoneCodes) : [];
 
   const capacityTotals = zoneCapacityTotals(zones);
   const occupancyPct = capacityTotals.occupancyPct || avgSeed(warehouseIds, "occupancy");
@@ -308,7 +350,7 @@ export async function getUnifiedDepotSource(params: {
 
   const base = {
     generatedAt: new Date().toISOString(),
-    source: zonesResult.status === "fulfilled" || incidentsResult.status === "fulfilled" || batchesResult.status === "fulfilled" ? "mixed" as const : "fallback" as const,
+    source: backendZones.length > 0 ? "backend" as const : "fallback" as const,
     warehouseIds,
     kpis,
     weeklyThroughput: distributeWeekly(kpis.bagsIn, kpis.bagsOut),

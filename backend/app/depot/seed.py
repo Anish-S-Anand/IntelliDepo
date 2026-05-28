@@ -147,11 +147,11 @@ BATCHES = [
 ]
 
 DEMO_USERS = [
-    {"email": "wm.blr@fidelis-demo.com", "full_name": "Warehouse Manager - Bengaluru", "password": "MacroPulse2025!", "is_superuser": False},
-    {"email": "wm.hyd@fidelis-demo.com", "full_name": "Warehouse Manager - Hyderabad", "password": "MacroPulse2025!", "is_superuser": False},
-    {"email": "wm.mum@fidelis-demo.com", "full_name": "Warehouse Manager - Mumbai", "password": "MacroPulse2025!", "is_superuser": False},
-    {"email": "regional@fidelis-demo.com", "full_name": "Regional Manager - India", "password": "MacroPulse2025!", "is_superuser": False},
-    {"email": "admin@fidelis-demo.com", "full_name": "Platform Admin", "password": "MacroPulse2025!", "is_superuser": True},
+    {"email": "wm.blr@fidelis-demo.com", "full_name": "Warehouse Manager - Bengaluru", "password": "Depot!26", "is_superuser": False},
+    {"email": "wm.hyd@fidelis-demo.com", "full_name": "Warehouse Manager - Hyderabad", "password": "Depot!26", "is_superuser": False},
+    {"email": "wm.mum@fidelis-demo.com", "full_name": "Warehouse Manager - Mumbai", "password": "Depot!26", "is_superuser": False},
+    {"email": "regional@fidelis-demo.com", "full_name": "Regional Manager - India", "password": "Depot!26", "is_superuser": False},
+    {"email": "admin@fidelis-demo.com", "full_name": "Platform Admin", "password": "Depot!26", "is_superuser": True},
 ]
 
 
@@ -532,7 +532,7 @@ async def seed_database(db_url: str | None = None):
                 """))
 
                 history_rows = 0
-                for day_offset in range(30, -1, -1):
+                for day_offset in range(60, -1, -1):
                     recorded_at = (now - timedelta(days=day_offset)).replace(hour=18, minute=0, second=0, microsecond=0)
                     for zone in zone_rows:
                         zone_code = zone["zone_code"]

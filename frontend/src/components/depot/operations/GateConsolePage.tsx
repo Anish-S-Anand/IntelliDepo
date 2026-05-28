@@ -61,6 +61,14 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function isGateConsoleGate(gate: GateResponse): boolean {
+  return gate.gate_type === "entry" || gate.gate_type === "exit";
+}
+
+function isGateConsoleLog(log: AccessLogResponse): boolean {
+  return log.gate_code === "GATE-A" || log.gate_code === "GATE-B";
+}
+
 function getBackendBaseUrl(): string {
   if (typeof window === "undefined") return "http://localhost:8000";
   return `${window.location.protocol}//${window.location.hostname}:8000`;
@@ -68,14 +76,16 @@ function getBackendBaseUrl(): string {
 
 // Hardcoded fallback map: normalised plate → filename
 const PLATE_FOOTAGE_MAP: Record<string, string> = {
-  "KA01AB1234": "blackswift_KA01AB1234.jpg.png",
-  "MH02CD5678": "bmw_MH02CD5678.jpg.png",
-  "DL03EF9012": "mercedes_DL03EF9012.jpg.png",
-  "TN04GH3456": "silverswift_TN04GH3456.jpg.png",
+  KA01AB1234: "/vehicles/gate-entry/KA01AB1234.png",
+  MH02CD5678: "/vehicles/gate-entry/MH02CD5678.png",
+  TN04AB1234: "/vehicles/gate-entry/TN04AB1234.png",
+  AP09MN6789: "/vehicles/gate-entry/AP09MN6789.png",
 };
-
 function getFootageUrl(plateNumber: string, dynamicMap?: Record<string, string>): string | null {
   const normalized = plateNumber.replace(/[\s\-\.]/g, "").toUpperCase();
+  const localAsset = PLATE_FOOTAGE_MAP[normalized];
+  if (localAsset) return localAsset;
+
   // Try dynamic map from backend first
   if (dynamicMap) {
     const key = Object.keys(dynamicMap).find(
@@ -83,11 +93,7 @@ function getFootageUrl(plateNumber: string, dynamicMap?: Record<string, string>)
     );
     if (key) return `${getBackendBaseUrl()}${dynamicMap[key]}`;
   }
-  // Fallback to hardcoded map
-  const entry = Object.entries(PLATE_FOOTAGE_MAP).find(
-    ([k]) => normalized.includes(k.toUpperCase()) || k.toUpperCase().includes(normalized)
-  );
-  return entry ? `${getBackendBaseUrl()}/tmp/vehicle_registry/${entry[1]}` : null;
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,10 +157,16 @@ function RegisterVisitorModal({
     id_proof_number: "",
     vehicle_plate: "",
     host_name: "",
-    gate_id: "Gate-1",
+    gate_id: gates[0]?.id ?? "",
     pass_valid_hours: 4,
   });
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!form.gate_id && gates.length > 0) {
+      setForm((prev) => ({ ...prev, gate_id: gates[0].id }));
+    }
+  }, [form.gate_id, gates]);
 
   const set = (key: string, val: string | number) =>
     setForm((prev) => ({ ...prev, [key]: val }));
@@ -217,10 +229,13 @@ function RegisterVisitorModal({
           <div>
             <label className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-1 block">Gate</label>
             <select className={inputCls} value={form.gate_id} onChange={(e) => set("gate_id", e.target.value)}>
-              <option value="Gate-1">Gate-1</option>
-              <option value="Gate-2">Gate-2</option>
-              <option value="Gate-3">Gate-3</option>
-              <option value="Gate-4">Gate-4</option>
+              {gates.length === 0 ? (
+                <option value="">No gates configured</option>
+              ) : gates.map((gate) => (
+                <option key={gate.id} value={gate.id}>
+                  {gate.gate_code} - {gate.name}
+                </option>
+              ))}
             </select>
           </div>
           <div>
@@ -457,7 +472,7 @@ export default function GateConsolePage() {
           {
             id: "gate-a",
             gate_code: "GATE-A",
-            name: "Gate A — North Entry",
+            name: "Gate A - North Entry",
             gate_type: "entry",
             status: "open",
             is_active: true,
@@ -470,22 +485,9 @@ export default function GateConsolePage() {
           {
             id: "gate-b",
             gate_code: "GATE-B",
-            name: "Gate B — South Exit",
+            name: "Gate B - South Exit",
             gate_type: "exit",
-            status: "open",
-            is_active: true,
-            last_opened: new Date().toISOString(),
-            last_closed: null,
-            camera_id: null,
-            total_entries_today: 0,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: "gate-c",
-            gate_code: "GATE-C",
-            name: "Gate C — Loading Dock",
-            gate_type: "loading",
-            status: "open",
+            status: "closed",
             is_active: true,
             last_opened: new Date().toISOString(),
             last_closed: null,
@@ -497,8 +499,9 @@ export default function GateConsolePage() {
         setGates(dummyGates);
         if (!scanGateId) setScanGateId(dummyGates[0].id);
       } else {
-        setGates(data);
-        if (!scanGateId && data.length > 0) setScanGateId(data[0].id);
+        const consoleGates = data.filter(isGateConsoleGate);
+        setGates(consoleGates);
+        if (!scanGateId && consoleGates.length > 0) setScanGateId(consoleGates[0].id);
       }
     } catch {
       // Fallback to dummy data on error
@@ -506,7 +509,7 @@ export default function GateConsolePage() {
         {
           id: "gate-a",
           gate_code: "GATE-A",
-          name: "Gate A — North Entry",
+          name: "Gate A - North Entry",
           gate_type: "entry",
           status: "open",
           is_active: true,
@@ -519,22 +522,9 @@ export default function GateConsolePage() {
         {
           id: "gate-b",
           gate_code: "GATE-B",
-          name: "Gate B — South Exit",
+          name: "Gate B - South Exit",
           gate_type: "exit",
-          status: "open",
-          is_active: true,
-          last_opened: new Date().toISOString(),
-          last_closed: null,
-          camera_id: null,
-          total_entries_today: 0,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "gate-c",
-          gate_code: "GATE-C",
-          name: "Gate C — Loading Dock",
-          gate_type: "loading",
-          status: "open",
+          status: "closed",
           is_active: true,
           last_opened: new Date().toISOString(),
           last_closed: null,
@@ -548,105 +538,51 @@ export default function GateConsolePage() {
     }
   }, [scanGateId]);
 
+  const buildGateEntryDemoLogs = (): AccessLogResponse[] => {
+    const now = new Date();
+    const rows = [
+      { id: "log-1", plate: "KA01AB1234", confidence: 0.96, offsetMinutes: 120, vehicleId: "veh-1" },
+      { id: "log-2", plate: "MH02CD5678", confidence: 0.92, offsetMinutes: 225, vehicleId: "veh-2" },
+      { id: "log-3", plate: "TN-04-AB-1234", confidence: 0.94, offsetMinutes: 315, vehicleId: "veh-3" },
+      { id: "log-4", plate: "AP-09-MN-6789", confidence: 0.91, offsetMinutes: 360, vehicleId: "veh-4" },
+    ];
+
+    return rows.map((row) => {
+      const timestamp = new Date(now.getTime() - row.offsetMinutes * 60000).toISOString();
+      return {
+        id: row.id,
+        gate_id: "gate-a",
+        gate_code: "GATE-A",
+        plate_number: row.plate,
+        direction: "entry",
+        decision: "granted",
+        plate_confidence: row.confidence,
+        vehicle_id: row.vehicleId,
+        denied_reason: null,
+        processed_at: timestamp,
+        created_at: timestamp,
+      };
+    });
+  };
+
   const loadLogs = useCallback(async () => {
     try {
       const data = await getAccessLogs({ limit: 20 });
       // Filter out the first entry with plate AP02BE1874 or any entry that should be removed
-      const filteredData = data.filter(log => log.plate_number !== "AP02BE1874" && log.plate_number !== "RJ-14-LJ-7880" && log.plate_number !== "RJ-14-IJ-7890");
-      
+      const filteredData = data.filter(log =>
+        isGateConsoleLog(log)
+        && log.plate_number !== "AP02BE1874"
+        && log.plate_number !== "RJ-14-LJ-7880"
+        && log.plate_number !== "RJ-14-IJ-7890"
+      );
+
       if (filteredData.length === 0) {
-        // Add dummy data with varied dates/times
-        const now = new Date();
-        const dummyLogs: AccessLogResponse[] = [
-          {
-            id: "log-2",
-            gate_id: "gate-b",
-            gate_code: "GATE-B",
-            plate_number: "MH02CD5678",
-            direction: "exit",
-            decision: "granted",
-            plate_confidence: 0.92,
-            vehicle_id: "veh-2",
-            denied_reason: null,
-            processed_at: new Date(now.getTime() - 3 * 60 * 60000 - 45 * 60000).toISOString(), // 3h 45m ago
-            created_at: new Date(now.getTime() - 3 * 60 * 60000 - 45 * 60000).toISOString(),
-          },
-          {
-            id: "log-3",
-            gate_id: "gate-a",
-            gate_code: "GATE-A",
-            plate_number: "DL03EF9012",
-            direction: "entry",
-            decision: "denied",
-            plate_confidence: 0.88,
-            vehicle_id: null,
-            denied_reason: "Vehicle not registered",
-            processed_at: new Date(now.getTime() - 5 * 60 * 60000 - 15 * 60000).toISOString(), // 5h 15m ago
-            created_at: new Date(now.getTime() - 5 * 60 * 60000 - 15 * 60000).toISOString(),
-          },
-          {
-            id: "log-4",
-            gate_id: "gate-c",
-            gate_code: "GATE-C",
-            plate_number: "TN04GH3456",
-            direction: "exit",
-            decision: "granted",
-            plate_confidence: 0.97,
-            vehicle_id: "veh-blacklist-1",
-            denied_reason: null,
-            processed_at: new Date(now.getTime() - 6 * 60 * 60000 - 33 * 60000).toISOString(), // 6h 33m ago
-            created_at: new Date(now.getTime() - 6 * 60 * 60000 - 33 * 60000).toISOString(),
-          },
-        ];
-        setAccessLogs(dummyLogs);
+        setAccessLogs(buildGateEntryDemoLogs());
       } else {
         setAccessLogs(filteredData);
       }
     } catch {
-      // Fallback to dummy data with varied dates/times
-      const now = new Date();
-      const dummyLogs: AccessLogResponse[] = [
-        {
-          id: "log-2",
-          gate_id: "gate-b",
-          gate_code: "GATE-B",
-          plate_number: "MH02CD5678",
-          direction: "exit",
-          decision: "granted",
-          plate_confidence: 0.92,
-          vehicle_id: "veh-2",
-          denied_reason: null,
-          processed_at: new Date(now.getTime() - 3 * 60 * 60000 - 45 * 60000).toISOString(),
-          created_at: new Date(now.getTime() - 3 * 60 * 60000 - 45 * 60000).toISOString(),
-        },
-        {
-          id: "log-3",
-          gate_id: "gate-a",
-          gate_code: "GATE-A",
-          plate_number: "DL03EF9012",
-          direction: "entry",
-          decision: "denied",
-          plate_confidence: 0.88,
-          vehicle_id: null,
-          denied_reason: "Vehicle not registered",
-          processed_at: new Date(now.getTime() - 5 * 60 * 60000 - 15 * 60000).toISOString(),
-          created_at: new Date(now.getTime() - 5 * 60 * 60000 - 15 * 60000).toISOString(),
-        },
-        {
-          id: "log-4",
-          gate_id: "gate-c",
-          gate_code: "GATE-C",
-          plate_number: "TN04GH3456",
-          direction: "exit",
-          decision: "granted",
-          plate_confidence: 0.97,
-          vehicle_id: "veh-blacklist-1",
-          denied_reason: null,
-          processed_at: new Date(now.getTime() - 6 * 60 * 60000 - 33 * 60000).toISOString(),
-          created_at: new Date(now.getTime() - 6 * 60 * 60000 - 33 * 60000).toISOString(),
-        },
-      ];
-      setAccessLogs(dummyLogs);
+      setAccessLogs(buildGateEntryDemoLogs());
     }
   }, []);
 
@@ -659,53 +595,53 @@ export default function GateConsolePage() {
           {
             id: "veh-1",
             plate_number: "KA01AB1234",
-            vehicle_type: "Car",
+            vehicle_type: "Truck",
             owner_name: "Rajesh Kumar",
-            company: "Tech Solutions Pvt Ltd",
+            company: "Cement Logistics",
             status: "registered",
             blacklist_reason: null,
             valid_until: null,
             is_active: true,
-            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/blackswift_KA01AB1234.jpg.png`,
+            footage_url: getFootageUrl("KA01AB1234"),
             created_at: new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
           },
           {
             id: "veh-2",
             plate_number: "MH02CD5678",
-            vehicle_type: "Car",
+            vehicle_type: "Truck",
             owner_name: "Priya Sharma",
             company: "Logistics Express",
             status: "registered",
             blacklist_reason: null,
             valid_until: null,
             is_active: true,
-            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/bmw_MH02CD5678.jpg.png`,
+            footage_url: getFootageUrl("MH02CD5678"),
             created_at: new Date(Date.now() - 45 * 24 * 60 * 60000).toISOString(),
           },
           {
             id: "veh-3",
-            plate_number: "DL03EF9012",
-            vehicle_type: "Car",
+            plate_number: "TN-04-AB-1234",
+            vehicle_type: "Truck",
             owner_name: "Amit Patel",
-            company: "Premium Motors",
+            company: "Premium Cement Carriers",
             status: "registered",
             blacklist_reason: null,
             valid_until: null,
             is_active: true,
-            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/mercedes_DL03EF9012.jpg.png`,
+            footage_url: getFootageUrl("TN-04-AB-1234"),
             created_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
           },
           {
             id: "veh-4",
-            plate_number: "TN04GH3456",
-            vehicle_type: "Car",
+            plate_number: "AP-09-MN-6789",
+            vehicle_type: "Truck",
             owner_name: "Sunita Reddy",
             company: "Delivery Services",
             status: "registered",
             blacklist_reason: null,
             valid_until: null,
             is_active: true,
-            footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/silverswift_TN04GH3456.jpg.png`,
+            footage_url: getFootageUrl("AP-09-MN-6789"),
             created_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
           },
         ];
@@ -725,53 +661,53 @@ export default function GateConsolePage() {
         {
           id: "veh-1",
           plate_number: "KA01AB1234",
-          vehicle_type: "Car",
+          vehicle_type: "Truck",
           owner_name: "Rajesh Kumar",
-          company: "Tech Solutions Pvt Ltd",
+          company: "Cement Logistics",
           status: "registered",
           blacklist_reason: null,
           valid_until: null,
           is_active: true,
-          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/blackswift_KA01AB1234.jpg.png`,
+          footage_url: getFootageUrl("KA01AB1234"),
           created_at: new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
         },
         {
           id: "veh-2",
           plate_number: "MH02CD5678",
-          vehicle_type: "Car",
+          vehicle_type: "Truck",
           owner_name: "Priya Sharma",
           company: "Logistics Express",
           status: "registered",
           blacklist_reason: null,
           valid_until: null,
           is_active: true,
-          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/bmw_MH02CD5678.jpg.png`,
+          footage_url: getFootageUrl("MH02CD5678"),
           created_at: new Date(Date.now() - 45 * 24 * 60 * 60000).toISOString(),
         },
         {
           id: "veh-3",
-          plate_number: "DL03EF9012",
-          vehicle_type: "Car",
+          plate_number: "TN-04-AB-1234",
+          vehicle_type: "Truck",
           owner_name: "Amit Patel",
-          company: "Premium Motors",
+          company: "Premium Cement Carriers",
           status: "registered",
           blacklist_reason: null,
           valid_until: null,
           is_active: true,
-          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/mercedes_DL03EF9012.jpg.png`,
+          footage_url: getFootageUrl("TN-04-AB-1234"),
           created_at: new Date(Date.now() - 60 * 24 * 60 * 60000).toISOString(),
         },
         {
           id: "veh-4",
-          plate_number: "TN04GH3456",
-          vehicle_type: "Car",
+          plate_number: "AP-09-MN-6789",
+          vehicle_type: "Truck",
           owner_name: "Sunita Reddy",
           company: "Delivery Services",
           status: "registered",
           blacklist_reason: null,
           valid_until: null,
           is_active: true,
-          footage_url: `${getBackendBaseUrl()}/tmp/vehicle_registry/silverswift_TN04GH3456.jpg.png`,
+          footage_url: getFootageUrl("AP-09-MN-6789"),
           created_at: new Date(Date.now() - 15 * 24 * 60 * 60000).toISOString(),
         },
       ];
@@ -1204,9 +1140,6 @@ export default function GateConsolePage() {
         >
           Gate Control
         </h1>
-        <span className="text-[11px] text-[#4E6090] ml-2">
-          {gates.length} gates | Auto-refresh active
-        </span>
       </div>
 
       {/* ================================================================= */}
@@ -1224,14 +1157,7 @@ export default function GateConsolePage() {
               <h3 className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-2 font-bold">Gate In</h3>
               <div className="space-y-2">
                 {(() => {
-                  // Get unique gates that have "entry" direction in access logs
-                  const entryGateCodes = new Set(
-                    accessLogs.filter(log => log.direction === "entry").map(log => log.gate_code)
-                  );
-                  const entryGates = gates.filter(g => entryGateCodes.has(g.gate_code));
-                  
-                  // Fallback: if no logs yet, show gates with gate_type === "entry"
-                  const displayGates = entryGates.length > 0 ? entryGates : gates.filter(g => g.gate_type === "entry");
+                  const displayGates = gates.filter(g => g.gate_type === "entry");
                   
                   if (displayGates.length === 0) {
                     return <p className="text-[11px] text-[#4E6090]">No entry gates configured</p>;
@@ -1289,14 +1215,7 @@ export default function GateConsolePage() {
               <h3 className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-2 font-bold">Gate Out</h3>
               <div className="space-y-2">
                 {(() => {
-                  // Get unique gates that have "exit" direction in access logs
-                  const exitGateCodes = new Set(
-                    accessLogs.filter(log => log.direction === "exit").map(log => log.gate_code)
-                  );
-                  const exitGates = gates.filter(g => exitGateCodes.has(g.gate_code));
-                  
-                  // Fallback: if no logs yet, show gates with gate_type === "exit"
-                  const displayGates = exitGates.length > 0 ? exitGates : gates.filter(g => g.gate_type === "exit");
+                  const displayGates = gates.filter(g => g.gate_type === "exit");
                   
                   if (displayGates.length === 0) {
                     return <p className="text-[11px] text-[#4E6090]">No exit gates configured</p>;
@@ -1419,7 +1338,7 @@ export default function GateConsolePage() {
                 disabled={scanning}
                 className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
                   scanDirection === "entry"
-                    ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
+                    ? "border-[#E5521A] bg-[#E5521A] text-white"
                     : "border-[#1E2F50] text-[#4E6090] hover:border-[#2A3F68]"
                 } ${scanning ? "opacity-60 cursor-wait" : ""}`}
               >
@@ -1432,7 +1351,7 @@ export default function GateConsolePage() {
                 disabled={scanning}
                 className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
                   scanDirection === "exit"
-                    ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
+                    ? "border-[#E5521A] bg-[#E5521A] text-white"
                     : "border-[#1E2F50] text-[#4E6090] hover:border-[#2A3F68]"
                 } ${scanning ? "opacity-60 cursor-wait" : ""}`}
               >
@@ -1503,11 +1422,11 @@ export default function GateConsolePage() {
               type="button"
               onClick={() => downloadCsv(
                 `access-log-${new Date().toISOString().slice(0, 10)}.csv`,
-                ["Time", "Gate", "Plate", "Direction", "Confidence", "Reason"],
+                ["Time", "Gate", "Plate", "Direction", "Confidence"],
                 accessLogs.map((l) => [
                   new Date(l.processed_at || l.created_at).toLocaleString(),
                   l.gate_code || "—", l.plate_number, l.direction,
-                  l.plate_confidence, l.denied_reason || "",
+                  l.plate_confidence,
                 ]),
               )}
               className="px-2.5 py-1 rounded-lg text-[10px] font-semibold border border-[#1E2F50] text-[#8A9BBF] hover:border-[#22D3A1]/30 hover:text-[#22D3A1] transition-colors"
@@ -1536,7 +1455,6 @@ export default function GateConsolePage() {
                 <th className="pb-2 pr-3">Plate</th>
                 <th className="pb-2 pr-3">Direction</th>
                 <th className="pb-2 pr-3">Footage</th>
-                <th className="pb-2">Reason</th>
               </tr>
             </thead>
             <tbody>
@@ -1571,14 +1489,14 @@ export default function GateConsolePage() {
                       📊 Footage
                     </button>
                   </td>
-                  <td className="py-2 text-[10px] text-[#F04A4A]">
+                  <td className="hidden">
                     {log.denied_reason || "—"}
                   </td>
                 </tr>
               ))}
               {filteredLogs.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-6 text-center text-[11px] text-[#4E6090]">
+                  <td colSpan={5} className="py-6 text-center text-[11px] text-[#4E6090]">
                     No access logs matching filters
                   </td>
                 </tr>
@@ -1601,7 +1519,7 @@ export default function GateConsolePage() {
             <button
               type="button"
               onClick={() => setShowVehicleModal(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#E5521A]/30 bg-[#E5521A]/10 text-[#E5521A] text-[10px] font-semibold hover:bg-[#E5521A]/20 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#E5521A] bg-[#E5521A] text-white text-[10px] font-semibold shadow-sm shadow-[#E5521A]/25 hover:bg-[#C94312] hover:border-[#C94312] transition-colors"
             >
               <Plus className="w-3 h-3" /> Register Vehicle
             </button>
@@ -1724,7 +1642,7 @@ export default function GateConsolePage() {
             <button
               type="button"
               onClick={() => setShowVisitorModal(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#E5521A]/30 bg-[#E5521A]/10 text-[#E5521A] text-[10px] font-semibold hover:bg-[#E5521A]/20 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#E5521A] bg-[#E5521A] text-white text-[10px] font-semibold shadow-sm shadow-[#E5521A]/25 hover:bg-[#C94312] hover:border-[#C94312] transition-colors"
             >
               <UserPlus className="w-3 h-3" /> Register Visitor
             </button>

@@ -130,35 +130,6 @@ export default function PlatformNav() {
           </div>
         </button>
 
-        {/* Vertical Divider */}
-        <div
-          style={{
-            width: 1,
-            height: 24,
-            background: "var(--border-default)",
-            flexShrink: 0,
-          }}
-        />
-
-        {/* Depot Selector */}
-        <select
-          style={{
-            padding: "7px 12px",
-            background: "var(--bg-input)",
-            border: "1px solid var(--border-input)",
-            borderRadius: 7,
-            color: "var(--text-primary)",
-            fontSize: 15,
-            fontWeight: 700,
-            outline: "none",
-            cursor: "pointer",
-          }}
-        >
-          <option>📍 Mumbai Central</option>
-          <option>📍 Delhi North Hub</option>
-          <option>📍 Dubai South</option>
-        </select>
-
         {/* Spacer */}
         <div style={{ flex: 1 }} />
 
