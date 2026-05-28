@@ -177,6 +177,10 @@ app.include_router(monitoring_router)
 app.include_router(audit_router)
 app.include_router(realtime_router)
 
+# WebSocket endpoint for incident notifications
+from app.core.notifications.websocket_endpoint import router as websocket_notifications_router
+app.include_router(websocket_notifications_router)
+
 if settings.ENABLE_DEPOT_MODULES:
     from app.depot.vision.camera import router as camera_router
     from app.depot.vision.detection import router as detection_router

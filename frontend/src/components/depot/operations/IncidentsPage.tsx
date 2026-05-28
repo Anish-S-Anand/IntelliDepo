@@ -43,6 +43,9 @@ type AnalysisReport = {
 type AcknowledgmentConfirmation = {
   isOpen: boolean;
   incidentId: string | null;
+  assignedTo?: string;
+  notificationsSent?: string[];
+  notificationDetails?: Record<string, string>;
 };
 
 const BUSINESS_ACTIONS: { action: IncidentBusinessAction; label: string; notes: string; assigned_to?: string }[] = [
@@ -296,12 +299,18 @@ export default function IncidentsPage() {
     setAcknowledging(id);
     setAckError(null);
     try {
-      await acknowledgeIncident(id, "Acknowledged from incident console");
+      const response = await acknowledgeIncident(id, "Acknowledged from incident console");
       await fetchIncidents();
-      // Show acknowledgment confirmation popup
-      setAckConfirmation({ isOpen: true, incidentId: id });
+      // Show acknowledgment confirmation popup with assignment details
+      setAckConfirmation({ 
+        isOpen: true, 
+        incidentId: id,
+        assignedTo: response.assigned_to,
+        notificationsSent: response.notifications_sent,
+        notificationDetails: response.notification_details,
+      });
     } catch {
-      setAckError("Unable to acknowledge this incident. The displayed data was not changed.");
+      setAckError("Unable to assign this incident. The displayed data was not changed.");
     } finally {
       setAcknowledging(null);
     }
@@ -317,14 +326,22 @@ export default function IncidentsPage() {
         existingIncident ?? await createIncidentFromBreach(breach.id);
 
       if (incident.status !== "acknowledged") {
-        await acknowledgeIncident(incident.id, "Acknowledged from active perimeter breach card");
+        const response = await acknowledgeIncident(incident.id, "Acknowledged from active perimeter breach card");
+        // Show acknowledgment confirmation popup with assignment details
+        setAckConfirmation({ 
+          isOpen: true, 
+          incidentId: incident.id,
+          assignedTo: response.assigned_to,
+          notificationsSent: response.notifications_sent,
+          notificationDetails: response.notification_details,
+        });
+      } else {
+        setAckConfirmation({ isOpen: true, incidentId: incident.id });
       }
 
       await fetchIncidents();
-      // Show acknowledgment confirmation popup
-      setAckConfirmation({ isOpen: true, incidentId: incident.id });
     } catch {
-      setAckError("Unable to acknowledge this breach. The active breach data was not changed.");
+      setAckError("Unable to assign this breach. The active breach data was not changed.");
     } finally {
       setAcknowledging(null);
     }
@@ -348,7 +365,7 @@ export default function IncidentsPage() {
 
   const filters: { label: string; value: FilterType; style?: string }[] = [
     { label: "All Incidents", value: "all" },
-    { label: "Acknowledged", value: "acknowledged" },
+    { label: "Assigned", value: "acknowledged" },
     { label: "Resolved", value: "resolved" },
     { label: "Critical", value: "CRITICAL", style: "border-[#EF4444] text-[#EF4444]" },
     { label: "High", value: "HIGH", style: "border-[#F97316] text-[#F97316]" },
@@ -508,7 +525,7 @@ export default function IncidentsPage() {
       <div className="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         {[
           { v: cntTotal, l: "All Incidents", c: "#F5A623" },
-          { v: cntAck, l: "Acknowledged", c: "#5B9BF5" },
+          { v: cntAck, l: "Assigned", c: "#5B9BF5" },
           { v: cntRes, l: "Resolved", c: "#22D3A1" },
           { v: cntCrit, l: "Critical", c: "#F04A4A" },
         ].map((s) => (
@@ -613,7 +630,7 @@ export default function IncidentsPage() {
                   disabled={acknowledging === i.id}
                   className="px-3 py-1.5 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition disabled:opacity-50"
                 >
-                  {acknowledging === i.id ? "Acknowledging..." : "Acknowledge"}
+                  {acknowledging === i.id ? "Assigning..." : "Assigned"}
                 </button>
               )}
               {i.status !== "resolved" && (
@@ -682,10 +699,10 @@ export default function IncidentsPage() {
                         className="text-[11px] font-bold px-3 py-1 rounded-full border border-[#E5521A] text-[#E5521A] hover:bg-[#E5521A]/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {acknowledging === b.id
-                          ? "Acknowledging..."
+                          ? "Assigning..."
                           : isAcknowledged
-                            ? "Acknowledged"
-                            : "Acknowledge"}
+                            ? "Assigned"
+                            : "Assigned"}
                       </button>
                     </div>
                   </div>
@@ -1200,12 +1217,66 @@ export default function IncidentsPage() {
         <div className="fixed inset-0 bg-black/60 z-[10001] flex items-center justify-center p-4" onClick={() => setAckConfirmation({ isOpen: false, incidentId: null })}>
           <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-8 w-full max-w-md text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-6">
+              {/* Success Icon */}
+              <div className="flex justify-center mb-4">
+                <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </div>
+              
               <div className="text-[20px] font-bold text-[#E8EDF8] mb-2">
-                Issue is Acknowledged
+                Incident Acknowledged Successfully!
               </div>
-              <div className="text-[12px] text-[#8A9BBF]">
-                The incident has been successfully acknowledged
+              <div className="text-[12px] text-[#8A9BBF] mb-4">
+                The incident has been acknowledged and notifications have been sent
               </div>
+
+              {/* Assignment Details */}
+              {ackConfirmation.assignedTo && (
+                <div className="bg-[#0F1829] border border-[#1E2F50] rounded-lg p-4 mb-4 text-left">
+                  <div className="text-[11px] font-bold text-[#8A9BBF] mb-2">ASSIGNED TO</div>
+                  <div className="text-[14px] font-bold text-[#E8EDF8] mb-3">
+                    👤 {ackConfirmation.assignedTo}
+                  </div>
+
+                  {/* Notifications Sent */}
+                  {ackConfirmation.notificationsSent && ackConfirmation.notificationsSent.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[#1E2F50]">
+                      <div className="text-[11px] font-bold text-[#8A9BBF] mb-2">NOTIFICATIONS SENT</div>
+                      <div className="flex flex-wrap gap-2">
+                        {ackConfirmation.notificationsSent.includes('whatsapp') && (
+                          <div className="flex items-center gap-1 text-[11px] text-green-400">
+                            <span>📱</span>
+                            <span>WhatsApp</span>
+                          </div>
+                        )}
+                        {ackConfirmation.notificationsSent.includes('email') && (
+                          <div className="flex items-center gap-1 text-[11px] text-blue-400">
+                            <span>📧</span>
+                            <span>Email</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notification Details */}
+                  {ackConfirmation.notificationDetails && Object.keys(ackConfirmation.notificationDetails).length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[#1E2F50]">
+                      <div className="text-[11px] font-bold text-[#8A9BBF] mb-2">NOTIFICATION STATUS</div>
+                      <div className="space-y-1">
+                        {Object.entries(ackConfirmation.notificationDetails).map(([key, value]) => (
+                          <div key={key} className="text-[10px] text-[#8A9BBF]">
+                            <span className="capitalize">{key}:</span> {value}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <button
               onClick={() => setAckConfirmation({ isOpen: false, incidentId: null })}
