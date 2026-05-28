@@ -217,7 +217,7 @@ function zoneColor(pct: number): string {
   return "#22D3A1";
 }
 
-function displayZoneName(zone: ZoneData): string {
+function _displayZoneName(zone: ZoneData): string {
   return zone.name
     .replace(/\s+[—-]\s+Zone\s+[A-Z0-9]+$/i, "")
     .replace(/^Storage Bay\s+[A-Z0-9]+\s+[—-]\s+/i, "")
@@ -225,7 +225,7 @@ function displayZoneName(zone: ZoneData): string {
 }
 
 // Fallback full names if backend returns short names
-const ZONE_FULL_NAMES: Record<string, string> = {
+const _ZONE_FULL_NAMES: Record<string, string> = {
   A: "UltraTech Cement — Zone A",
   B: "ACC Cement — Zone B",
   C: "JSW Cement — Zone C",
@@ -233,7 +233,7 @@ const ZONE_FULL_NAMES: Record<string, string> = {
 };
 
 function resolveZoneName(zone: ZoneData): string {
-  return `Zone ${zone.zone_code}`;
+  return _ZONE_FULL_NAMES[zone.zone_code] ?? (_displayZoneName(zone) || `Zone ${zone.zone_code}`);
 }
 
 function matchesSearch(query: string, values: Array<string | number | null | undefined>): boolean {
@@ -500,7 +500,8 @@ export default function InventoryPage() {
       ]);
 
       // Heatmap data (for accurate zone utilization) - removed as it's not being fetched
-      let heatmapData: Record<string, { utilization_pct: number; current_occupancy: number; max_capacity_units: number }> = {};
+      const heatmapData: Record<string, { utilization_pct: number; current_occupancy: number; max_capacity_units: number }> = {};
+      void heatmapData;
       // Note: heatmapRes was removed since no third fetch was provided
 
       // Zones
@@ -901,7 +902,7 @@ export default function InventoryPage() {
           {hasActiveFilters && (
             <button
               onClick={resetFilters}
-              className="px-3 py-2 rounded-[10px] border border-[#E5521A]/30 text-[#E5521A] text-[11px] font-bold hover:bg-[#E5521A]/10 transition"
+              className="px-3 py-2 rounded-[10px] border border-[#E5521A] bg-[#E5521A] text-white text-[11px] font-bold shadow-sm shadow-[#E5521A]/20 transition hover:bg-[#C94312] hover:border-[#C94312] focus:outline-none focus:ring-2 focus:ring-[#E5521A]/35"
             >
               Clear All
             </button>

@@ -61,7 +61,7 @@ async def _get_or_create_demo_user(db: AsyncSession, email: str) -> User | None:
     # Create the demo user on-the-fly
     try:
         from app.core.auth.authentication import register_user
-        user = await register_user(db, email, "MacroPulse2025!", info["full_name"])
+        user = await register_user(db, email, "Depot!26", info["full_name"])
         user.is_superuser = info["is_superuser"]
         user.email_verified = True
         await db.commit()

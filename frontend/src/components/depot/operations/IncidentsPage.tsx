@@ -43,9 +43,12 @@ type AnalysisReport = {
 type AcknowledgmentConfirmation = {
   isOpen: boolean;
   incidentId: string | null;
+<<<<<<< HEAD
   assignedTo?: string;
   notificationsSent?: string[];
   notificationDetails?: Record<string, string>;
+=======
+>>>>>>> c37f5d71e1e25562b6527bd3e61381550cbbedfb
 };
 
 const BUSINESS_ACTIONS: { action: IncidentBusinessAction; label: string; notes: string; assigned_to?: string }[] = [
@@ -556,7 +559,7 @@ export default function IncidentsPage() {
             onClick={() => setFilter(f.value)}
             className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${
               filter === f.value
-                ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
+                ? "border-[#E5521A] bg-[#E5521A] text-white"
                 : f.style || "border-[#1E2F50] text-[#8A9BBF] hover:border-[#2A3F68] hover:text-[#E8EDF8]"
             }`}
           >

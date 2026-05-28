@@ -254,21 +254,21 @@ const DEMO_WAREHOUSES = {
   WH_HYD: {
     name: "Hyderabad Depot",
     region_id: "REG_SOUTH",
-    zones: ["HYD-Z1", "HYD-Z2", "HYD-Z3"],
+    zones: ["HYD-Z1", "HYD-Z2", "HYD-Z3", "HYD-Z4"],
     cameras: ["CAM-H1", "CAM-H2", "CAM-H3", "CAM-H4", "CAM-H5", "CAM-H6"],
     metrics: { bags_in: 1260, bags_out: 1040, vehicles: 38, workers: 82, incidents: 2, occupancy: 74, unload: 34 },
   },
   WH_BLR: {
     name: "Bangalore Depot",
     region_id: "REG_SOUTH",
-    zones: ["BLR-Z1", "BLR-Z2", "BLR-Z3"],
+    zones: ["BLR-Z1", "BLR-Z2", "BLR-Z3", "BLR-Z4"],
     cameras: ["CAM-B1", "CAM-B2", "CAM-B3", "CAM-B4", "CAM-B5", "CAM-B6"],
     metrics: { bags_in: 1435, bags_out: 1195, vehicles: 44, workers: 76, incidents: 3, occupancy: 71, unload: 29 },
   },
   WH_MUM: {
     name: "Mumbai Depot",
     region_id: "REG_WEST",
-    zones: ["MUM-Z1", "MUM-Z2", "MUM-Z3"],
+    zones: ["MUM-Z1", "MUM-Z2", "MUM-Z3", "MUM-Z4"],
     cameras: ["CAM-M1", "CAM-M2", "CAM-M3", "CAM-M4", "CAM-M5", "CAM-M6"],
     metrics: { bags_in: 980, bags_out: 910, vehicles: 31, workers: 64, incidents: 1, occupancy: 82, unload: 37 },
   },
@@ -276,6 +276,20 @@ const DEMO_WAREHOUSES = {
 
 type DemoWarehouseId = keyof typeof DEMO_WAREHOUSES;
 type DemoMetricKey = keyof typeof DEMO_WAREHOUSES.WH_HYD.metrics;
+
+// Zone→gate mapping: Z1→Gate A, Z2→Gate B, Z3→Gate C, Z4→no gate
+// Zone→camera mapping: Z1→[cam1,cam2], Z2→[cam3], Z3→[cam4], Z4→[cam5,cam6]
+const COMMAND_GATE_SEED = [
+  { suffix: "A", name: "Gate A - North Entry", gateType: "entry", status: "open" },
+  { suffix: "B", name: "Gate B - South Exit", gateType: "exit", status: "closed" },
+  { suffix: "C", name: "Gate C - Loading Dock", gateType: "loading", status: "open" },
+] as const;
+
+// Camera start index per zone: Z1 starts at 0 (2 cams), Z2 at 2 (1 cam), Z3 at 3 (1 cam), Z4 at 4 (2 cams)
+const ZONE_CAM_START = [0, 2, 3, 4] as const;
+const ZONE_CAM_COUNT = [2, 1, 1, 2] as const;
+// Gate index per zone (null = no gate)
+const ZONE_GATE_IDX = [0, 1, 2, null] as const;
 
 function demoWarehouseIds(): DemoWarehouseId[] {
   if (typeof window === "undefined") return ["WH_BLR"];
@@ -298,22 +312,29 @@ function demoCommandCenterSnapshot(): CommandCenterSnapshot {
   const sum = (key: DemoMetricKey) => metrics.reduce((total, item) => total + Number(item[key]), 0);
   const avgUnload = Math.round(sum("unload") / Math.max(metrics.length, 1));
   const occupancy = Math.round(sum("occupancy") / Math.max(metrics.length, 1));
-  const cameras = warehouseIds.flatMap((warehouseId) => DEMO_WAREHOUSES[warehouseId].cameras.map((cameraId, index) => ({
-    id: cameraId,
-    name: cameraId,
-    zone: DEMO_WAREHOUSES[warehouseId].zones[Math.floor(index / 2)],
-    status: "active",
-    protocol: "rtsp",
-    warehouse_id: warehouseId,
-    region_id: DEMO_WAREHOUSES[warehouseId].region_id,
-    last_seen: now,
-  })));
-  const gates = warehouseIds.flatMap((warehouseId) => DEMO_WAREHOUSES[warehouseId].zones.map((zone, index) => ({
-    id: `${warehouseId}-G${index + 1}`,
-    gate_code: `Gate ${index + 1}`,
-    name: `${DEMO_WAREHOUSES[warehouseId].name} Gate ${index + 1}`,
-    gate_type: "both",
-    status: index === 0 ? "open" : "closed",
+  const cameras = warehouseIds.flatMap((warehouseId) => {
+    const wh = DEMO_WAREHOUSES[warehouseId];
+    return wh.zones.flatMap((zone, zoneIndex) => {
+      const start = ZONE_CAM_START[zoneIndex];
+      const count = ZONE_CAM_COUNT[zoneIndex];
+      return wh.cameras.slice(start, start + count).map((cameraId) => ({
+        id: cameraId,
+        name: cameraId,
+        zone,
+        status: "active",
+        protocol: "rtsp",
+        warehouse_id: warehouseId,
+        region_id: DEMO_WAREHOUSES[warehouseId].region_id,
+        last_seen: now,
+      }));
+    });
+  });
+  const gates = warehouseIds.flatMap((warehouseId) => COMMAND_GATE_SEED.map((gate, index) => ({
+    id: `${warehouseId}-GATE-${gate.suffix}`,
+    gate_code: `GATE-${gate.suffix}`,
+    name: gate.name,
+    gate_type: gate.gateType,
+    status: gate.status,
     total_entries_today: 14 + index * 4,
     warehouse_id: warehouseId,
     region_id: DEMO_WAREHOUSES[warehouseId].region_id,
@@ -660,9 +681,8 @@ function isDemoSession(): boolean {
 }
 
 const DEMO_GATES = [
-  { id: "gate-a", name: "Gate A — North Entry" },
-  { id: "gate-b", name: "Gate B — South Exit" },
-  { id: "gate-c", name: "Gate C — Loading Bay" },
+  { id: "gate-a", name: "Gate A - North Entry" },
+  { id: "gate-b", name: "Gate B - South Exit" },
 ];
 
 function demoCommandAction(url: string, payload: Record<string, unknown>): CommandActionResponse {

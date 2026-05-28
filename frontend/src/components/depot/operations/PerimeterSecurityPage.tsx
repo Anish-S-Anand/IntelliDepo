@@ -216,7 +216,7 @@ export default function PerimeterSecurityPage() {
               onClick={() => setTab(t.value)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${
                 tab === t.value
-                  ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
+                  ? "border-[#E5521A] bg-[#E5521A] text-white"
                   : "border-[#1E2F50] text-[#8A9BBF] hover:border-[#2A3F68] hover:text-[#E8EDF8]"
               }`}
             >

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Bell, RefreshCw, Settings, User, Clock, LogOut, ChevronDown, Shield, MapPin } from "lucide-react";
+import { Bell, RefreshCw, Settings, User, Clock, LogOut, ChevronDown, Shield, Menu } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { getAllActiveAlerts } from "@/services/depotVision";
@@ -16,7 +16,7 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
   const [alertCount, setAlertCount] = useState(0);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  // Fetch live alert count for the bell badge — deferred so it doesn't compete
+  // Fetch live alert count for the bell badge, deferred so it doesn't compete
   // with the page's own data fetching on navigation
   useEffect(() => {
     let cancelled = false;
@@ -81,14 +81,14 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
         borderBottom: "1px solid var(--bg-nav-border)",
       }}
     >
-      {/* Mobile Hamburger */}
+      {/* Mobile menu */}
       <button
         onClick={toggleSidebar}
         className="md:hidden w-8 h-8 flex items-center justify-center text-lg theme-transition"
         style={{ color: "var(--text-primary)" }}
         aria-label="Toggle sidebar"
       >
-        ☰
+        <Menu className="w-5 h-5" />
       </button>
 
       {/* Logo */}
@@ -115,7 +115,7 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
             className="text-[8px] sm:text-[9px] font-semibold tracking-[0.12em] uppercase"
             style={{ color: "var(--text-muted)" }}
           >
-            IntelliDepot™
+            IntelliDepot TM
           </span>
         </div>
       </button>
@@ -125,27 +125,6 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
         className="hidden sm:block w-px h-7 flex-shrink-0"
         style={{ backgroundColor: "var(--border-default)" }}
       />
-
-      {/* Depot location — shows warehouse location from logged-in account */}
-      <div
-        className="hidden sm:flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-semibold theme-transition"
-        style={{
-          backgroundColor: "var(--bg-input)",
-          border: "1px solid var(--border-input)",
-          color: "var(--text-input)",
-        }}
-      >
-        <MapPin className="w-3 h-3 text-[#E5521A] flex-shrink-0" />
-        {(() => {
-          if (user?.location) return user.location;
-          // Derive from full_name e.g. "Warehouse Manager - Bengaluru" → "Bengaluru"
-          if (user?.full_name) {
-            const parts = user.full_name.split(/[-–—]/);
-            if (parts.length > 1) return parts[parts.length - 1].trim();
-          }
-          return user?.email?.split("@")[0] ?? "Depot";
-        })()}
-      </div>
 
       <div className="flex-1" />
 

@@ -147,11 +147,11 @@ BATCHES = [
 ]
 
 DEMO_USERS = [
-    {"email": "wm.blr@fidelis-demo.com", "full_name": "Warehouse Manager - Bengaluru", "password": "MacroPulse2025!", "is_superuser": False},
-    {"email": "wm.hyd@fidelis-demo.com", "full_name": "Warehouse Manager - Hyderabad", "password": "MacroPulse2025!", "is_superuser": False},
-    {"email": "wm.mum@fidelis-demo.com", "full_name": "Warehouse Manager - Mumbai", "password": "MacroPulse2025!", "is_superuser": False},
-    {"email": "regional@fidelis-demo.com", "full_name": "Regional Manager - India", "password": "MacroPulse2025!", "is_superuser": False},
-    {"email": "admin@fidelis-demo.com", "full_name": "Platform Admin", "password": "MacroPulse2025!", "is_superuser": True},
+    {"email": "wm.blr@fidelis-demo.com", "full_name": "Warehouse Manager - Bengaluru", "password": "Depot!26", "is_superuser": False},
+    {"email": "wm.hyd@fidelis-demo.com", "full_name": "Warehouse Manager - Hyderabad", "password": "Depot!26", "is_superuser": False},
+    {"email": "wm.mum@fidelis-demo.com", "full_name": "Warehouse Manager - Mumbai", "password": "Depot!26", "is_superuser": False},
+    {"email": "regional@fidelis-demo.com", "full_name": "Regional Manager - India", "password": "Depot!26", "is_superuser": False},
+    {"email": "admin@fidelis-demo.com", "full_name": "Platform Admin", "password": "Depot!26", "is_superuser": True},
 ]
 
 
@@ -456,21 +456,22 @@ async def seed_database(db_url: str | None = None):
 
             # ── Inventory Batches ──
             # Vary batch creation timestamps across the replay window so
-            # heatmap date ranges show inventory building over the month.
+            # Vary batch creation timestamps across 2+ months so
+            # heatmap date ranges show inventory building over time.
             batch_timestamps = [
-                now - timedelta(days=29, hours=4),
-                now - timedelta(days=27, hours=2),
-                now - timedelta(days=25, hours=5),
-                now - timedelta(days=23, hours=3),
-                now - timedelta(days=21, hours=6),
-                now - timedelta(days=19, hours=2),
-                now - timedelta(days=17, hours=5),
-                now - timedelta(days=15, hours=3),
-                now - timedelta(days=13, hours=4),
-                now - timedelta(days=11, hours=2),
-                now - timedelta(days=9, hours=5),
-                now - timedelta(days=7, hours=3),
-                now - timedelta(days=5, hours=4),
+                now - timedelta(days=62, hours=4),
+                now - timedelta(days=55, hours=2),
+                now - timedelta(days=49, hours=5),
+                now - timedelta(days=43, hours=3),
+                now - timedelta(days=38, hours=6),
+                now - timedelta(days=33, hours=2),
+                now - timedelta(days=28, hours=5),
+                now - timedelta(days=24, hours=3),
+                now - timedelta(days=20, hours=4),
+                now - timedelta(days=16, hours=2),
+                now - timedelta(days=12, hours=5),
+                now - timedelta(days=9, hours=3),
+                now - timedelta(days=6, hours=4),
                 now - timedelta(days=3, hours=2),
                 now - timedelta(days=1, hours=5),
             ]
@@ -487,6 +488,10 @@ async def seed_database(db_url: str | None = None):
                                 zone = EXCLUDED.zone,
                                 rack = EXCLUDED.rack,
                                 bin_location = EXCLUDED.bin_location,
+                                manufacture_date = EXCLUDED.manufacture_date,
+                                expiry_date = EXCLUDED.expiry_date,
+                                received_at = EXCLUDED.received_at,
+                                created_at = EXCLUDED.created_at,
                                 status = EXCLUDED.status,
                                 updated_at = EXCLUDED.updated_at
                         """), {
@@ -527,7 +532,7 @@ async def seed_database(db_url: str | None = None):
                 """))
 
                 history_rows = 0
-                for day_offset in range(30, -1, -1):
+                for day_offset in range(60, -1, -1):
                     recorded_at = (now - timedelta(days=day_offset)).replace(hour=18, minute=0, second=0, microsecond=0)
                     for zone in zone_rows:
                         zone_code = zone["zone_code"]
