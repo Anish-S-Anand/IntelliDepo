@@ -502,6 +502,32 @@ async def acknowledge_incident(
                      actor_role="operator", prev_state=prev,
                      new_state=IncidentStatus.ACKNOWLEDGED, details=body.reason)
 
+    # Trigger multi-channel notifications (WhatsApp, Email, WebSocket popup)
+    try:
+        from app.core.notifications.config import get_orchestrator
+        orchestrator = get_orchestrator()
+        notification_result = await orchestrator.trigger_acknowledgment_notifications(
+            incident=incident,
+            db=db
+        )
+        
+        # Log notification results
+        if notification_result.errors:
+            logger.warning(
+                f"Incident {incident_id} acknowledged with notification errors: "
+                f"{', '.join(notification_result.errors)}"
+            )
+        else:
+            logger.info(
+                f"Incident {incident_id} acknowledged - notifications sent: "
+                f"WhatsApp={notification_result.whatsapp_sent}, "
+                f"Email={notification_result.email_sent}, "
+                f"Popup={notification_result.popup_broadcast}"
+            )
+    except Exception as e:
+        # Don't block incident acknowledgment if notifications fail
+        logger.error(f"Notification orchestration failed for incident {incident_id}: {e}")
+
     await db.commit()
     await db.refresh(incident)
     return IncidentResponse.model_validate(incident)

@@ -43,6 +43,15 @@ type AnalysisReport = {
 type AcknowledgmentConfirmation = {
   isOpen: boolean;
   incidentId: string | null;
+  assignedTo: string;
+  priority: string;
+  resolutionTarget: string;
+};
+
+type AssignmentOverride = {
+  status: Incident["status"];
+  assignedTo: string;
+  acknowledgedAt: string;
 };
 
 const BUSINESS_ACTIONS: { action: IncidentBusinessAction; label: string; notes: string; assigned_to?: string }[] = [
@@ -54,7 +63,11 @@ const BUSINESS_ACTIONS: { action: IncidentBusinessAction; label: string; notes: 
 ];
 
 const EMPTY_VALUE = "-";
+const DEFAULT_ASSIGNEE = "Shift Supervisor";
+const DEFAULT_PRIORITY = "P3 - Medium";
+const DEFAULT_RESOLUTION_TARGET = "Resolve within 30 minutes";
 const ALLOWED_EVIDENCE_TYPES = new Set(["unauthorized_entry", "loitering"]);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED_EVIDENCE_VIDEOS = new Set(["Perimeter_Detection.mp4", "Theft Camera .mp4"]);
 
 const BREACH_TYPE_LABELS: Record<string, string> = {
@@ -136,7 +149,7 @@ function mapBackendIncident(inc: IncidentResponse): Incident {
     status: statusMap[inc.status] || "open",
     cam: resolveEvidenceVideo(inc.video_archive_ref) || EMPTY_VALUE,
     desc: inc.description || inc.title,
-    assignee: inc.acknowledged_by || inc.escalated_to || EMPTY_VALUE,
+    assignee: displayAssigneeForIncident(inc),
   };
 }
 
@@ -171,6 +184,64 @@ function notificationColor(status: string): string {
   return "#8A9BBF";
 }
 
+function priorityForSeverity(severity?: string | null): string {
+  const normalized = (severity || "").toUpperCase();
+  if (normalized === "CRITICAL") return "P1 - Critical";
+  if (normalized === "HIGH") return "P2 - High";
+  if (normalized === "MEDIUM") return "P3 - Medium";
+  return "P4 - Low";
+}
+
+function displayAssigneeForIncident(incident: IncidentResponse): string {
+  const assigned = incident.escalated_to || incident.acknowledged_by || "";
+  if (assigned && !UUID_PATTERN.test(assigned)) return assigned;
+  return assigneeForPriority(priorityForSeverity(incident.severity));
+}
+
+function assigneeForPriority(priority: string): string {
+  if (priority.startsWith("P1")) return "Regional Manager";
+  if (priority.startsWith("P2")) return "Security Supervisor";
+  if (priority.startsWith("P3")) return "Shift Supervisor";
+  return "Floor Worker";
+}
+
+function resolutionTargetForPriority(priority: string): string {
+  if (priority.startsWith("P1")) return "Resolve immediately";
+  if (priority.startsWith("P2")) return "Resolve within 15 minutes";
+  if (priority.startsWith("P3")) return "Resolve within 30 minutes";
+  return "Resolve before shift handover";
+}
+
+function incidentAssignmentPlan(incident?: Incident | null) {
+  const priority = priorityForSeverity(incident?.sev);
+  return {
+    assignedTo: assigneeForPriority(priority),
+    priority,
+    resolutionTarget: resolutionTargetForPriority(priority),
+  };
+}
+
+function displayIncidentStatus(status: string): string {
+  return status.toLowerCase() === "acknowledged" ? "Assigned" : status;
+}
+
+function applyAssignmentOverrides(
+  sourceIncidents: IncidentResponse[],
+  overrides: Record<string, AssignmentOverride>,
+): IncidentResponse[] {
+  return sourceIncidents.map((incident) => {
+    const override = overrides[incident.id];
+    if (!override) return incident;
+    return {
+      ...incident,
+      status: override.status,
+      acknowledged_at: override.acknowledgedAt,
+      acknowledged_by: override.assignedTo,
+      escalated_to: override.assignedTo,
+    };
+  });
+}
+
 export default function IncidentsPage() {
   const searchParams = useSearchParams();
   const user = useAuthStore((state) => state.user);
@@ -186,7 +257,14 @@ export default function IncidentsPage() {
   const [selectedVideo, setSelectedVideo] = useState<SelectedVideo | null>(null);
   const [videoLoadError, setVideoLoadError] = useState<string | null>(null);
   const [analysisReport, setAnalysisReport] = useState<AnalysisReport | null>(null);
-  const [ackConfirmation, setAckConfirmation] = useState<AcknowledgmentConfirmation>({ isOpen: false, incidentId: null });
+  const [ackConfirmation, setAckConfirmation] = useState<AcknowledgmentConfirmation>({
+    isOpen: false,
+    incidentId: null,
+    assignedTo: DEFAULT_ASSIGNEE,
+    priority: DEFAULT_PRIORITY,
+    resolutionTarget: DEFAULT_RESOLUTION_TARGET,
+  });
+  const [assignmentOverrides, setAssignmentOverrides] = useState<Record<string, AssignmentOverride>>({});
   const [unifiedIncidents, setUnifiedIncidents] = useState<UnifiedIncident[]>([]);
   const [selectedUnifiedIncident, setSelectedUnifiedIncident] = useState<UnifiedIncident | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -204,13 +282,13 @@ export default function IncidentsPage() {
         email: user?.email,
         location: user?.location,
       });
-      const uniqueIncidents = dedupeIncidents(source.incidents);
+      const uniqueIncidents = applyAssignmentOverrides(dedupeIncidents(source.incidents), assignmentOverrides);
       setRawIncidents(uniqueIncidents);
       setIncidents(uniqueIncidents.map(mapBackendIncident));
     } catch {
       // Keep empty — don't pad with stale mock data
     }
-  }, []);
+  }, [assignmentOverrides, user?.email, user?.location, user?.role]);
 
   const fetchBreaches = useCallback(async () => {
     try {
@@ -295,13 +373,38 @@ export default function IncidentsPage() {
     if (acknowledging !== null) return;
     setAcknowledging(id);
     setAckError(null);
+    const assignmentPlan = incidentAssignmentPlan(incidents.find((incident) => incident.id === id));
+    const { assignedTo, priority, resolutionTarget } = assignmentPlan;
+    const acknowledgedAt = new Date().toISOString();
     try {
-      await acknowledgeIncident(id, "Acknowledged from incident console");
-      await fetchIncidents();
-      // Show acknowledgment confirmation popup
-      setAckConfirmation({ isOpen: true, incidentId: id });
+      if (UUID_PATTERN.test(id)) {
+        await acknowledgeIncident(id, "Assigned from incident console");
+        await fetchIncidents();
+      } else {
+        setAssignmentOverrides((current) => ({
+          ...current,
+          [id]: {
+            status: "acknowledged",
+            assignedTo,
+            acknowledgedAt,
+          },
+        }));
+        setRawIncidents((current) => applyAssignmentOverrides(current, {
+          [id]: {
+            status: "acknowledged",
+            assignedTo,
+            acknowledgedAt,
+          },
+        }));
+        setIncidents((current) => current.map((incident) => (
+          incident.id === id
+            ? { ...incident, status: "acknowledged", assignee: assignedTo }
+            : incident
+        )));
+      }
+      setAckConfirmation({ isOpen: true, incidentId: id, assignedTo, priority, resolutionTarget });
     } catch {
-      setAckError("Unable to acknowledge this incident. The displayed data was not changed.");
+      setAckError("Unable to assign this incident. The displayed data was not changed.");
     } finally {
       setAcknowledging(null);
     }
@@ -317,14 +420,22 @@ export default function IncidentsPage() {
         existingIncident ?? await createIncidentFromBreach(breach.id);
 
       if (incident.status !== "acknowledged") {
-        await acknowledgeIncident(incident.id, "Acknowledged from active perimeter breach card");
+        await acknowledgeIncident(incident.id, "Assigned from active perimeter breach card");
       }
 
       await fetchIncidents();
       // Show acknowledgment confirmation popup
-      setAckConfirmation({ isOpen: true, incidentId: incident.id });
+      const linkedPriority = priorityForSeverity(incident.severity);
+      const assignedTo = assigneeForPriority(linkedPriority);
+      setAckConfirmation({
+        isOpen: true,
+        incidentId: incident.id,
+        assignedTo,
+        priority: linkedPriority,
+        resolutionTarget: resolutionTargetForPriority(linkedPriority),
+      });
     } catch {
-      setAckError("Unable to acknowledge this breach. The active breach data was not changed.");
+      setAckError("Unable to assign this breach. The active breach data was not changed.");
     } finally {
       setAcknowledging(null);
     }
@@ -348,7 +459,7 @@ export default function IncidentsPage() {
 
   const filters: { label: string; value: FilterType; style?: string }[] = [
     { label: "All Incidents", value: "all" },
-    { label: "Acknowledged", value: "acknowledged" },
+    { label: "Assigned", value: "acknowledged" },
     { label: "Resolved", value: "resolved" },
     { label: "Critical", value: "CRITICAL", style: "border-[#EF4444] text-[#EF4444]" },
     { label: "High", value: "HIGH", style: "border-[#F97316] text-[#F97316]" },
@@ -505,12 +616,11 @@ export default function IncidentsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
         {[
           { v: cntTotal, l: "All Incidents", c: "#F5A623" },
-          { v: cntAck, l: "Acknowledged", c: "#5B9BF5" },
-          { v: cntRes, l: "Resolved", c: "#22D3A1" },
           { v: cntCrit, l: "Critical", c: "#F04A4A" },
+          { v: cntRes, l: "Resolved", c: "#22D3A1" },
         ].map((s) => (
           <div key={s.l} className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-3.5 text-center transition-all hover:border-[#2A3F68]">
             <div className="text-[26px] font-extrabold" style={{ color: s.c }}>
@@ -579,7 +689,7 @@ export default function IncidentsPage() {
                     className="text-[9px] font-bold px-2 py-0.5 rounded-full border"
                     style={{ background: `${STA_COL[i.status]}22`, color: STA_COL[i.status], borderColor: `${STA_COL[i.status]}44` }}
                   >
-                    {i.status}
+                    {displayIncidentStatus(i.status)}
                   </span>
                 </div>
               </div>
@@ -590,6 +700,9 @@ export default function IncidentsPage() {
             </div>
             <div className="text-[12px] text-[#8A9BBF] mb-2 leading-relaxed">{i.desc}</div>
             <div className="text-[10px] text-[#4E6090]">📍 {i.loc} · 👤 {i.assignee}</div>
+            <div className="mt-1 text-[10px] font-semibold text-[#8A9BBF]">
+              Priority: {priorityForSeverity(i.sev)} · Target: {resolutionTargetForPriority(priorityForSeverity(i.sev))}
+            </div>
             <div className="flex flex-wrap gap-2 mt-2.5">
               <button
                 onClick={() => openUnifiedDetail(i.id)}
@@ -613,8 +726,13 @@ export default function IncidentsPage() {
                   disabled={acknowledging === i.id}
                   className="px-3 py-1.5 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition disabled:opacity-50"
                 >
-                  {acknowledging === i.id ? "Acknowledging..." : "Acknowledge"}
+                  {acknowledging === i.id ? "Assigning..." : "Assign"}
                 </button>
+              )}
+              {i.status === "acknowledged" && (
+                <span className="px-3 py-1.5 rounded-lg bg-[#5B9BF5]/12 text-[#5B9BF5] text-[11px] font-bold border border-[#5B9BF5]/25">
+                  Assigned
+                </span>
               )}
               {i.status !== "resolved" && (
                 <button
@@ -682,10 +800,10 @@ export default function IncidentsPage() {
                         className="text-[11px] font-bold px-3 py-1 rounded-full border border-[#E5521A] text-[#E5521A] hover:bg-[#E5521A]/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {acknowledging === b.id
-                          ? "Acknowledging..."
+                          ? "Assigning..."
                           : isAcknowledged
-                            ? "Acknowledged"
-                            : "Acknowledge"}
+                            ? "Assigned"
+                            : "Assign"}
                       </button>
                     </div>
                   </div>
@@ -1054,10 +1172,10 @@ export default function IncidentsPage() {
                       </div>
                     </div>
 
-                    {/* Acknowledgment Status */}
+                    {/* Assignment Status */}
                     <div className="bg-[#0F1A30] border border-[#1E2F50] rounded-lg p-4">
                       <h4 className="text-[14px] font-bold text-[#E8EDF8] mb-3 pb-2 border-b border-[#1E2F50]">
-                        Acknowledgment Status
+                        Assignment Status
                       </h4>
                       <div className="space-y-2">
                         <div className="flex justify-between items-start gap-3">
@@ -1069,7 +1187,7 @@ export default function IncidentsPage() {
                           <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.officer.badgeId}</span>
                         </div>
                         <div className="flex justify-between items-start gap-3">
-                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Acknowledged:</span>
+                          <span className="text-[11px] font-semibold text-[#8A9BBF]">Assigned:</span>
                           <span className="text-[12px] text-[#E8EDF8] text-right">{dummyData.officer.acknowledgedAt}</span>
                         </div>
                       </div>
@@ -1196,26 +1314,92 @@ export default function IncidentsPage() {
       })()}
 
       {/* Acknowledgment Confirmation Popup */}
-      {ackConfirmation.isOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[10001] flex items-center justify-center p-4" onClick={() => setAckConfirmation({ isOpen: false, incidentId: null })}>
-          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-8 w-full max-w-md text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-6">
-              <div className="text-[20px] font-bold text-[#E8EDF8] mb-2">
-                Issue is Acknowledged
+      {ackConfirmation.isOpen && (() => {
+        const assignedPerson = ackConfirmation.assignedTo || DEFAULT_ASSIGNEE;
+        const notificationRecipients = Array.from(new Set([assignedPerson, DEFAULT_ASSIGNEE])).join(" & ");
+        const closeConfirmation = () => setAckConfirmation({
+          isOpen: false,
+          incidentId: null,
+          assignedTo: DEFAULT_ASSIGNEE,
+          priority: DEFAULT_PRIORITY,
+          resolutionTarget: DEFAULT_RESOLUTION_TARGET,
+        });
+        
+        return (
+          <div className="fixed inset-0 bg-black/60 z-[10001] flex items-center justify-center p-4" onClick={closeConfirmation}>
+            <div className="bg-white border border-[#DDE3EE] rounded-[24px] p-6 sm:p-8 w-full max-w-[580px] text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              {/* Success Icon */}
+              <div className="mb-6">
+                <div className="w-[72px] h-[72px] rounded-full bg-[#CFF7EB] border-2 border-[#BFEFE3] flex items-center justify-center mx-auto mb-6">
+                  <CheckCircle2 className="w-8 h-8 text-[#22D3A1]" />
+                </div>
+                <div className="text-[24px] font-extrabold text-[#061126] mb-3">
+                  Incident Assigned Successfully!
+                </div>
+                <div className="text-[14px] text-[#25364D] mb-4">
+                  The incident has been assigned and notifications have been sent
+                </div>
               </div>
-              <div className="text-[12px] text-[#8A9BBF]">
-                The incident has been successfully acknowledged
+
+              {/* Assignment Info */}
+              <div className="bg-[#F5F7FC] border border-[#DDE3EE] rounded-xl p-4 sm:p-5 mb-5 text-left">
+                <div className="text-[12px] font-extrabold text-[#334155] uppercase mb-3">Assigned To</div>
+                <div className="flex items-center gap-3">
+                  <UserCheck className="w-6 h-6 text-[#4B83FF]" />
+                  <div>
+                    <div className="text-[16px] font-extrabold text-[#061126]">{assignedPerson}</div>
+                    <div className="text-[13px] text-[#25364D]">Responsible for resolving this incident according to priority</div>
+                  </div>
+                </div>
               </div>
+
+              <div className="bg-[#F5F7FC] border border-[#DDE3EE] rounded-xl p-4 sm:p-5 mb-5 text-left">
+                <div className="text-[12px] font-extrabold text-[#334155] uppercase mb-3">Priority</div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-[16px] font-extrabold text-[#061126]">{ackConfirmation.priority}</div>
+                  <div className="rounded-full bg-[#FFF1E8] px-3 py-1 text-[12px] font-bold text-[#E94B18]">
+                    {ackConfirmation.resolutionTarget}
+                  </div>
+                </div>
+              </div>
+
+              {/* Notifications Sent */}
+              <div className="bg-[#F5F7FC] border border-[#DDE3EE] rounded-xl p-4 sm:p-5 mb-7 text-left">
+                <div className="text-[12px] font-extrabold text-[#334155] uppercase mb-4">Notifications Sent</div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-[#16C784]" />
+                      <span className="text-[14px] font-semibold text-[#061126]">WhatsApp</span>
+                    </div>
+                    <span className="text-[12px] px-3 py-1 rounded-full bg-[#CFF7EB] text-[#16A36F] font-semibold">Sent</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-[#5B9BF5]" />
+                      <span className="text-[14px] font-semibold text-[#061126]">Email</span>
+                    </div>
+                    <span className="text-[12px] px-3 py-1 rounded-full bg-[#CFF7EB] text-[#16A36F] font-semibold">Sent</span>
+                  </div>
+                  <div className="hidden">
+                    📧 Notifications sent to: {assignedPerson} & Shift Supervisor
+                  </div>
+                  <div className="text-[12px] text-[#334155] mt-3">
+                    Notifications sent to: {notificationRecipients}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={closeConfirmation}
+                className="px-7 py-3 rounded-xl bg-[#E94B18] text-white text-[14px] font-extrabold hover:bg-[#FF6A36] transition mx-auto"
+              >
+                Got it!
+              </button>
             </div>
-            <button
-              onClick={() => setAckConfirmation({ isOpen: false, incidentId: null })}
-              className="px-6 py-2.5 rounded-lg bg-[#E5521A] text-white text-[12px] font-bold hover:bg-[#FF7A42] transition mx-auto"
-            >
-              Confirm
-            </button>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

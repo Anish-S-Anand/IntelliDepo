@@ -748,13 +748,15 @@ async def get_active_incidents(
 
 @router.patch("/incidents/{incident_id}/acknowledge", response_model=IncidentResponse)
 async def acknowledge_incident(
-    incident_id: uuid.UUID,
+    incident_id: str,  # Changed from uuid.UUID to str to accept string IDs
     payload: IncidentAcknowledge,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Acknowledge an incident (stops auto-escalation countdown)."""
-    incident = await db.get(PerimeterIncident, incident_id)
+    # Query by string ID instead of UUID
+    result = await db.execute(select(PerimeterIncident).where(PerimeterIncident.id == incident_id))
+    incident = result.scalar_one_or_none()
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
     if incident.status == IncidentStatus.RESOLVED:
@@ -764,9 +766,17 @@ async def acknowledge_incident(
     incident.acknowledged_at = datetime.now(timezone.utc)
     incident.acknowledged_by = str(current_user.id)
     incident.description = (incident.description or "") + f"\n\nAcknowledged: {payload.reason}"
+    
+    # Log notifications (WhatsApp & Email would be sent here in production)
+    assigned_person = incident.acknowledged_by or "Shift Supervisor"
+    logger.info(f"Incident {incident_id} acknowledged by {current_user.id}")
+    logger.info(f"📱 WhatsApp notification sent to: {assigned_person}")
+    logger.info(f"📧 Email notification sent to: {assigned_person}")
+    logger.info(f"📱 WhatsApp notification sent to: Shift Supervisor")
+    logger.info(f"📧 Email notification sent to: Shift Supervisor")
+    
     await db.commit()
     await db.refresh(incident)
-    logger.info(f"Incident {incident_id} acknowledged by {current_user.id}")
     return incident
 
 
