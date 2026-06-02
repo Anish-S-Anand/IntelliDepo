@@ -323,7 +323,7 @@ function BatchesTable({
         <table className="w-full text-[12px]">
           <thead>
             <tr className="bg-[#0F1A30] border-b border-[#1E2F50]">
-              {["Batch Code", "Product", "Zone", "Stock / Capacity", "Created", "Status", "Expiry", ""].map((h) => (
+              {["Batch Code", "Zone", "Stock / Capacity", "Created", "Status", "Expiry", ""].map((h) => (
                 <th key={h} className="text-left py-3 px-4 text-[10px] font-bold text-[#4E6090] uppercase tracking-wider whitespace-nowrap">
                   {h}
                 </th>
@@ -342,7 +342,6 @@ function BatchesTable({
               return (
                 <tr key={b.id} className={`border-b border-[#1E2F50]/40 transition-colors ${idx % 2 === 0 ? "bg-[#0A0E1A]" : "bg-[#0D1525]"} hover:bg-[#14203A]`}>
                   <td className="py-3 px-4 font-bold text-[#E8EDF8] whitespace-nowrap">{b.batch_code}</td>
-                  <td className="py-3 px-4 text-[#8A9BBF]">{b.product_name || b.sku_code}</td>
                   <td className="py-3 px-4">
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#1E2F50] text-[#5B9BF5]">
                       Zone {b.zone || "—"}

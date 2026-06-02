@@ -729,6 +729,7 @@ async function postCommandAction(url: string, payload: Record<string, unknown>):
     if (
       isDemoSession()
       || status === 404
+      || status === 500
       || status === 502
       || status === 503
       || status === 504
@@ -741,9 +742,9 @@ async function postCommandAction(url: string, payload: Record<string, unknown>):
 }
 
 function validUuid(value?: string): string | undefined {
-  return value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
-    ? value
-    : undefined;
+  if (!value) return undefined;
+  // Accept real UUIDs or demo gate IDs like "WH_BLR-GATE-A"
+  return value;
 }
 
 export async function openCommandGate(gateId?: string): Promise<CommandActionResponse> {

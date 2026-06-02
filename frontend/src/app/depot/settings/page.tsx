@@ -239,7 +239,7 @@ export default function SettingsPage() {
                 <div className="space-y-3.5">
                   {[
                     { label: "FIFO Compliance Warning Threshold", value: "90%", pct: 90, color: "#E5521A" },
-                    { label: "Cluster Capacity Critical Threshold", value: "95%", pct: 95, color: "#F04A4A" },
+                    { label: "Zone Capacity Critical Threshold", value: "95%", pct: 95, color: "#F04A4A" },
                     { label: "SLA Dwell Threshold (min)", value: "30", pct: 60, color: "#F5A623" },
                   ].map((t) => (
                     <div key={t.label}>

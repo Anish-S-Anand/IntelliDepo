@@ -290,7 +290,7 @@ export default function HeatmapPage() {
     <div className="p-5">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <div className="text-[11px] text-[#E5521A] font-bold tracking-[0.1em] uppercase mb-1">Cluster Mapping</div>
+          <div className="text-[11px] text-[#E5521A] font-bold tracking-[0.1em] uppercase mb-1">Zone Mapping</div>
           <h2 className="text-xl font-extrabold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>Warehouse Heatmap</h2>
           <p className="text-[11px] text-[#8A9BBF] mt-0.5">Zone density visualization · Capacity alerts · Real-time occupancy</p>
         </div>

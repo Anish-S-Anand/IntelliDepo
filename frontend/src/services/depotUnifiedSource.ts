@@ -140,7 +140,7 @@ function fallbackZones(warehouseIds: DepotWarehouseId[]): ZoneResponse[] {
       return {
         id: `${warehouseId}-${z.code}`,
         zone_code: z.code,
-        name: `${z.code} (Cluster ${index + 1})`,
+        name: `${z.code} (Zone ${index + 1})`,
         zone_type: "storage",
         floor: "Ground",
         area_sqm: 900 + index * 120,
@@ -228,26 +228,46 @@ function fallbackBatches(zones: ZoneResponse[]): BatchResponse[] {
 }
 
 function fallbackIncidents(warehouseIds: DepotWarehouseId[]): IncidentResponse[] {
-  const now = new Date().toISOString();
-  return warehouseIds.flatMap((warehouseId) => Array.from({ length: WAREHOUSE_SEED[warehouseId].metrics.incidents }, (_, index) => ({
-    id: `${warehouseId}-INC-${index + 1}`,
-    breach_id: `${warehouseId}-BR-${index + 1}`,
-    zone_id: WAREHOUSE_SEED[warehouseId].zones[index % WAREHOUSE_SEED[warehouseId].zones.length],
-    severity: index === 0 ? "critical" : "medium",
-    title: index === 0 ? "Unauthorized Entry" : "Capacity Warning",
-    description: `${WAREHOUSE_SEED[warehouseId].name} scoped incident ${index + 1}`,
-    escalation_level: index === 0 ? 2 : 1,
-    escalation_deadline: null,
-    escalated_to: index === 0 ? "Regional Manager" : null,
-    status: "open",
-    acknowledged_at: null,
-    acknowledged_by: null,
-    resolved_at: null,
-    resolved_by: null,
-    resolution_notes: null,
-    video_archive_ref: index === 0 ? "Perimeter_Detection.mp4" : "Theft Camera .mp4",
-    created_at: now,
-  })));
+  const now = new Date();
+  const INCIDENT_SEEDS: Record<string, Array<{ title: string; severity: string; desc: string; video: string }>> = {
+    WH_BLR: [
+      { title: "Unauthorized Entry at Gate B", severity: "critical", desc: "Unregistered vehicle attempted entry at Gate B — Bangalore Depot.", video: "Perimeter_Detection.mp4" },
+      { title: "Zone D Capacity Critical",     severity: "high",     desc: "Zone D at 85% capacity. Immediate clearance required — Bangalore Depot.", video: "Theft Camera .mp4" },
+      { title: "Bag Count Mismatch Zone A",    severity: "medium",   desc: "Physical count -5 bags vs manifest in Zone A — Bangalore Depot.", video: "" },
+    ],
+    WH_HYD: [
+      { title: "Perimeter Breach — North Side", severity: "critical", desc: "Motion detected in restricted perimeter zone — Hyderabad Depot.", video: "Perimeter_Detection.mp4" },
+      { title: "Zone C Overloaded",             severity: "high",     desc: "Zone C utilisation exceeded 85% threshold — Hyderabad Depot.", video: "" },
+    ],
+    WH_MUM: [
+      { title: "Loitering Near Loading Bay",  severity: "high",   desc: "Unidentified person loitering at Loading Bay 3 — Mumbai Depot.", video: "Theft Camera .mp4" },
+      { title: "Gate A Sensor Fault",         severity: "medium", desc: "Gate A camera offline for 10+ minutes — Mumbai Depot.", video: "" },
+      { title: "Zone D Near Capacity",        severity: "high",   desc: "Zone D at 90% capacity. Dispatch clearance needed — Mumbai Depot.", video: "" },
+    ],
+  };
+
+  return warehouseIds.flatMap((warehouseId) => {
+    const seeds = INCIDENT_SEEDS[warehouseId] ?? [];
+    return seeds.map((seed, index) => ({
+      id: `${warehouseId}-INC-${index + 1}`,
+      breach_id: `${warehouseId}-BR-${index + 1}`,
+      zone_id: WAREHOUSE_SEED[warehouseId].zones[index % WAREHOUSE_SEED[warehouseId].zones.length],
+      severity: seed.severity,
+      title: seed.title,
+      description: seed.desc,
+      escalation_level: seed.severity === "critical" ? 2 : 1,
+      escalation_deadline: null,
+      escalated_to: seed.severity === "critical" ? "Regional Manager" : null,
+      status: "open",
+      acknowledged_at: null,
+      acknowledged_by: null,
+      resolved_at: null,
+      resolved_by: null,
+      resolution_notes: null,
+      video_archive_ref: seed.video || null,
+      created_at: new Date(now.getTime() - (index + 1) * 12 * 60000).toISOString(),
+    }));
+  });
 }
 
 function scopedBreakdown(warehouseIds: DepotWarehouseId[], key: SeedMetricKey) {
@@ -340,7 +360,24 @@ export async function getUnifiedDepotSource(params: {
   const zoneCodes = new Set(zones.map((zone) => normalizeZoneCode(zone.zone_code)));
   const backendBatches = batchesResult.status === "fulfilled" ? scopeBatches(batchesResult.value, zoneCodes) : [];
   const batches = backendBatches.length > 0 ? backendBatches : fallbackBatches(zones);
-  const incidents = incidentsResult.status === "fulfilled" ? incidentsResult.value : fallbackIncidents(warehouseIds);
+
+  // Scope backend incidents to this user's assigned warehouses via zone codes.
+  // For central/admin (all warehouses) no filtering needed.
+  // For warehouse/regional managers, only show incidents from their zones.
+  const fallbackIncidentRows = fallbackIncidents(warehouseIds);
+  const backendIncidentRows = incidentsResult.status === "fulfilled" ? incidentsResult.value : [];
+  const allIncidents = backendIncidentRows.length > 0 ? backendIncidentRows : fallbackIncidentRows;
+  const isScopedRole = warehouseIds.length < Object.keys(WAREHOUSE_SEED).length;
+  const scopedIncidents = isScopedRole
+    ? allIncidents.filter((inc) => {
+        if (!inc.zone_id) return true; // no zone = global, show to all
+        const normalizedZone = normalizeZoneCode(inc.zone_id);
+        return zoneCodes.has(normalizedZone) || zoneCodes.has(normalizedZone.split("-")[0]);
+      })
+    : allIncidents;
+  const incidents = scopedIncidents.some((incident) => incident.status !== "resolved")
+    ? scopedIncidents
+    : fallbackIncidentRows;
   const density = densityResult.status === "fulfilled" ? scopeDensity(densityResult.value, zoneCodes) : [];
 
   const capacityTotals = zoneCapacityTotals(zones);

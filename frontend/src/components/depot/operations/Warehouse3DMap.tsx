@@ -23,9 +23,9 @@ function buildZoneLayout(zones: ZoneData[]): Record<string, { x: number; z: numb
   const layout: Record<string, { x: number; z: number; w: number; d: number }> = {};
   const columns = zones.length <= 4 ? 2 : 3;
   const rows = Math.max(1, Math.ceil(zones.length / columns));
-  const usableWidth = 22;
-  const usableDepth = 15;
-  const gap = 0.7;
+  const usableWidth = 21;
+  const usableDepth = 12.5;
+  const gap = 1.15;
   const cellW = usableWidth / columns;
   const cellD = usableDepth / rows;
   const w = Math.max(4.2, cellW - gap);
@@ -71,6 +71,7 @@ export default function Warehouse3DMap({ zones, onZoneClick, selectedZone, flash
 
     const W = mount.clientWidth;
     const H = mount.clientHeight || 420;
+    const renderPixelRatio = Math.min(window.devicePixelRatio * 1.5, 3);
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0e1a);
@@ -82,8 +83,9 @@ export default function Warehouse3DMap({ zones, onZoneClick, selectedZone, flash
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(W, H);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(renderPixelRatio);
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     mount.appendChild(renderer.domElement);
 
     // Lights
@@ -98,7 +100,7 @@ export default function Warehouse3DMap({ zones, onZoneClick, selectedZone, flash
 
     // Floor
     const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(26, 18),
+      new THREE.PlaneGeometry(30, 22),
       new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 })
     );
     floor.rotation.x = -Math.PI / 2;
@@ -106,16 +108,16 @@ export default function Warehouse3DMap({ zones, onZoneClick, selectedZone, flash
     scene.add(floor);
 
     // Grid
-    const grid = new THREE.GridHelper(26, 26, 0x1e2f50, 0x1e2f50);
+    const grid = new THREE.GridHelper(30, 36, 0x1e2f50, 0x1e2f50);
     (grid.material as THREE.Material).opacity = 0.4;
     (grid.material as THREE.Material).transparent = true;
     scene.add(grid);
 
     // Warehouse outline
     const wallPoints = [
-      new THREE.Vector3(-12, 0, -8), new THREE.Vector3(12, 0, -8),
-      new THREE.Vector3(12, 0, 8),   new THREE.Vector3(-12, 0, 8),
-      new THREE.Vector3(-12, 0, -8),
+      new THREE.Vector3(-14, 0, -10), new THREE.Vector3(14, 0, -10),
+      new THREE.Vector3(14, 0, 10),   new THREE.Vector3(-14, 0, 10),
+      new THREE.Vector3(-14, 0, -10),
     ];
     scene.add(new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(wallPoints),
@@ -184,22 +186,23 @@ export default function Warehouse3DMap({ zones, onZoneClick, selectedZone, flash
 
       // Label sprite
       const canvas = document.createElement("canvas");
-      canvas.width = 256; canvas.height = 128;
+      canvas.width = 512; canvas.height = 256;
       const ctx = canvas.getContext("2d")!;
-      ctx.clearRect(0, 0, 256, 128);
+      ctx.clearRect(0, 0, 512, 256);
       ctx.fillStyle = "rgba(10,14,26,0.85)";
-      ctx.roundRect(4, 4, 248, 120, 12);
+      ctx.roundRect(8, 8, 496, 240, 24);
       ctx.fill();
       ctx.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
-      ctx.font = "bold 22px sans-serif";
+      ctx.font = "bold 40px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(zoneData.name || `Zone ${code}`, 128, 38);
+      ctx.fillText(zoneData.name || `Zone ${code}`, 256, 76);
       ctx.fillStyle = "#e8edf8";
-      ctx.font = "bold 28px sans-serif";
-      ctx.fillText(`${utilPct}%`, 128, 72);
+      ctx.font = "bold 56px sans-serif";
+      ctx.fillText(`${utilPct}%`, 256, 144);
       ctx.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
-      ctx.font = "bold 18px sans-serif";
-      ctx.fillText(getStatusLabel(utilPct), 128, 108);      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
+      ctx.font = "bold 34px sans-serif";
+      ctx.fillText(getStatusLabel(utilPct), 256, 216);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
       sprite.position.set(cx, 0.15 + stackH + 1.8, cz);
       sprite.scale.set(3.5, 1.75, 1);
       scene.add(sprite);
@@ -208,17 +211,19 @@ export default function Warehouse3DMap({ zones, onZoneClick, selectedZone, flash
     // Gate labels
     const addGateLabel = (text: string, x: number, z: number) => {
       const canvas = document.createElement("canvas");
-      canvas.width = 256; canvas.height = 48;
+      canvas.width = 512; canvas.height = 96;
       const ctx = canvas.getContext("2d")!;
       ctx.fillStyle = "rgba(30,47,80,0.9)";
-      ctx.roundRect(0, 0, 256, 48, 8);
+      ctx.roundRect(0, 0, 512, 96, 16);
       ctx.fill();
       ctx.fillStyle = "#4e6090";
-      ctx.font = "bold 18px sans-serif";
+      ctx.font = "bold 34px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(text, 128, 32);
+      const displayText = text.includes("NORTH") ? "NORTH GATE - ENTRY" : "SOUTH GATE - EXIT";
+      ctx.fillText(displayText, 256, 64);
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
-      sprite.position.set(x, 0.5, z);
+      const labelZ = z < 0 ? -10.75 : 10.75;
+      sprite.position.set(x, 0.5, labelZ);
       sprite.scale.set(4, 0.75, 1);
       scene.add(sprite);
     };
@@ -256,6 +261,7 @@ export default function Warehouse3DMap({ zones, onZoneClick, selectedZone, flash
       const h = mount.clientHeight || 420;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      renderer.setPixelRatio(renderPixelRatio);
       renderer.setSize(w, h);
     };
     window.addEventListener("resize", handleResize);

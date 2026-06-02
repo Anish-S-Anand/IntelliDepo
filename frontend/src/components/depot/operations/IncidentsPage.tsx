@@ -824,7 +824,7 @@ export default function IncidentsPage() {
                     {[
                       ["Incident Type", selectedUnifiedIncident.incident_type],
                       ["Warehouse", selectedUnifiedIncident.warehouse_id || "Primary Warehouse"],
-                      ["Cluster", selectedUnifiedIncident.cluster_id || EMPTY_VALUE],
+                      ["Zone", selectedUnifiedIncident.cluster_id || EMPTY_VALUE],
                       ["Gate", selectedUnifiedIncident.gate_id || EMPTY_VALUE],
                       ["Camera", selectedUnifiedIncident.camera_id || EMPTY_VALUE],
                       ["Assigned To", selectedUnifiedIncident.assigned_to || "Unassigned"],
@@ -1340,8 +1340,8 @@ export default function IncidentsPage() {
 
       {/* Acknowledgment Confirmation Popup */}
       {ackConfirmation.isOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[10001] flex items-center justify-center p-4" onClick={() => setAckConfirmation({ isOpen: false, incidentId: null })}>
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-8 text-[#07142E] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setAckConfirmation({ isOpen: false, incidentId: null })}>
+          <div className="w-full max-w-2xl rounded-[28px] p-8 shadow-2xl" style={{ background: "#ffffff", color: "#07142E" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-7 text-center">
               <div className="mb-5 flex justify-center">
                 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#D5F6E8]">

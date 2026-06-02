@@ -60,7 +60,7 @@ const MODULES = [
   },
   {
     name: "Inventory",
-    description: "Cluster management, batch tracking, FIFO/FEFO compliance, and real-time stock levels.",
+    description: "Zone management, batch tracking, FIFO/FEFO compliance, and real-time stock levels.",
     icon: Package,
     href: "/depot/inventory",
     color: "#F97316",

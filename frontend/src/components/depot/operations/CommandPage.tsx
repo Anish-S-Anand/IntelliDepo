@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
@@ -199,7 +199,7 @@ function buildScopedHierarchy(warehouseIds: RoleWarehouseId[]): DepotHierarchy {
             }));
             return {
               id: zone,
-              name: `${zone} (Cluster ${index + 1})`,
+              name: `${zone} (Zone ${index + 1})`,
               gates: gate ? [{
                 id: `${warehouseId}-GATE-${gate.suffix}`,
                 name: gate.name,
@@ -278,11 +278,15 @@ function KpiCard({ kpi, href, hideDetail }: { kpi: CommandKpi; href?: string; hi
   const Icon = KPI_ICONS[kpi.key] ?? Activity;
   const isInteractive = typeof href === "string";
 
-  const className = `group rounded-[12px] border border-orange-500/20 bg-orange-500/[0.06] p-4 text-left shadow-sm transition duration-200 ease-out ${
+  const className = `group rounded-[12px] bg-white p-4 text-left transition duration-200 ease-out ${
     isInteractive
-      ? "cursor-pointer hover:-translate-y-1 hover:scale-[1.015] hover:border-orange-500/45 hover:bg-orange-500/[0.11] hover:shadow-lg hover:shadow-orange-950/10 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+      ? "cursor-pointer hover:-translate-y-1 hover:scale-[1.015] hover:bg-white hover:shadow-lg hover:shadow-orange-950/10 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
       : ""
   }`;
+  const cardStyle = {
+    border: "1px solid var(--border-default, #1E2F50)",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+  };
 
   const content = (
     <>
@@ -305,11 +309,11 @@ function KpiCard({ kpi, href, hideDetail }: { kpi: CommandKpi; href?: string; hi
   );
 
   return href ? (
-    <Link href={href} className={className} aria-label={`${kpi.label}: open related tab`}>
+    <Link href={href} className={className} style={cardStyle} aria-label={`${kpi.label}: open related tab`}>
       {content}
     </Link>
   ) : (
-    <div className={className}>{content}</div>
+    <div className={className} style={cardStyle}>{content}</div>
   );
 }
 
@@ -366,6 +370,8 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ msg: string; ok: boolean } | null>(null);
   const [selectedGateId, setSelectedGateId] = useState("");
+  // Track manually overridden gate statuses so auto-refresh doesn't revert them
+  const manualGateOverrides = useRef<Record<string, "open" | "closed">>({});
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [broadcastTitle, setBroadcastTitle] = useState("");
   const [broadcastMsg, setBroadcastMsg] = useState("");
@@ -399,6 +405,13 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
       });
       const scopedSnapshot = scopedSource.commandSnapshot;
       const scopedHierarchy = buildScopedHierarchy(forcedWarehouseIds);
+      // Re-apply any manual gate overrides so auto-refresh doesn't revert them
+      const overrides = manualGateOverrides.current;
+      if (Object.keys(overrides).length > 0) {
+        scopedSnapshot.gates = scopedSnapshot.gates.map((gate) =>
+          overrides[gate.id] ? { ...gate, status: overrides[gate.id] } : gate
+        );
+      }
       setSnapshot(scopedSnapshot);
       setHierarchy(scopedHierarchy);
       setSelectedGateId((previous) =>
@@ -472,6 +485,8 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
   }));
 
   const updateGateStatus = (gateId: string, status: "open" | "closed") => {
+    // Record manual override so auto-refresh preserves it
+    manualGateOverrides.current[gateId] = status;
     setSnapshot((current) => {
       if (!current) return current;
       return {
@@ -488,7 +503,8 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
     try {
       await fn();
       showFeedback(successMsg, true);
-      void fetchSnapshot();
+      // Don't re-fetch for gate actions — optimistic update is the source of truth
+      if (!key.includes("gate")) void fetchSnapshot();
     } catch {
       if (key === "open-gate" && selectedGateId) updateGateStatus(selectedGateId, "closed");
       if (key === "close-gate" && selectedGateId) updateGateStatus(selectedGateId, "open");

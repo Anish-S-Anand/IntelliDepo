@@ -91,7 +91,7 @@ export default function OperationsDashboard() {
   const HEALTH_METRICS = [
     { label: "Active Cameras", value: `${capacityStatus.length > 0 ? "Live" : "—"}`, pct: 86, color: "#22D3A1" },
     { label: "Depot Health", value: avgCapacity > 0 ? `${100 - Math.max(0, avgCapacity - 80)}%` : "—", pct: avgCapacity > 0 ? 100 - Math.max(0, avgCapacity - 80) : 0, color: "#22D3A1" },
-    { label: "Cluster Utilization", value: `${avgCapacity}%`, pct: avgCapacity, color: avgCapacity > 90 ? "#F04A4A" : avgCapacity > 80 ? "#F5A623" : "#22D3A1" },
+    { label: "Zone Utilization", value: `${avgCapacity}%`, pct: avgCapacity, color: avgCapacity > 90 ? "#F04A4A" : avgCapacity > 80 ? "#F5A623" : "#22D3A1" },
     { label: "Alert Response", value: kpis ? `${kpis.avg_response_time_min.toFixed(1)} min` : "—", pct: kpis ? Math.min(100, 100 - kpis.avg_response_time_min * 2) : 0, color: "#5B9BF5" },
   ];
 

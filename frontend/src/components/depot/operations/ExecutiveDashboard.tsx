@@ -451,7 +451,7 @@ export default function ExecutiveDashboard() {
           <div className="flex flex-wrap justify-between items-start gap-2 mb-4">
             <div>
               <span className="text-[13px] font-black" style={{ color: "var(--text-primary)" }}>
-                📦 Daily Throughput — Bags
+                Throughput Bags
               </span>
               <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
                 How many bags entered and left the depot each day
