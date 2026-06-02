@@ -169,6 +169,92 @@ export interface NotificationEntry {
   sent_at: string;
 }
 
+export type UnifiedIncidentSeverity = "critical" | "warning" | "info";
+export type UnifiedIncidentStatus =
+  | "new"
+  | "assigned"
+  | "response_started"
+  | "escalated"
+  | "resolved"
+  | "closed";
+
+export type IncidentBusinessAction =
+  | "assign_responder"
+  | "dispatch_security"
+  | "notify_supervisor"
+  | "mark_false_alarm"
+  | "escalate_to_regional_manager"
+  | "start_response"
+  | "resolve_with_outcome"
+  | "attach_evidence";
+
+export interface UnifiedNotificationSummary {
+  id: string;
+  channel: string;
+  recipient: string | null;
+  status: string;
+  sent_at: string | null;
+  delivered_at: string | null;
+  read_at: string | null;
+  provider_message_id: string | null;
+  error_message: string | null;
+}
+
+export interface UnifiedIncidentTimelineItem {
+  id: string;
+  action: string;
+  actor: string | null;
+  actor_role: string | null;
+  previous_state: string | null;
+  new_state: string | null;
+  details: string | null;
+  occurred_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface UnifiedIncident {
+  id: string;
+  source: string;
+  source_id: string;
+  incident_type: string;
+  title: string;
+  description: string | null;
+  severity: UnifiedIncidentSeverity;
+  priority: string;
+  status: UnifiedIncidentStatus;
+  timestamp: string;
+  organization_id: string | null;
+  region_id: string | null;
+  warehouse_id: string | null;
+  cluster_id: string | null;
+  gate_id: string | null;
+  camera_id: string | null;
+  location_label: string;
+  assigned_to: string | null;
+  detected_entity: "person" | "vehicle" | "unknown";
+  vehicle_plate: string | null;
+  reason: string | null;
+  evidence_snapshot_url: string | null;
+  evidence_video_url: string | null;
+  notification_summary: UnifiedNotificationSummary[];
+  timeline: UnifiedIncidentTimelineItem[];
+}
+
+export interface IncidentBusinessActionPayload {
+  action: IncidentBusinessAction;
+  notes: string;
+  assigned_to?: string;
+  channel?: string;
+  recipient?: string;
+  evidence_snapshot_url?: string;
+  evidence_video_url?: string;
+}
+
+export interface IncidentBusinessActionResponse {
+  incident: UnifiedIncident;
+  timeline_item: UnifiedIncidentTimelineItem;
+}
+
 export async function getActiveIncidents(): Promise<IncidentResponse[]> {
   const { data } = await api.get("/ops/incidents/active");
   return data;
@@ -181,5 +267,37 @@ export async function getIncidentAudit(incidentId: string): Promise<AuditEntry[]
 
 export async function getIncidentNotifications(incidentId: string): Promise<NotificationEntry[]> {
   const { data } = await api.get(`/ops/incidents/${incidentId}/notifications`);
+  return data;
+}
+
+export async function getUnifiedIncidents(params?: {
+  status?: UnifiedIncidentStatus;
+  severity?: UnifiedIncidentSeverity;
+  limit?: number;
+}): Promise<UnifiedIncident[]> {
+  const query = new URLSearchParams();
+  if (params?.status) query.set("status", params.status);
+  if (params?.severity) query.set("severity", params.severity);
+  if (params?.limit) query.set("limit", String(params.limit));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  const { data } = await api.get<UnifiedIncident[]>(`/depot/incidents/unified${suffix}`);
+  return data;
+}
+
+export async function getUnifiedIncidentDetail(incidentId: string): Promise<UnifiedIncident> {
+  const { data } = await api.get<UnifiedIncident>(`/depot/incidents/${incidentId}/detail`);
+  return data;
+}
+
+export async function getUnifiedIncidentNotifications(incidentId: string): Promise<UnifiedNotificationSummary[]> {
+  const { data } = await api.get<UnifiedNotificationSummary[]>(`/depot/incidents/${incidentId}/notifications`);
+  return data;
+}
+
+export async function runIncidentBusinessAction(
+  incidentId: string,
+  payload: IncidentBusinessActionPayload,
+): Promise<IncidentBusinessActionResponse> {
+  const { data } = await api.post<IncidentBusinessActionResponse>(`/depot/incidents/${incidentId}/actions`, payload);
   return data;
 }

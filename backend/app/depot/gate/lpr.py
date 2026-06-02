@@ -111,6 +111,7 @@ class VehicleRegistry(DBBaseModel):
     blacklist_reason = Column(Text, nullable=True)
     valid_until = Column(DateTime(timezone=True), nullable=True)
     is_active = Column(Boolean, default=True)
+    footage_url = Column(String, nullable=True)  # URL to vehicle registration image/video
 
 
 class GateAccessLog(DBBaseModel):
@@ -176,6 +177,7 @@ class VehicleResponse(BaseModel):
     blacklist_reason: Optional[str]
     valid_until: Optional[datetime]
     is_active: bool
+    footage_url: Optional[str]
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

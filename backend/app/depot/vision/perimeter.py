@@ -746,7 +746,15 @@ async def get_active_incidents(
     return dedupe_incidents(list(result.scalars().all()))
 
 
-@router.patch("/incidents/{incident_id}/acknowledge", response_model=IncidentResponse)
+class IncidentAcknowledgeResponse(BaseModel):
+    """Enhanced response with notification details."""
+    incident: IncidentResponse
+    assigned_to: str
+    notifications_sent: list[str]
+    notification_details: dict[str, str]
+
+
+@router.patch("/incidents/{incident_id}/acknowledge", response_model=IncidentAcknowledgeResponse)
 async def acknowledge_incident(
     incident_id: uuid.UUID,
     payload: IncidentAcknowledge,
@@ -764,10 +772,62 @@ async def acknowledge_incident(
     incident.acknowledged_at = datetime.now(timezone.utc)
     incident.acknowledged_by = str(current_user.id)
     incident.description = (incident.description or "") + f"\n\nAcknowledged: {payload.reason}"
+    
+    # Commit first to ensure incident is saved
     await db.commit()
     await db.refresh(incident)
+    
+    # Send popup notification via WebSocket (non-blocking)
+    assigned_person = incident.escalated_to or "Security Supervisor"
+    notifications_sent = []
+    notification_details = {}
+    
+    try:
+        from app.core.notifications.websocket_manager import websocket_manager
+        from app.core.notifications.incident_schemas import AssignmentPopupData
+        
+        # Determine priority from severity
+        priority_map = {
+            "critical": "P1",
+            "high": "P2",
+            "medium": "P3",
+            "low": "P4"
+        }
+        priority = priority_map.get(incident.severity.lower() if incident.severity else "medium", "P3")
+        
+        # Broadcast popup to connected clients
+        popup_data = AssignmentPopupData(
+            incident_id=incident.id,
+            title=incident.title or "Perimeter Incident",
+            priority=priority,
+            assigned_to=assigned_person,
+            acknowledged_by=current_user.email if hasattr(current_user, 'email') else "user",
+            acknowledged_at=incident.acknowledged_at,
+            zone=incident.zone_id
+        )
+        
+        broadcast_result = await websocket_manager.broadcast_assignment_popup(popup_data)
+        
+        if broadcast_result.clients_notified > 0:
+            notifications_sent.append("popup")
+            notification_details["popup"] = f"Broadcast to {broadcast_result.clients_notified} clients"
+            logger.info(f"✅ Popup broadcast to {broadcast_result.clients_notified} clients")
+        else:
+            notification_details["popup"] = "No clients connected"
+            logger.warning("No WebSocket clients connected for popup broadcast")
+        
+    except Exception as e:
+        logger.error(f"Failed to send popup notification: {e}", exc_info=True)
+        notification_details["error"] = f"Popup failed: {str(e)}"
+    
     logger.info(f"Incident {incident_id} acknowledged by {current_user.id}")
-    return incident
+    
+    return IncidentAcknowledgeResponse(
+        incident=IncidentResponse.model_validate(incident),
+        assigned_to=assigned_person,
+        notifications_sent=notifications_sent,
+        notification_details=notification_details,
+    )
 
 
 @router.patch("/incidents/{incident_id}/resolve", response_model=IncidentResponse)

@@ -69,6 +69,13 @@ export interface IncidentResponse {
   created_at: string;
 }
 
+export interface IncidentAcknowledgeResponse {
+  incident: IncidentResponse;
+  assigned_to: string;
+  notifications_sent: string[];
+  notification_details: Record<string, string>;
+}
+
 // ---------------------------------------------------------------------------
 // Agent Result
 // ---------------------------------------------------------------------------
@@ -190,8 +197,8 @@ export async function createIncidentFromBreach(breachId: string): Promise<Incide
   return res.data;
 }
 
-export async function acknowledgeIncident(incidentId: string, reason: string): Promise<IncidentResponse> {
-  const res = await api.patch<IncidentResponse>(`/depot/vision/perimeter/incidents/${incidentId}/acknowledge`, {
+export async function acknowledgeIncident(incidentId: string, reason: string): Promise<IncidentAcknowledgeResponse> {
+  const res = await api.patch<IncidentAcknowledgeResponse>(`/depot/vision/perimeter/incidents/${incidentId}/acknowledge`, {
     reason,
   });
   return res.data;

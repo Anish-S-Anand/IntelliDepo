@@ -6,21 +6,32 @@ import { useEffect, useState } from "react";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const user = useAuthStore((s) => s.user);
+  const fetchMe = useAuthStore((s) => s.fetchMe);
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [checkingUser, setCheckingUser] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (mounted && !isAuthenticated) {
+    if (!mounted) return;
+
+    if (!isAuthenticated) {
       router.replace("/login");
+      return;
     }
-  }, [isAuthenticated, mounted, router]);
+
+    if (!user && !checkingUser) {
+      setCheckingUser(true);
+      void fetchMe().finally(() => setCheckingUser(false));
+    }
+  }, [checkingUser, fetchMe, isAuthenticated, mounted, router, user]);
 
   // Show loading spinner while checking auth — never blank
-  if (!mounted) {
+  if (!mounted || (isAuthenticated && !user)) {
     return (
       <div
         className="min-h-screen flex items-center justify-center"

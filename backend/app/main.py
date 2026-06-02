@@ -177,6 +177,10 @@ app.include_router(monitoring_router)
 app.include_router(audit_router)
 app.include_router(realtime_router)
 
+# WebSocket endpoint for incident notifications
+from app.core.notifications.websocket_endpoint import router as websocket_notifications_router
+app.include_router(websocket_notifications_router)
+
 if settings.ENABLE_DEPOT_MODULES:
     from app.depot.vision.camera import router as camera_router
     from app.depot.vision.detection import router as detection_router
@@ -212,12 +216,16 @@ if settings.ENABLE_DEPOT_MODULES:
     from app.depot.ops.incidents import router as ops_incidents_router
     from app.depot.ops.fleet_yard import router as ops_fleet_router
     from app.depot.ops.command import router as ops_command_router
+    from app.depot.incidents import router as depot_incidents_router
+    from app.depot.hierarchy import router as depot_hierarchy_router
     app.include_router(ops_monitoring_router)
     app.include_router(ops_operations_router)
     app.include_router(ops_scorecards_router)
     app.include_router(ops_incidents_router)
     app.include_router(ops_fleet_router)
     app.include_router(ops_command_router)
+    app.include_router(depot_incidents_router)
+    app.include_router(depot_hierarchy_router)
 
 from app.core.data_infra.storage_router import router as storage_router
 

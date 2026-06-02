@@ -66,20 +66,20 @@ export const CLUSTERS: Cluster[] = [
 ];
 
 export const INCIDENTS: Incident[] = [
-  { id: "INC-001", type: "Damaged Bags", sev: "HIGH", loc: "Zone C · Bay 4", t: "2m ago", status: "open", cam: "CAM-04", desc: "5 bags torn during unloading from Truck TN-04-AB-1234.", assignee: "—" },
-  { id: "INC-002", type: "Security Breach", sev: "CRITICAL", loc: "Gate 4 Perimeter", t: "8m ago", status: "acknowledged", cam: "CAM-042", desc: "Unauthorized entry detected at Gate 4.", assignee: "Guard Unit 2" },
+  { id: "INC-001", type: "Damaged Bags", sev: "HIGH", loc: "Zone C · Bay 4", t: "2m ago", status: "open", cam: "BLR-W01-Cluster3-Perimeter", desc: "5 bags torn during unloading from Truck TN-04-AB-1234.", assignee: "—" },
+  { id: "INC-002", type: "Security Breach", sev: "CRITICAL", loc: "Gate 4 Perimeter", t: "8m ago", status: "acknowledged", cam: "BLR-W01-Gate1-Entry", desc: "Unauthorized entry detected at Gate 4.", assignee: "Guard Unit 2" },
   { id: "INC-003", type: "SLA Risk", sev: "MEDIUM", loc: "Dock B", t: "15m ago", status: "open", cam: "—", desc: "Truck queue exceeded 30-minute SLA threshold at Dock B.", assignee: "—" },
   { id: "INC-004", type: "Temp Warning", sev: "LOW", loc: "Cold Storage Zone A", t: "32m ago", status: "resolved", cam: "CAM-12", desc: "Temperature exceeded 4°C threshold briefly.", assignee: "Ops Team" },
   { id: "INC-005", type: "Count Mismatch", sev: "HIGH", loc: "Cluster B-09", t: "1h ago", status: "open", cam: "CAM-08", desc: "Physical count shows -5 bags vs ERP record.", assignee: "—" },
 ];
 
 export const CAMERAS: CameraFeed[] = [
-  { id: "CAM-01", name: "Gate Entry North", status: "active", v: 12, p: 48, per: 6, conf: 97.2, fps: 30, res: "4K", act: "HIGH" },
-  { id: "CAM-02", name: "Zone A Overhead", status: "active", v: 0, p: 124, per: 3, conf: 99.1, fps: 25, res: "4K", act: "MEDIUM" },
-  { id: "CAM-03", name: "Loading Bay 1-4", status: "active", v: 4, p: 67, per: 8, conf: 98.5, fps: 30, res: "1080p", act: "HIGH" },
-  { id: "CAM-04", name: "Zone C Perimeter", status: "alert", v: 1, p: 22, per: 2, conf: 94.3, fps: 25, res: "1080p", act: "LOW" },
-  { id: "CAM-05", name: "Gate Exit South", status: "active", v: 8, p: 0, per: 4, conf: 96.8, fps: 30, res: "4K", act: "HIGH" },
-  { id: "CAM-06", name: "Yard Overview", status: "inactive", v: 0, p: 0, per: 0, conf: 0, fps: 0, res: "4K", act: "NONE" },
+  { id: "BLR-W01-Gate1-Entry", name: "BLR-W01-Gate1-Entry", status: "active", v: 12, p: 48, per: 6, conf: 97.2, fps: 30, res: "4K", act: "HIGH" },
+  { id: "BLR-W01-Cluster1-Overhead", name: "BLR-W01-Cluster1-Overhead", status: "active", v: 0, p: 124, per: 3, conf: 99.1, fps: 25, res: "4K", act: "MEDIUM" },
+  { id: "BLR-W01-LoadingBay1-4", name: "BLR-W01-LoadingBay1-4", status: "active", v: 4, p: 67, per: 8, conf: 98.5, fps: 30, res: "1080p", act: "HIGH" },
+  { id: "BLR-W01-Cluster3-Perimeter", name: "BLR-W01-Cluster3-Perimeter", status: "alert", v: 1, p: 22, per: 2, conf: 94.3, fps: 25, res: "1080p", act: "LOW" },
+  { id: "BLR-W01-Gate2-Exit", name: "BLR-W01-Gate2-Exit", status: "active", v: 8, p: 0, per: 4, conf: 96.8, fps: 30, res: "4K", act: "HIGH" },
+  { id: "BLR-W01-Yard-Overview", name: "BLR-W01-Yard-Overview", status: "inactive", v: 0, p: 0, per: 0, conf: 0, fps: 0, res: "4K", act: "NONE" },
 ];
 
 export const THROUGHPUT = [1200, 1350, 980, 1420, 1580, 1280, 850];
@@ -110,11 +110,12 @@ export function occColor(pct: number) {
   return "#22D3A1";
 }
 
+// BLR zone data — derived from ZONE_SEED WH_BLR for consistency across heatmap, inventory, command
 export const ZONES = [
-  { name: "ZONE A", pct: 81, bags: 810, cap: 1000, color: "#F59E0B" },
-  { name: "ZONE B", pct: 45, bags: 450, cap: 1000, color: "#22D3A1" },
-  { name: "ZONE C", pct: 60, bags: 595, cap: 1000, color: "#22D3A1" },
-  { name: "ZONE D", pct: 91, bags: 910, cap: 1000, color: "#F04A4A" },
+  { name: "ZONE A", pct: 76, bags: 910,  cap: 1200, color: "#F59E0B" }, // BLR-Z1: 76% warning
+  { name: "ZONE B", pct: 41, bags: 329,  cap: 800,  color: "#22D3A1" }, // BLR-Z2: 41% normal
+  { name: "ZONE C", pct: 63, bags: 630,  cap: 1000, color: "#22D3A1" }, // BLR-Z3: 63% normal
+  { name: "ZONE D", pct: 85, bags: 1190, cap: 1400, color: "#F04A4A" }, // BLR-Z4: 85% warning
 ];
 
 // ---------------------------------------------------------------------------
@@ -184,12 +185,12 @@ export interface ZoneHistory {
 }
 
 export const COUNTING_SESSIONS: CountingSession[] = [
-  { id: "CS-001", manifestCode: "MF-2026-0412", vehicleNumber: "TN-04-AB-1234", expectedBags: 500, expectedBoxes: 50, countedBags: 498, countedBoxes: 50, totalExpected: 550, totalCounted: 548, discrepancy: -2, confidenceAvg: 97.8, status: "mismatch", zone: "Zone A", camera: "CAM-02", timestamp: "10:24 AM" },
-  { id: "CS-002", manifestCode: "MF-2026-0413", vehicleNumber: "MH-12-CD-5678", expectedBags: 300, expectedBoxes: 0, countedBags: 300, countedBoxes: 0, totalExpected: 300, totalCounted: 300, discrepancy: 0, confidenceAvg: 99.1, status: "matched", zone: "Zone B", camera: "CAM-03", timestamp: "09:45 AM" },
-  { id: "CS-003", manifestCode: "MF-2026-0414", vehicleNumber: "GJ-05-EF-9012", expectedBags: 200, expectedBoxes: 100, countedBags: 195, countedBoxes: 98, totalExpected: 300, totalCounted: 293, discrepancy: -7, confidenceAvg: 94.3, status: "mismatch", zone: "Zone C", camera: "CAM-04", timestamp: "08:30 AM" },
-  { id: "CS-004", manifestCode: "MF-2026-0415", vehicleNumber: "DL-03-GH-3456", expectedBags: 450, expectedBoxes: 25, countedBags: 450, countedBoxes: 25, totalExpected: 475, totalCounted: 475, discrepancy: 0, confidenceAvg: 98.5, status: "matched", zone: "Zone A", camera: "CAM-01", timestamp: "07:15 AM" },
-  { id: "CS-005", manifestCode: "MF-2026-0416", vehicleNumber: "RJ-14-IJ-7890", expectedBags: 150, expectedBoxes: 75, countedBags: 148, countedBoxes: 73, totalExpected: 225, totalCounted: 221, discrepancy: -4, confidenceAvg: 96.2, status: "mismatch", zone: "Zone D", camera: "CAM-05", timestamp: "06:50 AM" },
-  { id: "CS-006", manifestCode: "MF-2026-0417", vehicleNumber: "KA-01-KL-2345", expectedBags: 600, expectedBoxes: 0, countedBags: 600, countedBoxes: 0, totalExpected: 600, totalCounted: 600, discrepancy: 0, confidenceAvg: 99.4, status: "matched", zone: "Zone B", camera: "CAM-02", timestamp: "06:20 AM" },
+  { id: "CS-001", manifestCode: "MF-2026-0412", vehicleNumber: "TN-04-AB-1234", expectedBags: 500, expectedBoxes: 50, countedBags: 498, countedBoxes: 50, totalExpected: 550, totalCounted: 548, discrepancy: -2, confidenceAvg: 97.8, status: "mismatch", zone: "Zone A", camera: "BLR-W01-Cluster1-Overhead", timestamp: "10:24 AM" },
+  { id: "CS-002", manifestCode: "MF-2026-0413", vehicleNumber: "MH-12-CD-5678", expectedBags: 300, expectedBoxes: 0, countedBags: 300, countedBoxes: 0, totalExpected: 300, totalCounted: 300, discrepancy: 0, confidenceAvg: 99.1, status: "matched", zone: "Zone B", camera: "BLR-W01-LoadingBay1-4", timestamp: "09:45 AM" },
+  { id: "CS-003", manifestCode: "MF-2026-0414", vehicleNumber: "GJ-05-EF-9012", expectedBags: 200, expectedBoxes: 100, countedBags: 195, countedBoxes: 98, totalExpected: 300, totalCounted: 293, discrepancy: -7, confidenceAvg: 94.3, status: "mismatch", zone: "Zone C", camera: "BLR-W01-Cluster3-Perimeter", timestamp: "08:30 AM" },
+  { id: "CS-004", manifestCode: "MF-2026-0415", vehicleNumber: "DL-03-GH-3456", expectedBags: 450, expectedBoxes: 25, countedBags: 450, countedBoxes: 25, totalExpected: 475, totalCounted: 475, discrepancy: 0, confidenceAvg: 98.5, status: "matched", zone: "Zone A", camera: "BLR-W01-Gate1-Entry", timestamp: "07:15 AM" },
+  { id: "CS-005", manifestCode: "MF-2026-0416", vehicleNumber: "RJ-14-IJ-7890", expectedBags: 150, expectedBoxes: 75, countedBags: 148, countedBoxes: 73, totalExpected: 225, totalCounted: 221, discrepancy: -4, confidenceAvg: 96.2, status: "mismatch", zone: "Zone D", camera: "BLR-W01-Gate2-Exit", timestamp: "06:50 AM" },
+  { id: "CS-006", manifestCode: "MF-2026-0417", vehicleNumber: "KA-01-KL-2345", expectedBags: 600, expectedBoxes: 0, countedBags: 600, countedBoxes: 0, totalExpected: 600, totalCounted: 600, discrepancy: 0, confidenceAvg: 99.4, status: "matched", zone: "Zone B", camera: "BLR-W01-Cluster1-Overhead", timestamp: "06:20 AM" },
 ];
 
 export const BATCH_TALLIES: BatchTally[] = [
@@ -216,12 +217,12 @@ export const COUNT_TIMESERIES: CountTimeSeries[] = [
 ];
 
 export const ZONE_DETAILS: ZoneDetail[] = [
-  { id: "Z-A01", code: "A", name: "Storage Bay A — Cement", type: "storage", floor: "ground", areaSqm: 2400, maxCapacity: 1000, currentOccupancy: 810, utilizationPct: 81, status: "warning", polygon: [[50, 50], [350, 50], [350, 250], [50, 250]], densityPerSqm: 0.34, products: ["OPC Cement 53", "PPC Cement 33"], lastUpdated: "2m ago" },
-  { id: "Z-B01", code: "B", name: "Storage Bay B — Fertilizers", type: "storage", floor: "ground", areaSqm: 2800, maxCapacity: 1000, currentOccupancy: 450, utilizationPct: 45, status: "normal", polygon: [[400, 50], [700, 50], [700, 250], [400, 250]], densityPerSqm: 0.16, products: ["Fertilizer Grade A", "Fertilizer Grade B"], lastUpdated: "15m ago" },
-  { id: "Z-C01", code: "C", name: "Storage Bay C — Cement", type: "storage", floor: "ground", areaSqm: 1600, maxCapacity: 1000, currentOccupancy: 595, utilizationPct: 59.5, status: "normal", polygon: [[50, 300], [350, 300], [350, 500], [50, 500]], densityPerSqm: 0.37, products: ["JSW Cement", "OPC Cement 43"], lastUpdated: "8m ago" },
-  { id: "Z-D01", code: "D", name: "Heavy Materials D", type: "storage", floor: "ground", areaSqm: 3200, maxCapacity: 1000, currentOccupancy: 910, utilizationPct: 91, status: "critical", polygon: [[400, 300], [700, 300], [700, 500], [400, 500]], densityPerSqm: 0.28, products: ["Steel Coils Grade 2", "Staging"], lastUpdated: "1m ago" },
-  { id: "Z-L01", code: "L", name: "Loading Dock", type: "loading", floor: "ground", areaSqm: 1200, maxCapacity: 200, currentOccupancy: 45, utilizationPct: 22.5, status: "normal", polygon: [[750, 50], [950, 50], [950, 250], [750, 250]], densityPerSqm: 0.04, products: [], lastUpdated: "5m ago" },
-  { id: "Z-S01", code: "S", name: "Staging Area", type: "staging", floor: "ground", areaSqm: 1800, maxCapacity: 400, currentOccupancy: 150, utilizationPct: 37.5, status: "normal", polygon: [[750, 300], [950, 300], [950, 500], [750, 500]], densityPerSqm: 0.08, products: [], lastUpdated: "45m ago" },
+  { id: "Z-A01", code: "A", name: "Storage Bay A — Cement",       type: "storage", floor: "ground", areaSqm: 2400, maxCapacity: 1200, currentOccupancy: 910,  utilizationPct: 76,   status: "warning",  polygon: [[50, 50], [350, 50], [350, 250], [50, 250]],   densityPerSqm: 0.38, products: ["OPC Cement 53", "PPC Cement 33"],       lastUpdated: "2m ago" },
+  { id: "Z-B01", code: "B", name: "Storage Bay B — Fertilizers",  type: "storage", floor: "ground", areaSqm: 2800, maxCapacity: 800,  currentOccupancy: 329,  utilizationPct: 41,   status: "normal",   polygon: [[400, 50], [700, 50], [700, 250], [400, 250]], densityPerSqm: 0.12, products: ["Fertilizer Grade A", "Fertilizer Grade B"], lastUpdated: "15m ago" },
+  { id: "Z-C01", code: "C", name: "Storage Bay C — Cement",       type: "storage", floor: "ground", areaSqm: 1600, maxCapacity: 1000, currentOccupancy: 630,  utilizationPct: 63,   status: "normal",   polygon: [[50, 300], [350, 300], [350, 500], [50, 500]], densityPerSqm: 0.39, products: ["JSW Cement", "OPC Cement 43"],              lastUpdated: "8m ago" },
+  { id: "Z-D01", code: "D", name: "Heavy Materials D",            type: "storage", floor: "ground", areaSqm: 3200, maxCapacity: 1400, currentOccupancy: 1190, utilizationPct: 85,   status: "warning",  polygon: [[400, 300], [700, 300], [700, 500], [400, 500]], densityPerSqm: 0.37, products: ["Steel Coils Grade 2", "Staging"],          lastUpdated: "1m ago" },
+  { id: "Z-L01", code: "L", name: "Loading Dock",                 type: "loading", floor: "ground", areaSqm: 1200, maxCapacity: 200,  currentOccupancy: 45,   utilizationPct: 22.5, status: "normal",   polygon: [[750, 50], [950, 50], [950, 250], [750, 250]], densityPerSqm: 0.04, products: [],                                          lastUpdated: "5m ago" },
+  { id: "Z-S01", code: "S", name: "Staging Area",                 type: "staging", floor: "ground", areaSqm: 1800, maxCapacity: 400,  currentOccupancy: 150,  utilizationPct: 37.5, status: "normal",   polygon: [[750, 300], [950, 300], [950, 500], [750, 500]], densityPerSqm: 0.08, products: [],                                          lastUpdated: "45m ago" },
 ];
 
 export const ZONE_HISTORY_MONTHS = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];

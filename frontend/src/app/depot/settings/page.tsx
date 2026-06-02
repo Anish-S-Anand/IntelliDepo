@@ -104,10 +104,10 @@ export default function SettingsPage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
-                    { label: "Full Name", value: user?.full_name || "Operator" },
-                    { label: "Email Address", value: user?.email || "operator@intelli.com" },
-                    { label: "Role", value: user?.role || "Admin" },
-                    { label: "Location", value: user?.location || "Mumbai, India" },
+                    { label: "Full Name", value: user?.full_name || "Login required" },
+                    { label: "Email Address", value: user?.email || "No active account" },
+                    { label: "Role", value: user?.role || "Unauthenticated" },
+                    { label: "Location", value: user?.location || "No assigned location" },
                   ].map((field) => (
                     <div key={field.label}>
                       <label className="text-[10px] text-[#4E6090] font-semibold uppercase tracking-wider block mb-1.5">

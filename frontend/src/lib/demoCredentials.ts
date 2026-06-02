@@ -1,4 +1,4 @@
-export type DemoRole = "warehouse_manager" | "regional_manager" | "admin";
+export type DemoRole = "warehouse_manager" | "regional_manager" | "central_manager" | "admin";
 
 export interface DemoCredential {
   id: string;
@@ -13,7 +13,7 @@ export const DEMO_CREDENTIALS: DemoCredential[] = [
   {
     id: "wh-blr",
     email: "wm.blr@fidelis-demo.com",
-    password: "MacroPulse2025!",
+    password: "Depot!26",
     fullName: "Warehouse Manager - Bengaluru",
     role: "warehouse_manager",
     location: "Bengaluru",
@@ -21,7 +21,7 @@ export const DEMO_CREDENTIALS: DemoCredential[] = [
   {
     id: "wh-hyd",
     email: "wm.hyd@fidelis-demo.com",
-    password: "MacroPulse2025!",
+    password: "Depot!26",
     fullName: "Warehouse Manager - Hyderabad",
     role: "warehouse_manager",
     location: "Hyderabad",
@@ -29,7 +29,7 @@ export const DEMO_CREDENTIALS: DemoCredential[] = [
   {
     id: "wh-mum",
     email: "wm.mum@fidelis-demo.com",
-    password: "MacroPulse2025!",
+    password: "Depot!26",
     fullName: "Warehouse Manager - Mumbai",
     role: "warehouse_manager",
     location: "Mumbai",
@@ -37,15 +37,23 @@ export const DEMO_CREDENTIALS: DemoCredential[] = [
   {
     id: "regional-india",
     email: "regional@fidelis-demo.com",
-    password: "MacroPulse2025!",
-    fullName: "Regional Manager - India",
+    password: "Depot!26",
+    fullName: "Regional Manager - South",
     role: "regional_manager",
-    location: "India",
+    location: "South",
+  },
+  {
+    id: "central-command",
+    email: "central@fidelis-demo.com",
+    password: "Depot!26",
+    fullName: "Central Manager - Command",
+    role: "central_manager",
+    location: "National",
   },
   {
     id: "admin-platform",
     email: "admin@fidelis-demo.com",
-    password: "MacroPulse2025!",
+    password: "Depot!26",
     fullName: "Platform Admin",
     role: "admin",
   },

@@ -13,8 +13,17 @@ import { useTheme } from "@/components/layout/ThemeProvider";
 function roleLabel(role: string) {
   if (role === "warehouse_manager") return "Warehouse Manager";
   if (role === "regional_manager") return "Regional Manager";
+  if (role === "central_manager") return "Central Manager";
   if (role === "admin") return "Admin";
   return role;
+}
+
+function commandRouteForRole(role?: string) {
+  if (role === "warehouse_manager") return "/depot/command/warehouse";
+  if (role === "regional_manager") return "/depot/command/regional";
+  if (role === "central_manager") return "/depot/command/central";
+  if (role === "admin") return "/depot/command/admin";
+  return "/depot/command";
 }
 
 export default function LoginPage() {
@@ -32,7 +41,8 @@ export default function LoginPage() {
     clearError();
     try {
       await login(email, password);
-      router.push("/depot/operations");
+      const demoCredential = DEMO_CREDENTIALS.find((credential) => credential.email.toLowerCase() === email.trim().toLowerCase());
+      router.push(commandRouteForRole(demoCredential?.role));
     } catch {
       // error is set in store
     }
@@ -45,15 +55,14 @@ export default function LoginPage() {
   };
 
   // Theme-aware values
-  const pageBg = isDark ? "#010810" : "#F0F4FA";
-  const cardBg = isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF";
-  const cardBorder = isDark ? "rgba(255,255,255,0.1)" : "#E5E7EB";
-  const cardShadow = isDark ? "0 25px 80px rgba(0,0,0,0.5)" : "0 25px 80px rgba(0,0,0,0.1)";
+  const cardBg = isDark ? "rgba(7,12,24,0.76)" : "rgba(255,255,255,0.88)";
+  const cardBorder = isDark ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.72)";
+  const cardShadow = isDark ? "0 25px 80px rgba(0,0,0,0.55)" : "0 25px 80px rgba(15,23,42,0.22)";
   const headingColor = isDark ? "#FFFFFF" : "#0D1117";
-  const subColor = isDark ? "rgba(255,255,255,0.4)" : "#6B7280";
-  const labelColor = isDark ? "rgba(255,255,255,0.45)" : "#6B7280";
-  const inputBg = isDark ? "rgba(255,255,255,0.05)" : "#F9FAFB";
-  const inputBorder = isDark ? "rgba(255,255,255,0.1)" : "#D1D5DB";
+  const subColor = isDark ? "rgba(255,255,255,0.68)" : "#4B5563";
+  const labelColor = isDark ? "rgba(255,255,255,0.68)" : "#1F2937";
+  const inputBg = isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.92)";
+  const inputBorder = isDark ? "rgba(255,255,255,0.16)" : "rgba(148,163,184,0.55)";
   const inputText = isDark ? "#FFFFFF" : "#0D1117";
   const inputPlaceholder = isDark ? "rgba(255,255,255,0.2)" : "#9CA3AF";
   const iconColor = isDark ? "rgba(255,255,255,0.3)" : "#9CA3AF";
@@ -67,37 +76,36 @@ export default function LoginPage() {
 
   return (
     <div
-      className="min-h-screen w-full flex flex-col items-center justify-center py-6 px-4 sm:px-6 theme-transition"
-      style={{ backgroundColor: pageBg }}
+      className="relative min-h-screen w-full flex flex-col items-center justify-center py-6 px-4 sm:px-6 theme-transition overflow-hidden"
+      style={{
+        backgroundImage: "url('/backgrounds/login-warehouse.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
     >
       {/* Background effects — subtle in light, glow in dark */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        {isDark ? (
-          <>
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[300px] sm:w-[700px] h-[200px] sm:h-[350px] rounded-full bg-blue-600/10 blur-[80px] sm:blur-[120px]" />
-            <div className="absolute bottom-0 right-0 w-[200px] sm:w-[400px] h-[200px] sm:h-[400px] rounded-full bg-orange-600/8 blur-[60px] sm:blur-[120px]" />
-            <div
-              className="absolute inset-0 opacity-[0.02]"
-              style={{
-                backgroundImage: `linear-gradient(rgba(59,130,246,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.5) 1px, transparent 1px)`,
-                backgroundSize: "50px 50px",
-              }}
-            />
-          </>
-        ) : (
-          <>
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] sm:w-[800px] h-[200px] sm:h-[300px] rounded-full opacity-30 blur-[100px]" style={{ background: "radial-gradient(circle, #DBEAFE, transparent)" }} />
-            <div className="absolute bottom-0 right-0 w-[300px] sm:w-[500px] h-[200px] sm:h-[400px] rounded-full opacity-20 blur-[100px]" style={{ background: "radial-gradient(circle, #FEE2E2, transparent)" }} />
-          </>
-        )}
-      </div>
+      <div
+        className="pointer-events-none fixed inset-0"
+        style={{
+          background: isDark
+            ? "linear-gradient(90deg, rgba(1,8,16,0.88) 0%, rgba(1,8,16,0.70) 45%, rgba(1,8,16,0.40) 100%)"
+            : "linear-gradient(90deg, rgba(241,245,249,0.88) 0%, rgba(241,245,249,0.76) 44%, rgba(15,23,42,0.32) 100%)",
+        }}
+      />
+      <div
+        className="pointer-events-none fixed inset-0"
+        style={{
+          background: "radial-gradient(circle at 26% 44%, rgba(255,255,255,0.22), transparent 34%)",
+        }}
+      />
 
       {/* Theme toggle — top right */}
       <div className="fixed top-4 right-4 z-50">
         <ThemeToggle />
       </div>
 
-      <div className="relative w-full max-w-sm sm:max-w-md">
+      <div className="relative z-10 w-full max-w-sm sm:max-w-md">
         {/* ── Header / Branding ── */}
         <div className="flex flex-col items-center mb-6 sm:mb-8">
           <div
@@ -138,7 +146,7 @@ export default function LoginPage() {
             background: cardBg,
             border: `1px solid ${cardBorder}`,
             boxShadow: cardShadow,
-            backdropFilter: isDark ? "blur(20px)" : "none",
+            backdropFilter: "blur(18px)",
           }}
         >
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4 sm:space-y-5">
@@ -307,7 +315,7 @@ export default function LoginPage() {
               ))}
             </div>
             <p className="mt-2.5 sm:mt-3 text-[9px] sm:text-[10px] font-mono text-center" style={{ color: demoEmailColor }}>
-              Password: MacroPulse2025!
+              Password: Depot!26
             </p>
           </div>
 

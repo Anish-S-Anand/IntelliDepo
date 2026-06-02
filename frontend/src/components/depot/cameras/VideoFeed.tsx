@@ -10,10 +10,11 @@ interface VideoFeedProps {
   videoFile?: string;
   cameraIndex: number;
   offline?: boolean;
+  compact?: boolean;
   onDetectionUpdate?: (vehicles: Array<{ bbox: [number, number, number, number]; class: string; score: number }>) => void;
 }
 
-export function VideoFeed({ name, cameraId, videoFile, cameraIndex, offline = false, onDetectionUpdate }: VideoFeedProps) {
+export function VideoFeed({ name, cameraId, videoFile, cameraIndex, offline = false, compact = false, onDetectionUpdate }: VideoFeedProps) {
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -101,22 +102,24 @@ export function VideoFeed({ name, cameraId, videoFile, cameraIndex, offline = fa
     };
   }, [videoFile, cameraId, offline, name]);
 
-  const statusColor = status === "live" ? "bg-green-500" : status === "error" ? "bg-red-500" : "bg-gray-500";
   const statusText = status === "live" ? "LIVE" : status === "error" ? "OFFLINE" : "CONNECTING";
 
   return (
-    <div className="relative h-[280px] overflow-hidden rounded-md bg-black">
+    <div
+      className="relative overflow-hidden rounded-md bg-black"
+      style={{ height: compact ? "100%" : 280 }}
+    >
       {/* Video canvas */}
       <canvas ref={sourceCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 1 }} />
       {/* Detection overlay */}
       <canvas ref={overlayCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 2 }} />
       {/* Label bar — always on top */}
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px" }}>
-        <span className="camera-label-text" style={{ fontSize: 15, fontWeight: 800, background: isDark ? "#000000" : "#ffffff", padding: "6px 12px", borderRadius: 8, letterSpacing: "0.02em", whiteSpace: "nowrap", border: "none", color: isDark ? "#ffffff" : "#000000" }}>
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, padding: compact ? 5 : 8 }}>
+        <span className="camera-label-text" style={{ fontSize: compact ? 11 : 15, fontWeight: 800, background: isDark ? "#000000" : "#ffffff", padding: compact ? "4px 7px" : "6px 12px", borderRadius: compact ? 6 : 8, letterSpacing: "0.02em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: compact ? "78%" : "none", border: "none", color: isDark ? "#ffffff" : "#000000" }}>
           {name}
         </span>
-        <span className="camera-label-text" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: status === "live" ? "#22c55e" : status === "error" ? "#ef4444" : "#6b7280" }}>
-          <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "white" }} />
+        <span className="camera-label-text" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: compact ? 8 : 9, fontWeight: 700, padding: compact ? "2px 5px" : "2px 6px", borderRadius: 4, background: status === "live" ? "#22c55e" : status === "error" ? "#ef4444" : "#6b7280" }}>
+          <span style={{ display: "inline-block", width: compact ? 5 : 6, height: compact ? 5 : 6, borderRadius: "50%", background: "white" }} />
           {statusText}
         </span>
       </div>

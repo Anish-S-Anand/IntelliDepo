@@ -103,6 +103,12 @@ class Settings(BaseSettings):
     NOTIFICATION_WEBHOOK_TIMEOUT: int = 10
     NOTIFICATION_WEBHOOK_RETRIES: int = 3
     NOTIFICATION_QUIET_HOURS_ENABLED: bool = True
+    WHATSAPP_PROVIDER: str = "stub"
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_WHATSAPP_FROM: str = ""
+    META_WHATSAPP_TOKEN: str = ""
+    META_WHATSAPP_PHONE_NUMBER_ID: str = ""
 
     # Cement Bag Detection Training
     VIDEO_API_KEY: str = ""
