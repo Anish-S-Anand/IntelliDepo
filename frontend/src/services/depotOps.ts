@@ -270,6 +270,22 @@ export async function getIncidentNotifications(incidentId: string): Promise<Noti
   return data;
 }
 
+export type CreateOpsIncidentPayload = {
+  title: string;
+  description?: string;
+  incident_type?: string;
+  source?: string;
+  priority?: string;
+  zone?: string;
+  assigned_to?: string;
+  metadata_json?: Record<string, unknown>;
+};
+
+export async function createOpsIncident(payload: CreateOpsIncidentPayload): Promise<IncidentResponse> {
+  const { data } = await api.post<IncidentResponse>("/ops/incidents/", payload);
+  return data;
+}
+
 export async function getUnifiedIncidents(params?: {
   status?: UnifiedIncidentStatus;
   severity?: UnifiedIncidentSeverity;

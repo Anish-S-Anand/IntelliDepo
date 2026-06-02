@@ -16,6 +16,7 @@ import {
   type BreachResponse,
 } from "@/services/depotPerimeter";
 import {
+  createOpsIncident,
   getUnifiedIncidentDetail,
   getUnifiedIncidents,
   runIncidentBusinessAction,
@@ -192,6 +193,12 @@ export default function IncidentsPage() {
   const [businessActionNotes, setBusinessActionNotes] = useState("");
   const [notifyChannel, setNotifyChannel] = useState("in_app");
   const [notifyRecipient, setNotifyRecipient] = useState("Shift Supervisor");
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportTitle, setReportTitle] = useState("");
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportZone, setReportZone] = useState("");
+  const [reportPriority, setReportPriority] = useState("P2");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
   const selectedIncidentId = searchParams.get("incident");
 
   // Fetch real incidents from backend
@@ -358,6 +365,38 @@ export default function IncidentsPage() {
     }
   };
 
+  const handleReportIncident = async () => {
+    const title = reportTitle.trim();
+    const description = reportDescription.trim();
+    const zone = reportZone.trim();
+    if (!title || reportSubmitting) return;
+
+    setReportSubmitting(true);
+    setAckError(null);
+    try {
+      await createOpsIncident({
+        title,
+        description: description || undefined,
+        incident_type: "manual_report",
+        source: "manual",
+        priority: reportPriority,
+        zone: zone || undefined,
+        assigned_to: "Shift Supervisor",
+        metadata_json: { reported_from: "incident_console" },
+      });
+      setReportModalOpen(false);
+      setReportTitle("");
+      setReportDescription("");
+      setReportZone("");
+      setReportPriority("P2");
+      await Promise.all([fetchIncidents(), fetchUnifiedIncidents()]);
+    } catch {
+      setAckError("Unable to report this incident. Please try again.");
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
   const filters: { label: string; value: FilterType; style?: string }[] = [
     { label: "All Incidents", value: "all" },
     { label: "Assigned", value: "acknowledged" },
@@ -511,7 +550,10 @@ export default function IncidentsPage() {
             Live feed with severity tracking, escalation workflows, and perimeter breaches
           </p>
         </div>
-        <button className="px-3.5 py-2 rounded-lg bg-[#E5521A] border-[#E5521A] text-white text-[11px] font-bold">
+        <button
+          onClick={() => setReportModalOpen(true)}
+          className="px-3.5 py-2 rounded-lg bg-[#E5521A] border-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition"
+        >
           + Report Incident
         </button>
       </div>
@@ -971,6 +1013,87 @@ export default function IncidentsPage() {
               {videoLoadError && (
                 <span className="font-bold text-[#F04A4A]">{videoLoadError}</span>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Incident Modal */}
+      {reportModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setReportModalOpen(false)}>
+          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-4 sm:p-5 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="text-[16px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
+                Report Incident
+              </h3>
+              <button
+                onClick={() => setReportModalOpen(false)}
+                className="rounded-lg p-1 text-[#8A9BBF] hover:text-[#E8EDF8] hover:bg-[#1E2F50] transition"
+                aria-label="Close report incident"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-bold text-[#8A9BBF]">TITLE</span>
+                <input
+                  value={reportTitle}
+                  onChange={(e) => setReportTitle(e.target.value)}
+                  placeholder="Short incident title"
+                  className="w-full rounded-lg border border-[#1E2F50] bg-[#0F1A30] px-3 py-2 text-[12px] text-[#E8EDF8] placeholder-[#4E6090] outline-none focus:border-[#E5521A]"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-bold text-[#8A9BBF]">DESCRIPTION</span>
+                <textarea
+                  value={reportDescription}
+                  onChange={(e) => setReportDescription(e.target.value)}
+                  placeholder="What happened?"
+                  className="h-24 w-full resize-none rounded-lg border border-[#1E2F50] bg-[#0F1A30] px-3 py-2 text-[12px] text-[#E8EDF8] placeholder-[#4E6090] outline-none focus:border-[#E5521A]"
+                />
+              </label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold text-[#8A9BBF]">PRIORITY</span>
+                  <select
+                    value={reportPriority}
+                    onChange={(e) => setReportPriority(e.target.value)}
+                    className="w-full rounded-lg border border-[#1E2F50] bg-[#0F1A30] px-3 py-2 text-[12px] text-[#E8EDF8] outline-none focus:border-[#E5521A]"
+                  >
+                    <option value="P1">P1 Critical</option>
+                    <option value="P2">P2 High</option>
+                    <option value="P3">P3 Medium</option>
+                    <option value="P4">P4 Low</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold text-[#8A9BBF]">ZONE</span>
+                  <input
+                    value={reportZone}
+                    onChange={(e) => setReportZone(e.target.value)}
+                    placeholder="Optional"
+                    className="w-full rounded-lg border border-[#1E2F50] bg-[#0F1A30] px-3 py-2 text-[12px] text-[#E8EDF8] placeholder-[#4E6090] outline-none focus:border-[#E5521A]"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setReportModalOpen(false)}
+                className="px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:text-[#E8EDF8] hover:border-[#2A3F68] transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReportIncident}
+                disabled={!reportTitle.trim() || reportSubmitting}
+                className="px-4 py-1.5 rounded-lg bg-[#E5521A] text-white text-[11px] font-bold hover:bg-[#FF7A42] transition disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {reportSubmitting ? "Reporting..." : "Report"}
+              </button>
             </div>
           </div>
         </div>
