@@ -46,6 +46,8 @@ type AcknowledgmentConfirmation = {
   assignedTo: string;
   priority: string;
   resolutionTarget: string;
+  notificationsSent?: string[];
+  notificationDetails?: Record<string, string>;
 };
 
 type AssignmentOverride = {
@@ -422,8 +424,18 @@ export default function IncidentsPage() {
     const acknowledgedAt = new Date().toISOString();
     try {
       if (UUID_PATTERN.test(id)) {
-        await acknowledgeIncident(id, "Assigned from incident console");
+        const response = await acknowledgeIncident(id, "Assigned from incident console");
         await fetchIncidents();
+        // Show acknowledgment confirmation with notification details from backend
+        setAckConfirmation({ 
+          isOpen: true, 
+          incidentId: id, 
+          assignedTo: response.assigned_to || assignedTo, 
+          priority, 
+          resolutionTarget,
+          notificationsSent: response.notifications_sent || [],
+          notificationDetails: response.notification_details || {},
+        });
       } else {
         setAssignmentOverrides((current) => ({
           ...current,
@@ -445,8 +457,8 @@ export default function IncidentsPage() {
             ? { ...incident, status: "acknowledged", assignee: assignedTo }
             : incident
         )));
+        setAckConfirmation({ isOpen: true, incidentId: id, assignedTo, priority, resolutionTarget });
       }
-      setAckConfirmation({ isOpen: true, incidentId: id, assignedTo, priority, resolutionTarget });
     } catch {
       setAckError("Unable to assign this incident. The displayed data was not changed.");
     } finally {

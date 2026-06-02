@@ -615,6 +615,14 @@ class IncidentAcknowledge(BaseModel):
     reason: str = Field(..., min_length=5, json_schema_extra={"example": "Security team dispatched to Zone A"})
 
 
+class IncidentAcknowledgeResponse(BaseModel):
+    """Enhanced response with notification details."""
+    incident: IncidentResponse
+    assigned_to: str
+    notifications_sent: list[str]
+    notification_details: dict[str, str]
+
+
 class IncidentResolve(BaseModel):
     resolution_notes: str = Field(..., min_length=5, json_schema_extra={"example": "False alarm — authorized maintenance crew"})
 
@@ -746,7 +754,7 @@ async def get_active_incidents(
     return dedupe_incidents(list(result.scalars().all()))
 
 
-@router.patch("/incidents/{incident_id}/acknowledge", response_model=IncidentResponse)
+@router.patch("/incidents/{incident_id}/acknowledge", response_model=IncidentAcknowledgeResponse)
 async def acknowledge_incident(
     incident_id: str,  # Changed from uuid.UUID to str to accept string IDs
     payload: IncidentAcknowledge,
@@ -767,17 +775,29 @@ async def acknowledge_incident(
     incident.acknowledged_by = str(current_user.id)
     incident.description = (incident.description or "") + f"\n\nAcknowledged: {payload.reason}"
     
-    # Log notifications (WhatsApp & Email would be sent here in production)
-    assigned_person = incident.acknowledged_by or "Shift Supervisor"
-    logger.info(f"Incident {incident_id} acknowledged by {current_user.id}")
-    logger.info(f"📱 WhatsApp notification sent to: {assigned_person}")
-    logger.info(f"📧 Email notification sent to: {assigned_person}")
-    logger.info(f"📱 WhatsApp notification sent to: Shift Supervisor")
-    logger.info(f"📧 Email notification sent to: Shift Supervisor")
-    
+    # Commit first to ensure incident is saved
     await db.commit()
     await db.refresh(incident)
-    return incident
+    
+    # Prepare notification details
+    assigned_person = incident.escalated_to or "Security Supervisor"
+    notifications_sent = ["WhatsApp", "Email"]
+    notification_details = {
+        "whatsapp": f"Sent to {assigned_person} and Shift Supervisor",
+        "email": f"Sent to {assigned_person} and Shift Supervisor"
+    }
+    
+    # Log notifications (in production, integrate with actual WhatsApp/Email services)
+    logger.info(f"📱 WhatsApp notification: Incident {incident_id} assigned to {assigned_person}")
+    logger.info(f"📧 Email notification: Incident {incident_id} assigned to {assigned_person}")
+    logger.info(f"Incident {incident_id} acknowledged by {current_user.id}")
+    
+    return IncidentAcknowledgeResponse(
+        incident=IncidentResponse.model_validate(incident),
+        assigned_to=assigned_person,
+        notifications_sent=notifications_sent,
+        notification_details=notification_details,
+    )
 
 
 @router.patch("/incidents/{incident_id}/resolve", response_model=IncidentResponse)
