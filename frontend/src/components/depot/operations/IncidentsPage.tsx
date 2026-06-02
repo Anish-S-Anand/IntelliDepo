@@ -110,19 +110,23 @@ function mapBackendIncident(inc: IncidentResponse): Incident {
     escalated: "acknowledged",
     resolved: "resolved",
   };
-  return {
-    id: inc.id,
-    type: inc.title,
-    sev: sevMap[inc.severity] || "MEDIUM",
-
-    t: new Date(inc.created_at).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" }),
-    status: statusMap[inc.status] || "open",
-    cam: resolveEvidenceVideo(inc.video_archive_ref) || EMPTY_VALUE,
-    desc: inc.description || inc.title,
-    assignee: inc.acknowledged_by || inc.escalated_to || EMPTY_VALUE,
-  };
+return {
+  id: inc.id,
+  type: inc.title,
+  sev: sevMap[inc.severity] || "MEDIUM",
+  t: new Date(inc.created_at).toLocaleString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    day: "numeric",
+  }),
+  status: statusMap[inc.status] || "open",
+  cam: resolveEvidenceVideo(inc.video_archive_ref) || EMPTY_VALUE,
+  loc: inc.video_archive_ref || EMPTY_VALUE,
+  desc: inc.description || inc.title,
+  assignee: inc.acknowledged_by || inc.escalated_to || EMPTY_VALUE,
+};
 }
-
 export default function IncidentsPage() {
   const searchParams = useSearchParams();
   const [incidents, setIncidents] = useState<Incident[]>([]);

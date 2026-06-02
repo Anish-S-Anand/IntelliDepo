@@ -104,6 +104,9 @@ class Settings(BaseSettings):
     NOTIFICATION_WEBHOOK_RETRIES: int = 3
     NOTIFICATION_QUIET_HOURS_ENABLED: bool = True
 
+    # Cement Bag Detection Training
+    VIDEO_API_KEY: str = ""
+
     @field_validator("DEBUG", mode="before")
     @classmethod
     def normalize_debug(cls, value: object) -> object:
