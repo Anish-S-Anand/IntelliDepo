@@ -128,6 +128,7 @@ temp_data/
 probe.txt
 doc_page_*.png
 pytest-cache-files-*/
+IntelliDepo/
 
 # Model weights
 *.pt
