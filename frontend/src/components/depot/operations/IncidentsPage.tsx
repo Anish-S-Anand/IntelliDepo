@@ -1214,18 +1214,17 @@ export default function IncidentsPage() {
               </div>
               
               <div className="text-[20px] font-bold text-[#E8EDF8] mb-2">
-                Incident Acknowledged Successfully!
+                Incident assigned successfully to the Shift Supervisor
               </div>
               <div className="text-[12px] text-[#8A9BBF] mb-4">
-                The incident has been acknowledged and notifications have been sent
+                The incident has been acknowledged and assigned for follow-up.
               </div>
 
               {/* Assignment Details */}
-              {ackConfirmation.assignedTo && (
-                <div className="bg-[#0F1829] border border-[#1E2F50] rounded-lg p-4 mb-4 text-left">
+              <div className="bg-[#0F1829] border border-[#1E2F50] rounded-lg p-4 mb-4 text-left">
                   <div className="text-[11px] font-bold text-[#8A9BBF] mb-2">ASSIGNED TO</div>
                   <div className="text-[14px] font-bold text-[#E8EDF8] mb-3">
-                    👤 {ackConfirmation.assignedTo}
+                    Shift Supervisor
                   </div>
 
                   {/* Notifications Sent */}
@@ -1248,22 +1247,7 @@ export default function IncidentsPage() {
                       </div>
                     </div>
                   )}
-
-                  {/* Notification Details */}
-                  {ackConfirmation.notificationDetails && Object.keys(ackConfirmation.notificationDetails).length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-[#1E2F50]">
-                      <div className="text-[11px] font-bold text-[#8A9BBF] mb-2">NOTIFICATION STATUS</div>
-                      <div className="space-y-1">
-                        {Object.entries(ackConfirmation.notificationDetails).map(([key, value]) => (
-                          <div key={key} className="text-[10px] text-[#8A9BBF]">
-                            <span className="capitalize">{key}:</span> {value}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              </div>
             </div>
             <button
               onClick={() => setAckConfirmation({ isOpen: false, incidentId: null })}
