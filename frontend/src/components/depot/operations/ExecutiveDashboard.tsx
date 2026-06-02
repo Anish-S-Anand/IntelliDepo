@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
-import { getUnifiedDepotSource, type UnifiedDepotSource } from "@/services/depotUnifiedSource";
+import { getUnifiedDepotSource, type UnifiedDepotSource, ZONE_SEED, scopedWarehouseIdsForUser } from "@/services/depotUnifiedSource";
 import type { IncidentResponse } from "@/services/depotPerimeter";
 
 interface LiveZone {
@@ -36,19 +36,28 @@ import {
 
 // ─── Throughput data ────────────────────────────────────────────────────────
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const WEEKLY = [
-  { enter: 320, exit: 290 },
-  { enter: 380, exit: 350 },
-  { enter: 290, exit: 265 },
-  { enter: 410, exit: 385 },
-  { enter: 450, exit: 420 }, // Friday — peak
-  { enter: 360, exit: 330 },
-  { enter: 240, exit: 215 },
-];
-const WEEKLY_TOTALS = WEEKLY.reduce(
-  (a, d) => ({ enter: a.enter + d.enter, exit: a.exit + d.exit }),
-  { enter: 0, exit: 0 }
-);
+const WEEKLY_WEIGHTS = [0.13, 0.16, 0.12, 0.17, 0.18, 0.15, 0.09];
+
+// Warehouse-level bags_in/bags_out per warehouse (matches WAREHOUSE_SEED in depotUnifiedSource)
+const WAREHOUSE_THROUGHPUT: Record<string, { bagsIn: number; bagsOut: number }> = {
+  WH_BLR: { bagsIn: 1435, bagsOut: 1195 },
+  WH_HYD: { bagsIn: 1260, bagsOut: 1040 },
+  WH_MUM: { bagsIn: 980,  bagsOut: 910  },
+};
+
+function buildFallbackWeekly(warehouseIds: string[]) {
+  const totalIn  = warehouseIds.reduce((s, id) => s + (WAREHOUSE_THROUGHPUT[id]?.bagsIn  ?? 0), 0);
+  const totalOut = warehouseIds.reduce((s, id) => s + (WAREHOUSE_THROUGHPUT[id]?.bagsOut ?? 0), 0);
+  let runIn = 0, runOut = 0;
+  return DAYS.map((day, i) => {
+    const isLast = i === DAYS.length - 1;
+    const enter = isLast ? Math.max(0, totalIn  - runIn)  : Math.round(totalIn  * WEEKLY_WEIGHTS[i]);
+    const exit  = isLast ? Math.max(0, totalOut - runOut) : Math.round(totalOut * WEEKLY_WEIGHTS[i]);
+    runIn  += enter;
+    runOut += exit;
+    return { day, enter, exit };
+  });
+}
 
 // ─── 6 Cameras — replaced by live backend data ──────────────────────────────
 // (CAMERAS constant removed — now fetched from API)
@@ -151,9 +160,9 @@ const INCIDENTS: Incident[] = [
   {
     id: "INC-007",
     title: "Camera Signal Lost",
-    what: "Camera CAM-06 in Zone B (Aisle 4) is not sending a clear picture — signal keeps dropping.",
+    what: "Camera BLR-W01-Yard-Overview in BLR-Z2 (Aisle 4) is not sending a clear picture — signal keeps dropping.",
     where: "Zone B · Aisle 4",
-    doWhat: "Tech team should check and restart CAM-06.",
+    doWhat: "Tech team should check and restart BLR-W01-Yard-Overview.",
     severity: "medium", status: "open",
     assignee: "Tech. Support Karan",
     ago: "1 hr 50 min ago",
@@ -375,13 +384,14 @@ export default function ExecutiveDashboard() {
   const atRiskZones   = ZONES.filter((z) => z.pct >= 85).length;
   const avgOccupancy  = ZONES.length > 0 ? Math.round(ZONES.reduce((a, z) => a + z.pct, 0) / ZONES.length) : 0;
 
-  const weekly = depotSource?.weeklyThroughput ?? WEEKLY;
+  const weekly = depotSource?.weeklyThroughput ?? buildFallbackWeekly(scopedWarehouseIdsForUser(user?.role, user?.email, user?.location));
   const weeklyTotals = weekly.reduce(
     (a, d) => ({ enter: a.enter + d.enter, exit: a.exit + d.exit }),
     { enter: 0, exit: 0 },
   );
   const MAX_BAR = Math.max(...weekly.flatMap((d) => [d.enter, d.exit]));
-  const CHART_H = 220;
+  // Warehouse role: 220px. Regional/central (8+ zones): scale up so chart fills the taller zone card
+  const CHART_H = ZONES.length <= 4 ? 220 : Math.max(380, ZONES.length * 38);
 
   const cardStyle: React.CSSProperties = {
     backgroundColor: "var(--bg-card)",
@@ -418,146 +428,154 @@ export default function ExecutiveDashboard() {
         </span>
       </div>
 
-      {/* ── Throughput Chart ───────────────────────────────────────────────── */}
-      <div className="rounded-[14px] p-4 sm:p-[18px] mb-5" style={cardStyle}>
-        {/* Chart header */}
-        <div className="flex flex-wrap justify-between items-start gap-2 mb-4">
-          <div>
-            <span className="text-[13px] font-black" style={{ color: "var(--text-primary)" }}>
-              📦 Daily Throughput — Bags
-            </span>
-            <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-              How many bags entered and left the depot each day
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm" style={{ background: "#E5521A" }} />
-              <span className="text-[10px] font-bold" style={{ color: "var(--text-muted)" }}>Bags In</span>
-              <span className="text-[10px] font-black" style={{ color: "#E5521A" }}>{fmtK(weeklyTotals.enter)}</span>
+      {/* ── Throughput Chart + Zone Capacity side by side ─────────────────── */}
+      <div className="mb-5 grid grid-cols-1 xl:grid-cols-[3fr_2fr] gap-4 items-stretch">
+
+        {/* Throughput Chart */}
+        <div className="rounded-[14px] p-4 sm:p-[18px]" style={cardStyle}>
+          {/* Chart header */}
+          <div className="flex flex-wrap justify-between items-start gap-2 mb-4">
+            <div>
+              <span className="text-[13px] font-black" style={{ color: "var(--text-primary)" }}>
+                📦 Daily Throughput — Bags
+              </span>
+              <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                How many bags entered and left the depot each day
+              </p>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm" style={{ background: "rgba(91,155,245,0.85)" }} />
-              <span className="text-[10px] font-bold" style={{ color: "var(--text-muted)" }}>Bags Out</span>
-              <span className="text-[10px] font-black" style={{ color: "var(--color-info)" }}>{fmtK(weeklyTotals.exit)}</span>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm" style={{ background: "#E5521A" }} />
+                <span className="text-[10px] font-bold" style={{ color: "var(--text-muted)" }}>Bags In</span>
+                <span className="text-[10px] font-black" style={{ color: "#E5521A" }}>{fmtK(weeklyTotals.enter)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm" style={{ background: "rgba(91,155,245,0.85)" }} />
+                <span className="text-[10px] font-bold" style={{ color: "var(--text-muted)" }}>Bags Out</span>
+                <span className="text-[10px] font-black" style={{ color: "var(--color-info)" }}>{fmtK(weeklyTotals.exit)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Grouped bars */}
+          <div className="w-full overflow-x-auto">
+            <div
+              className="grid grid-cols-7 items-end gap-2 sm:gap-4 lg:gap-5"
+              style={{ minWidth: 320, minHeight: CHART_H + 52 }}
+            >
+              {weekly.map((day, i) => {
+                const eH   = Math.max(8, Math.round((day.enter / MAX_BAR) * CHART_H));
+                const xH   = Math.max(8, Math.round((day.exit  / MAX_BAR) * CHART_H));
+                const peak = i === 4;
+                return (
+                  <div key={i} className="flex flex-col items-center gap-1">
+                    <div className="flex items-end gap-[5px]" style={{ height: CHART_H }}>
+                      {/* In bar */}
+                      <div className="flex flex-col items-center justify-end gap-[3px]" style={{ height: CHART_H }}>
+                        <span className="text-[10px] font-bold" style={{ color: peak ? "#E5521A" : "var(--text-muted)" }}>
+                          {day.enter}
+                        </span>
+                        <div style={{
+                          width: ZONES.length <= 4 ? "clamp(16px,2.4vw,28px)" : "clamp(22px,3.2vw,44px)", height: eH,
+                          borderRadius: "4px 4px 0 0",
+                          background: peak
+                            ? "linear-gradient(to bottom,#FF7A42,rgba(255,122,66,0.55))"
+                            : "linear-gradient(to bottom,rgba(229,82,26,0.92),rgba(229,82,26,0.38))",
+                          filter: peak ? "drop-shadow(0 0 6px rgba(229,82,26,0.55))" : undefined,
+                        }} />
+                      </div>
+                      {/* Out bar */}
+                      <div className="flex flex-col items-center justify-end gap-[3px]" style={{ height: CHART_H }}>
+                        <span className="text-[10px] font-bold" style={{ color: peak ? "var(--color-info)" : "var(--text-faint)" }}>
+                          {day.exit}
+                        </span>
+                        <div style={{
+                          width: ZONES.length <= 4 ? "clamp(16px,2.4vw,28px)" : "clamp(22px,3.2vw,44px)", height: xH,
+                          borderRadius: "4px 4px 0 0",
+                          background: peak
+                            ? "linear-gradient(to bottom,rgba(91,155,245,1),rgba(91,155,245,0.5))"
+                            : "linear-gradient(to bottom,rgba(91,155,245,0.85),rgba(91,155,245,0.28))",
+                        }} />
+                      </div>
+                    </div>
+                    <span className="text-[10px] sm:text-[11px]"
+                      style={{ color: peak ? "#E5521A" : "var(--text-faint)", fontWeight: peak ? 900 : 600 }}>
+                      {DAYS[i]}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Summary strip */}
+          <div className="mt-4 pt-3 grid grid-cols-2 gap-2 sm:gap-3"
+            style={{ borderTop: "1px solid var(--border-default)" }}>
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+              style={{ backgroundColor: "rgba(229,82,26,0.07)", border: "1px solid rgba(229,82,26,0.15)" }}>
+              <ArrowUpCircle className="w-4 h-4 shrink-0" style={{ color: "#E5521A" }} />
+              <div>
+                <div className="text-[9px] font-black uppercase" style={{ color: "var(--text-faint)" }}>Total Bags In</div>
+                <div className="text-[14px] sm:text-[15px] font-extrabold" style={{ color: "#E5521A" }}>
+                  {weeklyTotals.enter} this week
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+              style={{ backgroundColor: "rgba(91,155,245,0.07)", border: "1px solid rgba(91,155,245,0.18)" }}>
+              <ArrowDownCircle className="w-4 h-4 shrink-0" style={{ color: "var(--color-info)" }} />
+              <div>
+                <div className="text-[9px] font-black uppercase" style={{ color: "var(--text-faint)" }}>Total Bags Out</div>
+                <div className="text-[14px] sm:text-[15px] font-extrabold" style={{ color: "var(--color-info)" }}>
+                  {weeklyTotals.exit} this week
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Grouped bars */}
-        <div className="w-full overflow-x-auto">
-          <div className="flex items-end gap-3 sm:gap-5" style={{ minWidth: 300, minHeight: CHART_H + 52 }}>
-            {weekly.map((day, i) => {
-              const eH   = Math.max(8, Math.round((day.enter / MAX_BAR) * CHART_H));
-              const xH   = Math.max(8, Math.round((day.exit  / MAX_BAR) * CHART_H));
-              const peak = i === 4;
+        {/* Zone Capacity */}
+        <div className="rounded-[14px] p-4 sm:p-[18px] flex flex-col" style={cardStyle}>
+          <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
+            <SectionHeading sub="">🏭 Storage Zone Levels</SectionHeading>
+            {atRiskZones > 0 && (
+              <span className="text-[9px] font-black px-2 py-0.5 rounded-full border"
+                style={{ background: "rgba(245,166,35,0.12)", color: "var(--color-warning)", borderColor: "rgba(245,166,35,0.25)" }}>
+                {atRiskZones} zone{atRiskZones > 1 ? "s" : ""} need attention
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 grid-rows-2 gap-2.5 sm:gap-3 flex-1">
+            {ZONES.map((z) => {
+              const col   = zoneColor(z.pct);
+              const label = zoneLabel(z.pct);
               return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1" style={{ minWidth: 40 }}>
-                  <div className="flex items-end gap-[5px]" style={{ height: CHART_H }}>
-                    {/* In bar */}
-                    <div className="flex flex-col items-center justify-end gap-[3px]" style={{ height: CHART_H }}>
-                      <span className="text-[10px] font-bold" style={{ color: peak ? "#E5521A" : "var(--text-muted)" }}>
-                        {day.enter}
-                      </span>
-                      <div style={{
-                        width: "clamp(16px,2.4vw,28px)", height: eH,
-                        borderRadius: "4px 4px 0 0",
-                        background: peak
-                          ? "linear-gradient(to bottom,#FF7A42,rgba(255,122,66,0.55))"
-                          : "linear-gradient(to bottom,rgba(229,82,26,0.92),rgba(229,82,26,0.38))",
-                        filter: peak ? "drop-shadow(0 0 6px rgba(229,82,26,0.55))" : undefined,
-                      }} />
-                    </div>
-                    {/* Out bar */}
-                    <div className="flex flex-col items-center justify-end gap-[3px]" style={{ height: CHART_H }}>
-                      <span className="text-[10px] font-bold" style={{ color: peak ? "var(--color-info)" : "var(--text-faint)" }}>
-                        {day.exit}
-                      </span>
-                      <div style={{
-                        width: "clamp(16px,2.4vw,28px)", height: xH,
-                        borderRadius: "4px 4px 0 0",
-                        background: peak
-                          ? "linear-gradient(to bottom,rgba(91,155,245,1),rgba(91,155,245,0.5))"
-                          : "linear-gradient(to bottom,rgba(91,155,245,0.85),rgba(91,155,245,0.28))",
-                      }} />
-                    </div>
+                <div key={z.id} className="rounded-[12px] p-3 sm:p-4 flex flex-col justify-between" style={innerCard}>
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-[13px] sm:text-[15px] font-black" style={{ color: "var(--text-primary)" }}>
+                      Zone {z.id}
+                    </span>
+                    <span className="text-[15px] sm:text-[18px] font-extrabold" style={{ color: col }}>
+                      {z.pct}%
+                    </span>
                   </div>
-                  <span className="text-[10px] sm:text-[11px]"
-                    style={{ color: peak ? "#E5521A" : "var(--text-faint)", fontWeight: peak ? 900 : 600 }}>
-                    {DAYS[i]}
-                  </span>
+                  {/* Progress bar */}
+                  <div className="w-full h-2.5 sm:h-3 rounded-full overflow-hidden mb-2"
+                    style={{ backgroundColor: "var(--bg-surface-3)" }}>
+                    <div className="h-full rounded-full transition-all"
+                      style={{ width: `${z.pct}%`, background: col }} />
+                  </div>
+                  {/* Status label */}
+                  <div className="text-[9px] sm:text-[10px] font-black" style={{ color: col }}>{label}</div>
+                  <div className="text-[9px] mt-0.5" style={{ color: "var(--text-faint)" }}>
+                    {z.used.toLocaleString()} / {z.total.toLocaleString()} bags
+                  </div>
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* Summary strip */}
-        <div className="mt-4 pt-3 grid grid-cols-2 gap-2 sm:gap-3"
-          style={{ borderTop: "1px solid var(--border-default)" }}>
-          <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-            style={{ backgroundColor: "rgba(229,82,26,0.07)", border: "1px solid rgba(229,82,26,0.15)" }}>
-            <ArrowUpCircle className="w-4 h-4 shrink-0" style={{ color: "#E5521A" }} />
-            <div>
-              <div className="text-[9px] font-black uppercase" style={{ color: "var(--text-faint)" }}>Total Bags In</div>
-              <div className="text-[14px] sm:text-[15px] font-extrabold" style={{ color: "#E5521A" }}>
-                {weeklyTotals.enter} this week
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-            style={{ backgroundColor: "rgba(91,155,245,0.07)", border: "1px solid rgba(91,155,245,0.18)" }}>
-            <ArrowDownCircle className="w-4 h-4 shrink-0" style={{ color: "var(--color-info)" }} />
-            <div>
-              <div className="text-[9px] font-black uppercase" style={{ color: "var(--text-faint)" }}>Total Bags Out</div>
-              <div className="text-[14px] sm:text-[15px] font-extrabold" style={{ color: "var(--color-info)" }}>
-                {weeklyTotals.exit} this week
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Zone Capacity ──────────────────────────────────────────────────── */}
-      <div className="rounded-[14px] p-4 sm:p-[18px] mb-5" style={cardStyle}>
-        <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
-          <SectionHeading sub="">🏭 Storage Zone Levels</SectionHeading>
-          {atRiskZones > 0 && (
-            <span className="text-[9px] font-black px-2 py-0.5 rounded-full border"
-              style={{ background: "rgba(245,166,35,0.12)", color: "var(--color-warning)", borderColor: "rgba(245,166,35,0.25)" }}>
-              {atRiskZones} zone{atRiskZones > 1 ? "s" : ""} need attention
-            </span>
-          )}
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-          {ZONES.map((z) => {
-            const col   = zoneColor(z.pct);
-            const label = zoneLabel(z.pct);
-            return (
-              <div key={z.id} className="rounded-[12px] p-3 sm:p-4" style={innerCard}>
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-[13px] sm:text-[15px] font-black" style={{ color: "var(--text-primary)" }}>
-                    Zone {z.id}
-                  </span>
-                  <span className="text-[15px] sm:text-[18px] font-extrabold" style={{ color: col }}>
-                    {z.pct}%
-                  </span>
-                </div>
-                {/* Progress bar */}
-                <div className="w-full h-2.5 sm:h-3 rounded-full overflow-hidden mb-2"
-                  style={{ backgroundColor: "var(--bg-surface-3)" }}>
-                  <div className="h-full rounded-full transition-all"
-                    style={{ width: `${z.pct}%`, background: col }} />
-                </div>
-                {/* Status label */}
-                <div className="text-[9px] sm:text-[10px] font-black" style={{ color: col }}>{label}</div>
-                <div className="text-[9px] mt-0.5" style={{ color: "var(--text-faint)" }}>
-                  {z.used.toLocaleString()} / {z.total.toLocaleString()} bags
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </div>
 
       {/* ── Incidents ──────────────────────────────────────────────────────── */}

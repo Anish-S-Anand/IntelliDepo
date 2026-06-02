@@ -217,7 +217,7 @@ function zoneColor(pct: number): string {
   return "#22D3A1";
 }
 
-function displayZoneName(zone: ZoneData): string {
+function _displayZoneName(zone: ZoneData): string {
   return zone.name
     .replace(/\s+[—-]\s+Zone\s+[A-Z0-9]+$/i, "")
     .replace(/^Storage Bay\s+[A-Z0-9]+\s+[—-]\s+/i, "")
@@ -225,7 +225,7 @@ function displayZoneName(zone: ZoneData): string {
 }
 
 // Fallback full names if backend returns short names
-const ZONE_FULL_NAMES: Record<string, string> = {
+const _ZONE_FULL_NAMES: Record<string, string> = {
   A: "UltraTech Cement — Zone A",
   B: "ACC Cement — Zone B",
   C: "JSW Cement — Zone C",
@@ -233,7 +233,7 @@ const ZONE_FULL_NAMES: Record<string, string> = {
 };
 
 function resolveZoneName(zone: ZoneData): string {
-  return `Zone ${zone.zone_code}`;
+  return _ZONE_FULL_NAMES[zone.zone_code] ?? (_displayZoneName(zone) || `Zone ${zone.zone_code}`);
 }
 
 function matchesSearch(query: string, values: Array<string | number | null | undefined>): boolean {
@@ -500,7 +500,8 @@ export default function InventoryPage() {
       ]);
 
       // Heatmap data (for accurate zone utilization) - removed as it's not being fetched
-      let heatmapData: Record<string, { utilization_pct: number; current_occupancy: number; max_capacity_units: number }> = {};
+      const heatmapData: Record<string, { utilization_pct: number; current_occupancy: number; max_capacity_units: number }> = {};
+      void heatmapData;
       // Note: heatmapRes was removed since no third fetch was provided
 
       // Zones
@@ -759,41 +760,6 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* ── Zone Bars ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        {displayZones.map((z) => {
-          const pct = Math.round(z.utilization_pct);
-          const col = zoneColor(pct);
-          return (
-            <div
-              key={z.id}
-              onClick={() => router.push(`/depot/heatmap?zone=${z.zone_code}`)}
-              className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 text-center relative overflow-hidden transition-all hover:border-[#E5521A]/30 hover:shadow-[0_6px_24px_rgba(229,82,26,0.08)] cursor-pointer"
-            >
-              <div
-                className="absolute top-0 left-0 right-0 h-[3px]"
-                style={{
-                  background: `linear-gradient(90deg, transparent, ${col}, transparent)`,
-                  opacity: 0.8,
-                }}
-              />
-              <div className="text-[10px] font-extrabold text-[#4E6090] tracking-[0.08em] leading-tight px-1">
-                {resolveZoneName(z)}
-              </div>
-              <div className="text-[28px] font-extrabold my-1.5" style={{ color: col }}>
-                {pct}%
-              </div>
-              <div className="w-full h-1 bg-[#1E2F50] rounded-full overflow-hidden mt-1.5">
-                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: col }} />
-              </div>
-              <div className="text-[9px] text-[#4E6090] mt-1.5">
-                {z.current_occupancy.toLocaleString()} / {z.max_capacity_units.toLocaleString()} bags
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
       {/* ── View Tabs ── */}
       <div className="flex gap-1 mb-4 bg-[#0F1A30] rounded-xl p-1 w-fit">
         <button
@@ -901,7 +867,7 @@ export default function InventoryPage() {
           {hasActiveFilters && (
             <button
               onClick={resetFilters}
-              className="px-3 py-2 rounded-[10px] border border-[#E5521A]/30 text-[#E5521A] text-[11px] font-bold hover:bg-[#E5521A]/10 transition"
+              className="px-3 py-2 rounded-[10px] border border-[#E5521A] bg-[#E5521A] text-white text-[11px] font-bold shadow-sm shadow-[#E5521A]/20 transition hover:bg-[#C94312] hover:border-[#C94312] focus:outline-none focus:ring-2 focus:ring-[#E5521A]/35"
             >
               Clear All
             </button>

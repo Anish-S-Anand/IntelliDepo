@@ -69,7 +69,7 @@ export default function SettingsPage() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-[#1E2F50] last:border-b-0 ${
                     isActive
-                      ? "bg-[#E5521A]/10 text-[#E5521A]"
+                      ? "bg-[#E5521A] text-white"
                       : "text-[#8A9BBF] hover:bg-[#1E2F50] hover:text-[#E8EDF8]"
                   }`}
                 >
@@ -302,7 +302,7 @@ export default function SettingsPage() {
                         onClick={() => theme === "dark" && toggleTheme()}
                         className={`p-4 rounded-xl border-2 transition-all ${
                           theme === "light"
-                            ? "border-[#E5521A] bg-[#E5521A]/10"
+                            ? "border-[#E5521A] bg-[#E5521A]"
                             : "border-[#1E2F50] hover:border-[#2A3F68]"
                         }`}
                       >
@@ -314,7 +314,7 @@ export default function SettingsPage() {
                         onClick={() => theme === "light" && toggleTheme()}
                         className={`p-4 rounded-xl border-2 transition-all ${
                           theme === "dark"
-                            ? "border-[#E5521A] bg-[#E5521A]/10"
+                            ? "border-[#E5521A] bg-[#E5521A]"
                             : "border-[#1E2F50] hover:border-[#2A3F68]"
                         }`}
                       >

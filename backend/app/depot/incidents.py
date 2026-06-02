@@ -745,28 +745,6 @@ async def run_incident_business_action(
         if payload.action == IncidentBusinessAction.ASSIGN_RESPONDER:
             ops_incident.assigned_to = payload.assigned_to or ops_incident.assigned_to or "Shift Supervisor"
             ops_incident.status = OpsIncidentStatus.ACKNOWLEDGED.value
-            ops_incident.acknowledged_at = _now()
-            ops_incident.acknowledged_by = _actor_name(current_user)
-            
-            # Trigger multi-channel notifications (WhatsApp, Email, WebSocket popup)
-            try:
-                from app.core.notifications.config import get_orchestrator
-                orchestrator = get_orchestrator()
-                notification_result = await orchestrator.trigger_acknowledgment_notifications(
-                    incident=ops_incident,
-                    db=db
-                )
-                if notification_result.errors:
-                    import logging
-                    logger = logging.getLogger("intelli.depot.incidents")
-                    logger.warning(
-                        f"Incident {incident_id} acknowledged with notification errors: "
-                        f"{', '.join(notification_result.errors)}"
-                    )
-            except Exception as e:
-                import logging
-                logger = logging.getLogger("intelli.depot.incidents")
-                logger.error(f"Notification orchestration failed for incident {incident_id}: {e}")
         elif payload.action in {IncidentBusinessAction.DISPATCH_SECURITY, IncidentBusinessAction.START_RESPONSE}:
             ops_incident.assigned_to = payload.assigned_to or ops_incident.assigned_to or "Security Team"
             ops_incident.status = OpsIncidentStatus.IN_PROGRESS.value
@@ -808,26 +786,6 @@ async def run_incident_business_action(
             perimeter_incident.acknowledged_at = perimeter_incident.acknowledged_at or _now()
             perimeter_incident.acknowledged_by = _actor_name(current_user)
             perimeter_incident.escalated_to = payload.assigned_to or perimeter_incident.escalated_to or "Security Team"
-            
-            # Trigger multi-channel notifications (WhatsApp, Email, WebSocket popup)
-            try:
-                from app.core.notifications.config import get_orchestrator
-                orchestrator = get_orchestrator()
-                notification_result = await orchestrator.trigger_acknowledgment_notifications(
-                    incident=perimeter_incident,
-                    db=db
-                )
-                if notification_result.errors:
-                    import logging
-                    logger = logging.getLogger("intelli.depot.incidents")
-                    logger.warning(
-                        f"Incident {incident_id} acknowledged with notification errors: "
-                        f"{', '.join(notification_result.errors)}"
-                    )
-            except Exception as e:
-                import logging
-                logger = logging.getLogger("intelli.depot.incidents")
-                logger.error(f"Notification orchestration failed for incident {incident_id}: {e}")
         elif payload.action == IncidentBusinessAction.ESCALATE_TO_REGIONAL_MANAGER:
             perimeter_incident.status = PerimeterIncidentStatus.ESCALATED.value
             perimeter_incident.escalation_level = int(perimeter_incident.escalation_level or 0) + 1

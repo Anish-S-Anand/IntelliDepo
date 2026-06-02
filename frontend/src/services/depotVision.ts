@@ -5,6 +5,7 @@
  * Integrates with DEPOT-V2 (detection) and DEPOT-V2.1 (colour analysis) backend APIs.
  */
 import api from "./api";
+import { DEPOT_WAREHOUSE_REGISTRY } from "@/lib/depot-camera-registry";
 
 // ---------------------------------------------------------------------------
 // Detection Types
@@ -435,49 +436,49 @@ export async function getCamerasWithDetections(): Promise<CameraWithDetections[]
       // Return mock cameras with the same structure
       const mockCameras: CameraWithDetections[] = [
         {
-          id: "gate-entry-north",
-          name: "Gate Entry North - LPR",
-          cameraId: "cam-001",
+          id: "blr-w01-gate1-entry",
+          name: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras[0],
+          cameraId: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras[0],
           detectionCount: 45,
           lastDetectionAt: new Date(Date.now() - 300000).toISOString(),
           videoFile: "LPR_RECOGNITION.mp4",
         },
         {
-          id: "zone-a-overhead",
-          name: "Zone A Overhead",
-          cameraId: "cam-002",
+          id: "blr-w01-cluster1-overhead",
+          name: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras[1],
+          cameraId: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras[1],
           detectionCount: 32,
           lastDetectionAt: new Date(Date.now() - 600000).toISOString(),
           videoFile: "Perimeter_Detection.mp4",
         },
         {
-          id: "loading-bay-1-4",
-          name: "Loading Bay 1-4",
-          cameraId: "cam-003",
+          id: "blr-w01-loadingbay1-4",
+          name: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras[2],
+          cameraId: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras[2],
           detectionCount: 28,
           lastDetectionAt: new Date(Date.now() - 900000).toISOString(),
           videoFile: "cluster 4-5 (1).mp4",
         },
         {
-          id: "zone-c-perimeter",
-          name: "Zone C Perimeter",
-          cameraId: "cam-004",
+          id: "blr-w01-cluster3-perimeter",
+          name: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras[3],
+          cameraId: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras[3],
           detectionCount: 19,
           lastDetectionAt: new Date(Date.now() - 1200000).toISOString(),
           videoFile: "cluster 13 (1).mp4",
         },
         {
-          id: "gate-exit-south",
-          name: "Gate Exit South",
-          cameraId: "cam-005",
+          id: "blr-w01-gate2-exit",
+          name: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras[4],
+          cameraId: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras[4],
           detectionCount: 38,
           lastDetectionAt: new Date(Date.now() - 180000).toISOString(),
           videoFile: "Theft Camera .mp4",
         },
         {
-          id: "yard-overview",
-          name: "Yard Overview",
-          cameraId: "cam-006",
+          id: "blr-w01-yard-overview",
+          name: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras[5],
+          cameraId: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras[5],
           detectionCount: 52,
           lastDetectionAt: new Date(Date.now() - 120000).toISOString(),
           videoFile: "dtranshipment 1 (2).mp4",

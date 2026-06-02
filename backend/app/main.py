@@ -41,7 +41,6 @@ from app.core.auth.mfa.router import router as mfa_router
 from app.core.auth.oauth.router import router as oauth_router
 from app.core.gateway.realtime import router as realtime_router
 from app.core.notifications.router import router as notifications_router
-from app.core.notifications.websocket_endpoint import router as websocket_notifications_router
 from app.core.data_infra.router import router as vector_router
 from app.core.observability.audit_router import router as audit_router
 from app.core.observability import audit as audit_module  # noqa: F401
@@ -60,12 +59,6 @@ import app.stream.scenario.models  # noqa: F401
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Validate notification configuration at startup
-    from app.core.notifications.config_validator import validate_notification_config
-    notification_status = validate_notification_config(settings)
-    # Store notification status in app state for runtime access
-    app.state.notification_channels = notification_status.get_summary()
-    
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -179,11 +172,14 @@ app.include_router(prompts_router)
 app.include_router(xai_router)
 app.include_router(rag_router)
 app.include_router(notifications_router)
-app.include_router(websocket_notifications_router)  # WebSocket endpoint for real-time notifications
 app.include_router(sentiment_router)
 app.include_router(monitoring_router)
 app.include_router(audit_router)
 app.include_router(realtime_router)
+
+# WebSocket endpoint for incident notifications
+from app.core.notifications.websocket_endpoint import router as websocket_notifications_router
+app.include_router(websocket_notifications_router)
 
 if settings.ENABLE_DEPOT_MODULES:
     from app.depot.vision.camera import router as camera_router

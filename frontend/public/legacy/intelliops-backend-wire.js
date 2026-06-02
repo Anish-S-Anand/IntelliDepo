@@ -552,27 +552,13 @@ window.renderClusters = async function(search, filter) {
   search = search || "";
   filter = filter || "all";
   const grid = document.getElementById("clusterGrid");
-  const zoneGrid = document.getElementById("zoneGrid");
   if (!grid) return;
 
-  let zones = [], batches = [];
+  let batches = [];
   try {
-    const [zR, bR] = await Promise.allSettled([
-      fetch("/backend/depot/vision/cluster/zones", {headers:_WIRE_HEADERS}),
-      fetch("/backend/depot/vision/sequencing/batches", {headers:_WIRE_HEADERS}),
-    ]);
-    if (zR.status==="fulfilled"&&zR.value.ok) zones = await zR.value.json();
-    if (bR.status==="fulfilled"&&bR.value.ok) batches = await bR.value.json();
+    const bR = await fetch("/backend/depot/vision/sequencing/batches", {headers:_WIRE_HEADERS});
+    if (bR.ok) batches = await bR.json();
   } catch {}
-
-  // Zone summary cards — real data
-  if (zoneGrid && zones.length) {
-    zoneGrid.innerHTML = zones.map(function(z){
-      const pct = Math.round(z.utilization_pct||0);
-      const col = pct>=90?"var(--sev-critical)":pct>=75?"var(--warn)":"var(--pos)";
-      return '<div class="zone-card"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:'+col+';opacity:0.9"></div><div class="zone-nm">Zone '+z.zone_code+'</div><div class="zone-pct" style="color:'+col+'">'+pct+'%</div><div class="prog-track"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div><div class="zone-cnt">'+(z.current_occupancy||0).toLocaleString()+' / '+(z.max_capacity_units||0).toLocaleString()+' bags</div></div>';
-    }).join("");
-  }
 
   // Cluster cards from inventory batches
   var activeBatches = batches.filter(function(b){return b.status==="active";});

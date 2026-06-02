@@ -482,7 +482,15 @@ async def list_active_incidents(
     return [IncidentResponse.model_validate(i) for i in result.scalars().all()]
 
 
-@router.patch("/{incident_id}/acknowledge", response_model=IncidentResponse)
+class IncidentAcknowledgeResponse(BaseModel):
+    """Enhanced response with notification details."""
+    incident: IncidentResponse
+    assigned_to: str
+    notifications_sent: list[str]
+    notification_details: dict[str, str]
+
+
+@router.patch("/{incident_id}/acknowledge", response_model=IncidentAcknowledgeResponse)
 async def acknowledge_incident(
     incident_id: uuid.UUID,
     body: IncidentAcknowledge,
@@ -502,35 +510,50 @@ async def acknowledge_incident(
                      actor_role="operator", prev_state=prev,
                      new_state=IncidentStatus.ACKNOWLEDGED, details=body.reason)
 
-    # Trigger multi-channel notifications (WhatsApp, Email, WebSocket popup)
-    try:
-        from app.core.notifications.config import get_orchestrator
-        orchestrator = get_orchestrator()
-        notification_result = await orchestrator.trigger_acknowledgment_notifications(
-            incident=incident,
-            db=db
-        )
-        
-        # Log notification results
-        if notification_result.errors:
-            logger.warning(
-                f"Incident {incident_id} acknowledged with notification errors: "
-                f"{', '.join(notification_result.errors)}"
-            )
-        else:
-            logger.info(
-                f"Incident {incident_id} acknowledged - notifications sent: "
-                f"WhatsApp={notification_result.whatsapp_sent}, "
-                f"Email={notification_result.email_sent}, "
-                f"Popup={notification_result.popup_broadcast}"
-            )
-    except Exception as e:
-        # Don't block incident acknowledgment if notifications fail
-        logger.error(f"Notification orchestration failed for incident {incident_id}: {e}")
-
+    # Commit first to ensure incident is saved
     await db.commit()
     await db.refresh(incident)
-    return IncidentResponse.model_validate(incident)
+
+    # Use NotificationOrchestrator for multi-channel notifications (non-blocking)
+    assigned_person = incident.assigned_to or "Shift Supervisor"
+    notifications_sent = []
+    notification_details = {}
+    
+    try:
+        from app.core.notifications.websocket_manager import websocket_manager
+        from app.core.notifications.incident_schemas import AssignmentPopupData
+        
+        # Broadcast popup to connected clients
+        popup_data = AssignmentPopupData(
+            incident_id=incident.id,
+            title=incident.title,
+            priority=incident.priority,
+            assigned_to=assigned_person,
+            acknowledged_by=incident.acknowledged_by or "dashboard",
+            acknowledged_at=incident.acknowledged_at,
+            zone=getattr(incident, 'zone', None)
+        )
+        
+        broadcast_result = await websocket_manager.broadcast_assignment_popup(popup_data)
+        
+        if broadcast_result.clients_notified > 0:
+            notifications_sent.append("popup")
+            notification_details["popup"] = f"Broadcast to {broadcast_result.clients_notified} clients"
+            logger.info(f"✅ Popup broadcast to {broadcast_result.clients_notified} clients")
+        else:
+            notification_details["popup"] = "No clients connected"
+            logger.warning("No WebSocket clients connected for popup broadcast")
+        
+    except Exception as e:
+        logger.error(f"Failed to send popup notification: {e}", exc_info=True)
+        notification_details["error"] = f"Popup failed: {str(e)}"
+    
+    return IncidentAcknowledgeResponse(
+        incident=IncidentResponse.model_validate(incident),
+        assigned_to=assigned_person,
+        notifications_sent=notifications_sent,
+        notification_details=notification_details,
+    )
 
 
 @router.patch("/{incident_id}/resolve", response_model=IncidentResponse)

@@ -2,10 +2,10 @@ import { type CommandCenterSnapshot } from "@/services/depotCommand";
 import { getZones, getDensityAnalytics, type DensityEntry, type ZoneResponse } from "@/services/depotCluster";
 import { getIncidents, type IncidentResponse } from "@/services/depotPerimeter";
 import { getBatches, type BatchResponse } from "@/services/depotSequencing";
+import { DEPOT_WAREHOUSE_ORDER, DEPOT_WAREHOUSE_REGISTRY, type DepotWarehouseId } from "@/lib/depot-camera-registry";
+import storageTruth from "@/data/depotWarehouseStorage.json";
 
 export type DepotRole = "warehouse_manager" | "regional_manager" | "central_manager" | "admin";
-export type DepotWarehouseId = "WH_HYD" | "WH_BLR" | "WH_MUM";
-
 export interface UnifiedDepotSource {
   generatedAt: string;
   source: "backend" | "fallback" | "mixed";
@@ -17,6 +17,7 @@ export interface UnifiedDepotSource {
     avgUnloadMinutes: number;
     incidentsToday: number;
     occupancyPct: number;
+    totalCapacityUnits: number;
     capacityRemainingUnits: number;
     workers: number;
     activeCameras: number;
@@ -33,31 +34,61 @@ export interface UnifiedDepotSource {
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const WEEKLY_WEIGHTS = [0.13, 0.16, 0.12, 0.17, 0.18, 0.15, 0.09];
 
+type ZoneSeedEntry = { code: string; maxCapacity: number; occupancy: number };
+
+// SINGLE SOURCE OF TRUTH: all tabs derive warehouse capacity from shared/depotWarehouseStorage.json.
+export const ZONE_SEED = storageTruth.warehouses as Record<DepotWarehouseId, ZoneSeedEntry[]>;
+
+/** Total occupied bags across all zones for a warehouse */
+export function warehouseTotalOccupancy(warehouseId: string): number {
+  const zones: ZoneSeedEntry[] = ZONE_SEED[warehouseId as DepotWarehouseId] ?? [];
+  return zones.reduce((total, zone) => total + zone.occupancy, 0);
+}
+
+/** Total capacity across all zones for a warehouse */
+export function warehouseTotalCapacity(warehouseId: string): number {
+  const zones: ZoneSeedEntry[] = ZONE_SEED[warehouseId as DepotWarehouseId] ?? [];
+  return zones.reduce((total, zone) => total + zone.maxCapacity, 0);
+}
+
 const WAREHOUSE_SEED = {
   WH_HYD: {
-    name: "Hyderabad Depot",
-    regionId: "REG_SOUTH",
-    zones: ["HYD-Z1", "HYD-Z2", "HYD-Z3"],
-    cameras: ["CAM-H1", "CAM-H2", "CAM-H3", "CAM-H4", "CAM-H5", "CAM-H6"],
-    metrics: { bagsIn: 1260, bagsOut: 1040, vehicles: 38, workers: 82, incidents: 2, occupancy: 74, unload: 34 },
+    name: DEPOT_WAREHOUSE_REGISTRY.WH_HYD.name,
+    regionId: DEPOT_WAREHOUSE_REGISTRY.WH_HYD.regionId,
+    zones: DEPOT_WAREHOUSE_REGISTRY.WH_HYD.zones,
+    cameras: DEPOT_WAREHOUSE_REGISTRY.WH_HYD.cameras,
+    metrics: { bagsIn: 1260, bagsOut: 1040, vehicles: 38, workers: 82, incidents: 2, occupancy: 74, unload: 34, health: 91 },
   },
   WH_BLR: {
-    name: "Bangalore Depot",
-    regionId: "REG_SOUTH",
-    zones: ["BLR-Z1", "BLR-Z2", "BLR-Z3"],
-    cameras: ["CAM-B1", "CAM-B2", "CAM-B3", "CAM-B4", "CAM-B5", "CAM-B6"],
-    metrics: { bagsIn: 1435, bagsOut: 1195, vehicles: 44, workers: 76, incidents: 3, occupancy: 71, unload: 29 },
+    name: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.name,
+    regionId: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.regionId,
+    zones: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.zones,
+    cameras: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras,
+    metrics: { bagsIn: 1435, bagsOut: 1195, vehicles: 44, workers: 76, incidents: 3, occupancy: 71, unload: 29, health: 91 },
   },
   WH_MUM: {
-    name: "Mumbai Depot",
-    regionId: "REG_WEST",
-    zones: ["MUM-Z1", "MUM-Z2", "MUM-Z3"],
-    cameras: ["CAM-M1", "CAM-M2", "CAM-M3", "CAM-M4", "CAM-M5", "CAM-M6"],
-    metrics: { bagsIn: 980, bagsOut: 910, vehicles: 31, workers: 64, incidents: 1, occupancy: 82, unload: 37 },
+    name: DEPOT_WAREHOUSE_REGISTRY.WH_MUM.name,
+    regionId: DEPOT_WAREHOUSE_REGISTRY.WH_MUM.regionId,
+    zones: DEPOT_WAREHOUSE_REGISTRY.WH_MUM.zones,
+    cameras: DEPOT_WAREHOUSE_REGISTRY.WH_MUM.cameras,
+    metrics: { bagsIn: 980, bagsOut: 910, vehicles: 31, workers: 64, incidents: 1, occupancy: 82, unload: 37, health: 88 },
   },
 } as const;
 
 type SeedMetricKey = keyof typeof WAREHOUSE_SEED.WH_HYD.metrics;
+
+// Zone→gate mapping: Z1→Gate A, Z2→Gate B, Z3→Gate C, Z4→no gate
+// Zone→camera mapping: Z1→[cam1,cam2], Z2→[cam3], Z3→[cam4], Z4→[cam5,cam6]
+const GATE_SEED = [
+  { suffix: "A", name: "Gate A - North Entry", gateType: "entry", status: "open" },
+  { suffix: "B", name: "Gate B - South Exit", gateType: "exit", status: "closed" },
+  { suffix: "C", name: "Gate C - Loading Dock", gateType: "loading", status: "open" },
+] as const;
+
+// Camera count per zone index: [2, 1, 1, 2]
+const ZONE_CAMERA_COUNTS = [2, 1, 1, 2] as const;
+// Gate index per zone index: [0=A, 1=B, 2=C, null=none]
+const ZONE_GATE_INDEX = [0, 1, 2, null] as const;
 
 export function scopedWarehouseIdsForUser(role?: string, email?: string, location?: string): DepotWarehouseId[] {
   const normalizedRole = (role ?? "").toLowerCase().replace(/\s+/g, "_");
@@ -72,10 +103,10 @@ export function scopedWarehouseIdsForUser(role?: string, email?: string, locatio
 
   if (normalizedRole === "regional_manager" || normalizedRole.includes("regional")) {
     if (normalizedLocation.includes("west")) return ["WH_MUM"];
-    return ["WH_HYD", "WH_BLR"];
+    return ["WH_BLR", "WH_HYD"];
   }
 
-  return ["WH_HYD", "WH_BLR", "WH_MUM"];
+  return DEPOT_WAREHOUSE_ORDER;
 }
 
 function sumSeed(warehouseIds: DepotWarehouseId[], key: SeedMetricKey): number {
@@ -103,20 +134,18 @@ function distributeWeekly(totalIn: number, totalOut: number) {
 
 function fallbackZones(warehouseIds: DepotWarehouseId[]): ZoneResponse[] {
   return warehouseIds.flatMap((warehouseId) => {
-    const warehouse = WAREHOUSE_SEED[warehouseId];
-    return warehouse.zones.map((zoneCode, index) => {
-      const max = 1000 + index * 120;
-      const utilization = Math.max(0, Math.min(100, warehouse.metrics.occupancy - index * 4));
-      const occupied = Math.round(max * utilization / 100);
+    const zones = ZONE_SEED[warehouseId] ?? [];
+    return zones.map((z, index) => {
+      const utilization = Math.round((z.occupancy / z.maxCapacity) * 100);
       return {
-        id: `${warehouseId}-${zoneCode}`,
-        zone_code: zoneCode,
-        name: `${zoneCode} (Cluster ${index + 1})`,
+        id: `${warehouseId}-${z.code}`,
+        zone_code: z.code,
+        name: `${z.code} (Cluster ${index + 1})`,
         zone_type: "storage",
         floor: "Ground",
         area_sqm: 900 + index * 120,
-        max_capacity_units: max,
-        current_occupancy: occupied,
+        max_capacity_units: z.maxCapacity,
+        current_occupancy: z.occupancy,
         utilization_pct: utilization,
         status: utilization >= 90 ? "critical" : utilization >= 80 ? "warning" : "normal",
         polygon_coords: null,
@@ -125,6 +154,35 @@ function fallbackZones(warehouseIds: DepotWarehouseId[]): ZoneResponse[] {
       };
     });
   });
+}
+
+function normalizeZoneCode(value: string | null | undefined): string {
+  return (value ?? "").trim().toUpperCase();
+}
+
+function zoneBelongsToWarehouse(zone: Pick<ZoneResponse, "zone_code" | "name">, warehouseId: DepotWarehouseId): boolean {
+  const warehouse = WAREHOUSE_SEED[warehouseId];
+  const code = normalizeZoneCode(zone.zone_code);
+  const name = normalizeZoneCode(zone.name);
+  return warehouse.zones.some((zoneCode) => {
+    const normalized = normalizeZoneCode(zoneCode);
+    return code === normalized || name.includes(normalized);
+  });
+}
+
+function scopeZones(zones: ZoneResponse[], warehouseIds: DepotWarehouseId[]): ZoneResponse[] {
+  const scoped = zones.filter((zone) =>
+    zone.is_active !== false && warehouseIds.some((warehouseId) => zoneBelongsToWarehouse(zone, warehouseId))
+  );
+  return scoped.sort((a, b) => normalizeZoneCode(a.zone_code).localeCompare(normalizeZoneCode(b.zone_code)));
+}
+
+function scopeBatches(batches: BatchResponse[], zoneCodes: Set<string>): BatchResponse[] {
+  return batches.filter((batch) => zoneCodes.has(normalizeZoneCode(batch.zone)));
+}
+
+function scopeDensity(density: DensityEntry[], zoneCodes: Set<string>): DensityEntry[] {
+  return density.filter((entry) => zoneCodes.has(normalizeZoneCode(entry.zone_code)));
 }
 
 function zoneCapacityTotals(zones: ZoneResponse[]) {
@@ -140,26 +198,34 @@ function zoneCapacityTotals(zones: ZoneResponse[]) {
 }
 
 function fallbackBatches(zones: ZoneResponse[]): BatchResponse[] {
-  return zones.map((zone, index) => ({
-    id: `seed-batch-${zone.zone_code}`,
-    batch_code: `B-${zone.zone_code}-${index + 1}`,
-    sku_code: `SKU-${zone.zone_code}`,
-    product_name: ["UltraTech Cement", "ACC Cement", "JSW Cement", "Ambuja Cement"][index % 4],
-    zone: zone.zone_code,
-    rack: `R-${index + 1}`,
-    bin_location: `BIN-${index + 1}`,
-    quantity: zone.current_occupancy,
-    original_quantity: zone.max_capacity_units,
-    manufacture_date: null,
-    expiry_date: null,
-    received_at: new Date().toISOString(),
-    sequencing_rule: "FIFO",
-    priority_score: 50 + index,
-    status: "active",
-    is_near_expiry: false,
-    days_to_expiry: null,
-    created_at: new Date().toISOString(),
-  }));
+  const now = new Date();
+  return zones.map((zone, index) => {
+    // Stagger creation dates: each batch created 15-60 days apart going back in time
+    const daysAgo = 15 + index * 20; // 15, 35, 55, 75... days ago
+    const createdAt = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+    // Expiry is 6 months after creation
+    const expiryDate = new Date(createdAt.getTime() + 180 * 24 * 60 * 60 * 1000);
+    return {
+      id: `seed-batch-${zone.zone_code}`,
+      batch_code: `B-${zone.zone_code}-${index + 1}`,
+      sku_code: `SKU-${zone.zone_code}`,
+      product_name: ["UltraTech Cement", "ACC Cement", "JSW Cement", "Ambuja Cement"][index % 4],
+      zone: zone.zone_code,
+      rack: `R-${index + 1}`,
+      bin_location: `BIN-${index + 1}`,
+      quantity: zone.current_occupancy,
+      original_quantity: zone.max_capacity_units,
+      manufacture_date: null,
+      expiry_date: expiryDate.toISOString(),
+      received_at: createdAt.toISOString(),
+      sequencing_rule: "FIFO",
+      priority_score: 50 + index,
+      status: "active",
+      is_near_expiry: false,
+      days_to_expiry: Math.round((expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)),
+      created_at: createdAt.toISOString(),
+    };
+  });
 }
 
 function fallbackIncidents(warehouseIds: DepotWarehouseId[]): IncidentResponse[] {
@@ -204,24 +270,25 @@ function buildCommandSnapshot(source: Omit<UnifiedDepotSource, "commandSnapshot"
 
   return {
     generated_at: now,
-    health_score: source.kpis.incidentsToday > 3 ? 84 : 91,
+    health_score: avgSeed(source.warehouseIds, "health"),
     kpis: [
-      { key: "bags_in", label: "Bags In", value: String(source.kpis.bagsIn), detail: scopedBreakdown(source.warehouseIds, "bagsIn"), tone: "healthy" },
-      { key: "bags_out", label: "Bags Out", value: String(source.kpis.bagsOut), detail: scopedBreakdown(source.warehouseIds, "bagsOut"), tone: "healthy" },
-      { key: "vehicles", label: "Vehicles", value: String(source.kpis.vehicles), detail: scopedBreakdown(source.warehouseIds, "vehicles"), tone: "normal" },
-      { key: "avg_unload", label: "Avg Unload Time", value: `${source.kpis.avgUnloadMinutes}m`, detail: "Average across assigned warehouses", tone: "normal" },
-      { key: "incidents", label: "Incidents Today", value: String(source.kpis.incidentsToday), detail: "Open backend incidents in current scope", tone: source.kpis.incidentsToday > 3 ? "critical" : "warning" },
-      { key: "occupancy", label: "Occupancy %", value: `${source.kpis.occupancyPct}%`, detail: "Scoped zone utilization", tone: source.kpis.occupancyPct >= 80 ? "warning" : "healthy" },
-      { key: "capacity_remaining", label: "Capacity Remaining", value: String(source.kpis.capacityRemainingUnits), detail: "Free storage units in assigned scope", tone: source.kpis.occupancyPct >= 80 ? "warning" : "healthy" },
-      { key: "workers", label: "Worker Count", value: String(source.kpis.workers), detail: scopedBreakdown(source.warehouseIds, "workers"), tone: "healthy" },
-      { key: "cameras", label: "Active Cameras", value: `${source.kpis.activeCameras}/${source.kpis.totalCameras}`, detail: `${source.warehouseIds.length} authorized warehouse group(s)`, tone: "healthy" },
+      { key: "bags_in",            label: "Bags In (Weekly)",    value: String(source.kpis.bagsIn),                   detail: scopedBreakdown(source.warehouseIds, "bagsIn"),   tone: "healthy" },
+      { key: "bags_out",           label: "Bags Out (Weekly)",   value: String(source.kpis.bagsOut),                  detail: scopedBreakdown(source.warehouseIds, "bagsOut"),  tone: "healthy" },
+      { key: "total_capacity",     label: "Total Capacity",      value: String(source.kpis.totalCapacityUnits), detail: "Total storage capacity in assigned scope", tone: "healthy" },
+      { key: "capacity_remaining", label: "Capacity Remaining",  value: String(source.kpis.capacityRemainingUnits),   detail: "Free storage units in assigned scope",           tone: source.kpis.occupancyPct >= 80 ? "warning" : "healthy" },
+      { key: "vehicles",           label: "Vehicles (Today)",    value: String(source.kpis.vehicles),                 detail: scopedBreakdown(source.warehouseIds, "vehicles"), tone: "normal" },
+      { key: "avg_unload",         label: "Avg Unload (Today)",  value: `${source.kpis.avgUnloadMinutes}m`,           detail: "Average across assigned warehouses",             tone: "normal" },
+      { key: "incidents",          label: "Incidents (Today)",   value: String(source.kpis.incidentsToday),           detail: "Open backend incidents in current scope",        tone: source.kpis.incidentsToday > 3 ? "critical" : "warning" },
+      { key: "occupancy",          label: "Occupancy %",         value: `${source.kpis.occupancyPct}%`,               detail: "Scoped zone utilization",                        tone: source.kpis.occupancyPct >= 80 ? "warning" : "healthy" },
+      { key: "workers",            label: "Workers (Today)",     value: String(source.kpis.workers),                  detail: scopedBreakdown(source.warehouseIds, "workers"),  tone: "healthy" },
+      { key: "cameras",            label: "Active Cameras",      value: `${source.kpis.activeCameras}/${source.kpis.totalCameras}`, detail: `${source.warehouseIds.length} authorized warehouse group(s)`, tone: "healthy" },
     ],
-    gates: source.warehouseIds.flatMap((warehouseId) => WAREHOUSE_SEED[warehouseId].zones.map((zone, index) => ({
-      id: `${warehouseId}-G${index + 1}`,
-      gate_code: `Gate ${index + 1}`,
-      name: `${WAREHOUSE_SEED[warehouseId].name} Gate ${index + 1}`,
-      gate_type: "both",
-      status: index === 0 ? "open" : "closed",
+    gates: source.warehouseIds.flatMap((warehouseId) => GATE_SEED.map((gate, index) => ({
+      id: `${warehouseId}-GATE-${gate.suffix}`,
+      gate_code: `GATE-${gate.suffix}`,
+      name: gate.name,
+      gate_type: gate.gateType,
+      status: gate.status,
       total_entries_today: 14 + index * 4,
       warehouse_id: warehouseId,
       region_id: WAREHOUSE_SEED[warehouseId].regionId,
@@ -270,13 +337,13 @@ export async function getUnifiedDepotSource(params: {
     getBatches({ status: "active" }),
   ]);
 
-  // Current backend zone, batch, incident, and camera APIs are global and do not
-  // yet expose persisted warehouse IDs. Use scoped demo data here so persona
-  // dashboards do not show the same storage/utilization figures for BLR/HYD/MUM.
+  const backendZones = zonesResult.status === "fulfilled" ? scopeZones(zonesResult.value, warehouseIds) : [];
   const zones = fallbackZones(warehouseIds);
-  const incidents = fallbackIncidents(warehouseIds);
-  const batches = fallbackBatches(zones);
-  const density = densityResult.status === "fulfilled" ? densityResult.value : [];
+  const zoneCodes = new Set(zones.map((zone) => normalizeZoneCode(zone.zone_code)));
+  const backendBatches = batchesResult.status === "fulfilled" ? scopeBatches(batchesResult.value, zoneCodes) : [];
+  const batches = backendBatches.length > 0 ? backendBatches : fallbackBatches(zones);
+  const incidents = incidentsResult.status === "fulfilled" ? incidentsResult.value : fallbackIncidents(warehouseIds);
+  const density = densityResult.status === "fulfilled" ? scopeDensity(densityResult.value, zoneCodes) : [];
 
   const capacityTotals = zoneCapacityTotals(zones);
   const occupancyPct = capacityTotals.occupancyPct || avgSeed(warehouseIds, "occupancy");
@@ -292,6 +359,7 @@ export async function getUnifiedDepotSource(params: {
     avgUnloadMinutes: avgSeed(warehouseIds, "unload"),
     incidentsToday: activeIncidents.length,
     occupancyPct,
+    totalCapacityUnits: capacityTotals.totalCapacity,
     capacityRemainingUnits: capacityTotals.capacityRemainingUnits,
     workers: sumSeed(warehouseIds, "workers"),
     activeCameras,
@@ -300,7 +368,7 @@ export async function getUnifiedDepotSource(params: {
 
   const base = {
     generatedAt: new Date().toISOString(),
-    source: zonesResult.status === "fulfilled" || incidentsResult.status === "fulfilled" || batchesResult.status === "fulfilled" ? "mixed" as const : "fallback" as const,
+    source: backendZones.length > 0 ? "mixed" as const : "fallback" as const,
     warehouseIds,
     kpis,
     weeklyThroughput: distributeWeekly(kpis.bagsIn, kpis.bagsOut),

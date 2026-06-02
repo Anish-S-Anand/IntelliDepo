@@ -9,16 +9,13 @@ import {
   BarChart3,
   Truck,
   Package,
-  Menu,
-  X,
   ChevronDown,
-  Bell,
-  RefreshCw,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { useTheme } from "@/components/layout/ThemeProvider";
 
-/* ── Only IntelliDepot ── */
+/* Only IntelliDepot */
 const PRODUCTS = [
   {
     id: "depot",
@@ -34,7 +31,7 @@ const PRODUCTS = [
   },
 ];
 
-/* ── Business-friendly stats (no technical jargon) ── */
+/* Business-friendly stats */
 const STATS = [
   { label: "Depots Managed",      value: "15+",  icon: Building2, color: "#E5521A" },
   { label: "Trucks Tracked Daily", value: "200+", icon: Truck,     color: "#22C55E" },
@@ -44,10 +41,23 @@ const STATS = [
 
 export function IntelliLanding() {
   const router = useRouter();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
   const [scrolled, setScrolled]             = useState(false);
   const [visible, setVisible]               = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Theme-aware color tokens
+  const bg         = isDark ? "#010810"              : "#F6F8FB";
+  const surface    = isDark ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.82)";
+  const border     = isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.10)";
+  const textPrimary   = isDark ? "#FFFFFF"           : "#0F172A";
+  const textSecondary = isDark ? "rgba(255,255,255,0.55)" : "#334155";
+  const textMuted     = isDark ? "rgba(255,255,255,0.28)" : "#64748B";
+  const headerBg   = isDark ? "rgba(11,18,32,0.98)"  : "rgba(255,255,255,0.94)";
+  const headerBgSm = isDark ? "rgba(11,18,32,0.90)"  : "rgba(255,255,255,0.86)";
+  const dividerColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.10)";
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 100);
@@ -65,30 +75,36 @@ export function IntelliLanding() {
   }, []);
 
   return (
-    <div className="min-h-screen text-white overflow-x-hidden" style={{ background: "#010810" }}>
+    <div className="min-h-screen overflow-x-hidden" style={{ background: bg, color: textPrimary, transition: "background 0.25s ease, color 0.25s ease" }}>
 
-      {/* ══ TOPBAR — matches reference HTML exactly ══ */}
+      {/* Top bar */}
       <header
-        className={`fixed top-0 left-0 right-0 z-50 flex items-center gap-2.5 px-4 py-0 transition-all duration-500 ${
-          scrolled
-            ? "bg-[#0B1220]/98 backdrop-blur-xl shadow-2xl"
-            : "bg-[#0B1220]/90 backdrop-blur-md"
-        }`}
+        className="fixed top-0 left-0 right-0 z-50 flex items-center gap-2.5 px-4 py-0 transition-all duration-500"
         style={{
           height: 60,
-          borderBottom: "1px solid #1C2D4F",
+          background: scrolled ? headerBg : headerBgSm,
+          backdropFilter: "blur(16px)",
+          borderBottom: `1px solid ${border}`,
+          boxShadow: scrolled ? "0 2px 20px rgba(0,0,0,0.12)" : "none",
         }}
       >
         {/* Logo */}
         <button
           onClick={() => router.push("/")}
-          className="flex items-center gap-2.5 flex-shrink-0 group"
+          className="brand-logo-button landing-logo-button flex items-center gap-2.5 flex-shrink-0 group focus:outline-none"
           aria-label="Home"
-          style={{ textDecoration: "none" }}
+          style={{
+            textDecoration: "none",
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            boxShadow: "none",
+            padding: 0,
+          }}
         >
           <div
             className="flex items-center justify-center rounded-xl overflow-hidden flex-shrink-0"
-            style={{ width: 28, height: 28 }}
+            style={{ width: 28, height: 28, border: "none", boxShadow: "none" }}
           >
             <Image
               src="/fidelis-logo.png"
@@ -96,7 +112,7 @@ export function IntelliLanding() {
               width={28}
               height={28}
               className="object-contain"
-              style={{ filter: "drop-shadow(0 0 6px rgba(229,82,26,0.5))" }}
+              style={{ border: "none", boxShadow: "none", filter: "drop-shadow(0 0 6px rgba(229,82,26,0.5))" }}
               priority
             />
           </div>
@@ -104,183 +120,52 @@ export function IntelliLanding() {
             <div style={{ fontSize: 18, fontWeight: 800, color: "#E5521A", letterSpacing: "-0.4px", lineHeight: 1.1 }}>
               Fidelis
             </div>
-            <div style={{ fontSize: 11, color: "#7A8FAE", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>
-              IntelliDepot™
+            <div style={{ fontSize: 11, color: textMuted, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+              IntelliDepot TM
             </div>
           </div>
         </button>
 
-        {/* Vertical divider */}
-        <div style={{ width: 1, height: 24, background: "#1C2D4F", flexShrink: 0 }} />
-
-        {/* Depot selector */}
-        <select
-          className="depot-sel"
-          style={{
-            padding: "7px 12px",
-            background: "#0D1526",
-            border: "1px solid #1C2D4F",
-            borderRadius: 7,
-            color: "#E8EDF8",
-            fontSize: 15,
-            fontWeight: 700,
-            outline: "none",
-          }}
-        >
-          <option>📍 Mumbai Central</option>
-          <option>📍 Delhi North Hub</option>
-          <option>📍 Dubai South</option>
-        </select>
-
-        {/* Spacer */}
         <div style={{ flex: 1 }} />
 
-        {/* LIVE badge */}
-        <div
-          style={{
-            display: "flex", alignItems: "center", gap: 5,
-            padding: "6px 14px", borderRadius: 99,
-            background: "rgba(34,197,94,0.08)",
-            border: "1px solid rgba(34,197,94,0.2)",
-            fontSize: 14, fontWeight: 700, color: "#22C55E",
-            letterSpacing: "0.04em",
-          }}
-        >
-          <span
-            style={{
-              width: 7, height: 7, borderRadius: "50%",
-              background: "#22C55E",
-              animation: "blink 1.4s ease-in-out infinite",
-              display: "inline-block",
-            }}
-          />
-          LIVE
-        </div>
-
-        {/* Theme toggle */}
         <ThemeToggle />
 
-        {/* Refresh */}
-        <button
-          title="Refresh"
-          style={{
-            width: 34, height: 34, borderRadius: 7,
-            border: "1px solid #1C2D4F",
-            background: "transparent", color: "#7A8FAE",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer", flexShrink: 0,
-          }}
-        >
-          <RefreshCw size={16} />
-        </button>
-
-        {/* Alerts bell */}
-        <div style={{ position: "relative" }}>
-          <button
-            onClick={() => router.push("/login")}
-            title="Alerts"
-            style={{
-              width: 34, height: 34, borderRadius: 7,
-              border: "1px solid #1C2D4F",
-              background: "transparent", color: "#7A8FAE",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", flexShrink: 0,
-            }}
-          >
-            <Bell size={16} />
-          </button>
-          <span
-            style={{
-              position: "absolute", top: -4, right: -4,
-              width: 16, height: 16, borderRadius: 99,
-              background: "#991B1B", color: "#fff",
-              fontSize: 9, fontWeight: 800,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              border: "2px solid #0B1220",
-            }}
-          >
-            3
-          </span>
-        </div>
-
-        {/* Avatar / Sign In */}
         <button
           onClick={() => router.push("/login")}
           style={{
-            width: 34, height: 34, borderRadius: 8,
-            background: "linear-gradient(135deg, #C43A08, #E5521A)",
-            color: "#fff", fontSize: 13, fontWeight: 700,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer", flexShrink: 0,
-            border: "1px solid rgba(229,82,26,0.3)",
-          }}
-          title="Sign In"
-        >
-          AD
-        </button>
-
-        {/* Mobile menu toggle */}
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="lg:hidden"
-          style={{
-            width: 34, height: 34, borderRadius: 7,
-            border: "1px solid #1C2D4F",
-            background: "transparent", color: "#7A8FAE",
-            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "9px 18px",
+            borderRadius: 9,
+            border: `1px solid ${border}`,
+            background: isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.82)",
+            color: textPrimary,
+            fontSize: 14,
+            fontWeight: 800,
             cursor: "pointer",
+            flexShrink: 0,
           }}
-          aria-label="Toggle menu"
         >
-          {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+          Log In
+        </button>
+        <button
+          onClick={() => router.push("/register")}
+          style={{
+            padding: "9px 18px",
+            borderRadius: 9,
+            background: "linear-gradient(135deg, #C43A08, #E5521A)",
+            color: "#fff",
+            fontSize: 14,
+            fontWeight: 800,
+            cursor: "pointer",
+            flexShrink: 0,
+            border: "1px solid rgba(229,82,26,0.3)",
+            boxShadow: isDark ? "none" : "0 12px 28px rgba(229,82,26,0.20)",
+          }}
+        >
+          Sign Up
         </button>
       </header>
 
-      {/* Mobile dropdown menu */}
-      <div
-        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
-          mobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        }`}
-        style={{ paddingTop: 64 }}
-      >
-        <div
-          style={{
-            background: "rgba(1,8,16,0.98)",
-            backdropFilter: "blur(16px)",
-            borderBottom: "1px solid #1C2D4F",
-            padding: "12px 16px",
-          }}
-        >
-          <button
-            onClick={() => { router.push("/platform/depot"); setMobileMenuOpen(false); }}
-            className="w-full flex items-center gap-3 py-3 text-left"
-          >
-            <div
-              style={{
-                width: 36, height: 36, borderRadius: 9,
-                background: "rgba(229,82,26,0.12)",
-                border: "1px solid rgba(229,82,26,0.25)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}
-            >
-              <Building2 size={18} style={{ color: "#E5521A" }} />
-            </div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: "#E8EDF8" }}>IntelliDepot</div>
-              <div style={{ fontSize: 13, color: "#7A8FAE" }}>Warehouse Operations</div>
-            </div>
-          </button>
-          <button
-            onClick={() => { router.push("/login"); setMobileMenuOpen(false); }}
-            className="w-full mt-3 py-3 rounded-xl text-white font-bold text-base transition active:scale-95"
-            style={{ background: "#E5521A", fontSize: 16 }}
-          >
-            Sign In
-          </button>
-        </div>
-      </div>
-
-      {/* ══ Hero Section ══ */}
+      {/* Hero section */}
       <section
         className="relative flex flex-col items-center justify-center overflow-hidden"
         style={{ height: "100vh", minHeight: 600, maxHeight: 1000 }}
@@ -290,18 +175,28 @@ export function IntelliLanding() {
           ref={videoRef}
           autoPlay loop muted playsInline
           className="absolute inset-0 w-full h-full object-cover"
-          style={{ zIndex: 0 }}
+          style={{
+            zIndex: 0,
+            filter: isDark ? "none" : "contrast(1.08) saturate(0.9) brightness(1.18)",
+            opacity: isDark ? 1 : 0.28,
+          }}
         >
           <source src="/logo_intro.mp4" type="video/mp4" />
         </video>
-
-        {/* Gradient overlays */}
-        <div className="absolute inset-0 z-10" style={{
-          background: "linear-gradient(to bottom, rgba(1,8,16,0.55) 0%, rgba(1,8,16,0.3) 40%, rgba(1,8,16,0.7) 85%, rgba(1,8,16,1) 100%)"
-        }} />
-        <div className="absolute inset-0 z-10" style={{
-          background: "radial-gradient(ellipse at center, rgba(1,8,16,0.1) 0%, rgba(1,8,16,0.6) 100%)"
-        }} />
+        {isDark ? (
+          <>
+            <div className="absolute inset-0 z-10" style={{
+              background: "linear-gradient(to bottom, rgba(1,8,16,0.55) 0%, rgba(1,8,16,0.3) 40%, rgba(1,8,16,0.7) 85%, rgba(1,8,16,1) 100%)"
+            }} />
+            <div className="absolute inset-0 z-10" style={{
+              background: "radial-gradient(ellipse at center, rgba(1,8,16,0.1) 0%, rgba(1,8,16,0.6) 100%)"
+            }} />
+          </>
+        ) : (
+          <div className="absolute inset-0 z-10" style={{
+            background: "linear-gradient(180deg, rgba(246,248,251,0.70) 0%, rgba(246,248,251,0.80) 42%, rgba(246,248,251,0.96) 88%, #F6F8FB 100%)"
+          }} />
+        )}
 
         {/* Hero content */}
         <div
@@ -314,10 +209,11 @@ export function IntelliLanding() {
             display: "inline-flex", alignItems: "center", gap: 8,
             padding: "8px 18px", borderRadius: 99,
             border: "1px solid rgba(229,82,26,0.3)",
-            background: "rgba(229,82,26,0.10)",
+            background: isDark ? "rgba(229,82,26,0.10)" : "rgba(255,255,255,0.84)",
             color: "#E5521A", fontSize: 13, fontWeight: 800,
             textTransform: "uppercase", letterSpacing: "0.12em",
             marginBottom: 28,
+            boxShadow: isDark ? "none" : "0 14px 34px rgba(15,23,42,0.08)",
           }}>
             <span style={{
               width: 7, height: 7, borderRadius: "50%",
@@ -333,30 +229,27 @@ export function IntelliLanding() {
             fontWeight: 900, letterSpacing: "-0.03em",
             lineHeight: 1.05, marginBottom: 24,
           }}>
-            <span style={{ color: "#fff" }}>Intelligent Depot</span>
+            <span style={{ color: isDark ? "#FFFFFF" : "#111827" }}>Intelligent Depot</span>
             <br />
-            <span
-              style={{
-                backgroundImage: "linear-gradient(135deg, #E5521A 0%, #FF9A6C 40%, #FFD4B8 60%, #E5521A 100%)",
-                backgroundSize: "200% 200%",
-                animation: "gradient-shift 4s ease infinite",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
+            <span style={{
+              backgroundImage: "linear-gradient(135deg, #C43A08 0%, #E5521A 50%, #C43A08 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}>
               Operations by Fidelis
             </span>
           </h1>
 
           <p style={{
             fontSize: "clamp(1rem, 2vw, 1.25rem)",
-            color: "rgba(255,255,255,0.65)",
+            color: isDark ? "rgba(255,255,255,0.65)" : "#263244",
             maxWidth: 640, margin: "0 auto 36px",
             lineHeight: 1.7,
+            fontWeight: isDark ? 400 : 500,
           }}>
             Manage your entire depot with live cameras, smart inventory tracking,
-            automated gate entry, and real-time alerts — all from one screen.
+            automated gate entry, and real-time alerts, all from one screen.
           </p>
 
           {/* CTAs */}
@@ -368,7 +261,7 @@ export function IntelliLanding() {
                 gap: 8, padding: "14px 32px", borderRadius: 14,
                 background: "#E5521A", color: "#fff",
                 fontWeight: 800, fontSize: 17,
-                boxShadow: "0 0 50px rgba(229,82,26,0.4)",
+                boxShadow: isDark ? "0 0 50px rgba(229,82,26,0.35)" : "0 18px 44px rgba(229,82,26,0.24)",
                 border: "none", cursor: "pointer",
                 transition: "all 0.2s",
               }}
@@ -381,8 +274,9 @@ export function IntelliLanding() {
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 gap: 8, padding: "14px 32px", borderRadius: 14,
-                border: "1px solid rgba(255,255,255,0.25)",
-                color: "rgba(255,255,255,0.75)", background: "rgba(255,255,255,0.05)",
+                border: `1.5px solid ${isDark ? "rgba(255,255,255,0.25)" : "rgba(15,23,42,0.16)"}`,
+                color: textPrimary,
+                background: isDark ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.92)",
                 fontWeight: 700, fontSize: 17, cursor: "pointer",
                 backdropFilter: "blur(8px)", transition: "all 0.2s",
               }}
@@ -395,7 +289,7 @@ export function IntelliLanding() {
 
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 animate-bounce"
-          style={{ color: "rgba(255,255,255,0.3)" }}>
+          style={{ color: isDark ? "rgba(255,255,255,0.3)" : "#475569" }}>
           <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em" }}>Scroll</span>
           <ChevronDown size={16} />
         </div>
@@ -413,15 +307,13 @@ export function IntelliLanding() {
         }
       `}</style>
 
-      {/* ══ Stats Bar ══ */}
+      {/* Stats bar */}
       <section style={{ position: "relative", zIndex: 10, padding: "48px 16px" }}>
-        <div
-          style={{
-            maxWidth: 800, margin: "0 auto",
-            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-            gap: 14,
-          }}
-        >
+        <div style={{
+          maxWidth: 800, margin: "0 auto",
+          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gap: 14,
+        }}>
           {STATS.map((stat, i) => {
             const Icon = stat.icon;
             return (
@@ -430,16 +322,17 @@ export function IntelliLanding() {
                 style={{
                   display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
                   padding: "22px 12px", borderRadius: 18,
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: surface,
+                  border: `1px solid ${border}`,
                   backdropFilter: "blur(8px)",
+                  boxShadow: isDark ? "none" : "0 18px 44px rgba(15,23,42,0.06)",
                   transition: "transform 0.3s, box-shadow 0.3s",
                   animationDelay: `${i * 100}ms`,
                   cursor: "default",
                 }}
                 onMouseEnter={e => {
                   (e.currentTarget as HTMLDivElement).style.transform = "translateY(-4px)";
-                  (e.currentTarget as HTMLDivElement).style.boxShadow = `0 12px 32px ${stat.color}20`;
+                  (e.currentTarget as HTMLDivElement).style.boxShadow = `0 12px 32px ${stat.color}25`;
                 }}
                 onMouseLeave={e => {
                   (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
@@ -456,7 +349,7 @@ export function IntelliLanding() {
                 <div style={{ fontSize: 30, fontWeight: 900, color: stat.color, letterSpacing: "-0.5px" }}>
                   {stat.value}
                 </div>
-                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", textAlign: "center", fontWeight: 700, lineHeight: 1.3 }}>
+                <div style={{ fontSize: 13, color: textSecondary, textAlign: "center", fontWeight: 700, lineHeight: 1.3 }}>
                   {stat.label}
                 </div>
               </div>
@@ -465,21 +358,21 @@ export function IntelliLanding() {
         </div>
       </section>
 
-      {/* ══ Divider ══ */}
+      {/* Divider */}
       <div style={{ padding: "0 32px", maxWidth: 1200, margin: "0 auto" }}>
         <div style={{ height: 1, background: "linear-gradient(90deg, transparent, rgba(229,82,26,0.4), transparent)" }} />
       </div>
 
-      {/* ══ IntelliDepot Feature Section ══ */}
+      {/* IntelliDepot feature section */}
       <section style={{ position: "relative", zIndex: 10, padding: "64px 16px 80px" }}>
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 48 }}>
             <div style={{
               display: "inline-flex", alignItems: "center", gap: 8,
               padding: "6px 16px", borderRadius: 99,
-              border: "1px solid rgba(255,255,255,0.1)",
-              background: "rgba(255,255,255,0.03)",
-              color: "rgba(255,255,255,0.45)", fontSize: 13, fontWeight: 700,
+              border: `1px solid ${border}`,
+              background: surface,
+              color: textSecondary, fontSize: 13, fontWeight: 700,
               textTransform: "uppercase", letterSpacing: "0.12em",
               marginBottom: 18,
             }}>
@@ -487,15 +380,15 @@ export function IntelliLanding() {
             </div>
             <h2 style={{
               fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)",
-              fontWeight: 900, color: "#fff", marginBottom: 14, letterSpacing: "-0.02em",
+              fontWeight: 900, color: textPrimary, marginBottom: 14, letterSpacing: "-0.02em",
             }}>
-              IntelliDepot — One Platform, Full Control
+              IntelliDepot - One Platform, Full Control
             </h2>
             <p style={{
-              color: "rgba(255,255,255,0.45)", fontSize: 17, maxWidth: 560, margin: "0 auto",
+              color: textSecondary, fontSize: 17, maxWidth: 560, margin: "0 auto",
               lineHeight: 1.7,
             }}>
-              Purpose-built for warehouse operations — seamlessly integrated across the Fidelis enterprise.
+              Purpose-built for warehouse operations and integrated across the Fidelis enterprise.
             </p>
           </div>
 
@@ -509,8 +402,11 @@ export function IntelliLanding() {
                 style={{
                   width: "100%", textAlign: "left",
                   padding: "36px 40px", borderRadius: 28,
-                  background: "linear-gradient(135deg, rgba(229,82,26,0.08) 0%, rgba(255,255,255,0.02) 100%)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: isDark
+                    ? "linear-gradient(135deg, rgba(229,82,26,0.08) 0%, rgba(255,255,255,0.02) 100%)"
+                    : "linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(255,247,243,0.94) 100%)",
+                  border: `1px solid ${border}`,
+                  boxShadow: isDark ? "none" : "0 24px 64px rgba(15,23,42,0.08)",
                   cursor: "pointer", position: "relative", overflow: "hidden",
                   transition: "all 0.3s",
                 }}
@@ -520,8 +416,10 @@ export function IntelliLanding() {
                   (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-4px)";
                 }}
                 onMouseLeave={e => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.08)";
-                  (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = border;
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow = isDark
+                    ? "none"
+                    : "0 24px 64px rgba(15,23,42,0.08)";
                   (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
                 }}
               >
@@ -529,7 +427,7 @@ export function IntelliLanding() {
                 <div style={{
                   position: "absolute", top: -80, right: -80,
                   width: 300, height: 300, borderRadius: "50%",
-                  background: `${product.color}12`, filter: "blur(60px)",
+                  background: `${product.color}10`, filter: "blur(60px)",
                   pointerEvents: "none",
                 }} />
 
@@ -551,13 +449,13 @@ export function IntelliLanding() {
                       }}>
                         {product.tagline}
                       </div>
-                      <h3 style={{ fontSize: 26, fontWeight: 900, color: "#fff", letterSpacing: "-0.02em" }}>
+                      <h3 style={{ fontSize: 26, fontWeight: 900, color: textPrimary, letterSpacing: "-0.02em" }}>
                         {product.name}
                       </h3>
                     </div>
                   </div>
                   <p style={{
-                    fontSize: 16, color: "rgba(255,255,255,0.55)", lineHeight: 1.8, marginBottom: 28,
+                    fontSize: 16, color: textSecondary, lineHeight: 1.8, marginBottom: 28,
                     maxWidth: 580,
                   }}>
                     {product.description}
@@ -576,14 +474,12 @@ export function IntelliLanding() {
         </div>
       </section>
 
-      {/* ══ Footer ══ */}
-      <footer
-        style={{
-          position: "relative", zIndex: 10,
-          borderTop: "1px solid rgba(255,255,255,0.06)",
-          padding: "28px 16px",
-        }}
-      >
+      {/* Footer */}
+      <footer style={{
+        position: "relative", zIndex: 10,
+        borderTop: `1px solid ${dividerColor}`,
+        padding: "28px 16px",
+      }}>
         <div style={{
           maxWidth: 1200, margin: "0 auto",
           display: "flex", flexWrap: "wrap",
@@ -599,11 +495,11 @@ export function IntelliLanding() {
                 className="object-contain opacity-50"
               />
             </div>
-            <span style={{ fontSize: 13, color: "rgba(255,255,255,0.28)" }}>
-              Fidelis Platform · IntelliDepot™ · {new Date().getFullYear()}
+            <span style={{ fontSize: 13, color: textMuted }}>
+              Fidelis Platform - IntelliDepot TM - {new Date().getFullYear()}
             </span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "rgba(255,255,255,0.28)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: textMuted }}>
             <span style={{
               width: 7, height: 7, borderRadius: "50%",
               background: "#22C55E", display: "inline-block",
