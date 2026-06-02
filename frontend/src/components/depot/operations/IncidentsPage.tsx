@@ -604,14 +604,6 @@ export default function IncidentsPage() {
             <div className="text-[10px] text-[#4E6090]">📍 {i.loc} · 👤 {i.assignee}</div>
             <div className="flex flex-wrap gap-2 mt-2.5">
               <button
-                onClick={() => openUnifiedDetail(i.id)}
-                disabled={detailLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#5B9BF5]/35 text-[#5B9BF5] text-[11px] font-bold hover:bg-[#5B9BF5]/10 transition disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                Business Detail
-              </button>
-              <button
                 onClick={() => handleIncidentAnalysisClick(i)}
                 disabled={i.cam === EMPTY_VALUE}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1E2F50] text-[#8A9BBF] text-[11px] font-bold hover:text-[#E5521A] hover:border-[#E5521A]/40 transition disabled:cursor-not-allowed disabled:opacity-40"
