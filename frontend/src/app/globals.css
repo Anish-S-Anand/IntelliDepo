@@ -1059,23 +1059,3 @@ html:not(.dark) [class*="May"],
 html:not(.dark) [class*="pm"] {
   color: #4B5563 !important;
 }
-
-button.brand-logo-button,
-button.brand-logo-button:hover,
-button.brand-logo-button:focus,
-button.brand-logo-button:focus-visible,
-button.landing-logo-button,
-button.landing-logo-button:hover,
-button.landing-logo-button:focus,
-button.landing-logo-button:focus-visible,
-html.dark button.brand-logo-button,
-html:not(.dark) button.brand-logo-button,
-html.dark button.landing-logo-button,
-html:not(.dark) button.landing-logo-button {
-  border: 0 !important;
-  border-color: transparent !important;
-  border-width: 0 !important;
-  outline: 0 !important;
-  box-shadow: none !important;
-  background: transparent !important;
-}

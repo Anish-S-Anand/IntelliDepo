@@ -24,42 +24,40 @@ class WarehouseDef:
 WAREHOUSES: dict[str, WarehouseDef] = {
     "WH_HYD": WarehouseDef(
         id="WH_HYD",
-        name="Hyderabad Warehouse 01",
+        name="Hyderabad Depot",
         city="Hyderabad",
         region_id="REG_SOUTH",
         region_name="South Region",
-        zones=("HYD-Z1", "HYD-Z2", "HYD-Z3", "HYD-Z4"),
-        cameras=("HYD-W01-Gate1-Entry", "HYD-W01-Cluster1-Overhead", "HYD-W01-LoadingBay1-4", "HYD-W01-Cluster3-Perimeter", "HYD-W01-Gate2-Exit", "HYD-W01-Yard-Overview"),
+        zones=("HYD-Z1", "HYD-Z2", "HYD-Z3"),
+        cameras=("CAM-H1", "CAM-H2", "CAM-H3", "CAM-H4", "CAM-H5", "CAM-H6"),
         capacity_sqft=120000,
     ),
     "WH_BLR": WarehouseDef(
         id="WH_BLR",
-        name="Bangalore Warehouse 01",
+        name="Bangalore Depot",
         city="Bangalore",
         region_id="REG_SOUTH",
         region_name="South Region",
-        zones=("BLR-Z1", "BLR-Z2", "BLR-Z3", "BLR-Z4"),
-        cameras=("BLR-W01-Gate1-Entry", "BLR-W01-Cluster1-Overhead", "BLR-W01-LoadingBay1-4", "BLR-W01-Cluster3-Perimeter", "BLR-W01-Gate2-Exit", "BLR-W01-Yard-Overview"),
+        zones=("BLR-Z1", "BLR-Z2", "BLR-Z3"),
+        cameras=("CAM-B1", "CAM-B2", "CAM-B3", "CAM-B4", "CAM-B5", "CAM-B6"),
         capacity_sqft=110000,
     ),
     "WH_MUM": WarehouseDef(
         id="WH_MUM",
-        name="Mumbai Warehouse 01",
+        name="Mumbai Depot",
         city="Mumbai",
         region_id="REG_WEST",
         region_name="West Region",
-        zones=("MUM-Z1", "MUM-Z2", "MUM-Z3", "MUM-Z4"),
-        cameras=("MUM-W01-Gate1-Entry", "MUM-W01-Cluster1-Overhead", "MUM-W01-LoadingBay1-4", "MUM-W01-Cluster3-Perimeter", "MUM-W01-Gate2-Exit", "MUM-W01-Yard-Overview"),
+        zones=("MUM-Z1", "MUM-Z2", "MUM-Z3"),
+        cameras=("CAM-M1", "CAM-M2", "CAM-M3", "CAM-M4", "CAM-M5", "CAM-M6"),
         capacity_sqft=130000,
     ),
 }
 
 REGIONS: dict[str, tuple[str, ...]] = {
-    "REG_SOUTH": ("WH_BLR", "WH_HYD"),
+    "REG_SOUTH": ("WH_HYD", "WH_BLR"),
     "REG_WEST": ("WH_MUM",),
 }
-
-WAREHOUSE_ORDER = ("WH_BLR", "WH_HYD", "WH_MUM")
 
 REGION_NAMES = {
     "REG_SOUTH": "South Region",
@@ -106,13 +104,13 @@ def resolve_access_scope(user: User) -> AccessScope:
             return AccessScope(role, assignment, (assignment,), (wh.region_id,))
         if role == "regional_manager":
             return AccessScope(role, assignment, REGIONS[assignment], (assignment,))
-        return AccessScope(role, assignment, WAREHOUSE_ORDER, tuple(REGIONS))
+        return AccessScope(role, assignment, tuple(WAREHOUSES), tuple(REGIONS))
 
     names = role_names(user)
     if "admin" in names:
-        return AccessScope("admin", "ALL", WAREHOUSE_ORDER, tuple(REGIONS))
+        return AccessScope("admin", "ALL", tuple(WAREHOUSES), tuple(REGIONS))
     if "central_manager" in names:
-        return AccessScope("central_manager", "ALL", WAREHOUSE_ORDER, tuple(REGIONS))
+        return AccessScope("central_manager", "ALL", tuple(WAREHOUSES), tuple(REGIONS))
     if "regional_manager" in names:
         return AccessScope("regional_manager", "REG_SOUTH", REGIONS["REG_SOUTH"], ("REG_SOUTH",))
     return AccessScope("warehouse_manager", "WH_BLR", ("WH_BLR",), ("REG_SOUTH",))
@@ -136,7 +134,7 @@ def warehouse_for_zone(zone: str | None, fallback_index: int = 0) -> str:
             return warehouse.id
         if warehouse.city.upper() in text or warehouse.id in text:
             return warehouse.id
-    ids = WAREHOUSE_ORDER
+    ids = tuple(WAREHOUSES)
     return ids[fallback_index % len(ids)]
 
 
@@ -147,7 +145,7 @@ def warehouse_for_camera(name: str | None, zone: str | None, fallback_index: int
             return warehouse.id
         if warehouse.city.upper() in text or warehouse.id in text:
             return warehouse.id
-    ids = WAREHOUSE_ORDER
+    ids = tuple(WAREHOUSES)
     return ids[fallback_index % len(ids)]
 
 

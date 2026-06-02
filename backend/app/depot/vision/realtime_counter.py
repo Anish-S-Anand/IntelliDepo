@@ -1298,8 +1298,8 @@ def _vision_counting_camera() -> Optional[dict]:
 
     camera = {
         "camera_id":       COUNTING_DEMO_CAMERA_ID,
-        "name":            "BLR-W01-LoadingBay1-4",
-        "zone":            "BLR-Z2",
+        "name":            "JSW Counting Line",
+        "zone":            "Loading Bay 1-4",
         "video_file":      COUNTING_DEMO_VIDEO,
         "reference_video": COUNTING_REFERENCE_VIDEO,
         "scene":           "Vision verified bag detections",
@@ -1355,8 +1355,8 @@ def _vision_counting_camera() -> Optional[dict]:
 
 def _empty_counting_camera(scene: str) -> dict:
     return {
-        "camera_id": COUNTING_DEMO_CAMERA_ID, "name": "BLR-W01-LoadingBay1-4",
-        "zone": "BLR-Z2", "video_file": COUNTING_DEMO_VIDEO,
+        "camera_id": COUNTING_DEMO_CAMERA_ID, "name": "JSW Counting Line",
+        "zone": "Loading Bay 1-4", "video_file": COUNTING_DEMO_VIDEO,
         "reference_video": COUNTING_REFERENCE_VIDEO, "scene": scene,
         "in_count": 0, "out_count": 0, "total": 0,
         "loaded_count": 0, "unloaded_count": 0,
@@ -1390,8 +1390,8 @@ def _reference_counting_camera() -> dict:
         for i in range(n_dets)
     ]
     return {
-        "camera_id": COUNTING_DEMO_CAMERA_ID, "name": "BLR-W01-LoadingBay1-4",
-        "zone": "BLR-Z2", "video_file": COUNTING_DEMO_VIDEO,
+        "camera_id": COUNTING_DEMO_CAMERA_ID, "name": "JSW Counting Line",
+        "zone": "Loading Bay 1-4", "video_file": COUNTING_DEMO_VIDEO,
         "reference_video": COUNTING_REFERENCE_VIDEO, "scene": scene,
         "in_count": count, "out_count": 0, "total": count,
         "loaded_count": count, "unloaded_count": 0,

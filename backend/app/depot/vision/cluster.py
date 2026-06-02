@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.database import BaseModel as DBBaseModel, get_db
 from app.core.auth.dependencies import get_current_user
@@ -36,14 +36,33 @@ def _zone_status(utilization_pct: float) -> str:
 
 
 async def apply_live_batch_capacity(db: AsyncSession, zones: list["DepotZone"]) -> list["DepotZone"]:
-    """Reconcile persisted zones from their current occupancy source of truth."""
+    """Overlay persisted zones with live inventory batch capacity totals."""
     if not zones:
         return zones
 
+    from app.depot.vision.sequencing import InventoryBatch
+
+    result = await db.execute(
+        select(
+            InventoryBatch.zone,
+            func.coalesce(func.sum(InventoryBatch.quantity), 0),
+        )
+        .where(InventoryBatch.status == "active")
+        .group_by(InventoryBatch.zone)
+    )
+    # occupied = sum of current quantity of active batches per zone
+    totals = {
+        zone_code: int(occupied or 0)
+        for zone_code, occupied in result.all()
+        if zone_code
+    }
+
     for zone in zones:
+        # Always use zone.max_capacity_units as the fixed denominator
         capacity = zone.max_capacity_units or 1000
-        occupied = int(zone.current_occupancy or 0)
+        occupied = totals.get(zone.zone_code, 0)
         utilization_pct = round((occupied / capacity) * 100, 1) if capacity > 0 else 0.0
+        zone.current_occupancy = occupied
         zone.utilization_pct = utilization_pct
         zone.status = _zone_status(utilization_pct)
 

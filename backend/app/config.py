@@ -91,24 +91,37 @@ class Settings(BaseSettings):
     # Celery (async task dispatch — optional)
     CELERY_BROKER_URL: str = ""
 
-    # Email / SMTP
+    # Email / SMTP Configuration
     SMTP_HOST: str = "localhost"
     SMTP_PORT: int = 1025
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@intelli.ai"
+    EMAIL_DOMAIN: str = "intelli.ai"
     SMTP_USE_TLS: bool = False
 
-    # Notifications
-    NOTIFICATION_WEBHOOK_TIMEOUT: int = 10
-    NOTIFICATION_WEBHOOK_RETRIES: int = 3
-    NOTIFICATION_QUIET_HOURS_ENABLED: bool = True
-    WHATSAPP_PROVIDER: str = "stub"
+    # WhatsApp Notification Configuration
+    WHATSAPP_PROVIDER: str = "stub"  # 'twilio', 'meta', or 'stub'
+    WHATSAPP_API_BASE_URL: str = "https://api.twilio.com/2010-04-01/Accounts"
+    WHATSAPP_API_TOKEN: str = ""
+    WHATSAPP_SENDER_NUMBER: str = ""
+    
+    # Twilio-specific WhatsApp Configuration
     TWILIO_ACCOUNT_SID: str = ""
     TWILIO_AUTH_TOKEN: str = ""
     TWILIO_WHATSAPP_FROM: str = ""
+    
+    # Meta-specific WhatsApp Configuration
     META_WHATSAPP_TOKEN: str = ""
     META_WHATSAPP_PHONE_NUMBER_ID: str = ""
+
+    # General Notification Settings
+    NOTIFICATION_WEBHOOK_TIMEOUT: int = 10
+    NOTIFICATION_WEBHOOK_RETRIES: int = 3
+    NOTIFICATION_QUIET_HOURS_ENABLED: bool = True
+    NOTIFICATIONS_WHATSAPP_ENABLED: bool = True
+    NOTIFICATIONS_EMAIL_ENABLED: bool = True
+    NOTIFICATIONS_WEBSOCKET_ENABLED: bool = True
 
     @field_validator("DEBUG", mode="before")
     @classmethod
@@ -120,6 +133,33 @@ class Settings(BaseSettings):
             if normalized in {"dev", "debug", "development"}:
                 return True
         return value
+
+    @field_validator("SMTP_PORT")
+    @classmethod
+    def validate_smtp_port(cls, value: int) -> int:
+        """Validate SMTP port is within valid TCP port range (0-65535)."""
+        if not 0 <= value <= 65535:
+            raise ValueError(f"SMTP_PORT must be between 0 and 65535, got {value}")
+        return value
+
+    @field_validator("WHATSAPP_PROVIDER")
+    @classmethod
+    def validate_whatsapp_provider(cls, value: str) -> str:
+        """Validate WhatsApp provider is one of the supported values."""
+        valid_providers = {"twilio", "meta", "stub"}
+        if value.lower() not in valid_providers:
+            raise ValueError(
+                f"WHATSAPP_PROVIDER must be one of {valid_providers}, got '{value}'"
+            )
+        return value.lower()
+
+    @field_validator("EMAIL_DOMAIN")
+    @classmethod
+    def validate_email_domain(cls, value: str) -> str:
+        """Validate email domain is not empty."""
+        if not value or not value.strip():
+            raise ValueError("EMAIL_DOMAIN cannot be empty")
+        return value.strip()
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

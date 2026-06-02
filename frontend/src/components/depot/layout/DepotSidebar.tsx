@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import { useState, useEffect } from "react";
@@ -90,7 +90,7 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
         borderRight: "1px solid var(--bg-nav-border)",
       }}
     >
-      {/* Nav items â€” fill available space */}
+      {/* Nav items — fill available space */}
       <div className="flex flex-col gap-[2px] flex-1">
         {visibleNavItems.map((item) => {
         const Icon = item.icon;
@@ -148,6 +148,13 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
       })}
       </div>
 
+      {/* Bottom — version / branding pinned to bottom */}
+      <div
+        className="px-3 py-3 text-[9px] font-semibold tracking-[0.1em] uppercase"
+        style={{ color: "var(--text-faint)", borderTop: "1px solid var(--bg-nav-border)" }}
+      >
+        IntelliDepot™ v1.0
+      </div>
     </aside>
   );
 }

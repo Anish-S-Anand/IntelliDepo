@@ -116,21 +116,6 @@ class CameraResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-_LEGACY_CAMERA_NAME_MAP = {
-    "Gate Entry North": "BLR-W01-Gate1-Entry",
-    "Zone A Overhead": "BLR-W01-Cluster1-Overhead",
-    "Loading Bay 1-4": "BLR-W01-LoadingBay1-4",
-    "Zone C Perimeter": "BLR-W01-Cluster3-Perimeter",
-    "Gate Exit South": "BLR-W01-Gate2-Exit",
-    "Yard Overview": "BLR-W01-Yard-Overview",
-}
-
-
-def _standardize_camera_name(camera: Camera) -> Camera:
-    camera.name = _LEGACY_CAMERA_NAME_MAP.get(camera.name, camera.name)
-    return camera
-
-
 class FrameData(BaseModel):
     camera_id: uuid.UUID
     timestamp: datetime
@@ -527,7 +512,7 @@ async def list_cameras(zone: Optional[str] = None, db: AsyncSession = Depends(ge
     if zone:
         query = query.where(Camera.zone == zone)
     result = await db.execute(query)
-    return [_standardize_camera_name(camera) for camera in result.scalars().all()]
+    return result.scalars().all()
 
 
 @router.get("/{camera_id}", response_model=CameraResponse)
@@ -536,7 +521,7 @@ async def get_camera(camera_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     camera = await db.get(Camera, camera_id)
     if not camera or not camera.is_active:
         raise HTTPException(status_code=404, detail="Camera not found")
-    return _standardize_camera_name(camera)
+    return camera
 
 
 @router.post("/{camera_id}/connect")
@@ -608,7 +593,7 @@ async def get_camera_snapshot(camera_id: str, theme: str = "light", seek: float 
     except (ValueError, AttributeError):
         pass
 
-    # Fallback: slug-to-name lookup for legacy camera names.
+    # Fallback: slug-to-name lookup (e.g. 'gate-entry-north' → 'Gate Entry North')
     if camera is None:
         slug_name = camera_id.replace("-", " ").title()
         result = await db.execute(

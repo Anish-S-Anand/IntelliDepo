@@ -2,18 +2,19 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
+  getZones,
   getZoneHistory,
   getThresholds,
   configureThreshold,
+  getCapacityStatus,
   updateZoneBoundary,
   type ZoneResponse,
   type ZoneHistoryEntry,
   type ThresholdResponse,
   type CapacityStatusEntry,
 } from "@/services/depotCluster";
-import { useAuthStore } from "@/stores/authStore";
-import { getUnifiedDepotSource } from "@/services/depotUnifiedSource";
 import {
+  Settings,
   TrendingUp,
   Download,
   Edit3,
@@ -36,7 +37,6 @@ function statusColor(status: string): string {
 }
 
 export default function ZoneConfigPage() {
-  const user = useAuthStore((state) => state.user);
   // --- Data state ---
   const [zones, setZones] = useState<ZoneResponse[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
@@ -66,29 +66,10 @@ export default function ZoneConfigPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [source, t] = await Promise.all([
-          getUnifiedDepotSource({
-            role: user?.role,
-            email: user?.email,
-            location: user?.location,
-          }),
-          getThresholds(),
-        ]);
-        const z = source.zones;
+        const [z, t, cs] = await Promise.all([getZones(), getThresholds(), getCapacityStatus()]);
         setZones(z);
         setThresholds(t);
-        setCapacityStatus(z.map((zone) => ({
-          zone_code: zone.zone_code,
-          name: zone.name,
-          utilization_pct: zone.utilization_pct,
-          status: zone.status,
-          current_occupancy: zone.current_occupancy,
-          max_capacity_units: zone.max_capacity_units,
-          warning_threshold: 80,
-          critical_threshold: 95,
-          exceeds_warning: zone.utilization_pct >= 80,
-          exceeds_critical: zone.utilization_pct >= 95,
-        })));
+        setCapacityStatus(cs);
         if (z.length > 0) {
           setSelectedZoneId(z[0].id);
         }
@@ -99,7 +80,7 @@ export default function ZoneConfigPage() {
       }
     }
     load();
-  }, [user?.email, user?.location, user?.role]);
+  }, []);
 
   // --- When selected zone changes, load its history + apply matching threshold ---
   useEffect(() => {
@@ -249,7 +230,7 @@ export default function ZoneConfigPage() {
             onClick={() => setSelectedZoneId(z.id)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-[11px] font-bold transition-all whitespace-nowrap ${
               selectedZoneId === z.id
-                ? "bg-[#E5521A] text-white border-[#E5521A]"
+                ? "bg-[#E5521A]/12 text-[#E5521A] border-[#E5521A]/25"
                 : "bg-[#14203A] text-[#4E6090] border-[#1E2F50] hover:text-[#8A9BBF] hover:border-[#1E2F50]"
             }`}
           >
@@ -678,7 +659,7 @@ export default function ZoneConfigPage() {
                   <div
                     key={cs.zone_code}
                     className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
-                      selectedZoneId === zoneId ? "bg-[#E5521A] text-white" : "hover:bg-[#0F1A30]"
+                      selectedZoneId === zoneId ? "bg-[#E5521A]/10" : "hover:bg-[#0F1A30]"
                     }`}
                     onClick={() => { if (zoneId) setSelectedZoneId(zoneId); }}
                   >

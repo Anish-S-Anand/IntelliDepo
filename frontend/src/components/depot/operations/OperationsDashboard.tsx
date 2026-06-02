@@ -1,17 +1,25 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { Activity, AlertTriangle, Camera, Package, Truck, TrendingUp } from "lucide-react";
 import { THROUGHPUT, DAYS } from "@/lib/depot-data";
-import { useAuthStore } from "@/stores/authStore";
 import { getAllActiveAlerts, type UnifiedAlert } from "@/services/depotVision";
 import { getActiveBreaches, getActiveIncidents, type IncidentResponse } from "@/services/depotPerimeter";
-import { type CapacityStatusEntry } from "@/services/depotCluster";
+import { getCapacityStatus, type CapacityStatusEntry } from "@/services/depotCluster";
 import { getDashboardKPIs, type DashboardKPIData } from "@/services/depotOps";
 import { getCountSessions, getManifests, type CountSessionResponse, type ManifestResponse } from "@/services/depotCounting";
-import { getUnifiedDepotSource } from "@/services/depotUnifiedSource";
+
+// Static KPI labels — values come from the API
+const KPI_LABELS = [
+  { label: "Bag Count Accuracy", key: "accuracy", glow: "#22D3A1" },
+  { label: "FIFO Compliance", key: "fifo", glow: "#22D3A1" },
+  { label: "Avg Loading Time", key: "loading", glow: "#5B9BF5" },
+  { label: "Depot Occupancy", key: "occupancy", glow: "#E5521A" },
+  { label: "Active Alerts", key: "alerts", glow: "#F5A623" },
+  { label: "Open Incidents", key: "incidents", glow: "#F04A4A" },
+];
 
 export default function OperationsDashboard() {
-  const user = useAuthStore((state) => state.user);
   const [kpis, setKpis] = useState<DashboardKPIData | null>(null);
   const [visionAlerts, setVisionAlerts] = useState<UnifiedAlert[]>([]);
   const [breachCount, setBreachCount] = useState(0);
@@ -27,11 +35,7 @@ export default function OperationsDashboard() {
       getAllActiveAlerts(),
       getActiveBreaches(),
       getActiveIncidents(),
-      getUnifiedDepotSource({
-        role: user?.role,
-        email: user?.email,
-        location: user?.location,
-      }),
+      getCapacityStatus(),
       getCountSessions(),
       getManifests(),
     ]);
@@ -39,24 +43,11 @@ export default function OperationsDashboard() {
     if (alertRes.status === "fulfilled") setVisionAlerts(alertRes.value);
     if (breachRes.status === "fulfilled") setBreachCount(breachRes.value.length);
     if (incRes.status === "fulfilled") setIncidents(incRes.value);
-    if (capRes.status === "fulfilled") {
-      setCapacityStatus(capRes.value.zones.map((zone) => ({
-        zone_code: zone.zone_code,
-        name: zone.name,
-        utilization_pct: zone.utilization_pct,
-        status: zone.status,
-        current_occupancy: zone.current_occupancy,
-        max_capacity_units: zone.max_capacity_units,
-        warning_threshold: 80,
-        critical_threshold: 95,
-        exceeds_warning: zone.utilization_pct >= 80,
-        exceeds_critical: zone.utilization_pct >= 95,
-      })));
-    }
+    if (capRes.status === "fulfilled") setCapacityStatus(capRes.value);
     if (sessRes.status === "fulfilled") setCountSessions(sessRes.value);
     if (manRes.status === "fulfilled") setManifests(manRes.value);
     setLoading(false);
-  }, [user?.email, user?.location, user?.role]);
+  }, []);
 
   useEffect(() => {
     void fetchAll();

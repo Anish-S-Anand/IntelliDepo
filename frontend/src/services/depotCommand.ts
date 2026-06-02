@@ -1,6 +1,4 @@
 import api from "./api";
-import { DEPOT_WAREHOUSE_ORDER, DEPOT_WAREHOUSE_REGISTRY } from "@/lib/depot-camera-registry";
-import { ZONE_SEED } from "./depotUnifiedSource";
 
 export interface CameraRecord {
   id: string;
@@ -254,24 +252,24 @@ function countTone(count: number, criticalAt = 4): CommandKpi["tone"] {
 
 const DEMO_WAREHOUSES = {
   WH_HYD: {
-    name: DEPOT_WAREHOUSE_REGISTRY.WH_HYD.name,
-    region_id: DEPOT_WAREHOUSE_REGISTRY.WH_HYD.regionId,
-    zones: DEPOT_WAREHOUSE_REGISTRY.WH_HYD.zones,
-    cameras: DEPOT_WAREHOUSE_REGISTRY.WH_HYD.cameras,
+    name: "Hyderabad Depot",
+    region_id: "REG_SOUTH",
+    zones: ["HYD-Z1", "HYD-Z2", "HYD-Z3"],
+    cameras: ["CAM-H1", "CAM-H2", "CAM-H3", "CAM-H4", "CAM-H5", "CAM-H6"],
     metrics: { bags_in: 1260, bags_out: 1040, vehicles: 38, workers: 82, incidents: 2, occupancy: 74, unload: 34 },
   },
   WH_BLR: {
-    name: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.name,
-    region_id: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.regionId,
-    zones: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.zones,
-    cameras: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras,
+    name: "Bangalore Depot",
+    region_id: "REG_SOUTH",
+    zones: ["BLR-Z1", "BLR-Z2", "BLR-Z3"],
+    cameras: ["CAM-B1", "CAM-B2", "CAM-B3", "CAM-B4", "CAM-B5", "CAM-B6"],
     metrics: { bags_in: 1435, bags_out: 1195, vehicles: 44, workers: 76, incidents: 3, occupancy: 71, unload: 29 },
   },
   WH_MUM: {
-    name: DEPOT_WAREHOUSE_REGISTRY.WH_MUM.name,
-    region_id: DEPOT_WAREHOUSE_REGISTRY.WH_MUM.regionId,
-    zones: DEPOT_WAREHOUSE_REGISTRY.WH_MUM.zones,
-    cameras: DEPOT_WAREHOUSE_REGISTRY.WH_MUM.cameras,
+    name: "Mumbai Depot",
+    region_id: "REG_WEST",
+    zones: ["MUM-Z1", "MUM-Z2", "MUM-Z3"],
+    cameras: ["CAM-M1", "CAM-M2", "CAM-M3", "CAM-M4", "CAM-M5", "CAM-M6"],
     metrics: { bags_in: 980, bags_out: 910, vehicles: 31, workers: 64, incidents: 1, occupancy: 82, unload: 37 },
   },
 } as const;
@@ -279,28 +277,14 @@ const DEMO_WAREHOUSES = {
 type DemoWarehouseId = keyof typeof DEMO_WAREHOUSES;
 type DemoMetricKey = keyof typeof DEMO_WAREHOUSES.WH_HYD.metrics;
 
-// Zone→gate mapping: Z1→Gate A, Z2→Gate B, Z3→Gate C, Z4→no gate
-// Zone→camera mapping: Z1→[cam1,cam2], Z2→[cam3], Z3→[cam4], Z4→[cam5,cam6]
-const COMMAND_GATE_SEED = [
-  { suffix: "A", name: "Gate A - North Entry", gateType: "entry", status: "open" },
-  { suffix: "B", name: "Gate B - South Exit", gateType: "exit", status: "closed" },
-  { suffix: "C", name: "Gate C - Loading Dock", gateType: "loading", status: "open" },
-] as const;
-
-// Camera start index per zone: Z1 starts at 0 (2 cams), Z2 at 2 (1 cam), Z3 at 3 (1 cam), Z4 at 4 (2 cams)
-const ZONE_CAM_START = [0, 2, 3, 4] as const;
-const ZONE_CAM_COUNT = [2, 1, 1, 2] as const;
-// Gate index per zone (null = no gate)
-const ZONE_GATE_IDX = [0, 1, 2, null] as const;
-
 function demoWarehouseIds(): DemoWarehouseId[] {
   if (typeof window === "undefined") return ["WH_BLR"];
   const token = localStorage.getItem("token") || "";
   if (token.includes("wh-hyd")) return ["WH_HYD"];
   if (token.includes("wh-blr")) return ["WH_BLR"];
   if (token.includes("wh-mum")) return ["WH_MUM"];
-  if (token.includes("regional-india")) return ["WH_BLR", "WH_HYD"];
-  return DEPOT_WAREHOUSE_ORDER as DemoWarehouseId[];
+  if (token.includes("regional-india")) return ["WH_HYD", "WH_BLR"];
+  return ["WH_HYD", "WH_BLR", "WH_MUM"];
 }
 
 function scopedBreakdown(warehouseIds: DemoWarehouseId[], key: DemoMetricKey) {
@@ -313,33 +297,23 @@ function demoCommandCenterSnapshot(): CommandCenterSnapshot {
   const metrics = warehouseIds.map((id) => DEMO_WAREHOUSES[id].metrics);
   const sum = (key: DemoMetricKey) => metrics.reduce((total, item) => total + Number(item[key]), 0);
   const avgUnload = Math.round(sum("unload") / Math.max(metrics.length, 1));
-  const totalOccupied = warehouseIds.reduce((s, id) => s + (ZONE_SEED[id] ?? []).reduce((zs, z) => zs + z.occupancy, 0), 0);
-  const totalCapacity = warehouseIds.reduce((s, id) => s + (ZONE_SEED[id] ?? []).reduce((zs, z) => zs + z.maxCapacity, 0), 0);
-  const occupancyPct = totalCapacity > 0 ? Math.round((totalOccupied / totalCapacity) * 100) : 0;
-  const capacityRemaining = Math.max(0, totalCapacity - totalOccupied);
-  const cameras = warehouseIds.flatMap((warehouseId) => {
-    const wh = DEMO_WAREHOUSES[warehouseId];
-    return wh.zones.flatMap((zone, zoneIndex) => {
-      const start = ZONE_CAM_START[zoneIndex];
-      const count = ZONE_CAM_COUNT[zoneIndex];
-      return wh.cameras.slice(start, start + count).map((cameraId) => ({
-        id: cameraId,
-        name: cameraId,
-        zone,
-        status: "active",
-        protocol: "rtsp",
-        warehouse_id: warehouseId,
-        region_id: DEMO_WAREHOUSES[warehouseId].region_id,
-        last_seen: now,
-      }));
-    });
-  });
-  const gates = warehouseIds.flatMap((warehouseId) => COMMAND_GATE_SEED.map((gate, index) => ({
-    id: `${warehouseId}-GATE-${gate.suffix}`,
-    gate_code: `GATE-${gate.suffix}`,
-    name: gate.name,
-    gate_type: gate.gateType,
-    status: gate.status,
+  const occupancy = Math.round(sum("occupancy") / Math.max(metrics.length, 1));
+  const cameras = warehouseIds.flatMap((warehouseId) => DEMO_WAREHOUSES[warehouseId].cameras.map((cameraId, index) => ({
+    id: cameraId,
+    name: cameraId,
+    zone: DEMO_WAREHOUSES[warehouseId].zones[Math.floor(index / 2)],
+    status: "active",
+    protocol: "rtsp",
+    warehouse_id: warehouseId,
+    region_id: DEMO_WAREHOUSES[warehouseId].region_id,
+    last_seen: now,
+  })));
+  const gates = warehouseIds.flatMap((warehouseId) => DEMO_WAREHOUSES[warehouseId].zones.map((zone, index) => ({
+    id: `${warehouseId}-G${index + 1}`,
+    gate_code: `Gate ${index + 1}`,
+    name: `${DEMO_WAREHOUSES[warehouseId].name} Gate ${index + 1}`,
+    gate_type: "both",
+    status: index === 0 ? "open" : "closed",
     total_entries_today: 14 + index * 4,
     warehouse_id: warehouseId,
     region_id: DEMO_WAREHOUSES[warehouseId].region_id,
@@ -349,33 +323,25 @@ function demoCommandCenterSnapshot(): CommandCenterSnapshot {
     generated_at: now,
     health_score: 82,
     kpis: [
-      { key: "bags_in",           label: "Bags In (Weekly)",       value: String(sum("bags_in")),    detail: scopedBreakdown(warehouseIds, "bags_in"),    tone: "healthy" },
-      { key: "bags_out",          label: "Bags Out (Weekly)",      value: String(sum("bags_out")),   detail: scopedBreakdown(warehouseIds, "bags_out"),   tone: "healthy" },
-      { key: "total_capacity",    label: "Total Capacity",         value: String(totalCapacity),     detail: "Total storage units across assigned zones", tone: "healthy" },
-      { key: "capacity_remaining",label: "Capacity Remaining",     value: String(capacityRemaining), detail: "Free storage units in assigned scope",      tone: occupancyPct >= 80 ? "warning" : "healthy" },
-      { key: "vehicles",          label: "Vehicles (Today)",       value: String(sum("vehicles")),   detail: scopedBreakdown(warehouseIds, "vehicles"),   tone: "normal" },
-      { key: "avg_unload",        label: "Avg Unload (Today)",     value: `${avgUnload}m`,           detail: "Average across assigned warehouses",        tone: "normal" },
-      { key: "incidents",         label: "Incidents (Today)",      value: String(sum("incidents")),  detail: scopedBreakdown(warehouseIds, "incidents"),  tone: sum("incidents") > 3 ? "critical" : "warning" },
-      { key: "occupancy",         label: "Occupancy %",            value: `${occupancyPct}%`,        detail: `${totalOccupied} / ${totalCapacity} bags across all zones`, tone: occupancyPct >= 80 ? "warning" : "healthy" },
-      { key: "workers",           label: "Workers (Today)",        value: String(sum("workers")),    detail: scopedBreakdown(warehouseIds, "workers"),    tone: "healthy" },
-      { key: "cameras",           label: "Active Cameras",         value: `${cameras.length}/${cameras.length}`, detail: `${warehouseIds.length} warehouse camera group(s)`, tone: "healthy" },
+      { key: "bags_in", label: "Bags In", value: String(sum("bags_in")), detail: scopedBreakdown(warehouseIds, "bags_in"), tone: "healthy" },
+      { key: "bags_out", label: "Bags Out", value: String(sum("bags_out")), detail: scopedBreakdown(warehouseIds, "bags_out"), tone: "healthy" },
+      { key: "vehicles", label: "Vehicles", value: String(sum("vehicles")), detail: scopedBreakdown(warehouseIds, "vehicles"), tone: "normal" },
+      { key: "avg_unload", label: "Avg Unload Time", value: `${avgUnload}m`, detail: "Average across assigned warehouses", tone: "normal" },
+      { key: "incidents", label: "Incidents Today", value: String(sum("incidents")), detail: scopedBreakdown(warehouseIds, "incidents"), tone: sum("incidents") > 3 ? "critical" : "warning" },
+      { key: "occupancy", label: "Occupancy %", value: `${occupancy}%`, detail: "Scoped warehouse occupancy", tone: occupancy >= 80 ? "warning" : "healthy" },
+      { key: "workers", label: "Worker Count", value: String(sum("workers")), detail: scopedBreakdown(warehouseIds, "workers"), tone: "healthy" },
+      { key: "cameras", label: "Active Cameras", value: `${cameras.length}/${cameras.length}`, detail: `${warehouseIds.length} warehouse camera group(s)`, tone: "healthy" },
     ],
     gates,
     cameras,
-    zones: warehouseIds.flatMap((warehouseId) => {
-      const seedZones = ZONE_SEED[warehouseId] ?? [];
-      return seedZones.map((z, index) => {
-        const util = Math.round((z.occupancy / z.maxCapacity) * 100);
-        return {
-          zone_code: z.code,
-          name: `${z.code} (Cluster ${index + 1})`,
-          utilization_pct: util,
-          current_occupancy: z.occupancy,
-          max_capacity_units: z.maxCapacity,
-          status: util >= 90 ? "critical" : util >= 80 ? "warning" : "normal",
-        };
-      });
-    }),
+    zones: warehouseIds.flatMap((warehouseId) => DEMO_WAREHOUSES[warehouseId].zones.map((zone, index) => ({
+      zone_code: zone,
+      name: `${zone} (Cluster ${index + 1})`,
+      utilization_pct: DEMO_WAREHOUSES[warehouseId].metrics.occupancy - index * 3,
+      current_occupancy: 700 + index * 80,
+      max_capacity_units: 1000,
+      status: index === 0 ? "warning" : "normal",
+    }))),
     exceptions: [
       { id: "ex-1", source: "Incident", title: "Unauthorized vehicle at inbound gate", detail: "LPR mismatch detected at Gate A", priority: "P1", zone: "Gate A", created_at: now },
       { id: "ex-2", source: "Inventory", title: "SKU cement-bag-43 below reorder level", detail: "38 available, reorder at 75", priority: "P2", zone: "Zone B", created_at: now },
@@ -694,8 +660,9 @@ function isDemoSession(): boolean {
 }
 
 const DEMO_GATES = [
-  { id: "gate-a", name: "Gate A - North Entry" },
-  { id: "gate-b", name: "Gate B - South Exit" },
+  { id: "gate-a", name: "Gate A — North Entry" },
+  { id: "gate-b", name: "Gate B — South Exit" },
+  { id: "gate-c", name: "Gate C — Loading Bay" },
 ];
 
 function demoCommandAction(url: string, payload: Record<string, unknown>): CommandActionResponse {

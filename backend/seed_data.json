@@ -40,7 +40,12 @@
       {"name": "South Perimeter Wall", "zone_type": "general", "alert_severity": "medium", "alert_on_entry": true},
       {"name": "Emergency Exit Corridor", "zone_type": "controlled", "alert_severity": "high", "alert_on_entry": true}
     ],
-    "cluster_zones_source": "../frontend/src/data/depotWarehouseStorage.json",
+    "cluster_zones": [
+      {"zone_code": "A", "name": "Storage Bay A — Cement", "zone_type": "storage", "floor": "ground", "area_sqm": 2400, "max_capacity_units": 1000, "current_occupancy": 810},
+      {"zone_code": "B", "name": "Storage Bay B — Fertilizers", "zone_type": "storage", "floor": "ground", "area_sqm": 2800, "max_capacity_units": 1000, "current_occupancy": 450},
+      {"zone_code": "C", "name": "Hazmat Storage C", "zone_type": "hazmat", "floor": "ground", "area_sqm": 1600, "max_capacity_units": 1000, "current_occupancy": 595},
+      {"zone_code": "D", "name": "Heavy Materials D", "zone_type": "storage", "floor": "ground", "area_sqm": 3200, "max_capacity_units": 1000, "current_occupancy": 910}
+    ],
     "manifests": [
       {"manifest_code": "MF-2026-0412", "vehicle_number": "TN-04-AB-1234", "expected_bags": 500, "expected_boxes": 50},
       {"manifest_code": "MF-2026-0413", "vehicle_number": "MH-12-CD-5678", "expected_bags": 300, "expected_boxes": 0},

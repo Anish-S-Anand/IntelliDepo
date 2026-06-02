@@ -2,11 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import {
   Activity,
   AlertTriangle,
-  ArrowUpRight,
   BarChart3,
   BellRing,
   Camera,
@@ -40,7 +38,6 @@ import {
 } from "@/services/depotCommand";
 import { getUnifiedDepotSource } from "@/services/depotUnifiedSource";
 import { useDepotCommandEvents } from "@/hooks/useDepotCommandEvents";
-import { DEPOT_WAREHOUSE_ORDER, DEPOT_WAREHOUSE_REGISTRY } from "@/lib/depot-camera-registry";
 
 const TONE_STYLES: Record<string, { color: string; bg: string; border: string }> = {
   healthy: { color: "#22D3A1", bg: "rgba(34,211,161,0.12)", border: "rgba(34,211,161,0.28)" },
@@ -57,28 +54,12 @@ const KPI_ICONS: Record<string, typeof Camera> = {
   avg_unload: Timer,
   occupancy: Layers,
   capacity_remaining: Gauge,
-  total_capacity: Layers,
   workers: Users,
   gates: Shield,
   incidents: AlertTriangle,
   inventory: PackageCheck,
   zones: Layers,
   access: Truck,
-};
-
-const KPI_DISPLAY_ORDER = ["bags_in", "bags_out", "total_capacity", "capacity_remaining"] as const;
-
-const KPI_ROUTE_MAP: Record<string, string> = {
-  bags_in: "/depot/operations",
-  bags_out: "/depot/operations",
-  total_capacity: "/depot/heatmap",
-  capacity_remaining: "/depot/heatmap",
-  occupancy: "/depot/heatmap",
-  incidents: "/depot/incidents",
-  workers: "/depot/counting",
-  avg_unload: "/depot/counting",
-  vehicles: "/depot/gate",
-  cameras: "/depot/vision",
 };
 
 const BROADCAST_TYPES = [
@@ -105,49 +86,36 @@ const BROADCAST_CHANNELS = [
 export type CommandPersona = "warehouse_manager" | "regional_manager" | "central_manager" | "admin";
 
 const WAREHOUSE_LABELS: Record<string, { name: string; region: string; title: string }> = {
-  WH_HYD: { name: DEPOT_WAREHOUSE_REGISTRY.WH_HYD.name, region: "South", title: `${DEPOT_WAREHOUSE_REGISTRY.WH_HYD.name} - Operations Dashboard` },
-  WH_BLR: { name: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.name, region: "South", title: `${DEPOT_WAREHOUSE_REGISTRY.WH_BLR.name} - Operations Dashboard` },
-  WH_MUM: { name: DEPOT_WAREHOUSE_REGISTRY.WH_MUM.name, region: "West", title: `${DEPOT_WAREHOUSE_REGISTRY.WH_MUM.name} - Operations Dashboard` },
+  WH_HYD: { name: "Hyderabad Depot", region: "South", title: "Hyderabad Depot - Operations Dashboard" },
+  WH_BLR: { name: "Bangalore Depot", region: "South", title: "Bangalore Depot - Operations Dashboard" },
+  WH_MUM: { name: "Mumbai Depot", region: "West", title: "Mumbai Depot - Operations Dashboard" },
 };
 
 const ROLE_WAREHOUSE_REGISTRY = {
   WH_HYD: {
-    name: DEPOT_WAREHOUSE_REGISTRY.WH_HYD.name,
-    region_id: DEPOT_WAREHOUSE_REGISTRY.WH_HYD.regionId,
-    zones: DEPOT_WAREHOUSE_REGISTRY.WH_HYD.zones,
-    cameras: DEPOT_WAREHOUSE_REGISTRY.WH_HYD.cameras,
-    metrics: { bagsIn: 1260, bagsOut: 1040, vehicles: 38, workers: 82, incidents: 2, occupancy: 74, unload: 34, health: 91 },
+    name: "Hyderabad Depot",
+    region_id: "REG_SOUTH",
+    zones: ["HYD-Z1", "HYD-Z2", "HYD-Z3"],
+    cameras: ["CAM-H1", "CAM-H2", "CAM-H3", "CAM-H4", "CAM-H5", "CAM-H6"],
+    metrics: { bagsIn: 1260, bagsOut: 1040, vehicles: 38, workers: 82, incidents: 2, occupancy: 74, unload: 34 },
   },
   WH_BLR: {
-    name: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.name,
-    region_id: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.regionId,
-    zones: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.zones,
-    cameras: DEPOT_WAREHOUSE_REGISTRY.WH_BLR.cameras,
-    metrics: { bagsIn: 1435, bagsOut: 1195, vehicles: 44, workers: 76, incidents: 3, occupancy: 71, unload: 29, health: 91 },
+    name: "Bangalore Depot",
+    region_id: "REG_SOUTH",
+    zones: ["BLR-Z1", "BLR-Z2", "BLR-Z3"],
+    cameras: ["CAM-B1", "CAM-B2", "CAM-B3", "CAM-B4", "CAM-B5", "CAM-B6"],
+    metrics: { bagsIn: 1435, bagsOut: 1195, vehicles: 44, workers: 76, incidents: 3, occupancy: 71, unload: 29 },
   },
   WH_MUM: {
-    name: DEPOT_WAREHOUSE_REGISTRY.WH_MUM.name,
-    region_id: DEPOT_WAREHOUSE_REGISTRY.WH_MUM.regionId,
-    zones: DEPOT_WAREHOUSE_REGISTRY.WH_MUM.zones,
-    cameras: DEPOT_WAREHOUSE_REGISTRY.WH_MUM.cameras,
-    metrics: { bagsIn: 980, bagsOut: 910, vehicles: 31, workers: 64, incidents: 1, occupancy: 82, unload: 37, health: 88 },
+    name: "Mumbai Depot",
+    region_id: "REG_WEST",
+    zones: ["MUM-Z1", "MUM-Z2", "MUM-Z3"],
+    cameras: ["CAM-M1", "CAM-M2", "CAM-M3", "CAM-M4", "CAM-M5", "CAM-M6"],
+    metrics: { bagsIn: 980, bagsOut: 910, vehicles: 31, workers: 64, incidents: 1, occupancy: 82, unload: 37 },
   },
 } as const;
 
 type RoleWarehouseId = keyof typeof ROLE_WAREHOUSE_REGISTRY;
-
-// Zone→gate mapping: Z1→Gate A, Z2→Gate B, Z3→Gate C, Z4→no gate
-// Zone→camera mapping: Z1→[cam1,cam2], Z2→[cam3], Z3→[cam4], Z4→[cam5,cam6]
-const COMMAND_PAGE_GATE_SEED = [
-  { suffix: "A", name: "Gate A - North Entry", status: "open" },
-  { suffix: "B", name: "Gate B - South Exit", status: "closed" },
-  { suffix: "C", name: "Gate C - Loading Dock", status: "open" },
-] as const;
-
-const ZONE_CAM_START_PAGE = [0, 2, 3, 4] as const;
-const ZONE_CAM_COUNT_PAGE = [2, 1, 1, 2] as const;
-// Gate index per zone (null = no gate for Z4)
-const ZONE_GATE_IDX_PAGE = [0, 1, 2, null] as const;
 
 function scopedWarehouseIdsForLogin(email?: string, persona?: CommandPersona): RoleWarehouseId[] {
   const normalized = (email || "").toLowerCase();
@@ -156,8 +124,8 @@ function scopedWarehouseIdsForLogin(email?: string, persona?: CommandPersona): R
     if (normalized.includes("wm.mum")) return ["WH_MUM"];
     return ["WH_BLR"];
   }
-  if (persona === "regional_manager") return ["WH_BLR", "WH_HYD"];
-  return DEPOT_WAREHOUSE_ORDER as RoleWarehouseId[];
+  if (persona === "regional_manager") return ["WH_HYD", "WH_BLR"];
+  return ["WH_HYD", "WH_BLR", "WH_MUM"];
 }
 
 function buildScopedHierarchy(warehouseIds: RoleWarehouseId[]): DepotHierarchy {
@@ -185,27 +153,23 @@ function buildScopedHierarchy(warehouseIds: RoleWarehouseId[]): DepotHierarchy {
           id: warehouseId,
           name: warehouse.name,
           zones: warehouse.zones.map((zone, index) => {
-            const gateIdx = ZONE_GATE_IDX_PAGE[index];
-            const gate = gateIdx !== null ? COMMAND_PAGE_GATE_SEED[gateIdx] : null;
-            const camStart = ZONE_CAM_START_PAGE[index];
-            const camCount = ZONE_CAM_COUNT_PAGE[index];
-            const cameras = warehouse.cameras.slice(camStart, camStart + camCount).map((cameraId) => ({
+            const cameras = warehouse.cameras.slice(index * 2, index * 2 + 2).map((cameraId) => ({
               id: cameraId,
               name: cameraId,
               status: "live",
               zone,
-              gate_id: gate ? `${warehouseId}-GATE-${gate.suffix}` : null,
+              gate_id: `${warehouseId}-G${index + 1}`,
             }));
             return {
               id: zone,
               name: `${zone} (Cluster ${index + 1})`,
-              gates: gate ? [{
-                id: `${warehouseId}-GATE-${gate.suffix}`,
-                name: gate.name,
-                gate_code: `GATE-${gate.suffix}`,
-                status: gate.status,
+              gates: [{
+                id: `${warehouseId}-G${index + 1}`,
+                name: `Gate ${index + 1}`,
+                gate_code: `Gate ${index + 1}`,
+                status: index === 0 ? "open" : "closed",
                 cameras,
-              }] : [],
+              }],
               cameras,
             };
           }),
@@ -220,30 +184,45 @@ const PERSONA_PROFILES: Record<CommandPersona, {
   subtitle: string;
   scope: string;
   location: string;
+  visibility: string[];
+  control: string[];
+  analysis: string[];
 }> = {
   warehouse_manager: {
     title: "Warehouse Manager Command Center",
     subtitle: "Live warehouse visibility, local controls, and shift-level analysis.",
     scope: "Warehouse",
     location: "Current warehouse",
+    visibility: ["Cameras", "Vehicles", "Entry/exit", "Bags", "Clusters", "Workers"],
+    control: ["Boom barriers", "Broadcasts", "Access permissions", "Notifications"],
+    analysis: ["Vehicle count", "Loading stats", "Incidents", "Utilization", "Capacity"],
   },
   regional_manager: {
     title: "Regional Manager Command Center",
     subtitle: "Multi-warehouse visibility, regional alerts, and cross-warehouse comparison.",
     scope: "Region",
     location: "India region",
+    visibility: ["Multi-warehouse status", "Regional incidents", "Camera health", "Gate exceptions"],
+    control: ["Regional broadcasts", "Escalations", "Supervisor notifications"],
+    analysis: ["Warehouse comparison", "Regional incidents", "Capacity risk", "Throughput trends"],
   },
   central_manager: {
     title: "Central Command Center",
     subtitle: "National warehouse visibility, central governance, and major incident oversight.",
     scope: "National",
     location: "All regions",
+    visibility: ["National warehouse status", "Major incidents", "Regional health", "Critical sites"],
+    control: ["Central broadcasts", "Governance actions", "Major escalation"],
+    analysis: ["National KPIs", "Regional trends", "SLA risk", "Incident governance"],
   },
   admin: {
     title: "Administrator Command Center",
     subtitle: "Platform configuration, integrations, permissions, and operational audit.",
     scope: "Platform",
     location: "All warehouses",
+    visibility: ["System health", "Users", "Integrations", "Warehouse hierarchy"],
+    control: ["Permissions", "Templates", "Integrations", "All command controls"],
+    analysis: ["Audit", "Adoption", "Integration health", "Governance"],
   },
 };
 
@@ -272,43 +251,23 @@ function healthTone(score: number) {
   return TONE_STYLES.critical;
 }
 
-function KpiCard({ kpi, href, hideDetail }: { kpi: CommandKpi; href?: string; hideDetail?: boolean }) {
+function KpiCard({ kpi }: { kpi: CommandKpi }) {
   const tone = TONE_STYLES[kpi.tone] ?? TONE_STYLES.normal;
   const Icon = KPI_ICONS[kpi.key] ?? Activity;
-  const isInteractive = typeof href === "string";
 
-  const className = `group rounded-[12px] border border-orange-500/20 bg-orange-500/[0.06] p-4 text-left shadow-sm transition duration-200 ease-out ${
-    isInteractive
-      ? "cursor-pointer hover:-translate-y-1 hover:scale-[1.015] hover:border-orange-500/45 hover:bg-orange-500/[0.11] hover:shadow-lg hover:shadow-orange-950/10 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
-      : ""
-  }`;
-
-  const content = (
-    <>
+  return (
+    <div className="rounded-[12px] border border-[#1E2F50] bg-[#14203A] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#4E6090]">{kpi.label}</div>
           <div className="mt-2 text-[26px] font-extrabold leading-none text-[#E8EDF8]">{kpi.value}</div>
         </div>
-        <div className="flex items-center gap-2">
-          {isInteractive && (
-            <ArrowUpRight className="h-4 w-4 text-[#E5521A] opacity-75 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100" />
-          )}
-          <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border" style={{ background: tone.bg, borderColor: tone.border }}>
-            <Icon className="h-4 w-4" style={{ color: tone.color }} />
-          </div>
+        <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border" style={{ background: tone.bg, borderColor: tone.border }}>
+          <Icon className="h-4 w-4" style={{ color: tone.color }} />
         </div>
       </div>
-      <div className="mt-3 text-[11px] font-semibold text-[#8A9BBF]">{!hideDetail && kpi.detail}</div>
-    </>
-  );
-
-  return href ? (
-    <Link href={href} className={className} aria-label={`${kpi.label}: open related tab`}>
-      {content}
-    </Link>
-  ) : (
-    <div className={className}>{content}</div>
+      <div className="mt-3 text-[11px] font-semibold text-[#8A9BBF]">{kpi.detail}</div>
+    </div>
   );
 }
 
@@ -400,9 +359,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
       const scopedHierarchy = buildScopedHierarchy(forcedWarehouseIds);
       setSnapshot(scopedSnapshot);
       setHierarchy(scopedHierarchy);
-      setSelectedGateId((previous) =>
-        scopedSnapshot.gates.some((gate) => gate.id === previous) ? previous : scopedSnapshot.gates[0]?.id || ""
-      );
+      setSelectedGateId((previous) => previous || scopedSnapshot.gates[0]?.id || "");
     } catch {
       showFeedback("Command snapshot is unavailable", false);
     } finally {
@@ -428,13 +385,6 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
   const canOperateGate = personaKey === "warehouse_manager" || personaKey === "admin";
   const scopedCameras = snapshot?.cameras ?? [];
   const scopedKpis = snapshot?.kpis ?? [];
-  const displayKpis = useMemo(() => {
-    const pinnedKeys = new Set<string>(KPI_DISPLAY_ORDER);
-    const pinned = KPI_DISPLAY_ORDER
-      .map((key) => scopedKpis.find((kpi) => kpi.key === key))
-      .filter((kpi): kpi is CommandKpi => Boolean(kpi));
-    return [...pinned, ...scopedKpis.filter((kpi) => !pinnedKeys.has(kpi.key))];
-  }, [scopedKpis]);
   const visibleWarehouseIds = Array.from(new Set(scopedCameras.map((camera) => camera.warehouse_id).filter(Boolean))) as string[];
   const visibleRegions = Array.from(new Set(scopedCameras.map((camera) => camera.region_id).filter(Boolean))) as string[];
   const primaryWarehouse = visibleWarehouseIds[0];
@@ -452,18 +402,14 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
       : "All Warehouses";
   const incidentKpi = Number(scopedKpis.find((kpi) => kpi.key === "incidents")?.value || 0);
   const occupancyKpi = scopedKpis.find((kpi) => kpi.key === "occupancy")?.value || "0%";
-  const personaRows = visibleWarehouseIds.map((warehouseId) => {
-    const warehouseHealth = ROLE_WAREHOUSE_REGISTRY[warehouseId as RoleWarehouseId]?.metrics.health ?? snapshot?.health_score ?? 82;
-
-    return {
-      name: WAREHOUSE_LABELS[warehouseId]?.name || warehouseId,
-      region: WAREHOUSE_LABELS[warehouseId]?.region || "Region",
-      health: String(warehouseHealth),
-      incidents: incidentKpi,
-      occupancy: occupancyKpi,
-      tone: warehouseHealth >= 85 ? "#22D3A1" : warehouseHealth >= 65 ? "#F5A623" : "#F04A4A",
-    };
-  });
+  const personaRows = visibleWarehouseIds.map((warehouseId, index) => ({
+    name: WAREHOUSE_LABELS[warehouseId]?.name || warehouseId,
+    region: WAREHOUSE_LABELS[warehouseId]?.region || "Region",
+    health: String(Math.max(72, (snapshot?.health_score ?? 82) - index * 4)),
+    incidents: incidentKpi,
+    occupancy: occupancyKpi,
+    tone: (snapshot?.health_score ?? 82) >= 85 ? "#22D3A1" : (snapshot?.health_score ?? 82) >= 65 ? "#F5A623" : "#F04A4A",
+  }));
   const groupedCameras = visibleWarehouseIds.map((warehouseId) => ({
     warehouseId,
     label: WAREHOUSE_LABELS[warehouseId]?.name || warehouseId,
@@ -512,7 +458,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="mb-1 flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-[#E5521A] bg-[#E5521A] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white">
+            <span className="rounded-full border border-[#E5521A]/35 bg-[#E5521A]/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#E5521A]">
               {persona.scope}
             </span>
             <span className="text-[11px] font-semibold text-[#8A9BBF]">{user?.full_name || persona.location}</span>
@@ -537,6 +483,29 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
             <RefreshCw className="h-4 w-4" />
           </button>
         </div>
+      </div>
+
+      <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+        {[
+          { label: "Visibility", detail: persona.visibility.join(", "), icon: Camera, color: "#5B9BF5" },
+          { label: "Control", detail: persona.control.join(", "), icon: Shield, color: "#E5521A" },
+          { label: "Analysis", detail: persona.analysis.join(", "), icon: BarChart3, color: "#22D3A1" },
+        ].map((pillar) => {
+          const Icon = pillar.icon;
+          return (
+            <section key={pillar.label} className="rounded-[12px] border border-[#1E2F50] bg-[#14203A] p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border" style={{ background: `${pillar.color}18`, borderColor: `${pillar.color}44` }}>
+                  <Icon className="h-4 w-4" style={{ color: pillar.color }} />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-extrabold text-[#E8EDF8]">{pillar.label}</div>
+                  <div className="mt-0.5 text-[10px] font-semibold text-[#8A9BBF]">{pillar.detail}</div>
+                </div>
+              </div>
+            </section>
+          );
+        })}
       </div>
 
       <section className="mb-5 rounded-[14px] border border-[#1E2F50] bg-[#14203A] p-4">
@@ -725,15 +694,8 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
         <BarChart3 className="h-4 w-4 text-[#22D3A1]" />
         <h2 className="text-[13px] font-extrabold text-[#E8EDF8]">Analysis KPIs</h2>
       </div>
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {displayKpis.map((kpi) => (
-          <KpiCard
-            key={kpi.key}
-            kpi={kpi}
-            href={KPI_ROUTE_MAP[kpi.key]}
-            hideDetail={personaKey === "warehouse_manager"}
-          />
-        ))}
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {snapshot.kpis.map((kpi) => <KpiCard key={kpi.key} kpi={kpi} />)}
       </div>
 
       <div className="grid grid-cols-1 gap-4">
@@ -759,7 +721,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
         </section>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <section className="rounded-[14px] border border-[#1E2F50] bg-[#14203A] p-4">
           <div className="mb-3 flex items-center gap-2">
             <DoorClosed className="h-4 w-4 text-[#F5A623]" />
@@ -788,25 +750,23 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
             <Camera className="h-4 w-4 text-[#5B9BF5]" />
             <h2 className="text-[13px] font-extrabold text-[#E8EDF8]">Visibility: Camera Coverage</h2>
           </div>
-          <div className="space-y-3">
+          <div className="max-h-[280px] space-y-3 overflow-y-auto pr-1">
             {groupedCameras.map((group) => (
               <div key={group.warehouseId} className="space-y-2">
                 {personaKey !== "warehouse_manager" && (
                   <div className="px-1 text-[10px] font-extrabold uppercase text-[#5B9BF5]">{group.label} Cameras</div>
                 )}
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {group.cameras.map((camera) => (
-                    <div key={camera.id} className="flex items-center justify-between rounded-[10px] border border-[#1E2F50] bg-[#0D1526] p-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-[12px] font-bold text-[#E8EDF8]">{camera.name}</div>
-                        <div className="text-[10px] text-[#8A9BBF]">{camera.zone || "Unassigned"} - {camera.protocol.toUpperCase()}</div>
-                      </div>
-                      <span className={camera.status === "active" ? "text-[10px] font-extrabold text-[#22D3A1]" : "text-[10px] font-extrabold text-[#F5A623]"}>
-                        {camera.status.toUpperCase()}
-                      </span>
+                {group.cameras.map((camera) => (
+                  <div key={camera.id} className="flex items-center justify-between rounded-[10px] border border-[#1E2F50] bg-[#0D1526] p-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-[12px] font-bold text-[#E8EDF8]">{camera.name}</div>
+                      <div className="text-[10px] text-[#8A9BBF]">{camera.zone || "Unassigned"} - {camera.protocol.toUpperCase()}</div>
                     </div>
-                  ))}
-                </div>
+                    <span className={camera.status === "active" ? "text-[10px] font-extrabold text-[#22D3A1]" : "text-[10px] font-extrabold text-[#F5A623]"}>
+                      {camera.status.toUpperCase()}
+                    </span>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
@@ -830,7 +790,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
                 <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#4E6090]">Use case</div>
                 <div className="grid grid-cols-2 gap-2">
                   {BROADCAST_TYPES.map((type) => (
-                    <button key={type.value} type="button" onClick={() => setBroadcastType(type.value)} className={`rounded-[10px] border px-2 py-2 text-[11px] font-bold ${broadcastType === type.value ? "border-[#E5521A] bg-[#E5521A] text-white" : "border-[#1E2F50] text-[#8A9BBF]"}`}>
+                    <button key={type.value} type="button" onClick={() => setBroadcastType(type.value)} className={`rounded-[10px] border px-2 py-2 text-[11px] font-bold ${broadcastType === type.value ? "border-[#E5521A] bg-[#E5521A]/15 text-[#E5521A]" : "border-[#1E2F50] text-[#8A9BBF]"}`}>
                       {type.label}
                     </button>
                   ))}
@@ -843,7 +803,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {BROADCAST_AUDIENCES.map((audience) => (
-                    <button key={audience.value} type="button" onClick={() => setBroadcastAudience(audience.value)} className={`rounded-[10px] border px-2 py-2 text-[11px] font-bold transition ${broadcastAudience === audience.value ? "border-[#E5521A] bg-[#E5521A] text-white" : "border-[#1E2F50] text-[#8A9BBF] hover:border-[#2A3F68] hover:text-[#E8EDF8]"}`}>
+                    <button key={audience.value} type="button" onClick={() => setBroadcastAudience(audience.value)} className={`rounded-[10px] border px-2 py-2 text-[11px] font-bold ${broadcastAudience === audience.value ? "border-[#5B9BF5] bg-[#5B9BF5]/15 text-[#5B9BF5]" : "border-[#1E2F50] text-[#8A9BBF]"}`}>
                       {audience.label}
                     </button>
                   ))}
@@ -855,7 +815,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
                   {BROADCAST_CHANNELS.map((channel) => {
                     const active = broadcastChannels.includes(channel.value);
                     return (
-                      <button key={channel.value} type="button" onClick={() => toggleBroadcastChannel(channel.value)} className={`rounded-[10px] border px-2 py-2 text-[11px] font-bold transition ${active ? "border-[#E5521A] bg-[#E5521A] text-white" : "border-[#1E2F50] text-[#8A9BBF] hover:border-[#2A3F68] hover:text-[#E8EDF8]"}`}>
+                      <button key={channel.value} type="button" onClick={() => toggleBroadcastChannel(channel.value)} className={`rounded-[10px] border px-2 py-2 text-[11px] font-bold ${active ? "border-[#22D3A1] bg-[#22D3A1]/15 text-[#22D3A1]" : "border-[#1E2F50] text-[#8A9BBF]"}`}>
                         {channel.label}
                       </button>
                     );
@@ -864,7 +824,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {["P1", "P2", "P3"].map((priority) => (
-                  <button key={priority} type="button" onClick={() => setBroadcastPriority(priority)} className={`rounded-[10px] border py-2 text-[11px] font-bold ${broadcastPriority === priority ? "border-[#E5521A] bg-[#E5521A] text-white" : "border-[#1E2F50] text-[#8A9BBF]"}`}>
+                  <button key={priority} type="button" onClick={() => setBroadcastPriority(priority)} className={`rounded-[10px] border py-2 text-[11px] font-bold ${broadcastPriority === priority ? "border-[#E5521A] bg-[#E5521A]/15 text-[#E5521A]" : "border-[#1E2F50] text-[#8A9BBF]"}`}>
                     {priority}
                   </button>
                 ))}
@@ -915,7 +875,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-2">
                 {["in_app", "intercom", "radio"].map((channel) => (
-                  <button key={channel} type="button" onClick={() => setContactChannel(channel)} className={`rounded-[10px] border py-2 text-[11px] font-bold transition ${contactChannel === channel ? "border-[#E5521A] bg-[#E5521A] text-white" : "border-[#1E2F50] text-[#8A9BBF] hover:border-[#2A3F68] hover:text-[#E8EDF8]"}`}>
+                  <button key={channel} type="button" onClick={() => setContactChannel(channel)} className={`rounded-[10px] border py-2 text-[11px] font-bold ${contactChannel === channel ? "border-[#5B9BF5] bg-[#5B9BF5]/15 text-[#5B9BF5]" : "border-[#1E2F50] text-[#8A9BBF]"}`}>
                     {channel.replace("_", "-")}
                   </button>
                 ))}

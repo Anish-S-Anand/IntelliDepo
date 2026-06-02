@@ -62,7 +62,7 @@ export default function AnalyticsPage() {
               onClick={() => setRange(r)}
               className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold capitalize transition-colors ${
                 range === r
-                  ? "border-[#E5521A] bg-[#E5521A] text-white"
+                  ? "border-[#E5521A] bg-[#E5521A]/10 text-[#E5521A]"
                   : "border-[#1E2F50] text-[#8A9BBF] hover:border-[#2A3F68] hover:text-[#E8EDF8]"
               }`}
             >

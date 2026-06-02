@@ -1135,6 +1135,10 @@ svg.chart { width: 100%; overflow: visible; }
     </div>
   </div>
 
+  <div class="zone-grid mb-20" id="zoneGrid">
+    <div style="grid-column:1/-1;color:var(--sub);font-size:12px;text-align:center;padding:20px">Loading zones from backend…</div>
+  </div>
+
   <div class="filter-row">
     <input class="search-box" placeholder="Search product, cluster, batch…" oninput="filterClusters(this.value)" id="clusterSearch"/>
     <button class="fbtn on" onclick="setClusterFilter('all',this)">All Clusters</button>

@@ -19,33 +19,19 @@ interface Warehouse3DMapProps {
   flashedZones?: Set<string>;
 }
 
-function buildZoneLayout(zones: ZoneData[]): Record<string, { x: number; z: number; w: number; d: number }> {
-  const layout: Record<string, { x: number; z: number; w: number; d: number }> = {};
-  const columns = zones.length <= 4 ? 2 : 3;
-  const rows = Math.max(1, Math.ceil(zones.length / columns));
-  const usableWidth = 22;
-  const usableDepth = 15;
-  const gap = 0.7;
-  const cellW = usableWidth / columns;
-  const cellD = usableDepth / rows;
-  const w = Math.max(4.2, cellW - gap);
-  const d = Math.max(3.1, cellD - gap);
-  const startX = -usableWidth / 2;
-  const startZ = -usableDepth / 2;
+const ZONE_LAYOUT: Record<string, { x: number; z: number; w: number; d: number }> = {
+  A: { x: -9, z: -6, w: 7, d: 5 },
+  B: { x:  2, z: -6, w: 7, d: 5 },
+  C: { x: -9, z:  1, w: 7, d: 5 },
+  D: { x:  2, z:  1, w: 7, d: 5 },
+};
 
-  zones.forEach((zone, index) => {
-    const col = index % columns;
-    const row = Math.floor(index / columns);
-    layout[zone.code] = {
-      x: startX + col * cellW + gap / 2,
-      z: startZ + row * cellD + gap / 2,
-      w,
-      d,
-    };
-  });
-
-  return layout;
-}
+const ZONE_LABELS: Record<string, string> = {
+  A: "Zone A",
+  B: "Zone B",
+  C: "Zone C",
+  D: "Zone D",
+};
 
 function getZoneColor(status: string, utilPct: number): number {
   if (status === "critical" || utilPct >= 90) return 0xF04A4A;
@@ -124,12 +110,12 @@ export default function Warehouse3DMap({ zones, onZoneClick, selectedZone, flash
 
     // Zone meshes
     const zoneMeshes: THREE.Mesh[] = [];
-    const zoneLayout = buildZoneLayout(zones);
+    const zoneMap = new Map(zones.map((z) => [z.code, z]));
 
-    zones.forEach((zoneData) => {
-      const code = zoneData.code;
-      const layout = zoneLayout[code];
-      if (!layout) return;
+    Object.entries(ZONE_LAYOUT).forEach(([code, layout]) => {
+      const zoneData = zoneMap.get(code);
+      if (!zoneData) return;
+
       const utilPct = zoneData.utilizationPct;
       const status = zoneData.status;
       const color = getZoneColor(status, utilPct);
@@ -193,7 +179,7 @@ export default function Warehouse3DMap({ zones, onZoneClick, selectedZone, flash
       ctx.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
       ctx.font = "bold 22px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(zoneData.name || `Zone ${code}`, 128, 38);
+      ctx.fillText(ZONE_LABELS[code] ?? `Zone ${code}`, 128, 38);
       ctx.fillStyle = "#e8edf8";
       ctx.font = "bold 28px sans-serif";
       ctx.fillText(`${utilPct}%`, 128, 72);

@@ -241,6 +241,7 @@ export function exportVehicleLog(logs: {
           { label: "Total Scans", value: String(logs.length) },
           { label: "Granted", value: String(granted) },
           { label: "Denied", value: String(denied) },
+          { label: "Grant Rate", value: logs.length > 0 ? `${((granted / logs.length) * 100).toFixed(0)}%` : "—" },
         ],
       },
       {
