@@ -42,6 +42,110 @@ import { getUnifiedDepotSource } from "@/services/depotUnifiedSource";
 import { useDepotCommandEvents } from "@/hooks/useDepotCommandEvents";
 import { DEPOT_WAREHOUSE_ORDER, DEPOT_WAREHOUSE_REGISTRY } from "@/lib/depot-camera-registry";
 
+// ── Weather ──────────────────────────────────────────────────────────────────
+const WAREHOUSE_COORDS: Record<string, { lat: number; lon: number; city: string }> = {
+  WH_BLR: { lat: 12.97, lon: 77.59, city: "Bengaluru" },
+  WH_HYD: { lat: 17.38, lon: 78.49, city: "Hyderabad" },
+  WH_MUM: { lat: 19.07, lon: 72.87, city: "Mumbai" },
+};
+
+const WMO_LABELS: Record<number, { label: string; emoji: string }> = {
+  0: { label: "Clear", emoji: "☀️" }, 1: { label: "Mostly Clear", emoji: "🌤️" },
+  2: { label: "Partly Cloudy", emoji: "⛅" }, 3: { label: "Overcast", emoji: "☁️" },
+  45: { label: "Foggy", emoji: "🌫️" }, 48: { label: "Icy Fog", emoji: "🌫️" },
+  51: { label: "Light Drizzle", emoji: "🌦️" }, 61: { label: "Light Rain", emoji: "🌧️" },
+  63: { label: "Moderate Rain", emoji: "🌧️" }, 65: { label: "Heavy Rain", emoji: "🌧️" },
+  80: { label: "Rain Showers", emoji: "🌦️" }, 95: { label: "Thunderstorm", emoji: "⛈️" },
+};
+
+type WeatherData = { temp: number; label: string; emoji: string; wind: number; city: string } | null;
+
+function getWeatherAdvisory(temp: number, weatherCode: number): { text: string; color: string } {
+  // Rain / storm conditions take priority
+  if (weatherCode >= 95) return { text: "⛈️ Thunderstorm — halt outdoor ops, lock gates, no vehicle movement.", color: "#F04A4A" };
+  if (weatherCode >= 61) return { text: "🌧️ Rain — cover open stockpiles, add 15 min SLA buffer, slow-speed yard protocol.", color: "#F5A623" };
+  if (weatherCode >= 51) return { text: "🌦️ Drizzle — inspect bags for moisture, gate entry may slow.", color: "#F5A623" };
+  if (weatherCode === 45 || weatherCode === 48) return { text: "🌫️ Fog — LPR confidence drops, manual gate verification required.", color: "#F5A623" };
+  // Temperature-based
+  if (temp > 38) return { text: "🔥 Extreme heat — shift loading to early morning/evening, shut Zone D during 12–3pm.", color: "#F04A4A" };
+  if (temp > 32) return { text: "☀️ Hot — mandatory shade breaks every 90 min, avoid heavy lifts 12–3pm.", color: "#F5A623" };
+  if (temp > 25) return { text: "🌤️ Warm — push inbound early, increase water breaks, check bay ventilation.", color: "#22D3A1" };
+  if (temp >= 15) return { text: "✅ Ideal conditions — normal operations, no special measures needed.", color: "#22D3A1" };
+  return { text: "🧊 Cold — check bags for condensation on removal from cold storage.", color: "#5B9BF5" };
+}
+
+function WeatherWidget({ warehouseIds }: { warehouseIds: string[] }) {
+  const [weatherMap, setWeatherMap] = useState<Record<string, WeatherData & { code?: number }>>({});
+
+  useEffect(() => {
+    const load = async () => {
+      const results = await Promise.allSettled(
+        warehouseIds.map(async (id) => {
+          const coords = WAREHOUSE_COORDS[id];
+          if (!coords) return { id, data: null };
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,weathercode,windspeed_10m&timezone=Asia%2FKolkata`;
+          const res = await fetch(url);
+          const raw = await res.json();
+          const code = raw.current?.weathercode ?? 0;
+          const wmo = WMO_LABELS[code] ?? { label: "Unknown", emoji: "🌡️" };
+          return {
+            id,
+            data: {
+              temp: Math.round(raw.current?.temperature_2m ?? 0),
+              label: wmo.label,
+              emoji: wmo.emoji,
+              wind: Math.round(raw.current?.windspeed_10m ?? 0),
+              city: coords.city,
+              code,
+            },
+          };
+        })
+      );
+      const map: Record<string, WeatherData & { code?: number }> = {};
+      for (const r of results) {
+        if (r.status === "fulfilled" && r.value.data) map[r.value.id] = r.value.data;
+      }
+      setWeatherMap(map);
+    };
+    void load();
+    const interval = setInterval(() => void load(), 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [warehouseIds.join(",")]);
+
+  const entries = warehouseIds.map((id) => weatherMap[id]).filter(Boolean) as (WeatherData & { code?: number })[];
+  if (entries.length === 0) return null;
+
+  // Use the first (primary) warehouse for the advisory
+  const primary = entries[0];
+  const advisory = primary ? getWeatherAdvisory(primary.temp, primary.code ?? 0) : null;
+
+  return (
+    <div className="flex flex-col items-end gap-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        {entries.map((w) => w && (
+          <div
+            key={w.city}
+            className="flex items-center gap-3 rounded-[12px] border border-[#1E2F50] bg-[#0D1526] px-4 py-3"
+          >
+            <span className="text-[32px] leading-none">{w.emoji}</span>
+            <div>
+              <div className="text-[12px] font-bold text-[#8A9BBF]">{w.city}</div>
+              <div className="text-[20px] font-extrabold text-[#E8EDF8] leading-tight">
+                {w.temp}°C <span className="text-[13px] font-semibold text-[#4E6090]">{w.label}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {advisory && (
+        <div className="text-[11px] font-semibold px-1" style={{ color: advisory.color }}>
+          {advisory.text}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const TONE_STYLES: Record<string, { color: string; bg: string; border: string }> = {
   healthy: { color: "#22D3A1", bg: "rgba(34,211,161,0.12)", border: "rgba(34,211,161,0.28)" },
   warning: { color: "#F5A623", bg: "rgba(245,166,35,0.12)", border: "rgba(245,166,35,0.28)" },
@@ -465,7 +569,15 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
       ? visibleRegions.includes("REG_WEST") ? "West Region" : "South Region"
       : "All Warehouses";
   const incidentKpi = Number(scopedKpis.find((kpi) => kpi.key === "incidents")?.value || 0);
-  const occupancyKpi = scopedKpis.find((kpi) => kpi.key === "occupancy")?.value || "0%";
+  const occupancyKpi = scopedKpis.find((kpi) => kpi.key === "occupancy" || kpi.key === "occupancy_count")?.value
+    ?? (() => {
+        // Derive from zone data directly
+        const zones = snapshot?.zones ?? [];
+        if (zones.length === 0) return "0%";
+        const totalCap = zones.reduce((s, z) => s + z.max_capacity_units, 0);
+        const totalOcc = zones.reduce((s, z) => s + z.current_occupancy, 0);
+        return totalCap > 0 ? `${Math.round((totalOcc / totalCap) * 100)}%` : "0%";
+      })();
   const personaRows = visibleWarehouseIds.map((warehouseId) => {
     const warehouseHealth = ROLE_WAREHOUSE_REGISTRY[warehouseId as RoleWarehouseId]?.metrics.health ?? snapshot?.health_score ?? 82;
 
@@ -540,102 +652,16 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <WeatherWidget warehouseIds={forcedWarehouseIds} />
           {feedback && (
             <span className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${feedback.ok ? "bg-[#22D3A1]/15 text-[#22D3A1]" : "bg-[#F04A4A]/15 text-[#F04A4A]"}`}>
               {feedback.msg}
             </span>
           )}
-          <button
-            type="button"
-            onClick={() => void fetchSnapshot()}
-            className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#1E2F50] bg-[#14203A] text-[#8A9BBF] transition hover:border-[#2A3F68] hover:text-[#E8EDF8]"
-            title="Refresh"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
         </div>
       </div>
 
-      <section className="mb-5 rounded-[14px] border border-[#1E2F50] bg-[#14203A] p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-[13px] font-extrabold text-[#E8EDF8]">
-              {personaKey === "warehouse_manager" ? "Warehouse Operating Scope" : personaKey === "regional_manager" ? "Regional Warehouse Scope" : personaKey === "central_manager" ? "Central Operating Scope" : "Administration Scope"}
-            </h2>
-            <p className="mt-1 text-[11px] text-[#8A9BBF]">{scopeLabel}</p>
-          </div>
-          <span className="rounded-full border border-[#5B9BF5]/30 bg-[#5B9BF5]/10 px-3 py-1.5 text-[10px] font-bold uppercase text-[#5B9BF5]">
-            Role based view
-          </span>
-        </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {personaRows.map((row) => (
-            <div key={row.name} className="rounded-[12px] border border-[#1E2F50] bg-[#0D1526] p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-[12px] font-extrabold text-[#E8EDF8]">{row.name}</div>
-                  <div className="mt-0.5 text-[10px] font-semibold text-[#8A9BBF]">{row.region}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[18px] font-extrabold leading-none" style={{ color: row.tone }}>{row.health}</div>
-                  <div className="mt-1 text-[9px] font-bold uppercase text-[#4E6090]">Health</div>
-                </div>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-[10px]">
-                <div className="rounded-lg bg-[#14203A] px-2 py-1.5 text-[#8A9BBF]">
-                  Incidents <span className="font-bold text-[#E8EDF8]">{row.incidents}</span>
-                </div>
-                <div className="rounded-lg bg-[#14203A] px-2 py-1.5 text-[#8A9BBF]">
-                  Occupancy <span className="font-bold text-[#E8EDF8]">{row.occupancy}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {hierarchy && (
-        <section className="mb-5 rounded-[14px] border border-[#1E2F50] bg-[#14203A] p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-[13px] font-extrabold text-[#E8EDF8]">Warehouse Hierarchy</h2>
-              <p className="mt-1 text-[11px] text-[#8A9BBF]">Only warehouses authorized for this login are rendered</p>
-            </div>
-            <span className="rounded-full border border-[#22D3A1]/30 bg-[#22D3A1]/10 px-3 py-1.5 text-[10px] font-bold uppercase text-[#22D3A1]">
-              Gates 1-3 · Zone mapped cameras
-            </span>
-          </div>
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-            {hierarchy.regions.map((region) => (
-              <div key={region.id} className="rounded-[12px] border border-[#1E2F50] bg-[#0D1526] p-3">
-                <div className="mb-2 text-[12px] font-extrabold text-[#E8EDF8]">{region.name}</div>
-                <div className="space-y-2">
-                  {region.warehouses.map((warehouse) => (
-                    <div key={warehouse.id} className="rounded-[10px] border border-[#1E2F50] bg-[#14203A] p-3">
-                      <div className="text-[11px] font-bold text-[#E8EDF8]">{warehouse.name}</div>
-                      <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
-                        {warehouse.zones.map((zone) => (
-                          <div key={zone.id} className="rounded-lg bg-[#0D1526] p-2">
-                            <div className="text-[10px] font-extrabold text-[#5B9BF5]">{zone.name}</div>
-                            <div className="mt-1 text-[10px] text-[#8A9BBF]">{zone.gates.length} gates · {zone.cameras.length} cameras</div>
-                            {zone.gates.slice(0, 2).map((gate) => (
-                              <div key={gate.id} className="mt-1 truncate text-[9px] text-[#4E6090]">
-                                {gate.gate_code}: {gate.status}
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <div className="mb-5 grid grid-cols-1 gap-4 xl:grid-cols-[320px_1fr]">
+      <div className="mb-5 grid grid-cols-1 gap-4 xl:grid-cols-[280px_1fr]">
         <section className="rounded-[14px] border border-[#1E2F50] bg-[#14203A] p-5">
           <div className="flex items-center justify-between">
             <div>
@@ -656,7 +682,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
           </p>
         </section>
 
-        <section className="rounded-[14px] border border-[#1E2F50] bg-[#14203A] p-4">
+        <section className="rounded-[14px] border border-[#1E2F50] bg-[#14203A] p-4 flex flex-col">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <BellRing className="h-4 w-4 text-[#E5521A]" />
@@ -669,8 +695,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
               onChange={setSelectedGateId}
             />
           </div>
-
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 h-full">
             {[
               {
                 key: "open-gate",
@@ -720,17 +745,17 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
                     else if ("fn" in action && action.fn) void runAction(action.key, action.fn, action.success);
                   }}
                   disabled={!!actionLoading || (action.key.includes("gate") && !selectedGateId)}
-                  className="flex min-h-[108px] flex-col items-center justify-center gap-2 rounded-[12px] border border-[#33476C] bg-[#101D34] px-3 py-4 text-center transition hover:border-[#4A628E] hover:bg-[#1A2A45] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex flex-1 min-h-[140px] flex-col items-center justify-center gap-3 rounded-[14px] border border-[#33476C] bg-[#101D34] px-4 py-5 text-center transition hover:border-[#4A628E] hover:bg-[#1A2A45] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border" style={{ background: `${action.color}20`, borderColor: `${action.color}55` }}>
+                  <div className="flex h-14 w-14 items-center justify-center rounded-[12px] border" style={{ background: `${action.color}20`, borderColor: `${action.color}55` }}>
                     {isLoading ? (
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: action.color, borderTopColor: "transparent" }} />
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: action.color, borderTopColor: "transparent" }} />
                     ) : (
-                      <Icon className="h-5 w-5" style={{ color: action.color }} />
+                      <Icon className="h-6 w-6" style={{ color: action.color }} />
                     )}
                   </div>
-                  <div className="text-[12px] font-extrabold" style={{ color: action.color }}>{action.label}</div>
-                  <div className="max-w-full truncate text-[10px] font-bold text-[#8B9BC1]">{action.sub}</div>
+                  <div className="text-[14px] font-extrabold" style={{ color: action.color }}>{action.label}</div>
+                  <div className="max-w-full truncate text-[11px] font-bold text-[#8B9BC1]">{action.sub}</div>
                 </button>
               );
             })}
@@ -738,20 +763,143 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
         </section>
       </div>
 
-      <div className="mb-3 flex items-center gap-2">
-        <BarChart3 className="h-4 w-4 text-[#22D3A1]" />
-        <h2 className="text-[13px] font-extrabold text-[#E8EDF8]">Analysis KPIs</h2>
-      </div>
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {displayKpis.map((kpi) => (
-          <KpiCard
-            key={kpi.key}
-            kpi={kpi}
-            href={KPI_ROUTE_MAP[kpi.key]}
-            hideDetail={personaKey === "warehouse_manager"}
-          />
-        ))}
-      </div>
+      {personaKey === "warehouse_manager" ? (
+        <div className="mb-5 grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">
+          <section className="rounded-[14px] border border-[#1E2F50] bg-[#14203A] p-4 flex flex-col">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-[13px] font-extrabold text-[#E8EDF8]">Warehouse Operating Scope</h2>
+                <p className="mt-1 text-[11px] text-[#8A9BBF]">{scopeLabel}</p>
+              </div>
+              <span className="rounded-full border border-[#5B9BF5]/30 bg-[#5B9BF5]/10 px-3 py-1.5 text-[10px] font-bold uppercase text-[#5B9BF5]">
+                Role based view
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              {personaRows.map((row) => (
+                <div key={row.name} className="rounded-[12px] border border-[#1E2F50] bg-[#0D1526] p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-[12px] font-extrabold text-[#E8EDF8]">{row.name}</div>
+                      <div className="mt-0.5 text-[10px] font-semibold text-[#8A9BBF]">{row.region}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[18px] font-extrabold leading-none" style={{ color: row.tone }}>{row.health}</div>
+                      <div className="mt-1 text-[9px] font-bold uppercase text-[#4E6090]">Health</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {hierarchy && (
+            <section className="rounded-[14px] border border-[#1E2F50] bg-[#14203A] p-4 flex flex-col">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-[13px] font-extrabold text-[#E8EDF8]">Warehouse Hierarchy</h2>
+                  <p className="mt-1 text-[11px] text-[#8A9BBF]">Only warehouses authorized for this login are rendered</p>
+                </div>
+                <span className="rounded-full border border-[#22D3A1]/30 bg-[#22D3A1]/10 px-3 py-1.5 text-[10px] font-bold uppercase text-[#22D3A1]">
+                  Gates 1-3 · Zone mapped cameras
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                {hierarchy.regions.flatMap((region) =>
+                  region.warehouses.map((warehouse) => (
+                    <div key={warehouse.id} className="rounded-[12px] border border-[#1E2F50] bg-[#0D1526] p-3">
+                      <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#4E6090]">{region.name}</div>
+                      <div className="mb-2 text-[12px] font-extrabold text-[#E8EDF8]">{warehouse.name}</div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {warehouse.zones.map((zone) => (
+                          <div key={zone.id} className="rounded-lg bg-[#14203A] p-2">
+                            <div className="text-[10px] font-extrabold text-[#5B9BF5]">{zone.name}</div>
+                            <div className="mt-1 text-[10px] text-[#8A9BBF]">{zone.gates.length} gates · {zone.cameras.length} cameras</div>
+                            {zone.gates.slice(0, 1).map((gate) => (
+                              <div key={gate.id} className="mt-1 truncate text-[9px] text-[#4E6090]">
+                                {gate.gate_code}: {gate.status}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          )}
+        </div>
+      ) : (
+        <>
+          <section className="mb-5 rounded-[14px] border border-[#1E2F50] bg-[#14203A] p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-[13px] font-extrabold text-[#E8EDF8]">
+                  {personaKey === "regional_manager" ? "Regional Warehouse Scope" : personaKey === "central_manager" ? "Central Operating Scope" : "Administration Scope"}
+                </h2>
+                <p className="mt-1 text-[11px] text-[#8A9BBF]">{scopeLabel}</p>
+              </div>
+              <span className="rounded-full border border-[#5B9BF5]/30 bg-[#5B9BF5]/10 px-3 py-1.5 text-[10px] font-bold uppercase text-[#5B9BF5]">
+                Role based view
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              {personaRows.map((row) => (
+                <div key={row.name} className="rounded-[12px] border border-[#1E2F50] bg-[#0D1526] p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-[12px] font-extrabold text-[#E8EDF8]">{row.name}</div>
+                      <div className="mt-0.5 text-[10px] font-semibold text-[#8A9BBF]">{row.region}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[18px] font-extrabold leading-none" style={{ color: row.tone }}>{row.health}</div>
+                      <div className="mt-1 text-[9px] font-bold uppercase text-[#4E6090]">Health</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {hierarchy && (
+            <section className="mb-5 rounded-[14px] border border-[#1E2F50] bg-[#14203A] p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-[13px] font-extrabold text-[#E8EDF8]">Warehouse Hierarchy</h2>
+                  <p className="mt-1 text-[11px] text-[#8A9BBF]">Only warehouses authorized for this login are rendered</p>
+                </div>
+                <span className="rounded-full border border-[#22D3A1]/30 bg-[#22D3A1]/10 px-3 py-1.5 text-[10px] font-bold uppercase text-[#22D3A1]">
+                  Gates 1-3 · Zone mapped cameras
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                {hierarchy.regions.flatMap((region) =>
+                  region.warehouses.map((warehouse) => (
+                    <div key={warehouse.id} className="rounded-[12px] border border-[#1E2F50] bg-[#0D1526] p-3">
+                      <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#4E6090]">{region.name}</div>
+                      <div className="mb-2 text-[12px] font-extrabold text-[#E8EDF8]">{warehouse.name}</div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {warehouse.zones.map((zone) => (
+                          <div key={zone.id} className="rounded-lg bg-[#14203A] p-2">
+                            <div className="text-[10px] font-extrabold text-[#5B9BF5]">{zone.name}</div>
+                            <div className="mt-1 text-[10px] text-[#8A9BBF]">{zone.gates.length} gates · {zone.cameras.length} cameras</div>
+                            {zone.gates.slice(0, 1).map((gate) => (
+                              <div key={gate.id} className="mt-1 truncate text-[9px] text-[#4E6090]">
+                                {gate.gate_code}: {gate.status}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          )}
+        </>
+      )}
 
       <div className="grid grid-cols-1 gap-4">
         <section className="rounded-[14px] border border-[#1E2F50] bg-[#14203A] p-4">

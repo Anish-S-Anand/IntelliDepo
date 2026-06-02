@@ -153,52 +153,6 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
       {/* Theme Toggle */}
       <ThemeToggle />
 
-      {/* Refresh */}
-      <button
-        className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors theme-transition"
-        style={{
-          border: "1px solid var(--border-default)",
-          color: "var(--text-muted)",
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = "#E5521A";
-          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(229,82,26,0.5)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
-          (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-default)";
-        }}
-        aria-label="Refresh"
-      >
-        <RefreshCw className="w-3.5 h-3.5" />
-      </button>
-
-      {/* Alerts */}
-      <button
-        onClick={() => router.push("/depot/incidents")}
-        className="relative w-8 h-8 rounded-lg flex items-center justify-center transition-colors theme-transition"
-        style={{
-          border: "1px solid var(--border-default)",
-          color: "var(--text-muted)",
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = "#E5521A";
-          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(229,82,26,0.5)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
-          (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-default)";
-        }}
-        aria-label="View alerts"
-      >
-        <Bell className="w-3.5 h-3.5" />
-        {alertCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#F04A4A] text-white text-[8px] font-extrabold flex items-center justify-center">
-            {alertCount > 9 ? "9+" : alertCount}
-          </span>
-        )}
-      </button>
-
       {/* Profile dropdown */}
       <div className="relative flex-shrink-0" ref={profileRef}>
         <button
@@ -208,7 +162,7 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
           aria-label="Profile menu"
           aria-expanded={profileOpen}
         >
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#C43A08] to-[#E5521A] flex items-center justify-center text-[11px] font-extrabold text-white">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#C43A08] to-[#E5521A] flex items-center justify-center text-[13px] font-extrabold text-white">
             {initials}
           </div>
           <ChevronDown

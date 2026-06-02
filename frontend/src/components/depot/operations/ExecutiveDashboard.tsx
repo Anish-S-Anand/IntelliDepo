@@ -442,6 +442,25 @@ export default function ExecutiveDashboard() {
         </span>
       </div>
 
+      {/* ── Analysis KPIs ──────────────────────────────────────────────────── */}
+      {depotSource && depotSource.commandSnapshot.kpis.length > 0 && (
+        <div className="mb-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {depotSource.commandSnapshot.kpis.map((kpi) => {
+            const toneColor = kpi.tone === "healthy" ? "var(--color-success)" : kpi.tone === "warning" ? "var(--color-warning)" : kpi.tone === "critical" ? "var(--color-danger)" : "var(--color-info)";
+            return (
+              <div key={kpi.key} className="rounded-[12px] p-3 sm:p-4" style={cardStyle}>
+                <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.1em] mb-2" style={{ color: "var(--text-faint)" }}>
+                  {kpi.label}
+                </div>
+                <div className="text-[22px] sm:text-[26px] font-extrabold leading-none" style={{ color: toneColor }}>
+                  {kpi.value}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* ── Throughput Chart + Zone Capacity side by side ─────────────────── */}
       <div className="mb-5 grid grid-cols-1 xl:grid-cols-[3fr_2fr] gap-4 items-stretch">
 
