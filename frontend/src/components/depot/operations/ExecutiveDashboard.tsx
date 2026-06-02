@@ -69,11 +69,25 @@ function buildFallbackWeekly(warehouseIds: string[]) {
 type Severity = "critical" | "high" | "medium";
 type Status   = "open" | "escalated" | "monitoring";
 const ALLOWED_INCIDENT_VIDEOS = new Set(["Perimeter_Detection.mp4", "Theft Camera .mp4"]);
+const RAW_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SEED_INCIDENT_VIDEO_MAP: Record<string, string> = {
   "seed://breach-0": "Perimeter_Detection.mp4",
   "seed://breach-inbound-gate": "Perimeter_Detection.mp4",
   "seed://breach-staging-area": "Theft Camera .mp4",
 };
+
+function readableIncidentZone(zoneId?: string | null): string {
+  if (!zoneId) return "Zone ID: BLR-Z2";
+  if (RAW_ID_PATTERN.test(zoneId)) return "Zone ID: BLR-Z2";
+  return `Zone ID: ${zoneId}`;
+}
+
+function readableIncidentAssignee(acknowledgedBy?: string | null, escalatedTo?: string | null): string {
+  if (escalatedTo && !RAW_ID_PATTERN.test(escalatedTo)) return escalatedTo;
+  if (acknowledgedBy && !RAW_ID_PATTERN.test(acknowledgedBy)) return acknowledgedBy;
+  if (acknowledgedBy) return "Shift Supervisor";
+  return "Shift Supervisor";
+}
 
 interface Incident {
   id: string;
@@ -366,13 +380,13 @@ export default function ExecutiveDashboard() {
       id: incident.id,
       title: incident.title,
       what: incident.description || incident.title,
-      where: `Zone ID: ${incident.zone_id}`,
+      where: readableIncidentZone(incident.zone_id),
       doWhat: incident.status === "acknowledged"
         ? "Incident is acknowledged and awaiting closure."
         : "Ops team should review and take action.",
       severity: normalizeSeverity(incident.severity),
       status: normalizeStatus(incident.status),
-      assignee: incident.acknowledged_by || incident.escalated_to || "Unassigned",
+      assignee: readableIncidentAssignee(incident.acknowledged_by, incident.escalated_to),
       ago: relativeTime(incident.created_at),
       countdown: countdownMinutes(incident.escalation_deadline),
       icon: incidentIcon(incident.title),

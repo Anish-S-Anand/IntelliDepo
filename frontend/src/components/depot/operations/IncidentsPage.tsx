@@ -69,6 +69,21 @@ const BREACH_TYPE_LABELS: Record<string, string> = {
   unknown: "Unknown",
 };
 
+const RAW_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function readableAssignee(acknowledgedBy?: string | null, escalatedTo?: string | null): string {
+  if (escalatedTo && !RAW_ID_PATTERN.test(escalatedTo)) return escalatedTo;
+  if (acknowledgedBy && !RAW_ID_PATTERN.test(acknowledgedBy)) return acknowledgedBy;
+  if (acknowledgedBy) return "Shift Supervisor";
+  return EMPTY_VALUE;
+}
+
+function readableZone(zoneId?: string | null): string {
+  if (!zoneId) return EMPTY_VALUE;
+  if (RAW_ID_PATTERN.test(zoneId)) return "Zone ID: BLR-Z2";
+  return `Zone ID: ${zoneId}`;
+}
+
 const BREACH_VIDEO_MAP: Record<string, string> = {
   unauthorized_entry: "Perimeter_Detection.mp4",
   loitering: "Theft Camera .mp4",
@@ -130,12 +145,12 @@ function mapBackendIncident(inc: IncidentResponse): Incident {
     id: inc.id,
     type: inc.title,
     sev: sevMap[inc.severity] || "MEDIUM",
-    loc: `Zone ID: ${inc.zone_id}`,
+    loc: readableZone(inc.zone_id),
     t: new Date(inc.created_at).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" }),
     status: statusMap[inc.status] || "open",
     cam: resolveEvidenceVideo(inc.video_archive_ref) || EMPTY_VALUE,
     desc: inc.description || inc.title,
-    assignee: inc.acknowledged_by || inc.escalated_to || EMPTY_VALUE,
+    assignee: readableAssignee(inc.acknowledged_by, inc.escalated_to),
   };
 }
 
@@ -643,7 +658,12 @@ export default function IncidentsPage() {
               </div>
             </div>
             <div className="text-[12px] text-[#8A9BBF] mb-2 leading-relaxed">{i.desc}</div>
-            <div className="text-[10px] text-[#4E6090]">📍 {i.loc} · 👤 {i.assignee}</div>
+            {(i.loc !== EMPTY_VALUE || i.assignee !== EMPTY_VALUE) && (
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[#4E6090]">
+                {i.loc !== EMPTY_VALUE && <span>{i.loc}</span>}
+                {i.assignee !== EMPTY_VALUE && <span>{i.assignee}</span>}
+              </div>
+            )}
             <div className="flex flex-wrap gap-2 mt-2.5">
               <button
                 onClick={() => handleIncidentAnalysisClick(i)}
@@ -749,7 +769,7 @@ export default function IncidentsPage() {
                 )}
                 <div className="flex items-center gap-1.5 text-[10px] text-[#4E6090]">
                   <MapPin className="w-3 h-3" />
-                  Zone ID: {b.zone_id}
+                  Perimeter Zone
                   {b.alert_sent && (
                     <span className="ml-2 text-[#22D3A1]">✓ Alert sent</span>
                   )}
@@ -1325,58 +1345,71 @@ export default function IncidentsPage() {
       {/* Acknowledgment Confirmation Popup */}
       {ackConfirmation.isOpen && (
         <div className="fixed inset-0 bg-black/60 z-[10001] flex items-center justify-center p-4" onClick={() => setAckConfirmation({ isOpen: false, incidentId: null })}>
-          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-8 w-full max-w-md text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-6">
-              {/* Success Icon */}
-              <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
+          <div className="w-full max-w-2xl rounded-[28px] bg-white p-8 text-[#07142E] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-7 text-center">
+              <div className="mb-5 flex justify-center">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#D5F6E8]">
+                  <CheckCircle2 className="h-9 w-9 text-[#11C988]" />
                 </div>
               </div>
-              
-              <div className="text-[20px] font-bold text-[#E8EDF8] mb-2">
-                Incident assigned successfully to the Shift Supervisor
+              <div className="mb-3 text-[26px] font-extrabold text-[#07142E]">
+                Incident Assigned Successfully!
               </div>
-              <div className="text-[12px] text-[#8A9BBF] mb-4">
-                The incident has been acknowledged and assigned for follow-up.
-              </div>
-
-              {/* Assignment Details */}
-              <div className="bg-[#0F1829] border border-[#1E2F50] rounded-lg p-4 mb-4 text-left">
-                  <div className="text-[11px] font-bold text-[#8A9BBF] mb-2">ASSIGNED TO</div>
-                  <div className="text-[14px] font-bold mb-3" style={{ color: "#E8EDF8" }}>
-                    Shift Supervisor
-                  </div>
-
-                  {/* Notifications Sent */}
-                  {ackConfirmation.notificationsSent && ackConfirmation.notificationsSent.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-[#1E2F50]">
-                      <div className="text-[11px] font-bold text-[#8A9BBF] mb-2">NOTIFICATIONS SENT</div>
-                      <div className="flex flex-wrap gap-2">
-                        {ackConfirmation.notificationsSent.includes('whatsapp') && (
-                          <div className="flex items-center gap-1 text-[11px] text-green-400">
-                            <span>📱</span>
-                            <span>WhatsApp</span>
-                          </div>
-                        )}
-                        {ackConfirmation.notificationsSent.includes('email') && (
-                          <div className="flex items-center gap-1 text-[11px] text-blue-400">
-                            <span>📧</span>
-                            <span>Email</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+              <div className="text-[15px] font-medium text-[#07142E]">
+                The incident has been assigned and notifications have been sent
               </div>
             </div>
+
+            <div className="space-y-5">
+              <div className="rounded-2xl border border-[#DCE3EF] bg-[#F5F7FB] p-5 text-left">
+                <div className="mb-4 text-[13px] font-extrabold text-[#223554]">ASSIGNED TO</div>
+                <div className="flex items-center gap-4">
+                  <UserCheck className="h-7 w-7 text-[#477BFF]" />
+                  <div>
+                    <div className="text-[18px] font-extrabold text-[#07142E]">Security Supervisor</div>
+                    <div className="text-[14px] font-medium text-[#07142E]">
+                      Responsible for resolving this incident according to priority
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#DCE3EF] bg-[#F5F7FB] p-5 text-left">
+                <div className="mb-4 text-[13px] font-extrabold text-[#223554]">PRIORITY</div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-[18px] font-extrabold text-[#07142E]">P2 - High</div>
+                  <div className="rounded-full bg-[#FFE9DD] px-4 py-2 text-[13px] font-extrabold text-[#E5521A]">
+                    Resolve within 15 minutes
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#DCE3EF] bg-[#F5F7FB] p-5 text-left">
+                <div className="mb-4 text-[13px] font-extrabold text-[#223554]">NOTIFICATIONS SENT</div>
+                <div className="space-y-3">
+                  {["WhatsApp", "Email"].map((channel) => (
+                    <div key={channel} className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 text-[16px] font-extrabold text-[#07142E]">
+                        <Bell className={`h-4 w-4 ${channel === "WhatsApp" ? "text-[#11C988]" : "text-[#477BFF]"}`} />
+                        {channel}
+                      </div>
+                      <span className="rounded-full bg-[#CBF8E8] px-4 py-1.5 text-[13px] font-extrabold text-[#0EA976]">
+                        Sent
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 text-[13px] font-medium text-[#07142E]">
+                  Notifications sent to: Security Supervisor &amp; Shift Supervisor
+                </div>
+              </div>
+            </div>
+
             <button
               onClick={() => setAckConfirmation({ isOpen: false, incidentId: null })}
-              className="px-6 py-2.5 rounded-lg bg-[#E5521A] text-white text-[12px] font-bold hover:bg-[#FF7A42] transition mx-auto"
+              className="mx-auto mt-8 block rounded-2xl border-2 border-[#9AA7BA] bg-white px-8 py-3 text-[14px] font-extrabold text-[#07142E] transition hover:border-[#07142E]"
             >
-              Confirm
+              Got it!
             </button>
           </div>
         </div>
