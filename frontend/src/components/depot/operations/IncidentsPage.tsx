@@ -654,7 +654,6 @@ export default function IncidentsPage() {
               </div>
               <div className="text-right">
                 <div className="text-[10px] text-[#4E6090]">{i.t}</div>
-                <div className="text-[10px] text-[#8A9BBF] mt-0.5">{i.cam !== EMPTY_VALUE ? `Camera: ${i.cam}` : ""}</div>
               </div>
             </div>
             <div className="text-[12px] text-[#8A9BBF] mb-2 leading-relaxed">{i.desc}</div>
@@ -759,9 +758,6 @@ export default function IncidentsPage() {
                     <div className="text-[10px] text-[#4E6090]">
                       {new Date(b.detected_at).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })}
                     </div>
-                    {b.camera_id && (
-                      <div className="text-[10px] text-[#8A9BBF] mt-0.5">📷 {b.camera_id}</div>
-                    )}
                   </div>
                 </div>
                 {b.notes && (
