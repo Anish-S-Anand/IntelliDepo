@@ -56,7 +56,7 @@ const KPI_ICONS: Record<string, typeof Camera> = {
   vehicles: Truck,
   avg_unload: Timer,
   occupancy: Layers,
-  capacity_remaining: Gauge,
+  occupancy_count: Layers,
   total_capacity: Layers,
   workers: Users,
   gates: Shield,
@@ -66,13 +66,14 @@ const KPI_ICONS: Record<string, typeof Camera> = {
   access: Truck,
 };
 
-const KPI_DISPLAY_ORDER = ["bags_in", "bags_out", "total_capacity", "capacity_remaining"] as const;
+const KPI_DISPLAY_ORDER = ["bags_in", "bags_out", "total_capacity", "occupancy_count"] as const;
+const HIDDEN_KPI_KEYS = new Set(["capacity_remaining", "occupancy"]);
 
 const KPI_ROUTE_MAP: Record<string, string> = {
   bags_in: "/depot/operations",
   bags_out: "/depot/operations",
   total_capacity: "/depot/heatmap",
-  capacity_remaining: "/depot/heatmap",
+  occupancy_count: "/depot/heatmap",
   occupancy: "/depot/heatmap",
   incidents: "/depot/incidents",
   workers: "/depot/counting",
@@ -433,7 +434,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
     const pinned = KPI_DISPLAY_ORDER
       .map((key) => scopedKpis.find((kpi) => kpi.key === key))
       .filter((kpi): kpi is CommandKpi => Boolean(kpi));
-    return [...pinned, ...scopedKpis.filter((kpi) => !pinnedKeys.has(kpi.key))];
+    return [...pinned, ...scopedKpis.filter((kpi) => !pinnedKeys.has(kpi.key) && !HIDDEN_KPI_KEYS.has(kpi.key))];
   }, [scopedKpis]);
   const visibleWarehouseIds = Array.from(new Set(scopedCameras.map((camera) => camera.warehouse_id).filter(Boolean))) as string[];
   const visibleRegions = Array.from(new Set(scopedCameras.map((camera) => camera.region_id).filter(Boolean))) as string[];

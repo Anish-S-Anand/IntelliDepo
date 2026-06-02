@@ -344,7 +344,6 @@ def _scoped_demo_kpis(warehouse_ids: tuple[str, ...], incident_count: int) -> li
     capacity, occupied = warehouse_storage_totals(warehouse_ids)
     bags_in = sum(int(m["bags_in"]) for m in metrics)
     bags_out = sum(int(m["bags_out"]) for m in metrics)
-    remaining = max(0, capacity - occupied)
     avg_unload = round(sum(metric["avg_unload"] for metric in metrics) / max(len(metrics), 1))
     occupancy = round((occupied / capacity) * 100) if capacity else 0
     active_cameras = len(warehouse_ids) * 6
@@ -353,11 +352,10 @@ def _scoped_demo_kpis(warehouse_ids: tuple[str, ...], incident_count: int) -> li
         CommandKpi(key="bags_in",    label="Bags In (Weekly)",    value=str(bags_in),  detail=_breakdown(warehouse_ids, "bags_in"),  tone="healthy"),
         CommandKpi(key="bags_out",   label="Bags Out (Weekly)",   value=str(bags_out), detail=_breakdown(warehouse_ids, "bags_out"), tone="healthy"),
         CommandKpi(key="total_capacity", label="Total Capacity", value=str(capacity), detail="Total storage capacity in assigned scope", tone="healthy"),
-        CommandKpi(key="capacity_remaining", label="Capacity Remaining", value=str(remaining), detail="Free storage units in assigned scope", tone="warning" if occupancy >= 80 else "healthy"),
+        CommandKpi(key="occupancy_count", label="Occupancy Count", value=str(occupied), detail="Occupied storage units in assigned scope", tone="warning" if occupancy >= 80 else "healthy"),
         CommandKpi(key="vehicles",   label="Vehicles (Today)",    value=str(sum(int(m["vehicles"]) for m in metrics)), detail=_breakdown(warehouse_ids, "vehicles"),  tone="normal"),
         CommandKpi(key="avg_unload", label="Avg Unload (Today)",  value=f"{avg_unload}m", detail="Average across assigned warehouses", tone="normal"),
         CommandKpi(key="incidents",  label="Incidents (Today)",   value=str(incident_count), detail="Scoped incident count, refreshed every 30s", tone=_tone_for_count(incident_count, warn_at=1, critical_at=4)),
-        CommandKpi(key="occupancy",  label="Occupancy %",         value=f"{occupancy}%", detail="Weighted by warehouse capacity", tone="warning" if occupancy >= 80 else "healthy"),
         CommandKpi(key="workers",    label="Workers (Today)",     value=str(sum(int(m["workers"]) for m in metrics)), detail=_breakdown(warehouse_ids, "workers"), tone="healthy"),
         CommandKpi(key="cameras",    label="Active Cameras",      value=f"{active_cameras}/{active_cameras}", detail=f"{len(warehouse_ids)} warehouse camera group(s)", tone="healthy"),
         CommandKpi(key="gates",      label="Boom Barriers",       value=str(total_gates), detail="Scoped gate controls only", tone="normal"),

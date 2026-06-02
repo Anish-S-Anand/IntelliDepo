@@ -18,7 +18,7 @@ export interface UnifiedDepotSource {
     incidentsToday: number;
     occupancyPct: number;
     totalCapacityUnits: number;
-    capacityRemainingUnits: number;
+    totalOccupancyUnits: number;
     workers: number;
     activeCameras: number;
     totalCameras: number;
@@ -193,7 +193,6 @@ function zoneCapacityTotals(zones: ZoneResponse[]) {
     totalCapacity,
     totalOccupancy,
     occupancyPct: totalCapacity > 0 ? Math.round((totalOccupancy / totalCapacity) * 100) : 0,
-    capacityRemainingUnits: Math.max(0, totalCapacity - totalOccupancy),
   };
 }
 
@@ -275,11 +274,10 @@ function buildCommandSnapshot(source: Omit<UnifiedDepotSource, "commandSnapshot"
       { key: "bags_in",            label: "Bags In (Weekly)",    value: String(source.kpis.bagsIn),                   detail: scopedBreakdown(source.warehouseIds, "bagsIn"),   tone: "healthy" },
       { key: "bags_out",           label: "Bags Out (Weekly)",   value: String(source.kpis.bagsOut),                  detail: scopedBreakdown(source.warehouseIds, "bagsOut"),  tone: "healthy" },
       { key: "total_capacity",     label: "Total Capacity",      value: String(source.kpis.totalCapacityUnits), detail: "Total storage capacity in assigned scope", tone: "healthy" },
-      { key: "capacity_remaining", label: "Capacity Remaining",  value: String(source.kpis.capacityRemainingUnits),   detail: "Free storage units in assigned scope",           tone: source.kpis.occupancyPct >= 80 ? "warning" : "healthy" },
+      { key: "occupancy_count",    label: "Occupancy Count",     value: String(source.kpis.totalOccupancyUnits), detail: "Occupied storage units in assigned scope", tone: source.kpis.occupancyPct >= 80 ? "warning" : "healthy" },
       { key: "vehicles",           label: "Vehicles (Today)",    value: String(source.kpis.vehicles),                 detail: scopedBreakdown(source.warehouseIds, "vehicles"), tone: "normal" },
       { key: "avg_unload",         label: "Avg Unload (Today)",  value: `${source.kpis.avgUnloadMinutes}m`,           detail: "Average across assigned warehouses",             tone: "normal" },
       { key: "incidents",          label: "Incidents (Today)",   value: String(source.kpis.incidentsToday),           detail: "Open backend incidents in current scope",        tone: source.kpis.incidentsToday > 3 ? "critical" : "warning" },
-      { key: "occupancy",          label: "Occupancy %",         value: `${source.kpis.occupancyPct}%`,               detail: "Scoped zone utilization",                        tone: source.kpis.occupancyPct >= 80 ? "warning" : "healthy" },
       { key: "workers",            label: "Workers (Today)",     value: String(source.kpis.workers),                  detail: scopedBreakdown(source.warehouseIds, "workers"),  tone: "healthy" },
       { key: "cameras",            label: "Active Cameras",      value: `${source.kpis.activeCameras}/${source.kpis.totalCameras}`, detail: `${source.warehouseIds.length} authorized warehouse group(s)`, tone: "healthy" },
     ],
@@ -360,7 +358,7 @@ export async function getUnifiedDepotSource(params: {
     incidentsToday: activeIncidents.length,
     occupancyPct,
     totalCapacityUnits: capacityTotals.totalCapacity,
-    capacityRemainingUnits: capacityTotals.capacityRemainingUnits,
+    totalOccupancyUnits: capacityTotals.totalOccupancy,
     workers: sumSeed(warehouseIds, "workers"),
     activeCameras,
     totalCameras,

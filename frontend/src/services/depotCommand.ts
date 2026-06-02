@@ -316,7 +316,6 @@ function demoCommandCenterSnapshot(): CommandCenterSnapshot {
   const totalOccupied = warehouseIds.reduce((s, id) => s + (ZONE_SEED[id] ?? []).reduce((zs, z) => zs + z.occupancy, 0), 0);
   const totalCapacity = warehouseIds.reduce((s, id) => s + (ZONE_SEED[id] ?? []).reduce((zs, z) => zs + z.maxCapacity, 0), 0);
   const occupancyPct = totalCapacity > 0 ? Math.round((totalOccupied / totalCapacity) * 100) : 0;
-  const capacityRemaining = Math.max(0, totalCapacity - totalOccupied);
   const cameras = warehouseIds.flatMap((warehouseId) => {
     const wh = DEMO_WAREHOUSES[warehouseId];
     return wh.zones.flatMap((zone, zoneIndex) => {
@@ -352,11 +351,10 @@ function demoCommandCenterSnapshot(): CommandCenterSnapshot {
       { key: "bags_in",           label: "Bags In (Weekly)",       value: String(sum("bags_in")),    detail: scopedBreakdown(warehouseIds, "bags_in"),    tone: "healthy" },
       { key: "bags_out",          label: "Bags Out (Weekly)",      value: String(sum("bags_out")),   detail: scopedBreakdown(warehouseIds, "bags_out"),   tone: "healthy" },
       { key: "total_capacity",    label: "Total Capacity",         value: String(totalCapacity),     detail: "Total storage units across assigned zones", tone: "healthy" },
-      { key: "capacity_remaining",label: "Capacity Remaining",     value: String(capacityRemaining), detail: "Free storage units in assigned scope",      tone: occupancyPct >= 80 ? "warning" : "healthy" },
+      { key: "occupancy_count",   label: "Occupancy Count",        value: String(totalOccupied),     detail: "Occupied storage units in assigned scope",  tone: occupancyPct >= 80 ? "warning" : "healthy" },
       { key: "vehicles",          label: "Vehicles (Today)",       value: String(sum("vehicles")),   detail: scopedBreakdown(warehouseIds, "vehicles"),   tone: "normal" },
       { key: "avg_unload",        label: "Avg Unload (Today)",     value: `${avgUnload}m`,           detail: "Average across assigned warehouses",        tone: "normal" },
       { key: "incidents",         label: "Incidents (Today)",      value: String(sum("incidents")),  detail: scopedBreakdown(warehouseIds, "incidents"),  tone: sum("incidents") > 3 ? "critical" : "warning" },
-      { key: "occupancy",         label: "Occupancy %",            value: `${occupancyPct}%`,        detail: `${totalOccupied} / ${totalCapacity} bags across all zones`, tone: occupancyPct >= 80 ? "warning" : "healthy" },
       { key: "workers",           label: "Workers (Today)",        value: String(sum("workers")),    detail: scopedBreakdown(warehouseIds, "workers"),    tone: "healthy" },
       { key: "cameras",           label: "Active Cameras",         value: `${cameras.length}/${cameras.length}`, detail: `${warehouseIds.length} warehouse camera group(s)`, tone: "healthy" },
     ],
