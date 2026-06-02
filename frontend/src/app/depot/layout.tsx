@@ -52,7 +52,7 @@ export default function DepotLayout({ children }: { children: React.ReactNode })
             style={{ backgroundColor: "var(--bg-page)" }}
           >
             {/* Responsive padding: tight on mobile, comfortable on desktop */}
-            <div className="px-3 sm:px-4 md:px-5 lg:px-6 xl:px-8 py-3 sm:py-4">
+            <div className="px-2 sm:px-3 md:px-4 lg:px-4 xl:px-5 py-3 sm:py-4">
               {children}
             </div>
           </main>

@@ -73,6 +73,7 @@ export default function PlatformNav() {
         {/* Logo + Brand */}
         <button
           onClick={() => router.push("/platform")}
+          className="brand-logo-button"
           aria-label="Home"
           style={{
             display: "flex",

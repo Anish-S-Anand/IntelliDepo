@@ -24,6 +24,7 @@ from datetime import datetime, timezone, timedelta, date
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
+from app.depot.storage_truth import cluster_zones_for_seed
 
 logger = logging.getLogger("intelli.depot.seed")
 
@@ -43,12 +44,12 @@ def add_months(value: date, months: int) -> date:
 CAMERAS = [
     # Local depot videos — real warehouse CCTV recordings from depot pendrive
     # stream_url uses "local:{filename}" prefix; video_library.py serves frames
-    {"name": "Gate Entry North",  "stream_url": "local:dtranshipment 1 (2).mp4",                "zone": "Entry Gate",   "frame_rate": 25, "resolution": "854x480"},  # Transhipment area
-    {"name": "Zone A Overhead",   "stream_url": "local:cluster 13 (1).mp4",                     "zone": "Zone-A",       "frame_rate": 25, "resolution": "854x480"},  # Cluster 13 storage
-    {"name": "Loading Bay 1-4",   "stream_url": "local:cluster 4-5 (1).mp4",                    "zone": "Loading Dock", "frame_rate": 25, "resolution": "854x480"},  # Cluster 4-5 bay
-    {"name": "Zone C Perimeter",  "stream_url": "local:Recording 2025-07-30 115417.mp4",        "zone": "Zone-C",       "frame_rate": 25, "resolution": "854x480"},  # Depot perimeter
-    {"name": "Gate Exit South",   "stream_url": "local:Recording 2025-08-11 171805.mp4",        "zone": "Exit Gate",    "frame_rate": 25, "resolution": "854x480"},  # Exit gate ops
-    {"name": "Yard Overview",     "stream_url": "local:Screen Recording 2025-08-11 174929.mp4", "zone": "Yard",         "frame_rate": 25, "resolution": "854x480"},  # Yard overview
+    {"name": "BLR-W01-Gate1-Entry",        "stream_url": "local:dtranshipment 1 (2).mp4",                "zone": "BLR-Z1", "frame_rate": 25, "resolution": "854x480"},  # Transhipment area
+    {"name": "BLR-W01-Cluster1-Overhead",  "stream_url": "local:cluster 13 (1).mp4",                     "zone": "BLR-Z1", "frame_rate": 25, "resolution": "854x480"},  # Cluster 13 storage
+    {"name": "BLR-W01-LoadingBay1-4",      "stream_url": "local:cluster 4-5 (1).mp4",                    "zone": "BLR-Z2", "frame_rate": 25, "resolution": "854x480"},  # Cluster 4-5 bay
+    {"name": "BLR-W01-Cluster3-Perimeter", "stream_url": "local:Recording 2025-07-30 115417.mp4",        "zone": "BLR-Z3", "frame_rate": 25, "resolution": "854x480"},  # Depot perimeter
+    {"name": "BLR-W01-Gate2-Exit",         "stream_url": "local:Recording 2025-08-11 171805.mp4",        "zone": "BLR-Z4", "frame_rate": 25, "resolution": "854x480"},  # Exit gate ops
+    {"name": "BLR-W01-Yard-Overview",      "stream_url": "local:Screen Recording 2025-08-11 174929.mp4", "zone": "BLR-Z4", "frame_rate": 25, "resolution": "854x480"},  # Yard overview
 ]
 
 GATES = [
@@ -68,10 +69,10 @@ VEHICLES = [
     {"plate_number": "UP-80-OP-0123", "vehicle_type": "truck", "owner_name": "Anil Gupta", "company": "UP Movers", "status": "pending", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=UP-80-OP-0123"},
     {"plate_number": "MH-01-QR-4567", "vehicle_type": "van", "owner_name": "Unknown", "company": "Unregistered", "status": "blacklisted", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=MH-01-QR-4567"},
     {"plate_number": "DL-10-ST-8901", "vehicle_type": "truck", "owner_name": "Suspicious", "company": "N/A", "status": "blacklisted", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=DL-10-ST-8901"},
-    {"plate_number": "KA01AB1234", "vehicle_type": "truck", "owner_name": "Rajesh Kumar", "company": "Cement Depot Fleet", "status": "registered", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=KA01AB1234"},
-    {"plate_number": "DL03EF9012", "vehicle_type": "truck", "owner_name": "Amit Patel", "company": "Cement Depot Fleet", "status": "registered", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=DL03EF9012"},
-    {"plate_number": "MH02CD5678", "vehicle_type": "truck", "owner_name": "Priya Sharma", "company": "Cement Depot Fleet", "status": "registered", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=MH02CD5678"},
-    {"plate_number": "TN04GH3456", "vehicle_type": "truck", "owner_name": "Sunita Reddy", "company": "Cement Depot Fleet", "status": "registered", "footage_url": "https://via.placeholder.com/800x600/1E2F50/E8EDF8?text=TN04GH3456"},
+    {"plate_number": "KA03NP0051", "vehicle_type": "SUV", "owner_name": "Mercedes GLS 400d", "company": "Vehicle Registry", "status": "registered", "footage_url": "/vehicles/registry/KA03NP0051.png"},
+    {"plate_number": "KL21L7408", "vehicle_type": "Hatchback", "owner_name": "Suzuki Alto", "company": "Vehicle Registry", "status": "registered", "footage_url": "/vehicles/registry/KL21L7408.png"},
+    {"plate_number": "KL56S6087", "vehicle_type": "Hatchback", "owner_name": "Suzuki Swift", "company": "Vehicle Registry", "status": "registered", "footage_url": "/vehicles/registry/KL56S6087.png"},
+    {"plate_number": "DL1CQ1199", "vehicle_type": "Sedan", "owner_name": "BMW 520d", "company": "Vehicle Registry", "status": "registered", "footage_url": "/vehicles/registry/DL1CQ1199.png"},
 ]
 
 GATE_ACCESS_LOGS = [
@@ -97,12 +98,7 @@ PERIMETER_ZONES = [
     {"name": "Dispatch Bay", "zone_type": "controlled", "alert_severity": "high", "alert_on_entry": True},
 ]
 
-CLUSTER_ZONES = [
-    {"zone_code": "A", "name": "UltraTech Cement — Zone A", "zone_type": "storage", "floor": "ground", "area_sqm": 2400, "max_capacity_units": 1000, "current_occupancy": 810},
-    {"zone_code": "B", "name": "ACC Cement — Zone B",       "zone_type": "storage", "floor": "ground", "area_sqm": 2800, "max_capacity_units": 1000, "current_occupancy": 450},
-    {"zone_code": "C", "name": "JSW Cement — Zone C",       "zone_type": "storage", "floor": "ground", "area_sqm": 1600, "max_capacity_units": 1000, "current_occupancy": 595},
-    {"zone_code": "D", "name": "Ambuja Cement — Zone D",    "zone_type": "storage", "floor": "ground", "area_sqm": 3200, "max_capacity_units": 1000, "current_occupancy": 910},
-]
+CLUSTER_ZONES = cluster_zones_for_seed("WH_BLR")
 
 MANIFESTS = [
     {"manifest_code": "MF-2026-0412", "vehicle_number": "TN-04-AB-1234", "expected_bags": 500, "expected_boxes": 50},
@@ -573,7 +569,7 @@ async def seed_database(db_url: str | None = None):
             ops_tasks = [
                 {"title": "Unload Truck TN-04-AB-1234", "worker_name": "Ramesh K.", "worker_id": "W-001", "area": "Zone C Bay 4", "zone": "Zone-C", "priority": "high",   "status": "in_progress"},
                 {"title": "FIFO Compliance Check — Zone B", "worker_name": "Priya S.", "worker_id": "W-002", "area": "Zone B Clusters", "zone": "Zone-B", "priority": "medium", "status": "pending"},
-                {"title": "LPR Gate Calibration", "worker_name": "Tech Team", "worker_id": "W-003", "area": "Gate Entry North", "zone": "Entry Gate", "priority": "low",    "status": "pending"},
+                {"title": "LPR Gate Calibration", "worker_name": "Tech Team", "worker_id": "W-003", "area": "BLR-W01-Gate1-Entry", "zone": "BLR-Z1", "priority": "low",    "status": "pending"},
                 {"title": "Damage Assessment — INC-002", "worker_name": "QA Lead", "worker_id": "W-004", "area": "Zone C", "zone": "Zone-C", "priority": "high",   "status": "in_progress"},
                 {"title": "Inventory Reconciliation — Zone A", "worker_name": "Anita R.", "worker_id": "W-005", "area": "Zone A", "zone": "Zone-A", "priority": "medium", "status": "completed"},
             ]
@@ -724,7 +720,7 @@ async def seed_database(db_url: str | None = None):
 
             # ── Incidents ──
             incidents = [
-                {"title": "Unauthorized entry at Gate 4 perimeter", "description": "Person detected in restricted zone after hours. Camera CAM-042 triggered alert.", "source": "camera", "priority": "P1", "severity_score": 0.95, "status": "open", "zone": "Gate 4 Perimeter", "category": "security"},
+                {"title": "Unauthorized entry at Gate 4 perimeter", "description": "Person detected in restricted zone after hours. Camera BLR-W01-Gate1-Entry triggered alert.", "source": "camera", "priority": "P1", "severity_score": 0.95, "status": "open", "zone": "Gate 4 Perimeter", "category": "security"},
                 {"title": "Damaged bags during unloading Zone C", "description": "5 bags torn during truck unloading at Bay 4. Estimated loss ₹4,200.", "source": "manual", "priority": "P2", "severity_score": 0.75, "status": "open", "zone": "Zone C Bay 4", "category": "damage"},
                 {"title": "Count mismatch in Cluster B-09", "description": "Physical count shows -5 bags vs ERP record for batch B2025-1021.", "source": "counting", "priority": "P2", "severity_score": 0.70, "status": "acknowledged", "zone": "Cluster B-09", "category": "inventory"},
                 {"title": "SLA breach risk — Dock B queue", "description": "Truck queue at Dock B exceeded 30-minute SLA window.", "source": "sla_breach", "priority": "P3", "severity_score": 0.55, "status": "open", "zone": "Dock B", "category": "sla"},

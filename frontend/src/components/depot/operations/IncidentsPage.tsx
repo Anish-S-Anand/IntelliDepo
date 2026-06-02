@@ -8,7 +8,6 @@ import { SEV_COL, STA_COL } from "@/lib/depot-data";
 import type { Incident } from "@/lib/depot-data";
 import { getVideoUrl } from "@/services/depotVision";
 import {
-  getIncidents,
   getActiveBreaches,
   createIncidentFromBreach,
   acknowledgeIncident,
@@ -43,12 +42,9 @@ type AnalysisReport = {
 type AcknowledgmentConfirmation = {
   isOpen: boolean;
   incidentId: string | null;
-<<<<<<< HEAD
   assignedTo?: string;
   notificationsSent?: string[];
   notificationDetails?: Record<string, string>;
-=======
->>>>>>> c37f5d71e1e25562b6527bd3e61381550cbbedfb
 };
 
 const BUSINESS_ACTIONS: { action: IncidentBusinessAction; label: string; notes: string; assigned_to?: string }[] = [
@@ -88,10 +84,6 @@ function resolveEvidenceVideo(ref?: string | null, breachType?: string | null): 
   if (breachType && BREACH_VIDEO_MAP[breachType]) return BREACH_VIDEO_MAP[breachType];
   if (ref && SEED_EVIDENCE_VIDEO_MAP[ref]) return SEED_EVIDENCE_VIDEO_MAP[ref];
   return null;
-}
-
-function hasAllowedEvidence(incident: IncidentResponse): boolean {
-  return ALLOWED_EVIDENCE_VIDEOS.has(resolveEvidenceVideo(incident.video_archive_ref) || "");
 }
 
 function dedupeIncidents(backendIncidents: IncidentResponse[]): IncidentResponse[] {

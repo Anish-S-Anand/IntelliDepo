@@ -1,15 +1,15 @@
 # Vehicle Footage Images
 
-Please place the 4 vehicle images in this folder with the following names:
+Registry footage images are stored in `public/vehicles/registry` with these names:
 
-1. **KL21L7408.jpg** - Silver Suzuki car (License plate: KL 21 L 7408)
-2. **DL1CQ1199.jpg** - Black BMW car (License plate: DL 1 CQ 1199)
-3. **KA01JT2408.jpg** - Black motorcycle (License plate: KA 01 JT 2408)
-4. **KA01JD2413.jpg** - White motorcycle (License plate: KA 01 JD 2413)
+1. **KA03NP0051.png** - Black Mercedes SUV (License plate: KA 03 NP 0051)
+2. **KL21L7408.png** - Silver Suzuki hatchback (License plate: KL 21 L 7408)
+3. **KL56S6087.png** - Grey Suzuki hatchback (License plate: KL 56 S 6087)
+4. **DL1CQ1199.png** - Black BMW sedan (License plate: DL 1 CQ 1199)
 
 These images will be displayed in the Vehicle Registry "Footage" column.
 
 ## Image Requirements
-- Format: JPG or JPEG
+- Format: PNG, JPG, or JPEG
 - Recommended size: 800x600 pixels or similar aspect ratio
 - File names must match exactly (case-sensitive on some systems)

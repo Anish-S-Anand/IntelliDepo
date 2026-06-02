@@ -1,0 +1,58 @@
+{
+  "warehouses": {
+    "WH_BLR": [
+      {
+        "code": "BLR-Z1",
+        "seedZoneCode": "A",
+        "name": "UltraTech Cement - Zone A",
+        "zoneType": "storage",
+        "floor": "ground",
+        "areaSqm": 2400,
+        "maxCapacity": 1200,
+        "occupancy": 910
+      },
+      {
+        "code": "BLR-Z2",
+        "seedZoneCode": "B",
+        "name": "ACC Cement - Zone B",
+        "zoneType": "storage",
+        "floor": "ground",
+        "areaSqm": 2800,
+        "maxCapacity": 800,
+        "occupancy": 329
+      },
+      {
+        "code": "BLR-Z3",
+        "seedZoneCode": "C",
+        "name": "JSW Cement - Zone C",
+        "zoneType": "storage",
+        "floor": "ground",
+        "areaSqm": 1600,
+        "maxCapacity": 1000,
+        "occupancy": 630
+      },
+      {
+        "code": "BLR-Z4",
+        "seedZoneCode": "D",
+        "name": "Ambuja Cement - Zone D",
+        "zoneType": "storage",
+        "floor": "ground",
+        "areaSqm": 3200,
+        "maxCapacity": 1400,
+        "occupancy": 1190
+      }
+    ],
+    "WH_HYD": [
+      { "code": "HYD-Z1", "maxCapacity": 1000, "occupancy": 740 },
+      { "code": "HYD-Z2", "maxCapacity": 1200, "occupancy": 490 },
+      { "code": "HYD-Z3", "maxCapacity": 900, "occupancy": 765 },
+      { "code": "HYD-Z4", "maxCapacity": 1100, "occupancy": 880 }
+    ],
+    "WH_MUM": [
+      { "code": "MUM-Z1", "maxCapacity": 1500, "occupancy": 1230 },
+      { "code": "MUM-Z2", "maxCapacity": 800, "occupancy": 296 },
+      { "code": "MUM-Z3", "maxCapacity": 1000, "occupancy": 680 },
+      { "code": "MUM-Z4", "maxCapacity": 1200, "occupancy": 1080 }
+    ]
+  }
+}

@@ -760,41 +760,6 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* ── Zone Bars ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        {displayZones.map((z) => {
-          const pct = Math.round(z.utilization_pct);
-          const col = zoneColor(pct);
-          return (
-            <div
-              key={z.id}
-              onClick={() => router.push(`/depot/heatmap?zone=${z.zone_code}`)}
-              className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 text-center relative overflow-hidden transition-all hover:border-[#E5521A]/30 hover:shadow-[0_6px_24px_rgba(229,82,26,0.08)] cursor-pointer"
-            >
-              <div
-                className="absolute top-0 left-0 right-0 h-[3px]"
-                style={{
-                  background: `linear-gradient(90deg, transparent, ${col}, transparent)`,
-                  opacity: 0.8,
-                }}
-              />
-              <div className="text-[10px] font-extrabold text-[#4E6090] tracking-[0.08em] leading-tight px-1">
-                {resolveZoneName(z)}
-              </div>
-              <div className="text-[28px] font-extrabold my-1.5" style={{ color: col }}>
-                {pct}%
-              </div>
-              <div className="w-full h-1 bg-[#1E2F50] rounded-full overflow-hidden mt-1.5">
-                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: col }} />
-              </div>
-              <div className="text-[9px] text-[#4E6090] mt-1.5">
-                {z.current_occupancy.toLocaleString()} / {z.max_capacity_units.toLocaleString()} bags
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
       {/* ── View Tabs ── */}
       <div className="flex gap-1 mb-4 bg-[#0F1A30] rounded-xl p-1 w-fit">
         <button

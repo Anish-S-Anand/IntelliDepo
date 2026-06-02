@@ -94,7 +94,7 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
       {/* Logo */}
       <button
         onClick={() => router.push(commandHomeHref)}
-        className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0"
+        className="brand-logo-button flex items-center gap-2 sm:gap-2.5 flex-shrink-0"
         aria-label="Go to depot home"
       >
         <div className="w-[44px] h-[44px] sm:w-[48px] sm:h-[48px] rounded-xl bg-white flex items-center justify-center shadow-[0_0_10px_rgba(229,82,26,0.3)] overflow-hidden flex-shrink-0">
@@ -125,6 +125,20 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
         className="hidden sm:block w-px h-7 flex-shrink-0"
         style={{ backgroundColor: "var(--border-default)" }}
       />
+
+      {/* Location pill — warehouse_manager only */}
+      {(normalizedRole === "warehouse_manager" || normalizedRole.includes("warehouse")) && user?.location && (
+        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold flex-shrink-0"
+          style={{
+            backgroundColor: "var(--bg-surface-2)",
+            border: "1px solid var(--border-default)",
+            color: "var(--text-primary)",
+          }}
+        >
+          <span style={{ color: "#E5521A" }}>📍</span>
+          {user.location}
+        </div>
+      )}
 
       <div className="flex-1" />
 

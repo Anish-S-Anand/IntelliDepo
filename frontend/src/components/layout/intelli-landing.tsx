@@ -91,18 +91,28 @@ export function IntelliLanding() {
         {/* Logo */}
         <button
           onClick={() => router.push("/")}
-          className="flex items-center gap-2.5 flex-shrink-0 group"
+          className="brand-logo-button landing-logo-button flex items-center gap-2.5 flex-shrink-0 group focus:outline-none"
           aria-label="Home"
-          style={{ textDecoration: "none" }}
+          style={{
+            textDecoration: "none",
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            boxShadow: "none",
+            padding: 0,
+          }}
         >
-          <div className="flex items-center justify-center rounded-xl overflow-hidden flex-shrink-0" style={{ width: 28, height: 28 }}>
+          <div
+            className="flex items-center justify-center rounded-xl overflow-hidden flex-shrink-0"
+            style={{ width: 28, height: 28, border: "none", boxShadow: "none" }}
+          >
             <Image
               src="/fidelis-logo.png"
               alt="Fidelis"
               width={28}
               height={28}
               className="object-contain"
-              style={{ filter: "drop-shadow(0 0 6px rgba(229,82,26,0.5))" }}
+              style={{ border: "none", boxShadow: "none", filter: "drop-shadow(0 0 6px rgba(229,82,26,0.5))" }}
               priority
             />
           </div>

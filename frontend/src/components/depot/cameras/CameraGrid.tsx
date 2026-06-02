@@ -4,9 +4,10 @@ import { useCallback, useMemo, useState } from "react";
 import { Camera, ShieldCheck, Truck, AlertTriangle, Users, Package } from "lucide-react";
 import { ModelProvider, useCocoSsd } from "@/hooks/useCocoSsd";
 import { useAuthStore } from "@/stores/authStore";
+import { DEPOT_WAREHOUSE_REGISTRY, type DepotWarehouseId } from "@/lib/depot-camera-registry";
 import { VideoFeed } from "./VideoFeed";
 
-type WarehouseId = "WH_HYD" | "WH_BLR" | "WH_MUM";
+type WarehouseId = DepotWarehouseId;
 
 interface CameraData {
   id: string;
@@ -32,27 +33,12 @@ const VIDEO_LIBRARY = [
   "Recording 2025-08-11 171805.mp4",
 ] as const;
 
-const WAREHOUSE_CAMERA_REGISTRY: Record<WarehouseId, { name: string; cityInitial: string }> = {
-  WH_HYD: { name: "Hyderabad", cityInitial: "H" },
-  WH_BLR: { name: "Bangalore", cityInitial: "B" },
-  WH_MUM: { name: "Mumbai", cityInitial: "M" },
-};
-
-const CAMERA_LABELS = [
-  "Gate 1 Entry",
-  "Cluster 1 Overhead",
-  "Loading Bay 1-4",
-  "Cluster 3 Perimeter",
-  "Gate 2 Exit",
-  "Yard Overview",
-] as const;
-
 function cameraSetForWarehouse(warehouseId: WarehouseId): CameraData[] {
-  const warehouse = WAREHOUSE_CAMERA_REGISTRY[warehouseId];
+  const warehouse = DEPOT_WAREHOUSE_REGISTRY[warehouseId];
 
   return Array.from({ length: 6 }, (_, index) => ({
-    id: `CAM-${warehouse.cityInitial}${index + 1}`,
-    name: `CAM-${warehouse.cityInitial}${index + 1} - ${CAMERA_LABELS[index]}`,
+    id: warehouse.cameras[index],
+    name: warehouse.cameras[index],
     warehouseId,
     warehouseName: warehouse.name,
     videoFile: VIDEO_LIBRARY[index],
@@ -121,7 +107,7 @@ function CameraGridInner() {
     () =>
       warehouseIds.map((warehouseId) => ({
         warehouseId,
-        label: `${WAREHOUSE_CAMERA_REGISTRY[warehouseId].name} Cameras`,
+        label: DEPOT_WAREHOUSE_REGISTRY[warehouseId].name,
         cameras: cameraSetForWarehouse(warehouseId),
       })),
     [warehouseIds],
