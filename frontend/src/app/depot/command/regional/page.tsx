@@ -8,5 +8,5 @@ const CommandPage = dynamic(
 );
 
 export default function RegionalCommandRoute() {
-  return <CommandPage forcedPersona="regional_manager" />;
+  return <CommandPage />;
 }

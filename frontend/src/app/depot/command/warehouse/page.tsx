@@ -8,5 +8,5 @@ const CommandPage = dynamic(
 );
 
 export default function WarehouseCommandRoute() {
-  return <CommandPage forcedPersona="warehouse_manager" />;
+  return <CommandPage />;
 }

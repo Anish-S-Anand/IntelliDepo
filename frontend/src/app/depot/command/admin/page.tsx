@@ -8,5 +8,5 @@ const CommandPage = dynamic(
 );
 
 export default function AdminCommandRoute() {
-  return <CommandPage forcedPersona="admin" />;
+  return <CommandPage />;
 }

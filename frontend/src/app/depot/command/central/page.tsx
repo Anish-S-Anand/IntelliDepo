@@ -8,5 +8,5 @@ const CommandPage = dynamic(
 );
 
 export default function CentralCommandRoute() {
-  return <CommandPage forcedPersona="central_manager" />;
+  return <CommandPage />;
 }
