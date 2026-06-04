@@ -135,7 +135,7 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
               {item.fullLabel || item.label}
             </span>
 
-            {badgeCount > 0 && (
+            {false && badgeCount > 0 && (
               <span 
                 className="absolute top-[6px] right-[10px] min-w-[13px] h-[13px] px-1 rounded-full bg-[#F04A4A] text-white text-[7px] flex items-center justify-center"
                 aria-label={`${badgeCount} active ${badgeCount === 1 ? 'alert' : 'alerts'}`}

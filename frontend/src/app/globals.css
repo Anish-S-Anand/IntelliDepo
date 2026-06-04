@@ -12,7 +12,7 @@
   /* ── Light Theme (default) ─────────────────────────────── */
   :root {
     /* Typography System Variables - Requirements 1.3, 1.4, 1.5, 1.7, 1.9 */
-    --font-family: var(--font-inter), 'Inter', 'Arial', 'Helvetica Neue', 'Helvetica', sans-serif;
+    --font-family: var(--font-poppins), 'Poppins', 'Arial', 'Helvetica Neue', sans-serif;
     --font-size-base: 16px;
     --line-height-base: 1.6;
     --line-height-heading: 1.2;
@@ -232,7 +232,7 @@
   }
   
   h6 { 
-    font-size: 13px; 
+    font-size: 15px; 
     font-weight: 800; 
     line-height: 1.2; 
   }
@@ -678,7 +678,7 @@ canvas, video, img {
   transition: none !important;
 }
 
-/* ── Universal Inter Font — clear, legible for all users ── */
+/* ── Universal Poppins Font ── */
 *, *::before, *::after {
   font-family: var(--font-family) !important;
 }
@@ -1079,3 +1079,11 @@ html:not(.dark) button.landing-logo-button {
   box-shadow: none !important;
   background: transparent !important;
 }
+
+/* ── Minimum readable font sizes across depot ── */
+/* Tailwind text-[9px] and text-[10px] are too small — bump them up */
+[class*="text-[9px]"]  { font-size: 11px !important; }
+[class*="text-[10px]"] { font-size: 12px !important; }
+[class*="text-[11px]"] { font-size: 13px !important; }
+[class*="text-[12px]"] { font-size: 13px !important; }
+[class*="text-[13px]"] { font-size: 14px !important; }

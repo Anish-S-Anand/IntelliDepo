@@ -50,28 +50,51 @@ const WAREHOUSE_COORDS: Record<string, { lat: number; lon: number; city: string 
 };
 
 const WMO_LABELS: Record<number, { label: string; emoji: string }> = {
-  0: { label: "Clear", emoji: "☀️" }, 1: { label: "Mostly Clear", emoji: "🌤️" },
-  2: { label: "Partly Cloudy", emoji: "⛅" }, 3: { label: "Overcast", emoji: "☁️" },
-  45: { label: "Foggy", emoji: "🌫️" }, 48: { label: "Icy Fog", emoji: "🌫️" },
-  51: { label: "Light Drizzle", emoji: "🌦️" }, 61: { label: "Light Rain", emoji: "🌧️" },
-  63: { label: "Moderate Rain", emoji: "🌧️" }, 65: { label: "Heavy Rain", emoji: "🌧️" },
-  80: { label: "Rain Showers", emoji: "🌦️" }, 95: { label: "Thunderstorm", emoji: "⛈️" },
+  0:  { label: "Clear Sky",       emoji: "☀️" },
+  1:  { label: "Mostly Clear",    emoji: "🌤️" },
+  2:  { label: "Partly Cloudy",   emoji: "⛅" },
+  3:  { label: "Mostly Cloudy",   emoji: "☁️" },
+  45: { label: "Foggy",           emoji: "🌫️" },
+  48: { label: "Icy Fog",         emoji: "🌫️" },
+  51: { label: "Light Drizzle",   emoji: "🌦️" },
+  53: { label: "Drizzle",         emoji: "🌦️" },
+  55: { label: "Heavy Drizzle",   emoji: "🌧️" },
+  56: { label: "Freezing Drizzle",emoji: "🌧️" },
+  57: { label: "Heavy Frz Drizzle",emoji: "🌧️" },
+  61: { label: "Light Rain",      emoji: "🌧️" },
+  63: { label: "Moderate Rain",   emoji: "🌧️" },
+  65: { label: "Heavy Rain",      emoji: "🌧️" },
+  66: { label: "Freezing Rain",   emoji: "🌧️" },
+  67: { label: "Heavy Frz Rain",  emoji: "🌧️" },
+  71: { label: "Light Snow",      emoji: "🌨️" },
+  73: { label: "Moderate Snow",   emoji: "❄️" },
+  75: { label: "Heavy Snow",      emoji: "❄️" },
+  77: { label: "Snow Grains",     emoji: "🌨️" },
+  80: { label: "Rain Showers",    emoji: "🌦️" },
+  81: { label: "Moderate Showers",emoji: "🌧️" },
+  82: { label: "Heavy Showers",   emoji: "⛈️" },
+  85: { label: "Snow Showers",    emoji: "🌨️" },
+  86: { label: "Heavy Snow Showers",emoji: "❄️" },
+  95: { label: "Thunderstorm",    emoji: "⛈️" },
+  96: { label: "Thunderstorm + Hail",emoji: "⛈️" },
+  99: { label: "Heavy Thunderstorm",emoji: "⛈️" },
 };
 
 type WeatherData = { temp: number; label: string; emoji: string; wind: number; city: string } | null;
 
 function getWeatherAdvisory(temp: number, weatherCode: number): { text: string; color: string } {
-  // Rain / storm conditions take priority
-  if (weatherCode >= 95) return { text: "⛈️ Thunderstorm — halt outdoor ops, lock gates, no vehicle movement.", color: "#F04A4A" };
-  if (weatherCode >= 61) return { text: "🌧️ Rain — cover open stockpiles, add 15 min SLA buffer, slow-speed yard protocol.", color: "#F5A623" };
-  if (weatherCode >= 51) return { text: "🌦️ Drizzle — inspect bags for moisture, gate entry may slow.", color: "#F5A623" };
-  if (weatherCode === 45 || weatherCode === 48) return { text: "🌫️ Fog — LPR confidence drops, manual gate verification required.", color: "#F5A623" };
-  // Temperature-based
-  if (temp > 38) return { text: "🔥 Extreme heat — shift loading to early morning/evening, shut Zone D during 12–3pm.", color: "#F04A4A" };
+  if (weatherCode >= 95) return { text: "⛈️ Thunderstorm — halt all outdoor ops, no vehicle movement, lock gates.", color: "#F04A4A" };
+  if (weatherCode >= 80) return { text: "🌧️ Heavy showers — cover open stockpiles, suspend yard ops, trucks to covered bays only.", color: "#F04A4A" };
+  if (weatherCode >= 61) return { text: "🌧️ Rain — cover open bag stockpiles, add 15 min SLA buffer, slow-speed yard protocol.", color: "#F5A623" };
+  if (weatherCode >= 51) return { text: "🌦️ Drizzle — inspect bags for moisture before dispatch, monitor gate LPR confidence.", color: "#F5A623" };
+  if (weatherCode === 45 || weatherCode === 48) return { text: "🌫️ Fog — LPR camera confidence reduced, manual gate verification required.", color: "#F5A623" };
+  if (weatherCode === 3) return { text: "☁️ Overcast — good working conditions, no special measures needed.", color: "#22D3A1" };
+  if (weatherCode === 2) return { text: "⛅ Partly cloudy — normal operations, monitor for afternoon showers.", color: "#22D3A1" };
+  if (temp > 38) return { text: "🔥 Extreme heat — shift loading to early morning/evening, shut Zone D during 12–3pm, alert supervisors.", color: "#F04A4A" };
   if (temp > 32) return { text: "☀️ Hot — mandatory shade breaks every 90 min, avoid heavy lifts 12–3pm.", color: "#F5A623" };
   if (temp > 25) return { text: "🌤️ Warm — push inbound early, increase water breaks, check bay ventilation.", color: "#22D3A1" };
   if (temp >= 15) return { text: "✅ Ideal conditions — normal operations, no special measures needed.", color: "#22D3A1" };
-  return { text: "🧊 Cold — check bags for condensation on removal from cold storage.", color: "#5B9BF5" };
+  return { text: "🧊 Cold — inspect bags for condensation on removal from cold storage.", color: "#5B9BF5" };
 }
 
 function WeatherWidget({ warehouseIds }: { warehouseIds: string[] }) {
@@ -83,10 +106,11 @@ function WeatherWidget({ warehouseIds }: { warehouseIds: string[] }) {
         warehouseIds.map(async (id) => {
           const coords = WAREHOUSE_COORDS[id];
           if (!coords) return { id, data: null };
-          const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,weathercode,windspeed_10m&timezone=Asia%2FKolkata`;
+          const ts = Date.now();
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,weather_code,windspeed_10m&timezone=Asia%2FKolkata&forecast_days=1&_t=${ts}`;
           const res = await fetch(url);
           const raw = await res.json();
-          const code = raw.current?.weathercode ?? 0;
+          const code: number = raw.current?.weather_code ?? raw.current?.weathercode ?? 0;
           const wmo = WMO_LABELS[code] ?? { label: "Unknown", emoji: "🌡️" };
           return {
             id,
@@ -108,7 +132,7 @@ function WeatherWidget({ warehouseIds }: { warehouseIds: string[] }) {
       setWeatherMap(map);
     };
     void load();
-    const interval = setInterval(() => void load(), 10 * 60 * 1000);
+    const interval = setInterval(() => void load(), 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [warehouseIds.join(",")]);
 

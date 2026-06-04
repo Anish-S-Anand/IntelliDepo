@@ -115,7 +115,7 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
             className="text-[8px] sm:text-[9px] font-semibold tracking-[0.12em] uppercase"
             style={{ color: "var(--text-muted)" }}
           >
-            IntelliDepot TM
+            IntelliDepot
           </span>
         </div>
       </button>
