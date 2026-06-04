@@ -41,6 +41,7 @@ import {
 import { getUnifiedDepotSource } from "@/services/depotUnifiedSource";
 import { useDepotCommandEvents } from "@/hooks/useDepotCommandEvents";
 import { DEPOT_WAREHOUSE_ORDER, DEPOT_WAREHOUSE_REGISTRY } from "@/lib/depot-camera-registry";
+import { LocationFilter, loadFilterFromStorage, saveFilterToStorage } from "./LocationFilter";
 
 // ── Weather ──────────────────────────────────────────────────────────────────
 const WAREHOUSE_COORDS: Record<string, { lat: number; lon: number; city: string }> = {
@@ -464,9 +465,34 @@ function GateSelector({
 export default function CommandPage({ forcedPersona }: { forcedPersona?: CommandPersona } = {}) {
   const user = useAuthStore((state) => state.user);
   const personaKey = forcedPersona ?? normalizeCommandPersona(user?.role);
+  
+  // LocationFilter state for regional managers
+  const [locationFilter, setLocationFilter] = useState<"combined" | "WH_HYD" | "WH_BLR">("combined");
+  
+  // Initialize locationFilter from localStorage on mount
+  useEffect(() => {
+    if (personaKey === "regional_manager") {
+      setLocationFilter(loadFilterFromStorage());
+    }
+  }, [personaKey]);
+  
+  // Filter-to-warehouse mapping
+  const FILTER_TO_WAREHOUSE_IDS: Record<"combined" | "WH_HYD" | "WH_BLR", RoleWarehouseId[]> = {
+    combined: ["WH_HYD", "WH_BLR"],
+    WH_HYD: ["WH_HYD"],
+    WH_BLR: ["WH_BLR"],
+  };
+  
   const forcedWarehouseIds = useMemo(
-    () => scopedWarehouseIdsForLogin(user?.email, personaKey),
-    [personaKey, user?.email],
+    () => {
+      // For regional managers, use locationFilter to determine scope
+      if (personaKey === "regional_manager") {
+        return FILTER_TO_WAREHOUSE_IDS[locationFilter];
+      }
+      // For other roles, use existing logic
+      return scopedWarehouseIdsForLogin(user?.email, personaKey);
+    },
+    [personaKey, user?.email, locationFilter],
   );
   const [snapshot, setSnapshot] = useState<CommandCenterSnapshot | null>(null);
   const [hierarchy, setHierarchy] = useState<DepotHierarchy | null>(null);
@@ -490,6 +516,12 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
   const showFeedback = (msg: string, ok = true) => {
     setFeedback({ msg, ok });
     window.setTimeout(() => setFeedback(null), 3500);
+  };
+  
+  // Handle location filter change
+  const handleFilterChange = (value: "combined" | "WH_HYD" | "WH_BLR") => {
+    setLocationFilter(value);
+    saveFilterToStorage(value);
   };
 
   const toggleBroadcastChannel = (channel: string) => {
@@ -652,6 +684,13 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {personaKey === "regional_manager" && (
+            <LocationFilter
+              value={locationFilter}
+              onChange={handleFilterChange}
+              disabled={loading}
+            />
+          )}
           <WeatherWidget warehouseIds={forcedWarehouseIds} />
           {feedback && (
             <span className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${feedback.ok ? "bg-[#22D3A1]/15 text-[#22D3A1]" : "bg-[#F04A4A]/15 text-[#F04A4A]"}`}>
