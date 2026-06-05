@@ -894,7 +894,7 @@ export default function InventoryPage() {
                 : "No zones match the current filter."}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               {displayZones.map((z) => {
                 const pct = Math.round(z.utilization_pct);
                 const col = zoneColor(pct);
@@ -902,28 +902,28 @@ export default function InventoryPage() {
                   <div
                     key={z.id}
                     onClick={() => router.push(`/depot/heatmap?zone=${z.zone_code}`)}
-                    className="bg-[#14203A] border rounded-[14px] p-[15px] transition-all hover:border-[#E5521A]/40 hover:-translate-y-px cursor-pointer"
+                    className="bg-[#14203A] border rounded-[16px] p-5 transition-all hover:border-[#E5521A]/40 hover:-translate-y-px cursor-pointer"
                     style={{ borderColor: "#1E2F50" }}
                   >
-                    <div className="flex justify-between mb-2.5">
+                    <div className="flex justify-between mb-3">
                       <div>
-                        <div className="text-[13px] font-bold text-[#E8EDF8] leading-tight">{resolveZoneName(z)}</div>
-                        <div className="text-[10px] text-[#4E6090] mt-0.5">{z.zone_type}</div>
+                        <div className="text-[15px] font-bold text-[#E8EDF8] leading-tight">{resolveZoneName(z)}</div>
+                        <div className="text-[11px] text-[#4E6090] mt-0.5">{z.zone_type}</div>
                       </div>
                       <div className="flex flex-col gap-1 items-end">
                         <span
-                          className="text-[9px] font-bold px-2 py-0.5 rounded-full border"
+                          className="text-[11px] font-bold px-2.5 py-1 rounded-full border"
                           style={{ background: `${col}22`, color: col, borderColor: `${col}44` }}
                         >
                           {pct}%
                         </span>
-                        <span className="text-[9px] text-[#4E6090] mt-0.5">View map →</span>
+                        <span className="text-[10px] text-[#4E6090] mt-0.5">View map →</span>
                       </div>
                     </div>
-                    <div className="w-full h-1 bg-[#1E2F50] rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 bg-[#1E2F50] rounded-full overflow-hidden mb-3">
                       <div className="h-full rounded-full" style={{ width: `${pct}%`, background: col }} />
                     </div>
-                    <div className="grid grid-cols-2 gap-x-2.5 gap-y-1 text-[10px] mt-2.5">
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
                       <span className="text-[#4E6090]">Capacity</span>
                       <span className="font-semibold text-[#E8EDF8]">{z.max_capacity_units.toLocaleString()} bags</span>
                       <span className="text-[#4E6090]">Occupied</span>

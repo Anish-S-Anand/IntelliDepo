@@ -1,20 +1,44 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { Bell, RefreshCw, Settings, User, Clock, LogOut, ChevronDown, Shield, Menu } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { getAllActiveAlerts } from "@/services/depotVision";
 import { getPerimeterAlertCount } from "@/services/depotPerimeter";
+import { LocationFilter, loadFilterFromStorage, saveFilterToStorage } from "../operations/LocationFilter";
 
 export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => void }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, logout } = useAuthStore();
   const [profileOpen, setProfileOpen] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
+  const [locationFilter, setLocationFilter] = useState<"combined" | "WH_HYD" | "WH_BLR">("combined");
   const profileRef = useRef<HTMLDivElement>(null);
+
+  const normalizedRole = (user?.role ?? "").toLowerCase().replace(/\s+/g, "_");
+  const isRegionalManager = normalizedRole === "regional_manager" || normalizedRole.includes("regional");
+  const isOnCommandPage = pathname?.includes("/depot/command/regional");
+
+  // Load location filter from localStorage on mount
+  useEffect(() => {
+    if (isRegionalManager) {
+      setLocationFilter(loadFilterFromStorage());
+    }
+  }, [isRegionalManager]);
+
+  // Handle location filter change
+  const handleLocationFilterChange = (value: "combined" | "WH_HYD" | "WH_BLR") => {
+    setLocationFilter(value);
+    saveFilterToStorage(value);
+    // Trigger page reload to apply filter
+    if (isOnCommandPage) {
+      window.location.reload();
+    }
+  };
 
   // Fetch live alert count for the bell badge, deferred so it doesn't compete
   // with the page's own data fetching on navigation
@@ -57,7 +81,6 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
   const initials = user?.full_name
     ? user.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "--";
-  const normalizedRole = (user?.role ?? "").toLowerCase().replace(/\s+/g, "_");
   const commandHomeHref = normalizedRole === "warehouse_manager" || normalizedRole.includes("warehouse")
     ? "/depot/command/warehouse"
     : normalizedRole === "regional_manager" || normalizedRole.includes("regional")
@@ -115,7 +138,7 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
             className="text-[8px] sm:text-[9px] font-semibold tracking-[0.12em] uppercase"
             style={{ color: "var(--text-muted)" }}
           >
-            IntelliDepot TM
+            IntelliDepot
           </span>
         </div>
       </button>
@@ -149,6 +172,15 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
         <span className="w-1.5 h-1.5 rounded-full bg-[#22D3A1] animate-pulse" />
         LIVE
       </div>
+
+      {/* Location Filter — regional_manager only, shown on command page */}
+      {isRegionalManager && isOnCommandPage && (
+        <LocationFilter
+          value={locationFilter}
+          onChange={handleLocationFilterChange}
+          disabled={false}
+        />
+      )}
 
       {/* Theme Toggle */}
       <ThemeToggle />

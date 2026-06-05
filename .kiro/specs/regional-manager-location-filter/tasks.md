@@ -78,7 +78,7 @@ This implementation plan converts the regional manager location filter design in
   - For single warehouse selections, assert forcedWarehouseIds contains only that warehouse ID
   - For combined selection, assert forcedWarehouseIds contains both WH_HYD and WH_BLR
 
-- [~] 5. Checkpoint - Ensure all tests pass
+- [x] 5. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 6. Trigger data refetch on filter change
@@ -127,7 +127,7 @@ This implementation plan converts the regional manager location filter design in
   - **Validates: Requirements 5.2**
   - When locationFilter is 'combined', assert displayed metrics equal sum/aggregation of both warehouses
 
-- [-] 9. Add error handling for edge cases
+- [x] 9. Add error handling for edge cases
   - Handle case where selected warehouse returns no data (display "No data available for {warehouse_name}")
   - Handle case where camera feeds are empty for selected warehouse (display "No cameras found for selected warehouse")
   - Handle case where weather API fails for selected warehouse (hide weather widget)
@@ -140,7 +140,7 @@ This implementation plan converts the regional manager location filter design in
   - Test localStorage write failures don't break functionality
   - Test component handles missing user object gracefully
 
-- [~] 10. Final checkpoint - Ensure all tests pass and feature is complete
+- [x] 10. Final checkpoint - Ensure all tests pass and feature is complete
   - Ensure all tests pass, ask the user if questions arise.
   - Verify filter is only visible for regional_manager role
   - Verify default selection is "Combined" on first load
