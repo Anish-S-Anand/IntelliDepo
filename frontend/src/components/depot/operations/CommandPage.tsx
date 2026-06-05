@@ -43,6 +43,36 @@ import { useDepotCommandEvents } from "@/hooks/useDepotCommandEvents";
 import { DEPOT_WAREHOUSE_ORDER, DEPOT_WAREHOUSE_REGISTRY } from "@/lib/depot-camera-registry";
 import { LocationFilter, loadFilterFromStorage, saveFilterToStorage } from "./LocationFilter";
 
+// Central Manager localStorage utilities
+const CENTRAL_MANAGER_LOCATION_FILTER_STORAGE_KEY = "centralManagerLocationFilter";
+
+type CentralManagerLocationFilterValue = "combined" | "WH_MUM" | "WH_BLR" | "WH_HYD";
+
+function loadCentralManagerFilterFromStorage(): CentralManagerLocationFilterValue {
+  try {
+    const stored = localStorage.getItem(CENTRAL_MANAGER_LOCATION_FILTER_STORAGE_KEY);
+    if (stored === "WH_MUM" || stored === "WH_BLR" || stored === "WH_HYD" || stored === "combined") {
+      return stored;
+    }
+    if (stored !== null) {
+      console.warn(
+        `Invalid central manager location filter value in storage: "${stored}". Falling back to "combined".`
+      );
+    }
+  } catch (error) {
+    console.warn("Failed to load central manager location filter from storage:", error);
+  }
+  return "combined";
+}
+
+function saveCentralManagerFilterToStorage(value: CentralManagerLocationFilterValue): void {
+  try {
+    localStorage.setItem(CENTRAL_MANAGER_LOCATION_FILTER_STORAGE_KEY, value);
+  } catch (error) {
+    console.warn("Failed to save central manager location filter to storage:", error);
+  }
+}
+
 // ── Weather ──────────────────────────────────────────────────────────────────
 const WAREHOUSE_COORDS: Record<string, { lat: number; lon: number; city: string }> = {
   WH_BLR: { lat: 12.97, lon: 77.59, city: "Bengaluru" },
@@ -186,25 +216,25 @@ function WeatherWidget({ warehouseIds }: { warehouseIds: string[] }) {
   const advisory = primary ? getWeatherAdvisory(primary.temp, primary.code ?? 0) : null;
 
   return (
-    <div className="flex flex-col items-end gap-1.5">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex flex-wrap items-center gap-1.5">
         {entries.map((w) => w && (
           <div
             key={w.city}
-            className="flex items-center gap-3 rounded-[12px] border border-[#1E2F50] bg-[#0D1526] px-4 py-3"
+            className="flex items-center gap-2 rounded-[8px] border border-[#1E2F50] bg-[#0D1526] px-2.5 py-1.5"
           >
-            <span className="text-[32px] leading-none">{w.emoji}</span>
+            <span className="text-[18px] leading-none">{w.emoji}</span>
             <div>
-              <div className="text-[12px] font-bold text-[#8A9BBF]">{w.city}</div>
-              <div className="text-[20px] font-extrabold text-[#E8EDF8] leading-tight">
-                {w.temp}°C <span className="text-[13px] font-semibold text-[#4E6090]">{w.label}</span>
+              <div className="text-[9px] font-bold text-[#8A9BBF]">{w.city}</div>
+              <div className="text-[14px] font-extrabold text-[#E8EDF8] leading-tight">
+                {w.temp}°C <span className="text-[10px] font-semibold text-[#4E6090]">{w.label}</span>
               </div>
             </div>
           </div>
         ))}
       </div>
       {advisory && (
-        <div className="text-[11px] font-semibold px-1" style={{ color: advisory.color }}>
+        <div className="text-[9px] font-semibold px-1" style={{ color: advisory.color }}>
           {advisory.text}
         </div>
       )}
@@ -539,11 +569,27 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
     return "combined";
   });
   
-  // Filter-to-warehouse mapping
+  // Central Manager LocationFilter state - initialize from localStorage
+  const [centralLocationFilter, setCentralLocationFilter] = useState<"combined" | "WH_MUM" | "WH_BLR" | "WH_HYD">(() => {
+    if (typeof window !== "undefined" && personaKey === "central_manager") {
+      return loadCentralManagerFilterFromStorage();
+    }
+    return "combined";
+  });
+  
+  // Filter-to-warehouse mapping for regional managers
   const FILTER_TO_WAREHOUSE_IDS: Record<"combined" | "WH_HYD" | "WH_BLR", RoleWarehouseId[]> = {
     combined: ["WH_HYD", "WH_BLR"],
     WH_HYD: ["WH_HYD"],
     WH_BLR: ["WH_BLR"],
+  };
+  
+  // Filter-to-warehouse mapping for central managers
+  const CENTRAL_MANAGER_FILTER_TO_WAREHOUSE_IDS: Record<"combined" | "WH_MUM" | "WH_BLR" | "WH_HYD", RoleWarehouseId[]> = {
+    combined: ["WH_MUM", "WH_BLR", "WH_HYD"],
+    WH_MUM: ["WH_MUM"],
+    WH_BLR: ["WH_BLR"],
+    WH_HYD: ["WH_HYD"],
   };
   
   const forcedWarehouseIds = useMemo(
@@ -554,10 +600,16 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
         console.log("CommandPage - locationFilter:", locationFilter, "forcedWarehouseIds:", ids);
         return ids;
       }
+      // For central managers, use centralLocationFilter to determine scope
+      if (personaKey === "central_manager") {
+        const ids = CENTRAL_MANAGER_FILTER_TO_WAREHOUSE_IDS[centralLocationFilter];
+        console.log("CommandPage - centralLocationFilter:", centralLocationFilter, "forcedWarehouseIds:", ids);
+        return ids;
+      }
       // For other roles, use existing logic
       return scopedWarehouseIdsForLogin(user?.email, personaKey);
     },
-    [personaKey, user?.email, locationFilter],
+    [personaKey, user?.email, locationFilter, centralLocationFilter],
   );
   const [snapshot, setSnapshot] = useState<CommandCenterSnapshot | null>(null);
   const [hierarchy, setHierarchy] = useState<DepotHierarchy | null>(null);
@@ -752,6 +804,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
           </p>
         </div>
         <div className="flex flex-col items-end gap-3">
+          <WeatherWidget warehouseIds={forcedWarehouseIds} />
           <div className="flex items-center gap-2">
             {feedback && (
               <span className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${feedback.ok ? "bg-[#22D3A1]/15 text-[#22D3A1]" : "bg-[#F04A4A]/15 text-[#F04A4A]"}`}>
@@ -759,7 +812,6 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
               </span>
             )}
           </div>
-          <WeatherWidget warehouseIds={forcedWarehouseIds} />
         </div>
       </div>
 
