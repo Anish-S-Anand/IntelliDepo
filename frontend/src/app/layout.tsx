@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
+import { LoadingProvider } from "@/contexts/LoadingContext";
+import { LoadingIndicator } from "@/components/ui/LoadingIndicator";
+import { NavigationEvents } from "@/components/layout/NavigationEvents";
 
 // Configure Inter font with Next.js font optimization
 const inter = Inter({
@@ -56,7 +59,13 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.className} antialiased`}>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <LoadingProvider>
+            <NavigationEvents />
+            {children}
+            <LoadingIndicator />
+          </LoadingProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

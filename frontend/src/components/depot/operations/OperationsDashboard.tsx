@@ -161,7 +161,7 @@ export default function OperationsDashboard() {
         {/* Throughput chart */}
         <div className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-[18px]">
           <div className="flex justify-between items-center mb-3.5">
-            <span className="text-[13px] font-bold text-[#E8EDF8]">Daily Throughput (Bags)</span>
+            <span className="text-[13px] font-bold text-[#E8EDF8]">Weekly Throughput (Bags)</span>
             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full theme-bg-accent-subtle theme-text-nav-active border border-[var(--accent-border)]">
               THIS WEEK
             </span>

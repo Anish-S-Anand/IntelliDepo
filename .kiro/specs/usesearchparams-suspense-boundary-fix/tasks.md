@@ -1,0 +1,145 @@
+# Implementation Plan
+
+- [ ] 1. Write bug condition exploration test
+  - **Property 1: Bug Condition** - useSearchParams Without Suspense Boundary
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the bug exists (build failures with prerender errors)
+  - **Scoped PBT Approach**: Scope the property to the concrete failing components identified in the design
+  - Test that `npm run build` fails with prerender errors for components using `useSearchParams()` without Suspense
+  - Verify error messages contain "useSearchParams() should be wrapped in a suspense boundary at page"
+  - Document specific failing components: NavigationEvents, SettingsPage, HeatmapPage, IncidentsPage, AnalysisSection
+  - Run test on UNFIXED code
+  - **EXPECTED OUTCOME**: Test FAILS with prerender errors (this is correct - it proves the bug exists)
+  - Document counterexamples found:
+    - NavigationEvents affects ALL pages (root layout)
+    - Settings page fails at `/depot/settings`
+    - Heatmap page fails at `/depot/heatmap`
+    - Incidents page fails at `/depot/incidents`
+    - Analysis section causes parent page failures
+  - Mark task complete when test is written, run, and failure is documented
+  - _Requirements: 1.1, 1.2, 1.3, 1.4_
+
+- [ ] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Runtime Behavior and Non-Affected Components
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe behavior on UNFIXED code for:
+    - Components NOT using `useSearchParams()` (OperationsDashboard, PerimeterSecurityPage)
+    - Runtime search parameter access (settings tabs, heatmap zones, incident filters)
+    - Development mode functionality (`npm run dev`)
+    - Navigation with query parameters
+  - Write property-based tests capturing observed behavior patterns:
+    - Test 1: Search parameters are correctly read at runtime regardless of Suspense (property test with random URL params)
+    - Test 2: Components not using `useSearchParams()` render identically (snapshot/structural comparison)
+    - Test 3: Development mode works normally with HMR
+    - Test 4: Navigation with query parameters updates URL and component state correctly
+  - Property-based testing generates many test cases for stronger guarantees
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
+
+- [ ] 3. Fix useSearchParams() Suspense boundary wrapping
+
+  - [ ] 3.1 Fix NavigationEvents component (CRITICAL - affects all pages)
+    - Open `frontend/src/components/layout/NavigationEvents.tsx`
+    - Import Suspense from React
+    - Split component into wrapper and content components
+    - Wrap `NavigationEventsContent` (which uses `useSearchParams()`) in Suspense with fallback={null}
+    - Add `startLoading()` call to show loading indicator during navigation
+    - Add 100ms delay timer to prevent UI flicker on fast navigations
+    - Ensure cleanup in useEffect return function
+    - _Bug_Condition: isBugCondition(NavigationEvents) where NavigationEvents.uses_useSearchParams() AND NOT NavigationEvents.wrapped_in_suspense()_
+    - _Expected_Behavior: Component wrapped in Suspense, build succeeds, no prerender errors, loading indicator shows during navigation_
+    - _Preservation: Runtime behavior unchanged, navigation tracking continues to work, loading states properly managed_
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 3.4, 3.5_
+
+  - [ ] 3.2 Fix SettingsPage component
+    - Open `frontend/src/app/depot/settings/page.tsx`
+    - Import Suspense from React
+    - Split into SettingsPage (wrapper), SettingsPageContent (uses useSearchParams), and SettingsPageSkeleton (fallback)
+    - Create skeleton matching page structure with route-skeleton-bar classes
+    - Wrap SettingsPageContent in Suspense with SettingsPageSkeleton fallback
+    - Verify tab parameter reading logic remains unchanged
+    - _Bug_Condition: isBugCondition(SettingsPage) where SettingsPage.uses_useSearchParams() AND NOT SettingsPage.wrapped_in_suspense()_
+    - _Expected_Behavior: Component wrapped in Suspense, settings page builds successfully, skeleton shows during loading_
+    - _Preservation: Tab navigation continues to work identically, search parameter access unchanged_
+    - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4_
+
+  - [ ] 3.3 Fix HeatmapPage component
+    - Open `frontend/src/components/depot/operations/HeatmapPage.tsx`
+    - Import Suspense from React
+    - Split into HeatmapPage (wrapper), HeatmapPageContent (uses useSearchParams), and HeatmapPageSkeleton (fallback)
+    - Create skeleton matching heatmap layout with grid structure
+    - Wrap HeatmapPageContent in Suspense with HeatmapPageSkeleton fallback
+    - Verify zone parameter filtering logic remains unchanged
+    - _Bug_Condition: isBugCondition(HeatmapPage) where HeatmapPage.uses_useSearchParams() AND NOT HeatmapPage.wrapped_in_suspense()_
+    - _Expected_Behavior: Component wrapped in Suspense, heatmap page builds successfully, skeleton shows during loading_
+    - _Preservation: Zone filtering continues to work identically, search parameter access unchanged_
+    - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4_
+
+  - [ ] 3.4 Fix IncidentsPage component
+    - Open `frontend/src/components/depot/operations/IncidentsPage.tsx`
+    - Import Suspense from React
+    - Split into IncidentsPage (wrapper), IncidentsPageContent (uses useSearchParams), and IncidentsPageSkeleton (fallback)
+    - Create skeleton matching incidents list structure
+    - Wrap IncidentsPageContent in Suspense with IncidentsPageSkeleton fallback
+    - Verify status and severity filtering logic remains unchanged
+    - _Bug_Condition: isBugCondition(IncidentsPage) where IncidentsPage.uses_useSearchParams() AND NOT IncidentsPage.wrapped_in_suspense()_
+    - _Expected_Behavior: Component wrapped in Suspense, incidents page builds successfully, skeleton shows during loading_
+    - _Preservation: Incident filtering continues to work identically, search parameter access unchanged_
+    - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4_
+
+  - [ ] 3.5 Fix AnalysisSection component
+    - Open `frontend/src/components/depot/operations/AnalysisSection.tsx`
+    - Import Suspense from React
+    - Split into AnalysisSection (wrapper), AnalysisSectionContent (uses useSearchParams), and AnalysisSectionSkeleton (fallback)
+    - Create skeleton matching analysis section structure
+    - Wrap AnalysisSectionContent in Suspense with AnalysisSectionSkeleton fallback
+    - Verify router navigation with query params remains unchanged
+    - _Bug_Condition: isBugCondition(AnalysisSection) where AnalysisSection.uses_useSearchParams() AND NOT AnalysisSection.wrapped_in_suspense()_
+    - _Expected_Behavior: Component wrapped in Suspense, parent pages build successfully, skeleton shows during loading_
+    - _Preservation: Navigation and query param handling continues to work identically_
+    - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4_
+
+  - [ ] 3.6 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - Successful Static Generation
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior
+    - When this test passes, it confirms the expected behavior is satisfied
+    - Run bug condition exploration test from step 1
+    - Execute `npm run build` and verify:
+      - Build completes without prerender errors
+      - All 40+ pages are successfully statically generated
+      - No error messages about "useSearchParams() should be wrapped in a suspense boundary"
+      - Build output shows ✓ for all affected pages
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug is fixed)
+    - _Requirements: 2.1, 2.2, 2.3, 2.4_
+
+  - [-] 3.7 Verify preservation tests still pass
+    - **Property 2: Preservation** - Runtime Behavior and Non-Affected Components
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2
+    - Verify all preservation tests pass:
+      - Search parameters are correctly read at runtime (random URL params test passes)
+      - Components not using `useSearchParams()` render identically (comparison tests pass)
+      - Development mode works normally with HMR (`npm run dev` works)
+      - Navigation with query parameters functions correctly (manual verification)
+    - Manually test key user flows:
+      - Settings page tab navigation (/depot/settings?tab=notifications)
+      - Heatmap zone filtering (/depot/heatmap?zone=A1)
+      - Incidents page filtering (/depot/incidents?status=open&severity=critical)
+      - Navigation loading states appear and disappear correctly
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions)
+    - Confirm all tests still pass after fix (no regressions)
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
+
+- [ ] 4. Checkpoint - Ensure all tests pass
+  - Run full test suite: `npm run build` completes successfully
+  - Verify all 40+ pages are statically generated without errors
+  - Run development server: `npm run dev` works normally
+  - Manually test affected pages for runtime behavior preservation
+  - Check that loading indicators display during navigation
+  - Verify non-affected components remain unchanged
+  - If any issues arise, ask the user for clarification before proceeding

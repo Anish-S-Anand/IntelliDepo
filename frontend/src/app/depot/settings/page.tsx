@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Settings,
@@ -33,6 +33,14 @@ const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
 ];
 
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={<SettingsPageSkeleton />}>
+      <SettingsPageContent />
+    </Suspense>
+  );
+}
+
+function SettingsPageContent() {
   const searchParams = useSearchParams();
   const { user } = useAuthStore();
   const { theme, toggleTheme } = useTheme();
@@ -334,6 +342,27 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsPageSkeleton() {
+  return (
+    <div className="p-5 animate-pulse max-w-5xl">
+      <div className="route-skeleton-bar h-7 w-52 mb-4" />
+      <div className="route-skeleton-bar h-4 w-40 mb-6" />
+      <div className="flex gap-5 flex-col lg:flex-row">
+        <div className="lg:w-56 flex-shrink-0">
+          <div className="route-skeleton-bar h-64 rounded-lg" />
+        </div>
+        <div className="flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="route-skeleton-bar h-32 rounded-lg" />
+            ))}
+          </div>
         </div>
       </div>
     </div>

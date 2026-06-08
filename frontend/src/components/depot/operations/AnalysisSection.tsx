@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { Suspense, useState, useCallback, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Camera, AlertTriangle } from "lucide-react";
 import CameraListView from "./CameraListView";
@@ -13,6 +13,14 @@ interface AnalysisSectionProps {
 type ViewMode = "list" | "detail";
 
 export default function AnalysisSection({}: AnalysisSectionProps) {
+  return (
+    <Suspense fallback={<AnalysisSectionSkeleton />}>
+      <AnalysisSectionContent />
+    </Suspense>
+  );
+}
+
+function AnalysisSectionContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
@@ -113,5 +121,21 @@ export default function AnalysisSection({}: AnalysisSectionProps) {
       cameraName={selectedCameraName || selectedCameraId}
       onBack={handleBackToList}
     />
+  );
+}
+
+function AnalysisSectionSkeleton() {
+  return (
+    <div className="p-4 animate-pulse">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="route-skeleton-bar h-4 w-4 rounded" />
+        <div className="route-skeleton-bar h-4 w-48 rounded" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="route-skeleton-bar h-32 rounded-lg" />
+        ))}
+      </div>
+    </div>
   );
 }

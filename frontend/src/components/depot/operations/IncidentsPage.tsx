@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Radar, Shield, AlertTriangle, MapPin, Camera, X } from "lucide-react";
 import { SEV_COL, STA_COL } from "@/lib/depot-data";
@@ -128,6 +128,14 @@ return {
 };
 }
 export default function IncidentsPage() {
+  return (
+    <Suspense fallback={<IncidentsPageSkeleton />}>
+      <IncidentsPageContent />
+    </Suspense>
+  );
+}
+
+function IncidentsPageContent() {
   const searchParams = useSearchParams();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [rawIncidents, setRawIncidents] = useState<IncidentResponse[]>([]);
@@ -865,6 +873,30 @@ export default function IncidentsPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function IncidentsPageSkeleton() {
+  return (
+    <div className="p-3 sm:p-5 animate-pulse">
+      <div className="route-skeleton-bar h-7 w-52 mb-4" />
+      <div className="route-skeleton-bar h-4 w-40 mb-6" />
+      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="route-skeleton-bar h-24 rounded-lg" />
+        ))}
+      </div>
+      <div className="flex gap-2 mb-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="route-skeleton-bar h-8 w-24 rounded-lg" />
+        ))}
+      </div>
+      <div className="space-y-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="route-skeleton-bar h-24 rounded-lg" />
+        ))}
+      </div>
     </div>
   );
 }

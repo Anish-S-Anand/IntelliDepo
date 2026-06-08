@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   getZones,
@@ -115,6 +115,14 @@ function findReplayEntryInRange(
 }
 
 export default function HeatmapPage() {
+  return (
+    <Suspense fallback={<HeatmapPageSkeleton />}>
+      <HeatmapPageContent />
+    </Suspense>
+  );
+}
+
+function HeatmapPageContent() {
   const searchParams = useSearchParams();
   const zoneParam = searchParams.get("zone");
   const [zones, setZones] = useState<MergedZone[]>([]);
@@ -420,6 +428,18 @@ export default function HeatmapPage() {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function HeatmapPageSkeleton() {
+  return (
+    <div className="p-5 animate-pulse">
+      <div className="route-skeleton-bar h-7 w-48 mb-4" />
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
+        <div className="route-skeleton-bar h-[400px] rounded-lg" />
+        <div className="route-skeleton-bar h-[400px] rounded-lg" />
       </div>
     </div>
   );
