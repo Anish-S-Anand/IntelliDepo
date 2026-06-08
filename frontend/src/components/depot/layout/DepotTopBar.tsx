@@ -16,7 +16,7 @@ const CENTRAL_MANAGER_LOCATION_FILTER_STORAGE_KEY = "centralManagerLocationFilte
 type CentralManagerLocationFilterValue = "combined" | "WH_MUM" | "WH_BLR" | "WH_HYD";
 
 const CENTRAL_MANAGER_FILTER_OPTIONS = [
-  { value: "combined" as const, label: "Mumbai, Bengaluru, and Hyderabad (Combined)" },
+  { value: "combined" as const, label: "All warehouses" },
   { value: "WH_MUM" as const, label: "Mumbai" },
   { value: "WH_BLR" as const, label: "Bengaluru" },
   { value: "WH_HYD" as const, label: "Hyderabad" },

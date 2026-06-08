@@ -231,8 +231,8 @@ function WeatherWidget({ warehouseIds }: { warehouseIds: string[] }) {
   // Show loading state
   if (loading && entries.length === 0) {
     return (
-      <div className="flex items-center gap-2 rounded-[12px] border border-[#1E2F50] bg-[#0D1526] px-4 py-3">
-        <div className="text-[12px] text-[#8A9BBF]">Loading weather...</div>
+      <div className="flex items-center gap-3 rounded-[14px] border border-[#1E2F50] bg-[#0D1526] px-5 py-4">
+        <div className="text-[13px] font-semibold text-[#8A9BBF]">Loading weather...</div>
       </div>
     );
   }
@@ -240,8 +240,8 @@ function WeatherWidget({ warehouseIds }: { warehouseIds: string[] }) {
   // Show error state
   if (error && entries.length === 0) {
     return (
-      <div className="flex items-center gap-2 rounded-[12px] border border-[#F04A4A]/30 bg-[#F04A4A]/10 px-4 py-3">
-        <div className="text-[11px] text-[#F04A4A]">Weather unavailable</div>
+      <div className="flex items-center gap-3 rounded-[14px] border border-[#F04A4A]/30 bg-[#F04A4A]/10 px-5 py-4">
+        <div className="text-[13px] font-semibold text-[#F04A4A]">Weather unavailable</div>
       </div>
     );
   }
@@ -253,25 +253,25 @@ function WeatherWidget({ warehouseIds }: { warehouseIds: string[] }) {
   const advisory = primary ? getWeatherAdvisory(primary.temp, primary.code ?? 0) : null;
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-col items-end gap-2">
+      <div className="flex flex-wrap items-center gap-3">
         {entries.map((w) => w && (
           <div
             key={w.city}
-            className="flex items-center gap-2 rounded-[8px] border border-[#1E2F50] bg-[#0D1526] px-2.5 py-1.5"
+            className="min-w-[150px] flex items-center gap-3 rounded-[12px] border border-[#1E2F50] bg-[#0D1526] px-4 py-3"
           >
-            <span className="text-[18px] leading-none">{w.emoji}</span>
+            <span className="text-[24px] leading-none">{w.emoji}</span>
             <div>
-              <div className="text-[9px] font-bold text-[#8A9BBF]">{w.city}</div>
-              <div className="text-[14px] font-extrabold text-[#E8EDF8] leading-tight">
-                {w.temp}°C <span className="text-[10px] font-semibold text-[#4E6090]">{w.label}</span>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8A9BBF]">{w.city}</div>
+              <div className="text-[18px] font-extrabold text-[#E8EDF8] leading-tight">
+                {w.temp}°C <span className="text-[12px] font-semibold text-[#4E6090]">{w.label}</span>
               </div>
             </div>
           </div>
         ))}
       </div>
       {advisory && (
-        <div className="text-[9px] font-semibold px-1" style={{ color: advisory.color }}>
+        <div className="text-[11px] font-semibold px-2" style={{ color: advisory.color }}>
           {advisory.text}
         </div>
       )}

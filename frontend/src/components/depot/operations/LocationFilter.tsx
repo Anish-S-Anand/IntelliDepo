@@ -15,7 +15,7 @@ type FilterOption = {
 };
 
 const FILTER_OPTIONS: FilterOption[] = [
-  { value: "combined", label: "Hyderabad and Bengaluru (Combined)" },
+  { value: "combined", label: "All warehouses" },
   { value: "WH_HYD", label: "Hyderabad" },
   { value: "WH_BLR", label: "Bengaluru" },
 ];
