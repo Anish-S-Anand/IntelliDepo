@@ -41,6 +41,37 @@ import {
 import { getUnifiedDepotSource } from "@/services/depotUnifiedSource";
 import { useDepotCommandEvents } from "@/hooks/useDepotCommandEvents";
 import { DEPOT_WAREHOUSE_ORDER, DEPOT_WAREHOUSE_REGISTRY } from "@/lib/depot-camera-registry";
+import { LocationFilter, loadFilterFromStorage, saveFilterToStorage } from "./LocationFilter";
+
+// Central Manager localStorage utilities
+const CENTRAL_MANAGER_LOCATION_FILTER_STORAGE_KEY = "centralManagerLocationFilter";
+
+type CentralManagerLocationFilterValue = "combined" | "WH_MUM" | "WH_BLR" | "WH_HYD";
+
+function loadCentralManagerFilterFromStorage(): CentralManagerLocationFilterValue {
+  try {
+    const stored = localStorage.getItem(CENTRAL_MANAGER_LOCATION_FILTER_STORAGE_KEY);
+    if (stored === "WH_MUM" || stored === "WH_BLR" || stored === "WH_HYD" || stored === "combined") {
+      return stored;
+    }
+    if (stored !== null) {
+      console.warn(
+        `Invalid central manager location filter value in storage: "${stored}". Falling back to "combined".`
+      );
+    }
+  } catch (error) {
+    console.warn("Failed to load central manager location filter from storage:", error);
+  }
+  return "combined";
+}
+
+function saveCentralManagerFilterToStorage(value: CentralManagerLocationFilterValue): void {
+  try {
+    localStorage.setItem(CENTRAL_MANAGER_LOCATION_FILTER_STORAGE_KEY, value);
+  } catch (error) {
+    console.warn("Failed to save central manager location filter to storage:", error);
+  }
+}
 
 // ── Weather ──────────────────────────────────────────────────────────────────
 const WAREHOUSE_COORDS: Record<string, { lat: number; lon: number; city: string }> = {
@@ -50,6 +81,34 @@ const WAREHOUSE_COORDS: Record<string, { lat: number; lon: number; city: string 
 };
 
 const WMO_LABELS: Record<number, { label: string; emoji: string }> = {
+  0:  { label: "Clear Sky",       emoji: "☀️" },
+  1:  { label: "Mostly Clear",    emoji: "🌤️" },
+  2:  { label: "Partly Cloudy",   emoji: "⛅" },
+  3:  { label: "Mostly Cloudy",   emoji: "☁️" },
+  45: { label: "Foggy",           emoji: "🌫️" },
+  48: { label: "Icy Fog",         emoji: "🌫️" },
+  51: { label: "Light Drizzle",   emoji: "🌦️" },
+  53: { label: "Drizzle",         emoji: "🌦️" },
+  55: { label: "Heavy Drizzle",   emoji: "🌧️" },
+  56: { label: "Freezing Drizzle",emoji: "🌧️" },
+  57: { label: "Heavy Frz Drizzle",emoji: "🌧️" },
+  61: { label: "Light Rain",      emoji: "🌧️" },
+  63: { label: "Moderate Rain",   emoji: "🌧️" },
+  65: { label: "Heavy Rain",      emoji: "🌧️" },
+  66: { label: "Freezing Rain",   emoji: "🌧️" },
+  67: { label: "Heavy Frz Rain",  emoji: "🌧️" },
+  71: { label: "Light Snow",      emoji: "🌨️" },
+  73: { label: "Moderate Snow",   emoji: "❄️" },
+  75: { label: "Heavy Snow",      emoji: "❄️" },
+  77: { label: "Snow Grains",     emoji: "🌨️" },
+  80: { label: "Rain Showers",    emoji: "🌦️" },
+  81: { label: "Moderate Showers",emoji: "🌧️" },
+  82: { label: "Heavy Showers",   emoji: "⛈️" },
+  85: { label: "Snow Showers",    emoji: "🌨️" },
+  86: { label: "Heavy Snow Showers",emoji: "❄️" },
+  95: { label: "Thunderstorm",    emoji: "⛈️" },
+  96: { label: "Thunderstorm + Hail",emoji: "⛈️" },
+  99: { label: "Heavy Thunderstorm",emoji: "⛈️" },
   0:  { label: "Clear Sky",       emoji: "☀️" },
   1:  { label: "Mostly Clear",    emoji: "🌤️" },
   2:  { label: "Partly Cloudy",   emoji: "⛅" },
@@ -91,45 +150,76 @@ function getWeatherAdvisory(temp: number, weatherCode: number): { text: string; 
   if (weatherCode === 3) return { text: "☁️ Overcast — good working conditions, no special measures needed.", color: "#22D3A1" };
   if (weatherCode === 2) return { text: "⛅ Partly cloudy — normal operations, monitor for afternoon showers.", color: "#22D3A1" };
   if (temp > 38) return { text: "🔥 Extreme heat — shift loading to early morning/evening, shut Zone D during 12–3pm, alert supervisors.", color: "#F04A4A" };
+  if (weatherCode >= 95) return { text: "⛈️ Thunderstorm — halt all outdoor ops, no vehicle movement, lock gates.", color: "#F04A4A" };
+  if (weatherCode >= 80) return { text: "🌧️ Heavy showers — cover open stockpiles, suspend yard ops, trucks to covered bays only.", color: "#F04A4A" };
+  if (weatherCode >= 61) return { text: "🌧️ Rain — cover open bag stockpiles, add 15 min SLA buffer, slow-speed yard protocol.", color: "#F5A623" };
+  if (weatherCode >= 51) return { text: "🌦️ Drizzle — inspect bags for moisture before dispatch, monitor gate LPR confidence.", color: "#F5A623" };
+  if (weatherCode === 45 || weatherCode === 48) return { text: "🌫️ Fog — LPR camera confidence reduced, manual gate verification required.", color: "#F5A623" };
+  if (weatherCode === 3) return { text: "☁️ Overcast — good working conditions, no special measures needed.", color: "#22D3A1" };
+  if (weatherCode === 2) return { text: "⛅ Partly cloudy — normal operations, monitor for afternoon showers.", color: "#22D3A1" };
+  if (temp > 38) return { text: "🔥 Extreme heat — shift loading to early morning/evening, shut Zone D during 12–3pm, alert supervisors.", color: "#F04A4A" };
   if (temp > 32) return { text: "☀️ Hot — mandatory shade breaks every 90 min, avoid heavy lifts 12–3pm.", color: "#F5A623" };
   if (temp > 25) return { text: "🌤️ Warm — push inbound early, increase water breaks, check bay ventilation.", color: "#22D3A1" };
   if (temp >= 15) return { text: "✅ Ideal conditions — normal operations, no special measures needed.", color: "#22D3A1" };
+  return { text: "🧊 Cold — inspect bags for condensation on removal from cold storage.", color: "#5B9BF5" };
   return { text: "🧊 Cold — inspect bags for condensation on removal from cold storage.", color: "#5B9BF5" };
 }
 
 function WeatherWidget({ warehouseIds }: { warehouseIds: string[] }) {
   const [weatherMap, setWeatherMap] = useState<Record<string, WeatherData & { code?: number }>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
-      const results = await Promise.allSettled(
-        warehouseIds.map(async (id) => {
-          const coords = WAREHOUSE_COORDS[id];
-          if (!coords) return { id, data: null };
-          const ts = Date.now();
-          const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,weather_code,windspeed_10m&timezone=Asia%2FKolkata&forecast_days=1&_t=${ts}`;
-          const res = await fetch(url);
-          const raw = await res.json();
-          const code: number = raw.current?.weather_code ?? raw.current?.weathercode ?? 0;
-          const wmo = WMO_LABELS[code] ?? { label: "Unknown", emoji: "🌡️" };
-          return {
-            id,
-            data: {
-              temp: Math.round(raw.current?.temperature_2m ?? 0),
-              label: wmo.label,
-              emoji: wmo.emoji,
-              wind: Math.round(raw.current?.windspeed_10m ?? 0),
-              city: coords.city,
-              code,
-            },
-          };
-        })
-      );
-      const map: Record<string, WeatherData & { code?: number }> = {};
-      for (const r of results) {
-        if (r.status === "fulfilled" && r.value.data) map[r.value.id] = r.value.data;
+      try {
+        setLoading(true);
+        setError(null);
+        const results = await Promise.allSettled(
+          warehouseIds.map(async (id) => {
+            const coords = WAREHOUSE_COORDS[id];
+            if (!coords) return { id, data: null };
+            const ts = Date.now();
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,weather_code,windspeed_10m&timezone=Asia%2FKolkata&forecast_days=1&_t=${ts}`;
+            console.log(`Fetching weather for ${id} (${coords.city}):`, url);
+            const res = await fetch(url);
+            if (!res.ok) {
+              console.error(`Weather API error for ${id}:`, res.status, res.statusText);
+              throw new Error(`HTTP ${res.status}`);
+            }
+            const raw = await res.json();
+            console.log(`Weather data for ${id}:`, raw);
+            const code: number = raw.current?.weather_code ?? raw.current?.weathercode ?? 0;
+            const wmo = WMO_LABELS[code] ?? { label: "Unknown", emoji: "🌡️" };
+            return {
+              id,
+              data: {
+                temp: Math.round(raw.current?.temperature_2m ?? 0),
+                label: wmo.label,
+                emoji: wmo.emoji,
+                wind: Math.round(raw.current?.windspeed_10m ?? 0),
+                city: coords.city,
+                code,
+              },
+            };
+          })
+        );
+        const map: Record<string, WeatherData & { code?: number }> = {};
+        for (const r of results) {
+          if (r.status === "fulfilled" && r.value.data) {
+            map[r.value.id] = r.value.data;
+          } else if (r.status === "rejected") {
+            console.error("Weather fetch rejected:", r.reason);
+          }
+        }
+        console.log("Final weather map:", map);
+        setWeatherMap(map);
+        setLoading(false);
+      } catch (err) {
+        console.error("Weather load error:", err);
+        setError(err instanceof Error ? err.message : "Failed to load weather");
+        setLoading(false);
       }
-      setWeatherMap(map);
     };
     void load();
     const interval = setInterval(() => void load(), 5 * 60 * 1000);
@@ -137,6 +227,25 @@ function WeatherWidget({ warehouseIds }: { warehouseIds: string[] }) {
   }, [warehouseIds.join(",")]);
 
   const entries = warehouseIds.map((id) => weatherMap[id]).filter(Boolean) as (WeatherData & { code?: number })[];
+  
+  // Show loading state
+  if (loading && entries.length === 0) {
+    return (
+      <div className="flex items-center gap-2 rounded-[12px] border border-[#1E2F50] bg-[#0D1526] px-4 py-3">
+        <div className="text-[12px] text-[#8A9BBF]">Loading weather...</div>
+      </div>
+    );
+  }
+  
+  // Show error state
+  if (error && entries.length === 0) {
+    return (
+      <div className="flex items-center gap-2 rounded-[12px] border border-[#F04A4A]/30 bg-[#F04A4A]/10 px-4 py-3">
+        <div className="text-[11px] text-[#F04A4A]">Weather unavailable</div>
+      </div>
+    );
+  }
+  
   if (entries.length === 0) return null;
 
   // Use the first (primary) warehouse for the advisory
@@ -144,25 +253,25 @@ function WeatherWidget({ warehouseIds }: { warehouseIds: string[] }) {
   const advisory = primary ? getWeatherAdvisory(primary.temp, primary.code ?? 0) : null;
 
   return (
-    <div className="flex flex-col items-end gap-1.5">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex flex-wrap items-center gap-1.5">
         {entries.map((w) => w && (
           <div
             key={w.city}
-            className="flex items-center gap-3 rounded-[12px] border border-[#1E2F50] bg-[#0D1526] px-4 py-3"
+            className="flex items-center gap-2 rounded-[8px] border border-[#1E2F50] bg-[#0D1526] px-2.5 py-1.5"
           >
-            <span className="text-[32px] leading-none">{w.emoji}</span>
+            <span className="text-[18px] leading-none">{w.emoji}</span>
             <div>
-              <div className="text-[12px] font-bold text-[#8A9BBF]">{w.city}</div>
-              <div className="text-[20px] font-extrabold text-[#E8EDF8] leading-tight">
-                {w.temp}°C <span className="text-[13px] font-semibold text-[#4E6090]">{w.label}</span>
+              <div className="text-[9px] font-bold text-[#8A9BBF]">{w.city}</div>
+              <div className="text-[14px] font-extrabold text-[#E8EDF8] leading-tight">
+                {w.temp}°C <span className="text-[10px] font-semibold text-[#4E6090]">{w.label}</span>
               </div>
             </div>
           </div>
         ))}
       </div>
       {advisory && (
-        <div className="text-[11px] font-semibold px-1" style={{ color: advisory.color }}>
+        <div className="text-[9px] font-semibold px-1" style={{ color: advisory.color }}>
           {advisory.text}
         </div>
       )}
@@ -488,9 +597,56 @@ function GateSelector({
 export default function CommandPage({ forcedPersona }: { forcedPersona?: CommandPersona } = {}) {
   const user = useAuthStore((state) => state.user);
   const personaKey = forcedPersona ?? normalizeCommandPersona(user?.role);
+  
+  // LocationFilter state for regional managers - initialize directly from localStorage
+  const [locationFilter, setLocationFilter] = useState<"combined" | "WH_HYD" | "WH_BLR">(() => {
+    if (typeof window !== "undefined" && personaKey === "regional_manager") {
+      return loadFilterFromStorage();
+    }
+    return "combined";
+  });
+  
+  // Central Manager LocationFilter state - initialize from localStorage
+  const [centralLocationFilter, setCentralLocationFilter] = useState<"combined" | "WH_MUM" | "WH_BLR" | "WH_HYD">(() => {
+    if (typeof window !== "undefined" && personaKey === "central_manager") {
+      return loadCentralManagerFilterFromStorage();
+    }
+    return "combined";
+  });
+  
+  // Filter-to-warehouse mapping for regional managers
+  const FILTER_TO_WAREHOUSE_IDS: Record<"combined" | "WH_HYD" | "WH_BLR", RoleWarehouseId[]> = {
+    combined: ["WH_HYD", "WH_BLR"],
+    WH_HYD: ["WH_HYD"],
+    WH_BLR: ["WH_BLR"],
+  };
+  
+  // Filter-to-warehouse mapping for central managers
+  const CENTRAL_MANAGER_FILTER_TO_WAREHOUSE_IDS: Record<"combined" | "WH_MUM" | "WH_BLR" | "WH_HYD", RoleWarehouseId[]> = {
+    combined: ["WH_MUM", "WH_BLR", "WH_HYD"],
+    WH_MUM: ["WH_MUM"],
+    WH_BLR: ["WH_BLR"],
+    WH_HYD: ["WH_HYD"],
+  };
+  
   const forcedWarehouseIds = useMemo(
-    () => scopedWarehouseIdsForLogin(user?.email, personaKey),
-    [personaKey, user?.email],
+    () => {
+      // For regional managers, use locationFilter to determine scope
+      if (personaKey === "regional_manager") {
+        const ids = FILTER_TO_WAREHOUSE_IDS[locationFilter];
+        console.log("CommandPage - locationFilter:", locationFilter, "forcedWarehouseIds:", ids);
+        return ids;
+      }
+      // For central managers, use centralLocationFilter to determine scope
+      if (personaKey === "central_manager") {
+        const ids = CENTRAL_MANAGER_FILTER_TO_WAREHOUSE_IDS[centralLocationFilter];
+        console.log("CommandPage - centralLocationFilter:", centralLocationFilter, "forcedWarehouseIds:", ids);
+        return ids;
+      }
+      // For other roles, use existing logic
+      return scopedWarehouseIdsForLogin(user?.email, personaKey);
+    },
+    [personaKey, user?.email, locationFilter, centralLocationFilter],
   );
   const [snapshot, setSnapshot] = useState<CommandCenterSnapshot | null>(null);
   const [hierarchy, setHierarchy] = useState<DepotHierarchy | null>(null);
@@ -511,9 +667,18 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
   const [contactMsg, setContactMsg] = useState("");
   const [contactChannel, setContactChannel] = useState("in_app");
 
+  // Debug: Log personaKey to verify role
+  console.log("CommandPage - personaKey:", personaKey, "user role:", user?.role);
+
   const showFeedback = (msg: string, ok = true) => {
     setFeedback({ msg, ok });
     window.setTimeout(() => setFeedback(null), 3500);
+  };
+  
+  // Handle location filter change
+  const handleFilterChange = (value: "combined" | "WH_HYD" | "WH_BLR") => {
+    setLocationFilter(value);
+    saveFilterToStorage(value);
   };
 
   const toggleBroadcastChannel = (channel: string) => {
@@ -675,13 +840,15 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
             {persona.subtitle}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col items-end gap-3">
           <WeatherWidget warehouseIds={forcedWarehouseIds} />
-          {feedback && (
-            <span className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${feedback.ok ? "bg-[#22D3A1]/15 text-[#22D3A1]" : "bg-[#F04A4A]/15 text-[#F04A4A]"}`}>
-              {feedback.msg}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {feedback && (
+              <span className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${feedback.ok ? "bg-[#22D3A1]/15 text-[#22D3A1]" : "bg-[#F04A4A]/15 text-[#F04A4A]"}`}>
+                {feedback.msg}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

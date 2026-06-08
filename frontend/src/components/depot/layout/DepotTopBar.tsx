@@ -1,20 +1,97 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { Bell, RefreshCw, Settings, User, Clock, LogOut, ChevronDown, Shield, Menu } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { getAllActiveAlerts } from "@/services/depotVision";
 import { getPerimeterAlertCount } from "@/services/depotPerimeter";
+import { LocationFilter, loadFilterFromStorage, saveFilterToStorage } from "../operations/LocationFilter";
+
+// Central Manager configuration
+const CENTRAL_MANAGER_LOCATION_FILTER_STORAGE_KEY = "centralManagerLocationFilter";
+
+type CentralManagerLocationFilterValue = "combined" | "WH_MUM" | "WH_BLR" | "WH_HYD";
+
+const CENTRAL_MANAGER_FILTER_OPTIONS = [
+  { value: "combined" as const, label: "Mumbai, Bengaluru, and Hyderabad (Combined)" },
+  { value: "WH_MUM" as const, label: "Mumbai" },
+  { value: "WH_BLR" as const, label: "Bengaluru" },
+  { value: "WH_HYD" as const, label: "Hyderabad" },
+];
+
+function loadCentralManagerFilterFromStorage(): CentralManagerLocationFilterValue {
+  try {
+    const stored = localStorage.getItem(CENTRAL_MANAGER_LOCATION_FILTER_STORAGE_KEY);
+    if (stored === "WH_MUM" || stored === "WH_BLR" || stored === "WH_HYD" || stored === "combined") {
+      return stored;
+    }
+    if (stored !== null) {
+      console.warn(
+        `Invalid central manager location filter value in storage: "${stored}". Falling back to "combined".`
+      );
+    }
+  } catch (error) {
+    console.warn("Failed to load central manager location filter from storage:", error);
+  }
+  return "combined";
+}
+
+function saveCentralManagerFilterToStorage(value: CentralManagerLocationFilterValue): void {
+  try {
+    localStorage.setItem(CENTRAL_MANAGER_LOCATION_FILTER_STORAGE_KEY, value);
+  } catch (error) {
+    console.warn("Failed to save central manager location filter to storage:", error);
+  }
+}
 
 export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => void }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, logout } = useAuthStore();
   const [profileOpen, setProfileOpen] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
+  const [locationFilter, setLocationFilter] = useState<"combined" | "WH_HYD" | "WH_BLR" | "WH_MUM">("combined");
+  const [centralLocationFilter, setCentralLocationFilter] = useState<"combined" | "WH_MUM" | "WH_BLR" | "WH_HYD">("combined");
   const profileRef = useRef<HTMLDivElement>(null);
+
+  const normalizedRole = (user?.role ?? "").toLowerCase().replace(/\s+/g, "_");
+  const isRegionalManager = normalizedRole === "regional_manager" || normalizedRole.includes("regional");
+  const isCentralManager = normalizedRole === "central_manager" || normalizedRole.includes("central");
+  const isOnRegionalCommandPage = pathname?.includes("/depot/command/regional");
+  const isOnCentralCommandPage = pathname?.includes("/depot/command/central");
+
+  // Load location filter from localStorage on mount
+  useEffect(() => {
+    if (isRegionalManager) {
+      setLocationFilter(loadFilterFromStorage());
+    }
+    if (isCentralManager) {
+      setCentralLocationFilter(loadCentralManagerFilterFromStorage());
+    }
+  }, [isRegionalManager, isCentralManager]);
+
+  // Handle regional manager location filter change
+  const handleLocationFilterChange = (value: "combined" | "WH_HYD" | "WH_BLR" | "WH_MUM") => {
+    setLocationFilter(value);
+    saveFilterToStorage(value);
+    // Trigger page reload to apply filter
+    if (isOnRegionalCommandPage) {
+      window.location.reload();
+    }
+  };
+  
+  // Handle central manager location filter change
+  const handleCentralLocationFilterChange = (value: "combined" | "WH_MUM" | "WH_BLR" | "WH_HYD") => {
+    setCentralLocationFilter(value);
+    saveCentralManagerFilterToStorage(value);
+    // Trigger page reload to apply filter
+    if (isOnCentralCommandPage) {
+      window.location.reload();
+    }
+  };
 
   // Fetch live alert count for the bell badge, deferred so it doesn't compete
   // with the page's own data fetching on navigation
@@ -57,7 +134,6 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
   const initials = user?.full_name
     ? user.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "--";
-  const normalizedRole = (user?.role ?? "").toLowerCase().replace(/\s+/g, "_");
   const commandHomeHref = normalizedRole === "warehouse_manager" || normalizedRole.includes("warehouse")
     ? "/depot/command/warehouse"
     : normalizedRole === "regional_manager" || normalizedRole.includes("regional")
@@ -149,6 +225,25 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
         <span className="w-1.5 h-1.5 rounded-full bg-[#22D3A1] animate-pulse" />
         LIVE
       </div>
+
+      {/* Location Filter — regional_manager only, shown on command page */}
+      {isRegionalManager && isOnRegionalCommandPage && (
+        <LocationFilter
+          value={locationFilter}
+          onChange={handleLocationFilterChange}
+          disabled={false}
+        />
+      )}
+      
+      {/* Location Filter — central_manager only, shown on central command page */}
+      {isCentralManager && isOnCentralCommandPage && (
+        <LocationFilter
+          value={centralLocationFilter}
+          onChange={handleCentralLocationFilterChange}
+          disabled={false}
+          options={CENTRAL_MANAGER_FILTER_OPTIONS}
+        />
+      )}
 
       {/* Theme Toggle */}
       <ThemeToggle />
