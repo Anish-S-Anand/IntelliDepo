@@ -121,7 +121,7 @@ export function IntelliLanding() {
               Fidelis
             </div>
             <div style={{ fontSize: 11, color: textMuted, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>
-              IntelliDepot TM
+              IntelliDepot
             </div>
           </div>
         </button>
@@ -496,7 +496,7 @@ export function IntelliLanding() {
               />
             </div>
             <span style={{ fontSize: 13, color: textMuted }}>
-              Fidelis Platform - IntelliDepot TM - {new Date().getFullYear()}
+              Fidelis Platform - IntelliDepot - {new Date().getFullYear()}
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: textMuted }}>

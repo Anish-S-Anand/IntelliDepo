@@ -96,7 +96,9 @@ function ModelStatus() {
 
 function CameraGridInner() {
   const user = useAuthStore((state) => state.user);
+  type RegionFilter = "All" | "Bengaluru" | "Hyderabad";
   const [detections, setDetections] = useState<Record<number, DetectionCounts>>({});
+  const [regionFilter, setRegionFilter] = useState<RegionFilter>("All");
 
   const warehouseIds = useMemo(
     () => scopedWarehouseIds(user?.role, user?.email, user?.location),
@@ -113,9 +115,20 @@ function CameraGridInner() {
     [warehouseIds],
   );
 
-  const cameras = useMemo(() => cameraGroups.flatMap((group) => group.cameras), [cameraGroups]);
-  const overviewMode = cameraGroups.length > 1;
-  const overviewColumns = cameraGroups.length > 2 ? "grid-cols-6" : "grid-cols-4";
+  const filteredCameraGroups = useMemo(
+    () =>
+      cameraGroups.filter((group) => {
+        if (regionFilter === "All") return true;
+        if (regionFilter === "Bengaluru") return group.warehouseId === "WH_BLR";
+        if (regionFilter === "Hyderabad") return group.warehouseId === "WH_HYD";
+        return true;
+      }),
+    [cameraGroups, regionFilter],
+  );
+
+  const cameras = useMemo(() => filteredCameraGroups.flatMap((group) => group.cameras), [filteredCameraGroups]);
+  const overviewMode = filteredCameraGroups.length > 1;
+  const overviewColumns = filteredCameraGroups.length > 2 ? "grid-cols-6" : "grid-cols-4";
 
   const handleDetectionUpdate = useCallback(
     (cameraIndex: number) =>
@@ -157,13 +170,27 @@ function CameraGridInner() {
           <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] text-white/60">
             {activeCameras} feeds
           </span>
+          <label htmlFor="region-filter" className="sr-only">Camera region</label>
+          <div className="relative">
+            <select
+              id="region-filter"
+              value={regionFilter}
+              onChange={(event) => setRegionFilter(event.target.value as RegionFilter)}
+              className="rounded border border-white/10 bg-[#09101a] px-3 py-1.5 pr-8 text-xs font-semibold text-white outline-none transition hover:border-white/20"
+            >
+              <option value="All">All</option>
+              <option value="Bengaluru">Bengaluru</option>
+              <option value="Hyderabad">Hyderabad</option>
+            </select>
+            <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[11px] text-white/70">▾</span>
+          </div>
         </div>
         <ModelStatus />
       </div>
 
       {overviewMode && (
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {cameraGroups.map((group) => (
+          {filteredCameraGroups.map((group) => (
             <span key={group.warehouseId} className="rounded bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-white/60">
               {group.label}: {group.cameras.length}
             </span>
