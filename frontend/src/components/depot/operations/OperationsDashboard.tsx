@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { THROUGHPUT, DAYS } from "@/lib/depot-data";
 import { useAuthStore } from "@/stores/authStore";
 import { getAllActiveAlerts, type UnifiedAlert } from "@/services/depotVision";
@@ -71,6 +71,14 @@ export default function OperationsDashboard() {
   const openIncidents = incidents.filter((i) => i.status === "open" || i.status === "escalated").length;
   const totalAlerts = visionAlerts.length + breachCount;
   const maxThroughput = Math.max(...THROUGHPUT);
+
+  const todayIndex = useMemo(() => ((new Date().getDay() + 6) % 7), []); // map JS getDay() (0=Sun) to THROUGHPUT index (0=Mon)
+  const [animateBars, setAnimateBars] = useState(false);
+  useEffect(() => {
+    // Trigger the grow animation after mount
+    const t = window.setTimeout(() => setAnimateBars(true), 30);
+    return () => clearTimeout(t);
+  }, []);
 
   // Counting accuracy from real sessions
   const totalCounted = countSessions.reduce((s, c) => s + c.total_counted, 0);
@@ -178,14 +186,16 @@ export default function OperationsDashboard() {
           <div className="flex items-end gap-2 h-[170px] px-2">
             {THROUGHPUT.map((v, i) => {
               const h = Math.round((v / maxThroughput) * 150);
-              const isHighlight = i === 4;
+              const isHighlight = i === todayIndex;
               return (
                 <div key={i} className="flex-1 flex flex-col items-center gap-1">
                   <span className="text-[8px] text-[#8A9BBF]">{(v / 1000).toFixed(1)}k</span>
                   <div
                     className="w-full rounded-t transition-all"
                     style={{
-                      height: h,
+                      height: animateBars ? h : 0,
+                      transition: `height 700ms cubic-bezier(.2,.8,.2,1)`,
+                      transitionDelay: `${i * 80}ms`,
                       background: isHighlight
                         ? "linear-gradient(to bottom, #FF7A42, rgba(255,122,66,0.4))"
                         : "linear-gradient(to bottom, rgba(229,82,26,0.9), rgba(229,82,26,0.3))",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { getUnifiedDepotSource, type UnifiedDepotSource, ZONE_SEED, scopedWarehouseIdsForUser } from "@/services/depotUnifiedSource";
@@ -407,6 +407,13 @@ export default function ExecutiveDashboard() {
   // Warehouse role: 220px. Regional/central (8+ zones): scale up so chart fills the taller zone card
   const CHART_H = ZONES.length <= 4 ? 220 : Math.max(380, ZONES.length * 38);
 
+  const todayIndex = useMemo(() => ((new Date().getDay() + 6) % 7), []); // map JS getDay() to DAYS index (Mon=0)
+  const [animateBars, setAnimateBars] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setAnimateBars(true), 30);
+    return () => clearTimeout(t);
+  }, []);
+
   const cardStyle: React.CSSProperties = {
     backgroundColor: "var(--bg-card)",
     border: "1px solid var(--border-card)",
@@ -497,9 +504,9 @@ export default function ExecutiveDashboard() {
               style={{ minWidth: 320, minHeight: CHART_H + 52 }}
             >
               {weekly.map((day, i) => {
-                const eH   = Math.max(8, Math.round((day.enter / MAX_BAR) * CHART_H));
-                const xH   = Math.max(8, Math.round((day.exit  / MAX_BAR) * CHART_H));
-                const peak = i === 4;
+                  const eH   = Math.max(8, Math.round((day.enter / MAX_BAR) * CHART_H));
+                  const xH   = Math.max(8, Math.round((day.exit  / MAX_BAR) * CHART_H));
+                  const peak = i === todayIndex;
                 return (
                   <div key={i} className="flex flex-col items-center gap-1">
                     <div className="flex items-end gap-[5px]" style={{ height: CHART_H }}>
@@ -508,27 +515,33 @@ export default function ExecutiveDashboard() {
                         <span className="text-[10px] font-bold" style={{ color: peak ? "#E5521A" : "var(--text-muted)" }}>
                           {day.enter}
                         </span>
-                        <div style={{
-                          width: ZONES.length <= 4 ? "clamp(16px,2.4vw,28px)" : "clamp(22px,3.2vw,44px)", height: eH,
-                          borderRadius: "4px 4px 0 0",
-                          background: peak
-                            ? "linear-gradient(to bottom,#FF7A42,rgba(255,122,66,0.55))"
-                            : "linear-gradient(to bottom,rgba(229,82,26,0.92),rgba(229,82,26,0.38))",
-                          filter: peak ? "drop-shadow(0 0 6px rgba(229,82,26,0.55))" : undefined,
-                        }} />
+                          <div style={{
+                            width: ZONES.length <= 4 ? "clamp(16px,2.4vw,28px)" : "clamp(22px,3.2vw,44px)",
+                            height: animateBars ? eH : 0,
+                            transition: "height 700ms cubic-bezier(.2,.8,.2,1)",
+                            transitionDelay: `${i * 80}ms`,
+                            borderRadius: "4px 4px 0 0",
+                            background: peak
+                              ? "linear-gradient(to bottom,#FF7A42,rgba(255,122,66,0.55))"
+                              : "linear-gradient(to bottom,rgba(229,82,26,0.92),rgba(229,82,26,0.38))",
+                            filter: peak ? "drop-shadow(0 0 6px rgba(229,82,26,0.55))" : undefined,
+                          }} />
                       </div>
                       {/* Out bar */}
                       <div className="flex flex-col items-center justify-end gap-[3px]" style={{ height: CHART_H }}>
                         <span className="text-[10px] font-bold" style={{ color: peak ? "var(--color-info)" : "var(--text-faint)" }}>
                           {day.exit}
                         </span>
-                        <div style={{
-                          width: ZONES.length <= 4 ? "clamp(16px,2.4vw,28px)" : "clamp(22px,3.2vw,44px)", height: xH,
-                          borderRadius: "4px 4px 0 0",
-                          background: peak
-                            ? "linear-gradient(to bottom,rgba(91,155,245,1),rgba(91,155,245,0.5))"
-                            : "linear-gradient(to bottom,rgba(91,155,245,0.85),rgba(91,155,245,0.28))",
-                        }} />
+                          <div style={{
+                            width: ZONES.length <= 4 ? "clamp(16px,2.4vw,28px)" : "clamp(22px,3.2vw,44px)",
+                            height: animateBars ? xH : 0,
+                            transition: "height 700ms cubic-bezier(.2,.8,.2,1)",
+                            transitionDelay: `${i * 80 + 40}ms`,
+                            borderRadius: "4px 4px 0 0",
+                            background: peak
+                              ? "linear-gradient(to bottom,rgba(91,155,245,1),rgba(91,155,245,0.5))"
+                              : "linear-gradient(to bottom,rgba(91,155,245,0.85),rgba(91,155,245,0.28))",
+                          }} />
                       </div>
                     </div>
                     <span className="text-[10px] sm:text-[11px]"
