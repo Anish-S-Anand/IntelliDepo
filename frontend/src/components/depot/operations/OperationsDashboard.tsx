@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { THROUGHPUT, DAYS } from "@/lib/depot-data";
 import { useAuthStore } from "@/stores/authStore";
 import { getAllActiveAlerts, type UnifiedAlert } from "@/services/depotVision";
@@ -96,6 +97,18 @@ export default function OperationsDashboard() {
     { label: "Open Incidents", value: String(openIncidents), trend: `${incidents.filter((i) => i.severity === "critical").length} critical`, color: openIncidents > 0 ? "#F04A4A" : "#22D3A1" },
   ];
 
+  const router = useRouter();
+  const [hoveredKpi, setHoveredKpi] = useState<number | null>(null);
+
+  const KPI_ROUTE_MAP: Record<string, string> = {
+    "Bag Count Accuracy": "/depot/counting",
+    "FIFO Compliance": "/depot/inventory",
+    "Avg Response Time": "/depot/incidents",
+    "Depot Occupancy": "/depot/heatmap",
+    "Active Alerts": "/depot/vision",
+    "Open Incidents": "/depot/incidents",
+  };
+
   const HEALTH_METRICS = [
     { label: "Active Cameras", value: `${capacityStatus.length > 0 ? "Live" : "—"}`, pct: 86, color: "#22D3A1" },
     { label: "Depot Health", value: avgCapacity > 0 ? `${100 - Math.max(0, avgCapacity - 80)}%` : "—", pct: avgCapacity > 0 ? 100 - Math.max(0, avgCapacity - 80) : 0, color: "#22D3A1" },
@@ -151,24 +164,46 @@ export default function OperationsDashboard() {
 
       {/* KPI Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-5">
-        {kpiValues.map((kpi) => (
-          <div
-            key={kpi.label}
-            className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 relative overflow-hidden transition-all hover:border-[#E5521A]/30 hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(229,82,26,0.1)] group"
-          >
-            <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full opacity-[0.06]" style={{ background: kpi.color }} />
-            <div className="text-[9px] font-bold tracking-[0.08em] text-[#4E6090] uppercase mb-2">
-              {kpi.label}
-            </div>
-            <div className="text-[28px] font-extrabold leading-none" style={{ color: kpi.color, fontFamily: "'Syne', sans-serif" }}>
-              {kpi.value}
-            </div>
-            <div className="text-[10px] mt-1" style={{ color: kpi.color }}>
-              {kpi.trend}
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#E5521A] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-        ))}
+        {kpiValues.map((kpi, idx) => {
+          const route = KPI_ROUTE_MAP[kpi.label];
+          return (
+            <button
+              key={kpi.label}
+              type="button"
+              onClick={() => route && router.push(route)}
+              onMouseEnter={() => setHoveredKpi(idx)}
+              onMouseLeave={() => setHoveredKpi(null)}
+              className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 relative overflow-hidden transition-all group"
+              style={{ perspective: 900 }}
+              aria-label={`${kpi.label}: open related tab`}
+            >
+              <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full opacity-[0.06]" style={{ background: kpi.color }} />
+              <div
+                style={{
+                  transformStyle: "preserve-3d",
+                  transform: hoveredKpi === idx ? "rotateY(180deg)" : "rotateY(0deg)",
+                  transition: "transform 420ms cubic-bezier(.2,.8,.2,1)",
+                }}
+              >
+                {/* Front face */}
+                <div style={{ backfaceVisibility: "hidden" }}>
+                  <div className="text-[9px] font-bold tracking-[0.08em] text-[#4E6090] uppercase mb-2">{kpi.label}</div>
+                  <div className="text-[28px] font-extrabold leading-none" style={{ color: kpi.color, fontFamily: "'Syne', sans-serif" }}>{kpi.value}</div>
+                  <div className="text-[10px] mt-1" style={{ color: kpi.color }}>{kpi.trend}</div>
+                </div>
+
+                {/* Back face */}
+                <div style={{ transform: "rotateY(180deg)", backfaceVisibility: "hidden", position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div className="text-center">
+                    <div className="text-[12px] font-extrabold" style={{ color: kpi.color }}>Open</div>
+                    <div className="text-[11px] text-[#8A9BBF]">{route ? route.replace("/depot/", "") : "Details"}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#E5521A] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
+          );
+        })}
       </div>
 
       <div className="h-px bg-gradient-to-r from-transparent via-[#E5521A]/40 to-transparent mb-5" />

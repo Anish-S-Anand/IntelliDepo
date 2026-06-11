@@ -96,7 +96,7 @@ function ModelStatus() {
 
 function CameraGridInner() {
   const user = useAuthStore((state) => state.user);
-  type RegionFilter = "All" | "Bengaluru" | "Hyderabad";
+  type RegionFilter = "All" | WarehouseId;
   const [detections, setDetections] = useState<Record<number, DetectionCounts>>({});
   const [regionFilter, setRegionFilter] = useState<RegionFilter>("All");
 
@@ -115,13 +115,20 @@ function CameraGridInner() {
     [warehouseIds],
   );
 
+  const canSwitchCameras = warehouseIds.length > 1;
+  const cameraFilterOptions = useMemo(() => [
+    { value: "All" as const, label: "All" },
+    ...warehouseIds.map((warehouseId) => ({
+      value: warehouseId as const,
+      label: DEPOT_WAREHOUSE_REGISTRY[warehouseId].name,
+    })),
+  ], [warehouseIds]);
+
   const filteredCameraGroups = useMemo(
     () =>
       cameraGroups.filter((group) => {
         if (regionFilter === "All") return true;
-        if (regionFilter === "Bengaluru") return group.warehouseId === "WH_BLR";
-        if (regionFilter === "Hyderabad") return group.warehouseId === "WH_HYD";
-        return true;
+        return group.warehouseId === regionFilter;
       }),
     [cameraGroups, regionFilter],
   );
@@ -170,20 +177,24 @@ function CameraGridInner() {
           <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] text-white/60">
             {activeCameras} feeds
           </span>
-          <label htmlFor="region-filter" className="sr-only">Camera region</label>
-          <div className="relative">
-            <select
-              id="region-filter"
-              value={regionFilter}
-              onChange={(event) => setRegionFilter(event.target.value as RegionFilter)}
-              className="rounded border border-white/10 bg-[#09101a] px-3 py-1.5 pr-8 text-xs font-semibold text-white outline-none transition hover:border-white/20"
-            >
-              <option value="All">All</option>
-              <option value="Bengaluru">Bengaluru</option>
-              <option value="Hyderabad">Hyderabad</option>
-            </select>
-            <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[11px] text-white/70">▾</span>
-          </div>
+          {canSwitchCameras && (
+            <>
+              <label htmlFor="region-filter" className="sr-only">Camera region</label>
+              <div className="relative">
+                <select
+                  id="region-filter"
+                  value={regionFilter}
+                  onChange={(event) => setRegionFilter(event.target.value as RegionFilter)}
+                  className="rounded border border-white/10 bg-[#09101a] px-3 py-1.5 pr-8 text-xs font-semibold text-white outline-none transition hover:border-white/20"
+                >
+                  {cameraFilterOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[11px] text-white/70">▾</span>
+              </div>
+            </>
+          )}
         </div>
         <ModelStatus />
       </div>

@@ -173,25 +173,22 @@ export default function DepotTopBar({ toggleSidebar }: { toggleSidebar: () => vo
         className="brand-logo-button flex items-center gap-2 sm:gap-2.5 flex-shrink-0"
         aria-label="Go to depot home"
       >
-        <div className="w-[44px] h-[44px] sm:w-[48px] sm:h-[48px] rounded-xl bg-white flex items-center justify-center shadow-[0_0_10px_rgba(229,82,26,0.3)] overflow-hidden flex-shrink-0">
+        <div className="w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] rounded-xl bg-white flex items-center justify-center shadow-[0_0_8px_rgba(229,82,26,0.22)] overflow-hidden flex-shrink-0">
           <Image
             src="/fidelis-logo.png"
             alt="Fidelis"
-            width={48}
-            height={48}
-            className="w-8 h-8 sm:w-9 sm:h-9 object-contain"
+            width={42}
+            height={42}
+            className="w-7 h-7 sm:w-8 sm:h-8 object-contain"
             priority
           />
         </div>
-        <div className="hidden xs:flex flex-col leading-none gap-0.5">
-          <span className="text-[#E5521A] font-extrabold text-[17px] sm:text-[19px] tracking-tight">
-            Intelli
+        <div className="hidden sm:flex flex-col leading-none gap-0.5">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff8a3d] via-[#e5521a] to-[#ffb86f] font-extrabold text-[15px] sm:text-[16px] tracking-tight">
+            Intelli Depot
           </span>
-          <span
-            className="text-[8px] sm:text-[9px] font-semibold tracking-[0.12em] uppercase"
-            style={{ color: "var(--text-muted)" }}
-          >
-            IntelliDepot
+          <span className="hidden sm:block text-[8px] uppercase tracking-[0.22em] text-[#A8B8DA]">
+            Warehouse intelligence
           </span>
         </div>
       </button>

@@ -9,6 +9,7 @@ import { IncidentNotificationProvider } from "@/components/notifications/Inciden
 
 export default function DepotLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -41,14 +42,19 @@ export default function DepotLayout({ children }: { children: React.ReactNode })
           )}
 
           {/* Sidebar */}
-          <DepotSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+          <DepotSidebar
+            open={sidebarOpen}
+            collapsed={sidebarCollapsed}
+            onClose={() => setSidebarOpen(false)}
+            onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
+          />
 
           {/* Global broadcast banner — shows on all depot pages when a broadcast is sent */}
           <BroadcastBanner />
 
           {/* Main Content */}
           <main
-            className="pt-[64px] md:ml-[204px] min-h-[100vh] theme-transition depot-page-transition"
+            className={`pt-[64px] min-h-[100vh] theme-transition depot-page-transition ${sidebarCollapsed ? "md:ml-[72px]" : "md:ml-[204px]"}`}
             style={{ backgroundColor: "var(--bg-page)" }}
           >
             {/* Responsive padding: tight on mobile, comfortable on desktop */}

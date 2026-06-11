@@ -606,7 +606,7 @@ export default function IncidentsPage() {
           { v: cntRes, l: "Resolved", c: "#22D3A1" },
           { v: cntCrit, l: "Critical", c: "#F04A4A" },
         ].map((s) => (
-          <div key={s.l} className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-3.5 text-center transition-all hover:border-[#2A3F68]">
+          <div key={s.l} className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-3.5 text-center transition-all duration-200 ease-out hover:-translate-y-1 hover:scale-[1.02] hover:border-[#2A3F68] hover:shadow-lg">
             <div className="text-[26px] font-extrabold" style={{ color: s.c }}>
               {s.v}
             </div>

@@ -424,6 +424,17 @@ export default function ExecutiveDashboard() {
     border: "1px solid var(--border-default)",
   };
 
+  const [hoveredKpi, setHoveredKpi] = useState<number | null>(null);
+  const KPI_ROUTE_MAP: Record<string, string> = {
+    bags_in: "/depot/operations",
+    bags_out: "/depot/operations",
+    total_capacity: "/depot/heatmap",
+    occupancy_count: "/depot/heatmap",
+    incidents: "/depot/incidents",
+    vehicles: "/depot/gate",
+    avg_unload: "/depot/counting",
+  };
+
   return (
     <div className="p-3 sm:p-4 lg:p-5 w-full max-w-full">
 
@@ -452,17 +463,39 @@ export default function ExecutiveDashboard() {
       {/* ── Analysis KPIs ──────────────────────────────────────────────────── */}
       {depotSource && depotSource.commandSnapshot.kpis.length > 0 && (
         <div className="mb-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-          {depotSource.commandSnapshot.kpis.map((kpi) => {
+          {depotSource.commandSnapshot.kpis.map((kpi, idx) => {
             const toneColor = kpi.tone === "healthy" ? "var(--color-success)" : kpi.tone === "warning" ? "var(--color-warning)" : kpi.tone === "critical" ? "var(--color-danger)" : "var(--color-info)";
+            const route = KPI_ROUTE_MAP[kpi.key] ?? "/depot/operations";
             return (
-              <div key={kpi.key} className="rounded-[12px] p-3 sm:p-4" style={cardStyle}>
-                <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.1em] mb-2" style={{ color: "var(--text-faint)" }}>
-                  {kpi.label}
+              <button
+                key={kpi.key}
+                type="button"
+                onClick={() => router.push(route)}
+                onMouseEnter={() => setHoveredKpi(idx)}
+                onMouseLeave={() => setHoveredKpi(null)}
+                className="rounded-[12px] p-3 sm:p-4 relative overflow-hidden transition-all"
+                style={{ ...cardStyle, perspective: 900 }}
+                aria-label={`${kpi.label}: open related tab`}
+              >
+                <div
+                  style={{
+                    transformStyle: "preserve-3d",
+                    transform: hoveredKpi === idx ? "rotateY(180deg)" : "rotateY(0deg)",
+                    transition: "transform 380ms cubic-bezier(.2,.8,.2,1)",
+                  }}
+                >
+                  <div style={{ backfaceVisibility: "hidden" }}>
+                    <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.1em] mb-2" style={{ color: "var(--text-faint)" }}>{kpi.label}</div>
+                    <div className="text-[22px] sm:text-[26px] font-extrabold leading-none" style={{ color: toneColor }}>{kpi.value}</div>
+                  </div>
+                  <div style={{ transform: "rotateY(180deg)", backfaceVisibility: "hidden", position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div className="text-center">
+                      <div className="text-[12px] font-extrabold" style={{ color: toneColor }}>Open</div>
+                      <div className="text-[11px] text-[#8A9BBF]">{route.replace("/depot/", "")}</div>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-[22px] sm:text-[26px] font-extrabold leading-none" style={{ color: toneColor }}>
-                  {kpi.value}
-                </div>
-              </div>
+              </button>
             );
           })}
         </div>

@@ -936,9 +936,10 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
                     else if ("fn" in action && action.fn) void runAction(action.key, action.fn, action.success);
                   }}
                   disabled={!!actionLoading || (action.key.includes("gate") && !selectedGateId)}
-                  className="flex flex-1 min-h-[140px] flex-col items-center justify-center gap-3 rounded-[14px] border border-[#33476C] bg-[#101D34] px-4 py-5 text-center transition hover:border-[#4A628E] hover:bg-[#1A2A45] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex flex-1 min-h-[140px] flex-col items-center justify-center gap-3 rounded-[14px] border border-transparent px-4 py-5 text-center transition-all duration-200 ease-out shadow-sm hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ backgroundColor: `${action.color}35`, borderColor: `${action.color}55` }}
                 >
-                  <div className="flex h-14 w-14 items-center justify-center rounded-[12px] border" style={{ background: `${action.color}20`, borderColor: `${action.color}55` }}>
+                  <div className="flex h-14 w-14 items-center justify-center rounded-[12px] border border-transparent" style={{ backgroundColor: `${action.color}40` }}>
                     {isLoading ? (
                       <div className="h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: action.color, borderTopColor: "transparent" }} />
                     ) : (
@@ -946,7 +947,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
                     )}
                   </div>
                   <div className="text-[14px] font-extrabold" style={{ color: action.color }}>{action.label}</div>
-                  <div className="max-w-full truncate text-[11px] font-bold text-[#8B9BC1]">{action.sub}</div>
+                  <div className="max-w-full truncate text-[11px] font-bold" style={{ color: `${action.color}DD` }}>{action.sub}</div>
                 </button>
               );
             })}

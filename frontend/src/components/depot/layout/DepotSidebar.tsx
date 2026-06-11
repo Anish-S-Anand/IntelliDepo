@@ -15,6 +15,8 @@ import {
   Shield,
   Map,
   ScanLine,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { getAllActiveAlerts } from "@/services/depotVision";
 import { getPerimeterAlertCount } from "@/services/depotPerimeter";
@@ -30,7 +32,17 @@ const NAV_ITEMS = [
   { label: "MAP", fullLabel: "Heatmap", href: "/depot/heatmap", icon: Map, iconColor: "#FB923C" },
 ];
 
-export default function DepotSidebar({ open, onClose }: { open: boolean; onClose?: () => void }) {
+export default function DepotSidebar({
+  open,
+  collapsed,
+  onClose,
+  onToggleCollapse,
+}: {
+  open: boolean;
+  collapsed: boolean;
+  onClose?: () => void;
+  onToggleCollapse: () => void;
+}) {
   const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
   const [alertCount, setAlertCount] = useState(0);
@@ -84,14 +96,22 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
     <aside
       className={`depot-sidebar fixed left-0 top-[64px] bottom-0 w-[204px] flex flex-col items-stretch py-[10px] px-2 z-40 transition-all duration-300 ${
         open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-      }`}
+      } ${collapsed ? "md:w-[72px]" : "md:w-[204px]"}`}
       style={{
         backgroundColor: "var(--bg-nav)",
-        borderRight: "1px solid var(--bg-nav-border)",
       }}
     >
-      {/* Nav items â€” fill available space */}
-      <div className="flex flex-col gap-[2px] flex-1">
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        className="hidden md:inline-flex absolute right-3 top-3 items-center justify-center text-[#E5521A] transition hover:text-[#F17952] focus:outline-none focus:ring-2 focus:ring-[#E5521A]/25 focus:ring-offset-2"
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+      </button>
+
+      {/* Nav items — fill available space */}
+      <div className="flex flex-col gap-3 flex-1 pt-8">
         {visibleNavItems.map((item) => {
         const Icon = item.icon;
         const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
@@ -108,7 +128,8 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
             aria-label={item.fullLabel}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "depot-sidebar-item relative w-auto min-h-[50px] rounded-xl inline-flex flex-row items-center justify-start gap-[10px] px-[13px] text-[16px]",
+              "depot-sidebar-item relative w-auto min-h-[50px] rounded-xl inline-flex flex-row items-center gap-[10px] text-[16px]",
+              collapsed ? "justify-center px-0" : "justify-start px-[13px]",
               "focus:outline-none focus:ring-2 focus:ring-[#E5521A] focus:ring-offset-2",
               isActive ? "active" : ""
             )}
@@ -131,7 +152,10 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
                 style={{ color: isActive ? "#E5521A" : item.iconColor }}
               />
             </span>
-            <span className="text-[13.5px] font-bold tracking-[0.01em] leading-tight">
+            <span className={cn(
+              "text-[13.5px] font-bold tracking-[0.01em] leading-tight transition-all duration-200",
+              collapsed ? "hidden" : "block"
+            )}>
               {item.fullLabel || item.label}
             </span>
 
@@ -147,7 +171,6 @@ export default function DepotSidebar({ open, onClose }: { open: boolean; onClose
         );
       })}
       </div>
-
     </aside>
   );
 }

@@ -304,7 +304,7 @@ export default function HeatmapPage() {
           { label: "Critical Zones", value: criticalZones.toString(), color: criticalZones > 0 ? "#F04A4A" : "#22D3A1", icon: AlertTriangle },
           { label: "Warning Zones", value: warningZones.toString(), color: warningZones > 0 ? "#F5A623" : "#22D3A1", icon: Thermometer },
         ].map((kpi) => (
-          <div key={kpi.label} className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 relative overflow-hidden">
+          <div key={kpi.label} className="bg-[#14203A] border border-[#1E2F50] rounded-[14px] p-4 relative overflow-hidden transition-all duration-200 ease-out hover:-translate-y-1 hover:scale-[1.02] hover:border-[#2A3F68] hover:shadow-lg">
             <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full opacity-[0.06]" style={{ background: kpi.color }} />
             <kpi.icon className="w-4 h-4 mb-2" style={{ color: kpi.color }} />
             <div className="text-[9px] font-bold tracking-[0.08em] text-[#4E6090] uppercase mb-1">{kpi.label}</div>
