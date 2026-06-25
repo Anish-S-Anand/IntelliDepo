@@ -18,6 +18,7 @@ from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text, 
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.database import BaseModel as DBBaseModel, get_db
 from app.core.auth.dependencies import get_current_user
@@ -163,7 +164,7 @@ class VehicleCreate(BaseModel):
     vehicle_type: Optional[str] = None
     owner_name: Optional[str] = None
     company: Optional[str] = None
-    status: str = Field(VehicleStatus.REGISTERED)
+    status: str = Field(VehicleStatus.REGISTERED.value)
     valid_until: Optional[datetime] = None
 
 
@@ -549,15 +550,30 @@ async def register_vehicle(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    plate_number = payload.plate_number.strip().upper()
+    if not plate_number:
+        raise HTTPException(status_code=422, detail="Plate number is required")
+
     existing = await db.execute(
-        select(VehicleRegistry).where(VehicleRegistry.plate_number == payload.plate_number)
+        select(VehicleRegistry).where(VehicleRegistry.plate_number == plate_number)
     )
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Vehicle already registered")
 
-    vehicle = VehicleRegistry(**payload.model_dump())
+    data = payload.model_dump(exclude_none=True)
+    data["plate_number"] = plate_number
+    data["status"] = str(data.get("status") or VehicleStatus.REGISTERED.value)
+    for key in ("vehicle_type", "owner_name", "company"):
+        if isinstance(data.get(key), str):
+            data[key] = data[key].strip() or None
+
+    vehicle = VehicleRegistry(**data)
     db.add(vehicle)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Vehicle already registered")
     await db.refresh(vehicle)
     return vehicle
 

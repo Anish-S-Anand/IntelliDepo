@@ -2,6 +2,7 @@ import { type CommandCenterSnapshot } from "@/services/depotCommand";
 import { getZones, getDensityAnalytics, type DensityEntry, type ZoneResponse } from "@/services/depotCluster";
 import { getIncidents, type IncidentResponse } from "@/services/depotPerimeter";
 import { getBatches, type BatchResponse } from "@/services/depotSequencing";
+import { getGates, type GateResponse } from "@/services/depotGate";
 import { DEPOT_WAREHOUSE_ORDER, DEPOT_WAREHOUSE_REGISTRY, type DepotWarehouseId } from "@/lib/depot-camera-registry";
 import storageTruth from "@/data/depotWarehouseStorage.json";
 
@@ -274,7 +275,7 @@ function scopedBreakdown(warehouseIds: DepotWarehouseId[], key: SeedMetricKey) {
   return warehouseIds.map((id) => `${id.replace("WH_", "")}: ${WAREHOUSE_SEED[id].metrics[key]}`).join(" | ");
 }
 
-function buildCommandSnapshot(source: Omit<UnifiedDepotSource, "commandSnapshot">): CommandCenterSnapshot {
+function buildCommandSnapshot(source: Omit<UnifiedDepotSource, "commandSnapshot">, liveGates: GateResponse[] = []): CommandCenterSnapshot {
   const now = source.generatedAt;
   const cameras = source.warehouseIds.flatMap((warehouseId) => WAREHOUSE_SEED[warehouseId].cameras.map((cameraId, index) => ({
     id: cameraId,
@@ -301,17 +302,31 @@ function buildCommandSnapshot(source: Omit<UnifiedDepotSource, "commandSnapshot"
       { key: "workers",            label: "Workers (Today)",     value: String(source.kpis.workers),                  detail: scopedBreakdown(source.warehouseIds, "workers"),  tone: "healthy" },
       { key: "cameras",            label: "Active Cameras",      value: `${source.kpis.activeCameras}/${source.kpis.totalCameras}`, detail: `${source.warehouseIds.length} authorized warehouse group(s)`, tone: "healthy" },
     ],
-    gates: source.warehouseIds.flatMap((warehouseId) => GATE_SEED.map((gate, index) => ({
-      id: `${warehouseId}-GATE-${gate.suffix}`,
-      gate_code: `GATE-${gate.suffix}`,
-      name: gate.name,
-      gate_type: gate.gateType,
-      status: gate.status,
-      total_entries_today: 14 + index * 4,
-      warehouse_id: warehouseId,
-      region_id: WAREHOUSE_SEED[warehouseId].regionId,
-      last_activity_at: now,
-    }))),
+    gates: liveGates.length > 0
+      ? liveGates
+          .filter((gate) => gate.gate_type === "entry" || gate.gate_type === "exit")
+          .map((gate) => ({
+            id: gate.id,
+            gate_code: gate.gate_code,
+            name: gate.name,
+            gate_type: gate.gate_type,
+            status: gate.status,
+            total_entries_today: gate.total_entries_today,
+            warehouse_id: source.warehouseIds[0] ?? null,
+            region_id: source.warehouseIds[0] ? WAREHOUSE_SEED[source.warehouseIds[0]].regionId : null,
+            last_activity_at: gate.last_opened ?? gate.last_closed ?? gate.created_at,
+          }))
+      : source.warehouseIds.flatMap((warehouseId) => GATE_SEED.map((gate, index) => ({
+          id: `${warehouseId}-GATE-${gate.suffix}`,
+          gate_code: `GATE-${gate.suffix}`,
+          name: gate.name,
+          gate_type: gate.gateType,
+          status: gate.status,
+          total_entries_today: 14 + index * 4,
+          warehouse_id: warehouseId,
+          region_id: WAREHOUSE_SEED[warehouseId].regionId,
+          last_activity_at: now,
+        }))),
     cameras,
     zones: source.zones.map((zone) => ({
       zone_code: zone.zone_code,
@@ -348,14 +363,15 @@ export async function getUnifiedDepotSource(params: {
   location?: string;
 }): Promise<UnifiedDepotSource> {
   const warehouseIds = scopedWarehouseIdsForUser(params.role, params.email, params.location);
-  const [zonesResult, densityResult, incidentsResult, batchesResult] = await Promise.allSettled([
+  const [zonesResult, densityResult, incidentsResult, batchesResult, gatesResult] = await Promise.allSettled([
     getZones(),
     getDensityAnalytics(),
     getIncidents(),
     getBatches({ status: "active" }),
+    getGates(),
   ]);
-
   const backendZones = zonesResult.status === "fulfilled" ? scopeZones(zonesResult.value, warehouseIds) : [];
+  const liveGates = gatesResult.status === "fulfilled" ? gatesResult.value : [];
   const zones = fallbackZones(warehouseIds);
   const zoneCodes = new Set(zones.map((zone) => normalizeZoneCode(zone.zone_code)));
   const backendBatches = batchesResult.status === "fulfilled" ? scopeBatches(batchesResult.value, zoneCodes) : [];
@@ -415,6 +431,6 @@ export async function getUnifiedDepotSource(params: {
 
   return {
     ...base,
-    commandSnapshot: buildCommandSnapshot(base),
+    commandSnapshot: buildCommandSnapshot(base, liveGates),
   };
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { Radar, Shield, AlertTriangle, MapPin, Camera, X, Bell, CheckCircle2, ExternalLink, UserCheck } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
@@ -239,7 +240,7 @@ export default function IncidentsPage() {
       setRawIncidents(mergedRaw);
       setIncidents(mergedRaw.map(mapBackendIncident));
     } catch {
-      // Keep empty — don't pad with stale mock data
+      // Keep empty - do not pad with stale mock data
     }
   }, []);
 
@@ -337,7 +338,7 @@ export default function IncidentsPage() {
         notificationDetails: response.notification_details,
       });
     } catch {
-      // Backend failed (e.g. fallback/seed incident ID) — apply locally and show popup
+      // Backend failed (e.g. fallback/seed incident ID) - apply locally and show popup
       const now = new Date().toISOString();
       localAcknowledged.current.set(id, { assignee: "Security Supervisor", at: now });
       setIncidents((prev) => prev.map((inc) =>
@@ -579,6 +580,13 @@ export default function IncidentsPage() {
     };
   };
 
+  const renderViewportModal = (node: ReactNode) => {
+    if (typeof document === "undefined") {
+      return node;
+    }
+    return createPortal(node, document.body);
+  };
+
   return (
     <div className="p-3 sm:p-5 animate-[fadeIn_0.3s_ease]">
       <div className="flex justify-between items-start mb-5 flex-wrap gap-3">
@@ -725,7 +733,7 @@ export default function IncidentsPage() {
         <div className="flex items-center gap-2 mb-2">
           <Shield className="w-4 h-4 text-[#F04A4A]" />
           <span className="text-[13px] font-bold text-[#E8EDF8]">Active Perimeter Breaches</span>
-          <span className="text-[10px] text-[#8A9BBF]">— Real-time breach monitoring</span>
+          <span className="text-[10px] text-[#8A9BBF]">- Real-time breach monitoring</span>
         </div>
 
         {breaches.length === 0 ? (
@@ -764,7 +772,7 @@ export default function IncidentsPage() {
                         onClick={() => handleBreachAnalysisClick(b)}
                         className="inline-flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full border border-[#5B9BF5] text-[#5B9BF5] hover:bg-[#5B9BF5]/10 transition-colors cursor-pointer"
                       >
-                        📊 Analysis
+                        Analysis
                       </button>
                       <button
                         onClick={() => acknowledgeBreach(b)}
@@ -792,7 +800,7 @@ export default function IncidentsPage() {
                   <MapPin className="w-3 h-3" />
                   Perimeter Zone
                   {b.alert_sent && (
-                    <span className="ml-2 text-[#22D3A1]">✓ Alert sent</span>
+                    <span className="ml-2 text-[#22D3A1]">Alert sent</span>
                   )}
                 </div>
               </div>
@@ -802,9 +810,9 @@ export default function IncidentsPage() {
       </div>
 
       {/* Unified Business Incident Detail */}
-      {selectedUnifiedIncident && (
-        <div className="fixed inset-0 bg-black/75 z-[10000] flex items-center justify-center p-3 sm:p-4" onClick={() => setSelectedUnifiedIncident(null)}>
-          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl w-full max-w-5xl max-h-[92dvh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      {selectedUnifiedIncident && renderViewportModal(
+        <div className="fixed inset-0 z-[10000] bg-black/75" onClick={() => setSelectedUnifiedIncident(null)}>
+          <div className="fixed left-1/2 top-1/2 max-h-[calc(100dvh-2rem)] w-[min(64rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-[#1E2F50] bg-[#14203A] shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 z-10 bg-[#14203A]/95 border-b border-[#1E2F50] px-4 sm:px-5 py-4 flex items-start justify-between gap-3">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -826,7 +834,7 @@ export default function IncidentsPage() {
                   </span>
                 </div>
                 <p className="mt-1 text-[11px] text-[#8A9BBF]">
-                  {selectedUnifiedIncident.priority} · {formatUnifiedTime(selectedUnifiedIncident.timestamp)} · {selectedUnifiedIncident.location_label}
+                  {selectedUnifiedIncident.priority} - {formatUnifiedTime(selectedUnifiedIncident.timestamp)} - {selectedUnifiedIncident.location_label}
                 </p>
               </div>
               <button
@@ -972,7 +980,7 @@ export default function IncidentsPage() {
                           <div className="mt-1 text-[11px] text-[#8A9BBF]">{notification.recipient || "Recipient not recorded"}</div>
                           <div className="mt-1 text-[10px] text-[#4E6090]">
                             Sent {formatUnifiedTime(notification.sent_at)}
-                            {notification.provider_message_id ? ` · ${notification.provider_message_id}` : ""}
+                            {notification.provider_message_id ? ` - ${notification.provider_message_id}` : ""}
                           </div>
                           {notification.error_message && (
                             <div className="mt-1 text-[10px] font-bold text-[#F04A4A]">{notification.error_message}</div>
@@ -1003,7 +1011,7 @@ export default function IncidentsPage() {
                           </div>
                           {(item.actor || item.actor_role) && (
                             <div className="mt-1 text-[10px] text-[#4E6090]">
-                              {item.actor || "System"}{item.actor_role ? ` · ${item.actor_role}` : ""}
+                              {item.actor || "System"}{item.actor_role ? ` - ${item.actor_role}` : ""}
                             </div>
                           )}
                         </div>
@@ -1018,9 +1026,9 @@ export default function IncidentsPage() {
       )}
 
       {/* Video Analysis Modal */}
-      {selectedVideo && (
-        <div className="fixed inset-0 bg-black/80 z-[10000] flex items-center justify-center p-3 sm:p-4" onClick={() => setSelectedVideo(null)}>
-          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-3 sm:p-5 w-full max-w-4xl max-h-[92dvh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      {selectedVideo && renderViewportModal(
+        <div className="fixed inset-0 z-[10000] bg-black/80" onClick={() => setSelectedVideo(null)}>
+          <div className="fixed left-1/2 top-1/2 max-h-[calc(100dvh-2rem)] w-[min(56rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-[#1E2F50] bg-[#14203A] p-3 shadow-2xl sm:p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center gap-3 mb-4">
               <h3 className="text-[16px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
                 {selectedVideo.title}
@@ -1060,9 +1068,9 @@ export default function IncidentsPage() {
       )}
 
       {/* Report Incident Modal */}
-      {reportModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setReportModalOpen(false)}>
-          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-4 sm:p-5 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+      {reportModalOpen && renderViewportModal(
+        <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setReportModalOpen(false)}>
+          <div className="fixed left-1/2 top-1/2 max-h-[calc(100dvh-2rem)] w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-[#1E2F50] bg-[#14203A] p-4 sm:p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-4">
               <h3 className="text-[16px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
                 Report Incident
@@ -1141,9 +1149,9 @@ export default function IncidentsPage() {
       )}
 
       {/* Resolve Modal */}
-      {resolveModalId && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setResolveModalId(null)}>
-          <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-4 sm:p-5 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+      {resolveModalId && renderViewportModal(
+        <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setResolveModalId(null)}>
+          <div className="fixed left-1/2 top-1/2 max-h-[calc(100dvh-2rem)] w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-[#1E2F50] bg-[#14203A] p-4 sm:p-5" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[16px] font-bold text-[#E8EDF8] mb-4" style={{ fontFamily: "'Syne', sans-serif" }}>
               Resolve Incident
             </h3>
@@ -1173,13 +1181,13 @@ export default function IncidentsPage() {
       )}
 
       {/* Analysis Report Modal */}
-      {analysisReport && (() => {
+      {analysisReport && renderViewportModal((() => {
         const dummyData = generateDummyData(analysisReport.incidentId);
         const isUnauthorizedEntry = analysisReport.breachType === 'unauthorized_entry';
         
         return (
-          <div className="fixed inset-0 bg-black/80 z-[10000] flex items-center justify-center p-3 sm:p-4" onClick={() => setAnalysisReport(null)}>
-            <div className="bg-[#14203A] border border-[#1E2F50] rounded-2xl p-3 sm:p-5 w-full max-w-4xl max-h-[92dvh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-[10000] bg-black/80" onClick={() => setAnalysisReport(null)}>
+            <div className="fixed left-1/2 top-1/2 max-h-[calc(100dvh-2rem)] w-[min(56rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-[#1E2F50] bg-[#14203A] p-3 shadow-2xl sm:p-5" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center gap-3 mb-4">
                 <h3 className="text-[16px] font-bold text-[#E8EDF8]" style={{ fontFamily: "'Syne', sans-serif" }}>
                   {analysisReport.incidentType} - Analysis Report
@@ -1361,12 +1369,12 @@ export default function IncidentsPage() {
             </div>
           </div>
         );
-      })()}
+      })())}
 
       {/* Acknowledgment Confirmation Popup */}
-      {ackConfirmation.isOpen && (
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setAckConfirmation({ isOpen: false, incidentId: null })}>
-          <div className="w-full max-w-2xl rounded-[28px] p-8 shadow-2xl" style={{ background: "#ffffff", color: "#07142E" }} onClick={(e) => e.stopPropagation()}>
+      {ackConfirmation.isOpen && renderViewportModal(
+        <div className="fixed inset-0 z-[10001] bg-black/65" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setAckConfirmation({ isOpen: false, incidentId: null })}>
+          <div className="fixed left-1/2 top-1/2 max-h-[calc(100dvh-2rem)] w-[min(42rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[28px] p-8 shadow-2xl" style={{ background: "#ffffff", color: "#07142E" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-7 text-center">
               <div className="mb-5 flex justify-center">
                 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#D5F6E8]">

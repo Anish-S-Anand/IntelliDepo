@@ -195,7 +195,7 @@ export default function IntelliDepot() {
           height: 28px;
         }
 
-        .logo-text-name {
+            <div className="logo-text-name">IntelliDepot</div>
           font-size: 18px;
           font-weight: 800;
           color: var(--acc);
@@ -319,7 +319,7 @@ export default function IntelliDepot() {
             className="logo-img"
           />
           <div className="hidden sm:flex flex-col">
-            <div className="logo-text-name">IntelliDepot™</div>
+            <div className="logo-text-name">IntelliDepot</div>
             <div className="logo-text-sub">Fidelis</div>
           </div>
         </div>
@@ -327,16 +327,17 @@ export default function IntelliDepot() {
         <div style={{ flex: 1 }} />
 
         <div className="hidden sm:flex items-center gap-3">
-          <span style={{ fontSize: '13px', color: 'var(--pos)', fontWeight: 700 }}>
-            ● LIVE
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "var(--pos)", fontWeight: 700 }}>
+            <span style={{ width: "8px", height: "8px", borderRadius: "999px", background: "var(--pos)" }} />
+            LIVE
           </span>
           <button
             className="theme-toggle"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            style={{ width: '64px' }}
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            style={{ width: "64px" }}
           >
-            <div className={`toggle-knob ${theme === 'light' ? 'light-pos' : ''}`}>
-              {theme === 'dark' ? '🌙' : '☀️'}
+            <div className={`toggle-knob ${theme === "light" ? "light-pos" : ""}`}>
+              {theme === "dark" ? <Moon size={18} /> : <Sun size={18} />}
             </div>
           </button>
           <button

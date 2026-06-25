@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import { useState, useEffect } from "react";
@@ -34,14 +34,14 @@ const NAV_ITEMS = [
 
 export default function DepotSidebar({
   open,
-  collapsed,
+  collapsed = false,
   onClose,
-  onToggleCollapse,
+  onToggleCollapse = () => undefined,
 }: {
   open: boolean;
-  collapsed: boolean;
+  collapsed?: boolean;
   onClose?: () => void;
-  onToggleCollapse: () => void;
+  onToggleCollapse?: () => void;
 }) {
   const pathname = usePathname();
   const user = useAuthStore((state) => state.user);

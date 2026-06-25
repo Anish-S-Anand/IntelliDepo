@@ -9,6 +9,12 @@ import {
   ArrowUpRight,
   BarChart3,
   BellRing,
+  CloudFog,
+  CloudLightning,
+  CloudRain,
+  CloudSnow,
+  CloudSun,
+  Sun,
   Camera,
   ChevronDown,
   DoorClosed,
@@ -81,90 +87,63 @@ const WAREHOUSE_COORDS: Record<string, { lat: number; lon: number; city: string 
 };
 
 const WMO_LABELS: Record<number, { label: string; emoji: string }> = {
-  0:  { label: "Clear Sky",       emoji: "☀️" },
-  1:  { label: "Mostly Clear",    emoji: "🌤️" },
-  2:  { label: "Partly Cloudy",   emoji: "⛅" },
-  3:  { label: "Mostly Cloudy",   emoji: "☁️" },
-  45: { label: "Foggy",           emoji: "🌫️" },
-  48: { label: "Icy Fog",         emoji: "🌫️" },
-  51: { label: "Light Drizzle",   emoji: "🌦️" },
-  53: { label: "Drizzle",         emoji: "🌦️" },
-  55: { label: "Heavy Drizzle",   emoji: "🌧️" },
-  56: { label: "Freezing Drizzle",emoji: "🌧️" },
-  57: { label: "Heavy Frz Drizzle",emoji: "🌧️" },
-  61: { label: "Light Rain",      emoji: "🌧️" },
-  63: { label: "Moderate Rain",   emoji: "🌧️" },
-  65: { label: "Heavy Rain",      emoji: "🌧️" },
-  66: { label: "Freezing Rain",   emoji: "🌧️" },
-  67: { label: "Heavy Frz Rain",  emoji: "🌧️" },
-  71: { label: "Light Snow",      emoji: "🌨️" },
-  73: { label: "Moderate Snow",   emoji: "❄️" },
-  75: { label: "Heavy Snow",      emoji: "❄️" },
-  77: { label: "Snow Grains",     emoji: "🌨️" },
-  80: { label: "Rain Showers",    emoji: "🌦️" },
-  81: { label: "Moderate Showers",emoji: "🌧️" },
-  82: { label: "Heavy Showers",   emoji: "⛈️" },
-  85: { label: "Snow Showers",    emoji: "🌨️" },
-  86: { label: "Heavy Snow Showers",emoji: "❄️" },
-  95: { label: "Thunderstorm",    emoji: "⛈️" },
-  96: { label: "Thunderstorm + Hail",emoji: "⛈️" },
-  99: { label: "Heavy Thunderstorm",emoji: "⛈️" },
-  0:  { label: "Clear Sky",       emoji: "☀️" },
-  1:  { label: "Mostly Clear",    emoji: "🌤️" },
-  2:  { label: "Partly Cloudy",   emoji: "⛅" },
-  3:  { label: "Mostly Cloudy",   emoji: "☁️" },
-  45: { label: "Foggy",           emoji: "🌫️" },
-  48: { label: "Icy Fog",         emoji: "🌫️" },
-  51: { label: "Light Drizzle",   emoji: "🌦️" },
-  53: { label: "Drizzle",         emoji: "🌦️" },
-  55: { label: "Heavy Drizzle",   emoji: "🌧️" },
-  56: { label: "Freezing Drizzle",emoji: "🌧️" },
-  57: { label: "Heavy Frz Drizzle",emoji: "🌧️" },
-  61: { label: "Light Rain",      emoji: "🌧️" },
-  63: { label: "Moderate Rain",   emoji: "🌧️" },
-  65: { label: "Heavy Rain",      emoji: "🌧️" },
-  66: { label: "Freezing Rain",   emoji: "🌧️" },
-  67: { label: "Heavy Frz Rain",  emoji: "🌧️" },
-  71: { label: "Light Snow",      emoji: "🌨️" },
-  73: { label: "Moderate Snow",   emoji: "❄️" },
-  75: { label: "Heavy Snow",      emoji: "❄️" },
-  77: { label: "Snow Grains",     emoji: "🌨️" },
-  80: { label: "Rain Showers",    emoji: "🌦️" },
-  81: { label: "Moderate Showers",emoji: "🌧️" },
-  82: { label: "Heavy Showers",   emoji: "⛈️" },
-  85: { label: "Snow Showers",    emoji: "🌨️" },
-  86: { label: "Heavy Snow Showers",emoji: "❄️" },
-  95: { label: "Thunderstorm",    emoji: "⛈️" },
-  96: { label: "Thunderstorm + Hail",emoji: "⛈️" },
-  99: { label: "Heavy Thunderstorm",emoji: "⛈️" },
+  0: { label: "Clear Sky", emoji: "Clear" },
+  1: { label: "Mostly Clear", emoji: "Clear" },
+  2: { label: "Partly Cloudy", emoji: "Clouds" },
+  3: { label: "Mostly Cloudy", emoji: "Clouds" },
+  45: { label: "Foggy", emoji: "Fog" },
+  48: { label: "Icy Fog", emoji: "Fog" },
+  51: { label: "Light Drizzle", emoji: "Rain" },
+  53: { label: "Drizzle", emoji: "Rain" },
+  55: { label: "Heavy Drizzle", emoji: "Rain" },
+  56: { label: "Freezing Drizzle", emoji: "Rain" },
+  57: { label: "Heavy Freezing Drizzle", emoji: "Rain" },
+  61: { label: "Light Rain", emoji: "Rain" },
+  63: { label: "Moderate Rain", emoji: "Rain" },
+  65: { label: "Heavy Rain", emoji: "Rain" },
+  66: { label: "Freezing Rain", emoji: "Rain" },
+  67: { label: "Heavy Freezing Rain", emoji: "Rain" },
+  71: { label: "Light Snow", emoji: "Snow" },
+  73: { label: "Moderate Snow", emoji: "Snow" },
+  75: { label: "Heavy Snow", emoji: "Snow" },
+  77: { label: "Snow Grains", emoji: "Snow" },
+  80: { label: "Rain Showers", emoji: "Rain" },
+  81: { label: "Moderate Showers", emoji: "Rain" },
+  82: { label: "Heavy Showers", emoji: "Storm" },
+  85: { label: "Snow Showers", emoji: "Snow" },
+  86: { label: "Heavy Snow Showers", emoji: "Snow" },
+  95: { label: "Thunderstorm", emoji: "Storm" },
+  96: { label: "Thunderstorm + Hail", emoji: "Storm" },
+  99: { label: "Heavy Thunderstorm", emoji: "Storm" },
 };
 
 type WeatherData = { temp: number; label: string; emoji: string; wind: number; city: string } | null;
 
-function getWeatherAdvisory(temp: number, weatherCode: number): { text: string; color: string } {
-  if (weatherCode >= 95) return { text: "⛈️ Thunderstorm — halt all outdoor ops, no vehicle movement, lock gates.", color: "#F04A4A" };
-  if (weatherCode >= 80) return { text: "🌧️ Heavy showers — cover open stockpiles, suspend yard ops, trucks to covered bays only.", color: "#F04A4A" };
-  if (weatherCode >= 61) return { text: "🌧️ Rain — cover open bag stockpiles, add 15 min SLA buffer, slow-speed yard protocol.", color: "#F5A623" };
-  if (weatherCode >= 51) return { text: "🌦️ Drizzle — inspect bags for moisture before dispatch, monitor gate LPR confidence.", color: "#F5A623" };
-  if (weatherCode === 45 || weatherCode === 48) return { text: "🌫️ Fog — LPR camera confidence reduced, manual gate verification required.", color: "#F5A623" };
-  if (weatherCode === 3) return { text: "☁️ Overcast — good working conditions, no special measures needed.", color: "#22D3A1" };
-  if (weatherCode === 2) return { text: "⛅ Partly cloudy — normal operations, monitor for afternoon showers.", color: "#22D3A1" };
-  if (temp > 38) return { text: "🔥 Extreme heat — shift loading to early morning/evening, shut Zone D during 12–3pm, alert supervisors.", color: "#F04A4A" };
-  if (weatherCode >= 95) return { text: "⛈️ Thunderstorm — halt all outdoor ops, no vehicle movement, lock gates.", color: "#F04A4A" };
-  if (weatherCode >= 80) return { text: "🌧️ Heavy showers — cover open stockpiles, suspend yard ops, trucks to covered bays only.", color: "#F04A4A" };
-  if (weatherCode >= 61) return { text: "🌧️ Rain — cover open bag stockpiles, add 15 min SLA buffer, slow-speed yard protocol.", color: "#F5A623" };
-  if (weatherCode >= 51) return { text: "🌦️ Drizzle — inspect bags for moisture before dispatch, monitor gate LPR confidence.", color: "#F5A623" };
-  if (weatherCode === 45 || weatherCode === 48) return { text: "🌫️ Fog — LPR camera confidence reduced, manual gate verification required.", color: "#F5A623" };
-  if (weatherCode === 3) return { text: "☁️ Overcast — good working conditions, no special measures needed.", color: "#22D3A1" };
-  if (weatherCode === 2) return { text: "⛅ Partly cloudy — normal operations, monitor for afternoon showers.", color: "#22D3A1" };
-  if (temp > 38) return { text: "🔥 Extreme heat — shift loading to early morning/evening, shut Zone D during 12–3pm, alert supervisors.", color: "#F04A4A" };
-  if (temp > 32) return { text: "☀️ Hot — mandatory shade breaks every 90 min, avoid heavy lifts 12–3pm.", color: "#F5A623" };
-  if (temp > 25) return { text: "🌤️ Warm — push inbound early, increase water breaks, check bay ventilation.", color: "#22D3A1" };
-  if (temp >= 15) return { text: "✅ Ideal conditions — normal operations, no special measures needed.", color: "#22D3A1" };
-  return { text: "🧊 Cold — inspect bags for condensation on removal from cold storage.", color: "#5B9BF5" };
-  return { text: "🧊 Cold — inspect bags for condensation on removal from cold storage.", color: "#5B9BF5" };
+function WeatherIcon({ kind }: { kind: string }) {
+  const className = "h-7 w-7 shrink-0 text-[#5B9BF5]";
+  if (kind === "Clear") return <Sun className="h-7 w-7 shrink-0 text-[#F5A623]" aria-hidden />;
+  if (kind === "Clouds") return <CloudSun className={className} aria-hidden />;
+  if (kind === "Fog") return <CloudFog className="h-7 w-7 shrink-0 text-[#8A9BBF]" aria-hidden />;
+  if (kind === "Rain") return <CloudRain className="h-7 w-7 shrink-0 text-[#5B9BF5]" aria-hidden />;
+  if (kind === "Snow") return <CloudSnow className="h-7 w-7 shrink-0 text-[#B7C6E6]" aria-hidden />;
+  if (kind === "Storm") return <CloudLightning className="h-7 w-7 shrink-0 text-[#F5A623]" aria-hidden />;
+  return <CloudSun className={className} aria-hidden />;
 }
 
+function getWeatherAdvisory(temp: number, weatherCode: number): { text: string; color: string } {
+  if (weatherCode >= 95) return { text: "Thunderstorm - halt all outdoor ops, no vehicle movement, lock gates.", color: "#F04A4A" };
+  if (weatherCode >= 80) return { text: "Heavy showers - cover open stockpiles, suspend yard ops, trucks to covered bays only.", color: "#F04A4A" };
+  if (weatherCode >= 61) return { text: "Rain - cover open bag stockpiles, add 15 min SLA buffer, slow-speed yard protocol.", color: "#F5A623" };
+  if (weatherCode >= 51) return { text: "Drizzle - inspect bags for moisture before dispatch, monitor gate LPR confidence.", color: "#F5A623" };
+  if (weatherCode === 45 || weatherCode === 48) return { text: "Fog - LPR camera confidence reduced, manual gate verification required.", color: "#F5A623" };
+  if (weatherCode === 3) return { text: "Overcast - good working conditions, no special measures needed.", color: "#22D3A1" };
+  if (weatherCode === 2) return { text: "Partly cloudy - normal operations, monitor for afternoon showers.", color: "#22D3A1" };
+  if (temp > 38) return { text: "Extreme heat - shift loading to early morning/evening, shut Zone D during 12-3pm, alert supervisors.", color: "#F04A4A" };
+  if (temp > 32) return { text: "Hot - mandatory shade breaks every 90 min, avoid heavy lifts 12-3pm.", color: "#F5A623" };
+  if (temp > 25) return { text: "Warm - push inbound early, increase water breaks, check bay ventilation.", color: "#22D3A1" };
+  if (temp >= 15) return { text: "Ideal conditions - normal operations, no special measures needed.", color: "#22D3A1" };
+  return { text: "Cold - inspect bags for condensation on removal from cold storage.", color: "#5B9BF5" };
+}
 function WeatherWidget({ warehouseIds }: { warehouseIds: string[] }) {
   const [weatherMap, setWeatherMap] = useState<Record<string, WeatherData & { code?: number }>>({});
   const [loading, setLoading] = useState(true);
@@ -190,7 +169,7 @@ function WeatherWidget({ warehouseIds }: { warehouseIds: string[] }) {
             const raw = await res.json();
             console.log(`Weather data for ${id}:`, raw);
             const code: number = raw.current?.weather_code ?? raw.current?.weathercode ?? 0;
-            const wmo = WMO_LABELS[code] ?? { label: "Unknown", emoji: "🌡️" };
+            const wmo = WMO_LABELS[code] ?? { label: "Unknown", emoji: "Sensor" };
             return {
               id,
               data: {
@@ -260,11 +239,11 @@ function WeatherWidget({ warehouseIds }: { warehouseIds: string[] }) {
             key={w.city}
             className="min-w-[150px] flex items-center gap-3 rounded-[12px] border border-[#1E2F50] bg-[#0D1526] px-4 py-3"
           >
-            <span className="text-[24px] leading-none">{w.emoji}</span>
+            <WeatherIcon kind={w.emoji} />
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8A9BBF]">{w.city}</div>
               <div className="text-[18px] font-extrabold text-[#E8EDF8] leading-tight">
-                {w.temp}°C <span className="text-[12px] font-semibold text-[#4E6090]">{w.label}</span>
+                {w.temp} C <span className="text-[12px] font-semibold text-[#4E6090]">{w.label}</span>
               </div>
             </div>
           </div>
@@ -599,7 +578,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
   const personaKey = forcedPersona ?? normalizeCommandPersona(user?.role);
   
   // LocationFilter state for regional managers - initialize directly from localStorage
-  const [locationFilter, setLocationFilter] = useState<"combined" | "WH_HYD" | "WH_BLR">(() => {
+  const [locationFilter, setLocationFilter] = useState<"combined" | "WH_HYD" | "WH_BLR" | "WH_MUM">(() => {
     if (typeof window !== "undefined" && personaKey === "regional_manager") {
       return loadFilterFromStorage();
     }
@@ -615,10 +594,11 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
   });
   
   // Filter-to-warehouse mapping for regional managers
-  const FILTER_TO_WAREHOUSE_IDS: Record<"combined" | "WH_HYD" | "WH_BLR", RoleWarehouseId[]> = {
+  const FILTER_TO_WAREHOUSE_IDS: Record<"combined" | "WH_HYD" | "WH_BLR" | "WH_MUM", RoleWarehouseId[]> = {
     combined: ["WH_HYD", "WH_BLR"],
     WH_HYD: ["WH_HYD"],
     WH_BLR: ["WH_BLR"],
+    WH_MUM: ["WH_MUM"],
   };
   
   // Filter-to-warehouse mapping for central managers
@@ -654,8 +634,6 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ msg: string; ok: boolean } | null>(null);
   const [selectedGateId, setSelectedGateId] = useState("");
-  // Track manually overridden gate statuses so auto-refresh doesn't revert them
-  const manualGateOverrides = useRef<Record<string, "open" | "closed">>({});
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [broadcastTitle, setBroadcastTitle] = useState("");
   const [broadcastMsg, setBroadcastMsg] = useState("");
@@ -676,7 +654,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
   };
   
   // Handle location filter change
-  const handleFilterChange = (value: "combined" | "WH_HYD" | "WH_BLR") => {
+  const handleFilterChange = (value: "combined" | "WH_HYD" | "WH_BLR" | "WH_MUM") => {
     setLocationFilter(value);
     saveFilterToStorage(value);
   };
@@ -698,14 +676,7 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
       });
       const scopedSnapshot = scopedSource.commandSnapshot;
       const scopedHierarchy = buildScopedHierarchy(forcedWarehouseIds);
-      // Re-apply any manual gate overrides so auto-refresh doesn't revert them
-      const overrides = manualGateOverrides.current;
-      if (Object.keys(overrides).length > 0) {
-        scopedSnapshot.gates = scopedSnapshot.gates.map((gate) =>
-          overrides[gate.id] ? { ...gate, status: overrides[gate.id] } : gate
-        );
-      }
-      setSnapshot(scopedSnapshot);
+setSnapshot(scopedSnapshot);
       setHierarchy(scopedHierarchy);
       setSelectedGateId((previous) =>
         scopedSnapshot.gates.some((gate) => gate.id === previous) ? previous : scopedSnapshot.gates[0]?.id || ""
@@ -785,30 +756,13 @@ export default function CommandPage({ forcedPersona }: { forcedPersona?: Command
     cameras: scopedCameras.filter((camera) => camera.warehouse_id === warehouseId),
   }));
 
-  const updateGateStatus = (gateId: string, status: "open" | "closed") => {
-    // Record manual override so auto-refresh preserves it
-    manualGateOverrides.current[gateId] = status;
-    setSnapshot((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        gates: current.gates.map((gate) => gate.id === gateId ? { ...gate, status } : gate),
-      };
-    });
-  };
-
   const runAction = async (key: string, fn: () => Promise<CommandActionResponse>, successMsg: string) => {
     setActionLoading(key);
-    if (key === "open-gate" && selectedGateId) updateGateStatus(selectedGateId, "open");
-    if (key === "close-gate" && selectedGateId) updateGateStatus(selectedGateId, "closed");
     try {
       await fn();
       showFeedback(successMsg, true);
-      // Don't re-fetch for gate actions — optimistic update is the source of truth
-      if (!key.includes("gate")) void fetchSnapshot();
+      void fetchSnapshot();
     } catch {
-      if (key === "open-gate" && selectedGateId) updateGateStatus(selectedGateId, "closed");
-      if (key === "close-gate" && selectedGateId) updateGateStatus(selectedGateId, "open");
       showFeedback("Action failed. Check backend connection.", false);
     } finally {
       setActionLoading(null);

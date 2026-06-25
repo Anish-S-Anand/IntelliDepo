@@ -308,7 +308,7 @@ function RegisterVehicleModal({
   onSubmit,
 }: {
   onClose: () => void;
-  onSubmit: (data: Parameters<typeof registerVehicle>[0]) => void;
+  onSubmit: (data: Parameters<typeof registerVehicle>[0]) => Promise<void>;
 }) {
   const [form, setForm] = useState({
     plate_number: "",
@@ -320,6 +320,7 @@ function RegisterVehicleModal({
   });
   const [uploadedDocs, setUploadedDocs] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const set = (key: string, val: string) =>
     setForm((prev) => ({ ...prev, [key]: val }));
@@ -339,16 +340,26 @@ function RegisterVehicleModal({
     "w-full bg-[#0D1526] border border-[#1E2F50] rounded-lg px-3 py-2 text-[12px] text-[#E8EDF8] placeholder:text-[#4E6090] focus:outline-none focus:border-[#E5521A]/50";
 
   const handle = async () => {
-    if (!form.plate_number.trim()) return;
+    if (!form.plate_number.trim() || submitting) return;
     setSubmitting(true);
-    onSubmit({
-      plate_number: form.plate_number,
-      vehicle_type: form.vehicle_type || undefined,
-      owner_name: form.owner_name || undefined,
-      company: form.company || undefined,
-      status: form.status || undefined,
-      valid_until: form.valid_until || undefined,
-    });
+    setError(null);
+
+    try {
+      await onSubmit({
+        plate_number: form.plate_number.trim(),
+        vehicle_type: form.vehicle_type || undefined,
+        owner_name: form.owner_name || undefined,
+        company: form.company || undefined,
+        status: form.status || undefined,
+        valid_until: form.valid_until || undefined,
+      });
+    } catch (err) {
+      const message = err && typeof err === "object" && "response" in err
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : null;
+      setError(message || "Could not register vehicle. Please try again.");
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -432,6 +443,11 @@ function RegisterVehicleModal({
               <input type="datetime-local" className={inputCls} value={form.valid_until} onChange={(e) => set("valid_until", e.target.value)} />
             </div>
           )}
+          {error && (
+            <div className="rounded-lg border border-[#F04A4A]/40 bg-[#F04A4A]/10 px-3 py-2 text-[11px] font-semibold text-[#FFB4A8]">
+              {error}
+            </div>
+          )}
         </div>
         <div className="flex justify-end gap-2 px-5 py-4 border-t border-[#1E2F50]">
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-[#1E2F50] text-[12px] text-[#8A9BBF] hover:border-[#2A3F68]">Cancel</button>
@@ -472,7 +488,7 @@ export default function GateConsolePage() {
 
   // Access log filters
   const [logSearch, setLogSearch] = useState("");
-  
+
   // Visitor date filter
   const [visitorDate, setVisitorDate] = useState("");
 
@@ -1045,11 +1061,9 @@ export default function GateConsolePage() {
   };
 
   const handleRegisterVehicle = async (data: Parameters<typeof registerVehicle>[0]) => {
-    try {
-      await registerVehicle(data);
-      setShowVehicleModal(false);
-      await loadVehicles();
-    } catch { /* failed */ }
+    await registerVehicle(data);
+    setShowVehicleModal(false);
+    await loadVehicles();
   };
 
   // --- Filtered logs — grouped by plate with separate time-in / time-out ---
@@ -1185,11 +1199,11 @@ export default function GateConsolePage() {
               <div className="space-y-2">
                 {(() => {
                   const displayGates = gates.filter(g => g.gate_type === "entry");
-                  
+
                   if (displayGates.length === 0) {
                     return <p className="text-[11px] text-[#4E6090]">No entry gates configured</p>;
                   }
-                  
+
                   return displayGates.map((gate) => {
                     const isOpen = gate.status === "open";
                     const busy = togglingGate === gate.id;
@@ -1236,18 +1250,18 @@ export default function GateConsolePage() {
                 })()}
               </div>
             </div>
-            
+
             {/* Gate Out Column - Based on Access Log */}
             <div>
               <h3 className="text-[10px] uppercase tracking-wider text-[#4E6090] mb-2 font-bold">Gate Out</h3>
               <div className="space-y-2">
                 {(() => {
                   const displayGates = gates.filter(g => g.gate_type === "exit");
-                  
+
                   if (displayGates.length === 0) {
                     return <p className="text-[11px] text-[#4E6090]">No exit gates configured</p>;
                   }
-                  
+
                   return displayGates.map((gate) => {
                     const isOpen = gate.status === "open";
                     const busy = togglingGate === gate.id;
@@ -1759,7 +1773,7 @@ export default function GateConsolePage() {
           onSubmit={handleRegisterVehicle}
         />
       )}
-      
+
       {/* Analysis Image Modal */}
       {showAnalysisImage && selectedPlateNumber && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setShowAnalysisImage(false)}>
@@ -1837,7 +1851,7 @@ export default function GateConsolePage() {
                 ×
               </button>
             </div>
-            
+
             <div className="text-center py-8 text-[#8A9BBF]">
               Document information has been removed
             </div>

@@ -1,4 +1,5 @@
 import api from "./api";
+import { gateAction } from "./depotGate";
 import { DEPOT_WAREHOUSE_ORDER, DEPOT_WAREHOUSE_REGISTRY } from "@/lib/depot-camera-registry";
 import { ZONE_SEED } from "./depotUnifiedSource";
 
@@ -748,10 +749,36 @@ function validUuid(value?: string): string | undefined {
 }
 
 export async function openCommandGate(gateId?: string): Promise<CommandActionResponse> {
+  if (gateId) {
+    const gate = await gateAction(gateId, "open");
+    return {
+      id: gate.id,
+      action_type: "open_gate",
+      status: "success",
+      target_type: "gate",
+      target_id: gate.id,
+      target_name: gate.name,
+      zone: null,
+      message: `${gate.name} opened`,
+    };
+  }
   return postCommandAction("/depot/command/actions/open-gate", { gate_id: validUuid(gateId) });
 }
 
 export async function closeCommandGate(gateId?: string): Promise<CommandActionResponse> {
+  if (gateId) {
+    const gate = await gateAction(gateId, "close");
+    return {
+      id: gate.id,
+      action_type: "close_gate",
+      status: "success",
+      target_type: "gate",
+      target_id: gate.id,
+      target_name: gate.name,
+      zone: null,
+      message: `${gate.name} closed`,
+    };
+  }
   return postCommandAction("/depot/command/actions/close-gate", { gate_id: validUuid(gateId) });
 }
 

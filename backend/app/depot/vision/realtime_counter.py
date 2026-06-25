@@ -205,8 +205,8 @@ _pending_crosses: dict[str, dict[int, dict]] = {}  # cam_id → {tid: {dir, fram
 
 _demo_started_at  = time.monotonic()
 
-COUNTING_DEMO_VIDEO    = "Screen Recording 2025-07-30 120512.mp4"
-COUNTING_REFERENCE_VIDEO = "Recording 2025-08-04 164626.mp4"
+COUNTING_DEMO_VIDEO    = "bags_counting.mp4"
+COUNTING_REFERENCE_VIDEO = COUNTING_DEMO_VIDEO
 COUNTING_DEMO_CAMERA_ID = "jsw-counting-line"
 
 _COUNTING_PROFILE = [

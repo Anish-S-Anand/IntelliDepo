@@ -25,12 +25,12 @@ interface DetectionCounts {
 }
 
 const VIDEO_LIBRARY = [
-  "Screen Recording 2025-05-22 164244.mp4",
-  "Screen Recording 2025-08-11 173926.mp4",
-  "Screen Recording 2025-07-30 115414.mp4",
+  "cluster 4-5 (1).mp4",
+  "dtranshipment 1 (2).mp4",
   "Recording 2025-07-30 115417.mp4",
-  "Recording 2025-07-30 120521.mp4",
-  "Recording 2025-08-11 171805.mp4",
+  "Screen Recording 2025-07-30 115414.mp4",
+  "Screen Recording 2025-08-11 171757.mp4",
+  "Screen Recording 2025-08-11 173926.mp4",
 ] as const;
 
 function cameraSetForWarehouse(warehouseId: WarehouseId): CameraData[] {
@@ -119,7 +119,7 @@ function CameraGridInner() {
   const cameraFilterOptions = useMemo(() => [
     { value: "All" as const, label: "All" },
     ...warehouseIds.map((warehouseId) => ({
-      value: warehouseId as const,
+      value: warehouseId,
       label: DEPOT_WAREHOUSE_REGISTRY[warehouseId].name,
     })),
   ], [warehouseIds]);

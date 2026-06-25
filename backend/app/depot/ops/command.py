@@ -619,7 +619,7 @@ async def open_gate_action(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _require_command_role(current_user, {"warehouse_manager"}, "open gate")
+    _require_command_role(current_user, {"warehouse_manager", "central_manager", "admin"}, "open gate")
     scope = resolve_access_scope(current_user)
     gate = await _select_gate_for_action(db, payload.gate_id, "open")
     gate.status = GateStatus.OPEN.value
@@ -653,7 +653,7 @@ async def close_gate_action(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _require_command_role(current_user, {"warehouse_manager"}, "close gate")
+    _require_command_role(current_user, {"warehouse_manager", "central_manager", "admin"}, "close gate")
     scope = resolve_access_scope(current_user)
     gate = await _select_gate_for_action(db, payload.gate_id, "close")
     gate.status = GateStatus.CLOSED.value

@@ -78,7 +78,7 @@ interface TimeSeriesPoint {
   cumulative: number;
 }
 
-const COUNTING_VIDEO_FILE = "PRODUCT COUNTING SOFTWARE WITH CCTV CAMERA AI BY TEAM CADBIRD #AICCTV #CADBIRD #AI CCTV SOFTWARE - Cadbird Tech Security (480p, h264).mp4";
+const COUNTING_VIDEO_FILE = "bags_counting.mp4";
 
 // Point directly to the backend port — bypasses Next.js proxy buffering which
 // causes MJPEG streams to play in slow-motion.

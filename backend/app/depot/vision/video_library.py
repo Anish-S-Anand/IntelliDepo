@@ -39,20 +39,20 @@ LOCAL_VIDEO_DIR = Path(__file__).resolve().parent.parent.parent.parent / "tmp"
 # These are real warehouse/depot recordings from the depot pendrive.
 # Additional videos beyond the 6 primary scenes are available for
 # detection training and analytics.
-# 
+#
 # UPDATED: Using videos from backend/tmp directory
 # ---------------------------------------------------------------------------
 SCENE_VIDEOS = [
     {
         "scene": "gate_entry",
         "label": "GATE ENTRY NORTH - LPR",
-        "filename": "Screen Recording 2025-05-22 164244.mp4",
+        "filename": "cluster 4-5 (1).mp4",
         "description": "Gate entry monitoring",
     },
     {
         "scene": "zone_overhead",
         "label": "ZONE-A OVERHEAD",
-        "filename": "Screen Recording 2025-08-11 173926.mp4",
+        "filename": "dtranshipment 1 (2).mp4",
         "description": "Zone overhead view",
     },
     {
@@ -70,13 +70,13 @@ SCENE_VIDEOS = [
     {
         "scene": "gate_exit",
         "label": "GATE EXIT SOUTH",
-        "filename": "Recording 2025-07-30 120521.mp4",
+        "filename": "Screen Recording 2025-08-11 171757.mp4",
         "description": "Exit gate monitoring",
     },
     {
         "scene": "yard",
         "label": "YARD OVERVIEW",
-        "filename": "Recording 2025-08-11 171805.mp4",
+        "filename": "Screen Recording 2025-08-11 173926.mp4",
         "description": "Yard overview",
     },
 ]
@@ -100,7 +100,7 @@ ALL_DEPOT_VIDEOS = [
     "Screen Recording 2025-07-14 142945.mp4",
     "Screen Recording 2025-07-14 143106.mp4",
     "Screen Recording 2025-07-30 115414.mp4",
-    "Screen Recording 2025-07-30 120512.mp4",
+    "bags_counting.mp4",
     "Screen Recording 2025-08-11 171757.mp4",
     "Screen Recording 2025-08-11 173926.mp4",
     "Screen Recording 2025-08-11 174012.mp4",
@@ -236,14 +236,14 @@ def get_video_frame_by_filename(filename: str, seek_seconds: float = 0.0) -> Opt
                 fps = cap.get(cv2.CAP_PROP_FPS) or 25
                 total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
                 target_frame = int(seek_seconds * fps)
-                
+
                 # If seek position is beyond video length, loop back to start
                 if total_frames > 0 and target_frame >= total_frames:
                     target_frame = target_frame % int(total_frames)
-                
+
                 cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
                 ret, frame = cap.read()
-                
+
                 if not ret or frame is None:
                     # If still failing, try from the beginning
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
@@ -251,10 +251,10 @@ def get_video_frame_by_filename(filename: str, seek_seconds: float = 0.0) -> Opt
             except Exception as e:
                 logger.warning(f"Error seeking in video {filename}: {e}")
                 return None
-        
+
         if ret and frame is not None:
             return frame
-        
+
         logger.warning(f"Failed to read frame from {filename} at seek={seek_seconds}")
         return None
     finally:
